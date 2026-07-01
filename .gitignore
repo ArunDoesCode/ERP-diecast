@@ -1,0 +1,96 @@
+# --- OS / Editor ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+*.swo
+
+# --- Logs / temp ---
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+bun-debug.log*
+.cache/
+.temp/
+tmp/
+temp/
+
+# --- Dependencies ---
+node_modules/
+
+# --- Build outputs ---
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# --- Next.js ---
+frontend/.next/
+frontend/out/
+frontend/.vercel/
+
+# --- Runtime / process files ---
+*.pid
+*.pid.lock
+
+# --- Environment & secrets ---
+# Ignore all env files by default
+.env
+.env.*
+frontend/.env
+frontend/.env.*
+backend/.env
+backend/.env.*
+
+# Keep sample env files tracked
+!.env.example
+!.env.*.example
+!frontend/.env.example
+!frontend/.env.*.example
+!backend/.env.example
+!backend/.env.*.example
+
+# Secrets, keys, and certificates
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.asc
+*.gpg
+*.kdbx
+*.ovpn
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
+
+# --- Local databases / dumps ---
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+*.sql.gz
+*.dump
+
+# --- Uploads / user-generated files ---
+backend/uploads/
+backend/storage/
+
+# --- Tooling ---
+.turbo/
+.eslintcache
+
+# --- Test artifacts ---
+playwright-report/
+test-results/
+*.lcov
