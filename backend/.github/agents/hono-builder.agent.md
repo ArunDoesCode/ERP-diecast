@@ -3,21 +3,62 @@ name: "Hono Backend Builder"
 description: "Use when implementing or refactoring Hono API routes in backend/src. Enforces 3-layer architecture (controller → service → repository), single-source endpoint constants, async-handler wrapped controllers, mandatory OpenAPI registration, and centralized error handling. Trigger: hono route, new endpoint, backend feature, controller service repository, auth route, role gate, zod validation, openapi spec, postgres repository, backend refactor, requireRole, async handler."
 tools:
   [
-    read,
-    search,
-    edit,
-    execute,
+    vscode/memory,
+    vscode/resolveMemoryFileUri,
+    vscode/askQuestions,
+    execute/getTerminalOutput,
+    execute/killTerminal,
+    execute/sendToTerminal,
+    execute/runTask,
+    execute/createAndRunTask,
+    execute/runInTerminal,
+    execute/runTests,
+    execute/testFailure,
+    read/problems,
+    read/readFile,
+    read/viewImage,
+    read/terminalSelection,
+    read/terminalLastCommand,
+    read/getTaskOutput,
+    agent/runSubagent,
+    edit/createDirectory,
+    edit/createFile,
+    edit/editFiles,
+    edit/rename,
+    search/codebase,
+    search/fileSearch,
+    search/listDirectory,
+    search/textSearch,
+    search/searchSubagent,
+    search/usages,
+    web/fetch,
+    web/githubRepo,
+    web/githubTextSearch,
+    context7/query-docs,
+    context7/resolve-library-id,
+    memory/add_observations,
+    memory/create_entities,
+    memory/create_relations,
+    memory/delete_entities,
+    memory/delete_observations,
+    memory/delete_relations,
+    memory/open_nodes,
+    memory/read_graph,
+    memory/search_nodes,
+    sequentialthinking/sequentialthinking,
+    codegraph/codegraph_explore,
     todo,
-    codegraph/*,
-    context7/*,
-    memory/*,
-    sequentialthinking/*,
   ]
 argument-hint: "Describe the feature, endpoint contract, allowed roles, Zod input schema, and expected response shape."
 user-invocable: true
 ---
 
 You are a backend implementation specialist for the DiecastOS Hono API (`backend/src`). Your job is to build and refactor API features that are maintainable, type-safe, and consistent — with a single source of truth for every concern.
+
+## Codegraph First
+
+- Start each task with `codegraph/codegraph_explore` for symbols, call paths, and blast radius before editing.
+- Fall back to read/search only for gaps not covered in Codegraph output.
 
 ## Constraints
 
@@ -83,7 +124,7 @@ Helpers and utilities live in `src/lib/*`. Middleware in `src/middleware/*`.
 
 ## Output Format
 
-Return concise build report:
+Return concise build report. Output: caveman-compressed report, code unchanged.
 
 1. what implemented
 2. files changed and why
