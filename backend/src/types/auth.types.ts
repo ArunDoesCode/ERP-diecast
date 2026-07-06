@@ -11,6 +11,7 @@ export const registerSchema = z.object({
     "qa_inspector",
     "die_designer",
     "operator",
+    "super-admin"
   ]),
   phone: z.string().optional(),
 });

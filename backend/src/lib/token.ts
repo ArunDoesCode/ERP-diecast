@@ -8,12 +8,15 @@ export type Role =
   | "floor_supervisor"
   | "qa_inspector"
   | "die_designer"
-  | "operator";
+  | "operator"
+  | "super-admin";
 
 export type TokenPayload = {
   userId: number | string;
+  userName: string;
   role: Role;
   allowedPages: string[];
+
 };
 
 const accessSecret = new TextEncoder().encode(env.ACCESS_TOKEN_SECRET);

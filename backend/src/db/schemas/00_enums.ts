@@ -1,14 +1,5 @@
 import { pgEnum } from "drizzle-orm/pg-core";
 
-export const roleEnum = pgEnum("role", [
-  "owner",
-  "back_office",
-  "floor_supervisor",
-  "qa_inspector",
-  "die_designer",
-  "operator",
-]);
-
 export const jobStatusEnum = pgEnum("job_status", [
   "enquiry",
   "quoted",
@@ -36,11 +27,23 @@ export const inspectionTypeEnum = pgEnum("inspection_type", [
 
 export const poStatusEnum = pgEnum("po_status", [
   "draft",
-  "sent",
+  "pending_approval",
+  "approved",
   "partial",
-  "complete",
+  "rejected",
   "cancelled",
 ]);
+
+// NEW enum
+export const prStatusEnum = pgEnum("pr_status", [
+  "draft",
+  "pending_approval",
+  "approved",
+  "rejected",
+  "ordered", // PO has been created for this PR
+  "cancelled",
+]);
+
 
 export const invoiceStatusEnum = pgEnum("invoice_status", [
   "draft",

@@ -6,6 +6,7 @@ tools:
     vscode/memory,
     vscode/resolveMemoryFileUri,
     vscode/askQuestions,
+    vscode/runCommand,
     execute/getTerminalOutput,
     execute/killTerminal,
     execute/sendToTerminal,
@@ -69,6 +70,7 @@ You are a backend implementation specialist for the DiecastOS Hono API (`backend
 - DO NOT use `any` types anywhere.
 - DO NOT inline Supabase/DB client instantiation — import from `src/lib/supabase.ts` or the designated client module.
 - DO NOT ship an endpoint without OpenAPI metadata.
+- DO NOT ship a list/index endpoint without mandatory server-side pagination — see skill `pagination-contract` (`.github/skills/pagination-contract/SKILL.md`). `page`/`pageSize` always default (`1`/`10`, max `100`), never optional/opt-in — an unparameterized request still returns a paginated response, never the full table.
 
 ## Architecture
 

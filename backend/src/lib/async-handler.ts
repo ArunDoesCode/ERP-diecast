@@ -8,6 +8,6 @@ export function asyncHandler<TContext extends Context, TResult>(
   handler: AsyncRouteHandler<TContext, TResult>,
 ): AsyncRouteHandler<TContext, TResult> {
   return async (c: TContext) => {
-    return await handler(c);
+    return handler(c);
   };
 }

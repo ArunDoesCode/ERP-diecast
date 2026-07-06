@@ -1,0 +1,356 @@
+"use client";
+
+import {
+  keepPreviousData,
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import { toast } from "sonner";
+
+import { ApiClientError } from "@/lib/api/client";
+import type {
+  EmployeeInput,
+  EmployeeListParams,
+  EmployeeSearchParams,
+  PageInput,
+  PageListParams,
+  RoleInput,
+  RoleListParams,
+  RolePage,
+  RolePermissionDiff,
+} from "@/types/setup";
+
+import {
+  createEmployee,
+  createPage,
+  createRole,
+  deleteEmployee,
+  deletePage,
+  deleteRole,
+  generateEmployeeQr,
+  getEmployees,
+  getModules,
+  getPages,
+  getPermissionGrants,
+  getRoles,
+  searchEmployees,
+  updateEmployee,
+  updatePage,
+  updateRole,
+  updateRolePermissions,
+} from "./fetchers";
+
+export const setupKeys = {
+  modules: () => ["setup", "modules"] as const,
+  employees: (params?: EmployeeListParams) =>
+    params
+      ? (["setup", "employees", params] as const)
+      : (["setup", "employees"] as const),
+  employeeSearch: (params: Omit<EmployeeSearchParams, "page">) =>
+    ["setup", "employees", "search", params] as const,
+  roles: (params?: RoleListParams) =>
+    params
+      ? (["setup", "roles", params] as const)
+      : (["setup", "roles"] as const),
+  pages: (params?: PageListParams) =>
+    params
+      ? (["setup", "pages", params] as const)
+      : (["setup", "pages"] as const),
+  permissionGrants: () => ["setup", "permissions"] as const,
+};
+
+function errorMessage(error: unknown, fallback: string) {
+  return error instanceof ApiClientError ? error.message : fallback;
+}
+
+// Roles/Employees/Pages/Modules are cross-referenced by nearly every Setup tab
+// (e.g. EmployeeTable resolves role names, RoleTable counts employees,
+// PermissionsTab joins all four) — a short staleTime avoids a refetch storm
+// every time a tab remounts.
+const REFERENCE_STALE_TIME_MS = 60_000;
+
+// ---- modules ----
+
+export function useModulesQuery() {
+  return useQuery({
+    queryKey: setupKeys.modules(),
+    queryFn: getModules,
+    staleTime: REFERENCE_STALE_TIME_MS,
+  });
+}
+
+// ---- employees ----
+
+export function useEmployeesQuery(params?: EmployeeListParams) {
+  return useQuery({
+    queryKey: setupKeys.employees(params),
+    queryFn: () => getEmployees(params),
+    staleTime: REFERENCE_STALE_TIME_MS,
+    // keep showing the previous page's rows while the next page loads, instead of
+    // flashing the table to a loading state on every page/sort change
+    placeholderData: params ? keepPreviousData : undefined,
+  });
+}
+
+export function useCreateEmployeeMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: EmployeeInput) => createEmployee(input),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: setupKeys.employees() });
+      toast.success("Employee created");
+    },
+    onError: (error) => {
+      toast.error(errorMessage(error, "Failed to create employee"));
+    },
+  });
+}
+
+export function useUpdateEmployeeMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, input }: { id: number; input: EmployeeInput }) =>
+      updateEmployee(id, input),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: setupKeys.employees() });
+      toast.success("Employee updated");
+    },
+    onError: (error) => {
+      toast.error(errorMessage(error, "Failed to update employee"));
+    },
+  });
+}
+
+export function useDeleteEmployeeMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number) => deleteEmployee(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: setupKeys.employees() });
+      toast.success("Employee deleted");
+    },
+    onError: (error) => {
+      toast.error(errorMessage(error, "Failed to delete employee"));
+    },
+  });
+}
+
+export function useGenerateEmployeeQrMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number) => generateEmployeeQr(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: setupKeys.employees() });
+    },
+    onError: (error) => {
+      toast.error(errorMessage(error, "Failed to generate QR token"));
+    },
+  });
+}
+
+// Debounced name search with page-based infinite scroll (EmployeeCombobox). `q`/`pageSize`
+// define the query identity; `page` is TanStack's own pageParam, not part of the key.
+// Disabled until a search term exists — no fetch just from the combobox mounting/focusing.
+export function useEmployeeSearchQuery(q: string, pageSize: number) {
+  const trimmed = q.trim();
+
+  return useInfiniteQuery({
+    queryKey: setupKeys.employeeSearch({ q: trimmed, pageSize }),
+    queryFn: ({ pageParam }) =>
+      searchEmployees({ q: trimmed, page: pageParam, pageSize }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) =>
+      lastPage.meta.page < lastPage.meta.totalPages
+        ? lastPage.meta.page + 1
+        : undefined,
+    staleTime: REFERENCE_STALE_TIME_MS,
+    enabled: trimmed.length > 0,
+  });
+}
+
+// ---- roles ----
+
+export function useRolesQuery(params?: RoleListParams) {
+  return useQuery({
+    queryKey: setupKeys.roles(params),
+    queryFn: () => getRoles(params),
+    staleTime: REFERENCE_STALE_TIME_MS,
+    placeholderData: params ? keepPreviousData : undefined,
+  });
+}
+
+export function useCreateRoleMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: RoleInput) => createRole(input),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: setupKeys.roles() });
+      toast.success("Role created");
+    },
+    onError: (error) => {
+      toast.error(errorMessage(error, "Failed to create role"));
+    },
+  });
+}
+
+export function useUpdateRoleMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, input }: { id: number; input: RoleInput }) =>
+      updateRole(id, input),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: setupKeys.roles() });
+      toast.success("Role updated");
+    },
+    onError: (error) => {
+      toast.error(errorMessage(error, "Failed to update role"));
+    },
+  });
+}
+
+export function useDeleteRoleMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number) => deleteRole(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: setupKeys.roles() });
+      toast.success("Role deleted");
+    },
+    onError: (error) => {
+      toast.error(errorMessage(error, "Failed to delete role"));
+    },
+  });
+}
+
+// ---- pages ----
+
+export function usePagesQuery(params?: PageListParams) {
+  return useQuery({
+    queryKey: setupKeys.pages(params),
+    queryFn: () => getPages(params),
+    staleTime: REFERENCE_STALE_TIME_MS,
+    placeholderData: params ? keepPreviousData : undefined,
+  });
+}
+
+export function useCreatePageMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: PageInput) => createPage(input),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: setupKeys.pages() });
+      toast.success("Page created");
+    },
+    onError: (error) => {
+      toast.error(errorMessage(error, "Failed to create page"));
+    },
+  });
+}
+
+export function useUpdatePageMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, input }: { id: number; input: PageInput }) =>
+      updatePage(id, input),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: setupKeys.pages() });
+      toast.success("Page updated");
+    },
+    onError: (error) => {
+      toast.error(errorMessage(error, "Failed to update page"));
+    },
+  });
+}
+
+export function useDeletePageMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number) => deletePage(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: setupKeys.pages() });
+      toast.success("Page deleted");
+    },
+    onError: (error) => {
+      toast.error(errorMessage(error, "Failed to delete page"));
+    },
+  });
+}
+
+// ---- permissions ----
+
+export function usePermissionGrantsQuery() {
+  return useQuery({
+    queryKey: setupKeys.permissionGrants(),
+    queryFn: getPermissionGrants,
+  });
+}
+
+export function useUpdateRolePermissionsMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      roleId,
+      diff,
+    }: {
+      roleId: number;
+      diff: RolePermissionDiff;
+    }) => updateRolePermissions(roleId, diff),
+    onMutate: async ({ roleId, diff }) => {
+      await queryClient.cancelQueries({
+        queryKey: setupKeys.permissionGrants(),
+      });
+
+      const previous = queryClient.getQueryData<{ data: RolePage[] }>(
+        setupKeys.permissionGrants(),
+      );
+
+      if (previous) {
+        const addedPageIds = Object.values(diff).flatMap((d) => d.added);
+        const deletedPageIds = Object.values(diff).flatMap((d) => d.deleted);
+
+        const next = previous.data
+          .filter(
+            (grant) =>
+              !(
+                grant.roleId === roleId && deletedPageIds.includes(grant.pageId)
+              ),
+          )
+          .concat(addedPageIds.map((pageId) => ({ roleId, pageId })));
+
+        queryClient.setQueryData(setupKeys.permissionGrants(), {
+          data: next,
+        });
+      }
+
+      return { previous };
+    },
+    onError: (error, _variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(
+          setupKeys.permissionGrants(),
+          context.previous,
+        );
+      }
+      toast.error(errorMessage(error, "Failed to update permissions"));
+    },
+    onSuccess: () => {
+      toast.success("Permissions updated");
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: setupKeys.permissionGrants() });
+    },
+  });
+}

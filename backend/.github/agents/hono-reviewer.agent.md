@@ -32,6 +32,7 @@ Primary job: detect correctness risks first, then performance risks, then optimi
 - Missing async handler wrapper around async controller handlers.
 - Missing OpenAPI metadata on route descriptor.
 - Non-uniform error shape bypassing global error handler.
+- List/index endpoint missing mandatory server-side pagination, or defaulting `page`/`pageSize` to optional/undefined instead of `1`/`10` — see skill `pagination-contract` (`.github/skills/pagination-contract/SKILL.md`). Unbounded list responses are a HIGH finding, not a performance nit.
 
 ## Architecture Violations (Medium)
 
@@ -44,7 +45,7 @@ Primary job: detect correctness risks first, then performance risks, then optimi
 ## Performance Review Checks (Medium)
 
 - N+1 query patterns or repetitive repository calls in loops.
-- Full table scans caused by unbounded list endpoints.
+- Full table scans caused by unbounded list endpoints (note: missing pagination itself is now a HIGH critical violation above — this section covers scans that remain even with pagination in place, e.g. unindexed filters).
 - Missing pagination/limit/default sorting in list APIs.
 - Over-fetching columns when narrow select projection is possible.
 - Sequential independent awaits that could be parallelized safely.

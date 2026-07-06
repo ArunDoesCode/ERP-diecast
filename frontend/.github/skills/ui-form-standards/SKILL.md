@@ -12,7 +12,9 @@ tabler icon set.
 
 ## Owns
 
-- shadcn form wiring (RHF + Zod + `Form`, `FormField`, `FormItem`, `FormLabel`, `FormControl`, `FormMessage`)
+- shadcn form wiring (RHF + Zod + `Form`, `FormField`, `FormItem`, `FormControl`, `FormMessage`)
+- floating-label inputs via `FloatingLabelInput` from `@/components/ui/floating-label` (this repo's default text field — replaces separate `FormLabel` + `Input`)
+- consistent field height: every `FormItem` uses `className="min-h-19"` so inline `FormMessage` errors don't shift layout
 - Zod schema source and type inference
 - Toast placement — mutation hook, not form component
 - Loading / disabled state via `useMutation`
@@ -27,14 +29,17 @@ tabler icon set.
 
 ## ⚠️ Form Rules (this repo)
 
-| Rule                              | Detail                                                                         |
-| ----------------------------------- | --------------------------------------------------------------------------------- |
-| Zod schemas                       | From `@/types/[feature].ts` — never inline, never redefined in the component.    |
-| `isPending`                       | From `useMutation` — no separate `useState` for loading.                        |
-| Toasts                            | In the mutation's `onSuccess`/`onError` (in `lib/api/[feature]/queries.ts`) — not in the form component. |
-| Form submit                       | `mutate(data, { onSuccess: () => onClose?.() })` — form itself stays dumb.       |
-| No `useTransition` for mutations  | `useMutation` handles pending state.                                            |
-| No `packages/validators` imports  | That path doesn't exist in this repo — schemas are local to `src/types/`.        |
+| Rule                             | Detail                                                                                                                        |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Zod schemas                      | From `@/types/[feature].ts` — never inline, never redefined in the component.                                                 |
+| `isPending`                      | From `useMutation` — no separate `useState` for loading.                                                                      |
+| Text fields                      | `FloatingLabelInput` (`id` + `label` props) — not raw `Input` + `FormLabel`.                                                  |
+| Field spacing                    | Each `FormItem` gets `className="min-h-19"` to reserve space for `FormMessage`.                                               |
+| Toasts                           | In the mutation's `onSuccess`/`onError` (in `lib/api/[feature]/queries.ts`) — not in the form component.                      |
+| Response contract                | API may return HTTP 200 with `{ success: false, message }`; check `result.success` in `onSuccess` and toast `result.message`. |
+| Form submit                      | `mutate(data, { onSuccess: () => onClose?.() })` — form itself stays dumb.                                                    |
+| No `useTransition` for mutations | `useMutation` handles pending state.                                                                                          |
+| No `packages/validators` imports | That path doesn't exist in this repo — schemas are local to `src/types/`.                                                     |
 
 ## shadcn `ui/` components in this repo
 
@@ -50,6 +55,8 @@ and `cn()` from `@/lib/utils`). `form.tsx` was added this way — use it as the 
 - [ ] `useForm` with `zodResolver` and typed `defaultValues`
 - [ ] Mutation from `lib/api/[feature]/queries.ts` — `const loginMutation = useLoginMutation()`
 - [ ] Submit button `disabled={mutation.isPending}` with a pending label (e.g. `"Signing in..."`)
+- [ ] Every `FormItem` has `className="min-h-19"` to reserve space for `FormMessage`
+- [ ] Text fields use `FloatingLabelInput` (`id` + `label`) — not raw `Input` + `FormLabel`
 - [ ] `FormMessage` under every `FormField` for inline Zod errors
 - [ ] No inline `useState` mirroring form field values — RHF owns field state
 
@@ -69,10 +76,9 @@ import {
   FormControl,
   FormField,
   FormItem,
-  FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
+import { FloatingLabelInput } from "@/components/ui/floating-label";
 import { useLoginMutation } from "@/lib/api/auth/queries";
 import { type LoginInput, loginSchema } from "@/types/auth";
 
@@ -96,16 +102,24 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
           control={form.control}
           name="email"
           render={({ field }) => (
-            <FormItem>
-              <FormLabel>Email</FormLabel>
+            <FormItem className="min-h-19">
               <FormControl>
-                <Input type="email" {...field} />
+                <FloatingLabelInput
+                  {...field}
+                  id="email"
+                  label="Email"
+                  type="email"
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
-        <Button className="w-full" type="submit" disabled={loginMutation.isPending}>
+        <Button
+          className="w-full"
+          type="submit"
+          disabled={loginMutation.isPending}
+        >
           {loginMutation.isPending ? "Signing in..." : "Sign in"}
         </Button>
       </form>
@@ -118,6 +132,12 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
 
 - Sonner only — `import { toast } from "sonner"`. No custom toast components.
 - Toasts belong in `useMutation`'s `onSuccess`/`onError` — not in form submit handlers.
+- Handle the two-shape response: backend can return HTTP 200 with `{ success: false, message }`.
+  In `onSuccess`, guard on `result.success` first — toast `result.message` on false and return
+  before running success side-effects. `onError` only covers rejected/thrown requests (network,
+  timeout, non-2xx via `ApiClientError`).
+- Prefer the server `message`: `toast.success(result.message || "Signed in")` /
+  `toast.error(result.message || "Login failed")`.
 - Provider lives in `src/lib/Providers.tsx` only (`<Toaster />`) — all providers centralize there.
 - Messages: short, sentence case, user-friendly.
 

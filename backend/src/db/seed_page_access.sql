@@ -1,90 +1,191 @@
--- Run after drizzle-kit push to seed roles and page_access
--- Adjust sort_order and icon names to match your sidebar order
+-- 1. Create Roles 
+BEGIN;
 
--- 1. Roles
-INSERT INTO roles (name) VALUES
-  ('owner'),
-  ('back_office'),
-  ('floor_supervisor'),
-  ('qa_inspector'),
-  ('die_designer'),
-  ('operator')
-ON CONFLICT DO NOTHING;
+WITH role_seed(name) AS (
+  VALUES
+    ('super-admin'::role),
+    ('owner'::role),
+    ('back_office'::role),
+    ('floor_supervisor'::role),
+    ('operator'::role),
+    ('qa_inspector'::role),
+    ('die_designer'::role)
+)
+INSERT INTO roles (name)
+SELECT name
+FROM role_seed
+ON CONFLICT (name) DO NOTHING;
 
--- 2. Page access (page_key must match your Next.js route segment)
+COMMIT;
 
--- OWNER
-INSERT INTO page_access (role_id, page_key, label, icon, sort_order)
-SELECT id, 'shop-floor',   'Shop Floor',         'Activity',     1 FROM roles WHERE name = 'owner';
-INSERT INTO page_access (role_id, page_key, label, icon, sort_order)
-SELECT id, 'job-board',    'Job Board & P&L',    'LayoutList',   2 FROM roles WHERE name = 'owner';
-INSERT INTO page_access (role_id, page_key, label, icon, sort_order)
-SELECT id, 'ar-ap',        'AR / AP',            'ArrowLeftRight',3 FROM roles WHERE name = 'owner';
-INSERT INTO page_access (role_id, page_key, label, icon, sort_order)
-SELECT id, 'payroll',      'Payroll & Attendance','Users',        4 FROM roles WHERE name = 'owner';
-INSERT INTO page_access (role_id, page_key, label, icon, sort_order)
-SELECT id, 'employees',    'Employee Directory', 'IdCard',       5 FROM roles WHERE name = 'owner';
-INSERT INTO page_access (role_id, page_key, label, icon, sort_order)
-SELECT id, 'machine-health','Machine Health',    'Gauge',        6 FROM roles WHERE name = 'owner';
-INSERT INTO page_access (role_id, page_key, label, icon, sort_order)
-SELECT id, 'spare-parts',  'Spare Parts',        'Wrench',       7 FROM roles WHERE name = 'owner';
+insert into pages (key, label, path, sort_order) values ('setup', 'Setup', '/setup', 15) on conflict (key) do update set label = excluded.label, path = excluded.path, sort_order = excluded.sort_order;
 
--- BACK OFFICE
-INSERT INTO page_access (role_id, page_key, label, icon, sort_order)
-SELECT id, 'customers',    'Customers',          'Building2',    1 FROM roles WHERE name = 'back_office';
-INSERT INTO page_access (role_id, page_key, label, icon, sort_order)
-SELECT id, 'enquiries',    'Enquiries',          'Mail',         2 FROM roles WHERE name = 'back_office';
-INSERT INTO page_access (role_id, page_key, label, icon, sort_order)
-SELECT id, 'quotations',   'Quotations',         'FileText',     3 FROM roles WHERE name = 'back_office';
-INSERT INTO page_access (role_id, page_key, label, icon, sort_order)
-SELECT id, 'sales-orders', 'Sales Orders',       'ShoppingCart', 4 FROM roles WHERE name = 'back_office';
-INSERT INTO page_access (role_id, page_key, label, icon, sort_order)
-SELECT id, 'jobs',         'Jobs',               'Briefcase',    5 FROM roles WHERE name = 'back_office';
-INSERT INTO page_access (role_id, page_key, label, icon, sort_order)
-SELECT id, 'dispatch',     'Dispatch Challans',  'Truck',        6 FROM roles WHERE name = 'back_office';
-INSERT INTO page_access (role_id, page_key, label, icon, sort_order)
-SELECT id, 'suppliers',    'Suppliers',          'Package',      7 FROM roles WHERE name = 'back_office';
-INSERT INTO page_access (role_id, page_key, label, icon, sort_order)
-SELECT id, 'purchase-orders','Purchase Orders',  'ClipboardList',8 FROM roles WHERE name = 'back_office';
-INSERT INTO page_access (role_id, page_key, label, icon, sort_order)
-SELECT id, 'grn',          'GRN',                'PackageCheck', 9 FROM roles WHERE name = 'back_office';
-INSERT INTO page_access (role_id, page_key, label, icon, sort_order)
-SELECT id, 'inventory',    'Inventory',          'Boxes',        10 FROM roles WHERE name = 'back_office';
-INSERT INTO page_access (role_id, page_key, label, icon, sort_order)
-SELECT id, 'vendor-bills', 'Vendor Bills',       'Receipt',      11 FROM roles WHERE name = 'back_office';
-INSERT INTO page_access (role_id, page_key, label, icon, sort_order)
-SELECT id, 'invoices',     'Customer Invoices',  'FileCheck',    12 FROM roles WHERE name = 'back_office';
-INSERT INTO page_access (role_id, page_key, label, icon, sort_order)
-SELECT id, 'expenses',     'Expenses',           'Wallet',       13 FROM roles WHERE name = 'back_office';
+--2.create all pages in ui
+BEGIN;
 
--- FLOOR SUPERVISOR
-INSERT INTO page_access (role_id, page_key, label, icon, sort_order)
-SELECT id, 'active-jobs',  'Active Jobs',        'Flame',        1 FROM roles WHERE name = 'floor_supervisor';
-INSERT INTO page_access (role_id, page_key, label, icon, sort_order)
-SELECT id, 'step-assign',  'Step Assignment',    'UserCheck',    2 FROM roles WHERE name = 'floor_supervisor';
-INSERT INTO page_access (role_id, page_key, label, icon, sort_order)
-SELECT id, 'machine-config','Machine Config',    'Settings2',    3 FROM roles WHERE name = 'floor_supervisor';
-INSERT INTO page_access (role_id, page_key, label, icon, sort_order)
-SELECT id, 'die-loading',  'Die Loading',        'Layers',       4 FROM roles WHERE name = 'floor_supervisor';
-INSERT INTO page_access (role_id, page_key, label, icon, sort_order)
-SELECT id, 'scrap-rework', 'Scrap & Rework',     'RefreshCcw',   5 FROM roles WHERE name = 'floor_supervisor';
+WITH page_seed(key, label, path, sort_order) AS (
+  VALUES
+    ('landing','Landing','/landing',10),
+    ('setup','Setup','/setup',15),
+    ('shop-floor-live-view','Shop Floor Live View','/shop-floor-live-view',20),
+    ('job-board','Job Board','/job-board',30),
+    ('pnl-statement','P&L Statement','/pnl-statement',40),
+    ('customers','Customers','/customers',50),
+    ('enquiries','Enquiries','/enquiries',60),
+    ('quotations','Quotations','/quotations',70),
+    ('sales-orders','Sales Orders','/sales-orders',80),
+    ('jobs','Jobs / Work Orders','/jobs',90),
+    ('step-assignment','Step Assignment','/step-assignment',100),
+    ('scrap-rework','Scrap & Rework','/scrap-rework',110),
+    ('dispatch-challans','Dispatch Challans','/dispatch-challans',120),
+    ('operator','Operator PWA','/operator',130),
+    ('suppliers','Suppliers','/suppliers',140),
+    ('purchase-orders','POs (Purchase Orders)','/purchase-orders',150),
+    ('purchase-requisitions','PRs (Purchase Requisitions)','/purchase-requisitions',160),
+    ('grn','GRN (Goods Receipt Note)','/grn',170),
+    ('inventory','Inventory','/inventory',180),
+    ('ar-ap','AR/AP','/ar-ap',190),
+    ('vendor-bills','Vendor Bills','/vendor-bills',200),
+    ('customer-invoices','Customer Invoices','/customer-invoices',210),
+    ('expenses','Expenses','/expenses',220),
+    ('employee-directory','Employee Directory','/employee-directory',230),
+    ('payroll-attendance','Payroll & Attendance','/payroll-attendance',240),
+    ('machine-health','Machine Health','/machine-health',250),
+    ('spare-parts','Spare Parts','/spare-parts',260),
+    ('machine-config','Machine Config','/machine-config',270),
+    ('die-loading','Die Loading','/die-loading',280),
+    ('inward-inspection','Inward Inspection','/inward-inspection',290),
+    ('in-process-inspection','In-process Inspection','/in-process-inspection',300),
+    ('trial-run-logs','Trial Run Logs','/trial-run-logs',310),
+    ('final-inspection','Final Inspection','/final-inspection',320),
+    ('die-library','Die Library','/die-library',330),
+    ('die-design-tasks','Die Design Tasks','/die-design-tasks',340),
+    ('cnc-machine-programming','CNC Machine Programming','/cnc-machine-programming',350)
+)
+INSERT INTO pages (key, label, path, sort_order)
+SELECT key, label, path, sort_order
+FROM page_seed
+ON CONFLICT (key) DO UPDATE
+SET
+  label = EXCLUDED.label,
+  path = EXCLUDED.path,
+  sort_order = EXCLUDED.sort_order;
 
--- QA INSPECTOR
-INSERT INTO page_access (role_id, page_key, label, icon, sort_order)
-SELECT id, 'inward-inspection',  'Inward Inspection',   'PackageSearch', 1 FROM roles WHERE name = 'qa_inspector';
-INSERT INTO page_access (role_id, page_key, label, icon, sort_order)
-SELECT id, 'inprocess-inspection','In-Process Inspection','ScanLine',    2 FROM roles WHERE name = 'qa_inspector';
-INSERT INTO page_access (role_id, page_key, label, icon, sort_order)
-SELECT id, 'trial-logs',         'Trial Run Logs',      'FlaskConical',  3 FROM roles WHERE name = 'qa_inspector';
-INSERT INTO page_access (role_id, page_key, label, icon, sort_order)
-SELECT id, 'final-inspection',   'Final Inspection',    'ShieldCheck',   4 FROM roles WHERE name = 'qa_inspector';
+COMMIT;
 
--- DIE DESIGNER
-INSERT INTO page_access (role_id, page_key, label, icon, sort_order)
-SELECT id, 'die-library',   'Die Library',          'Archive',      1 FROM roles WHERE name = 'die_designer';
-INSERT INTO page_access (role_id, page_key, label, icon, sort_order)
-SELECT id, 'design-tasks',  'Die Design Tasks',     'PenTool',      2 FROM roles WHERE name = 'die_designer';
-INSERT INTO page_access (role_id, page_key, label, icon, sort_order)
-SELECT id, 'cnc-programs',  'CNC Programming',      'Cpu',          3 FROM roles WHERE name = 'die_designer';
+-- 3. Standard Role -> Page permissions
+BEGIN;
+WITH role_page_seed(role_name, page_key) AS (
+  VALUES
+    ('owner','landing'),
+    ('owner','shop-floor-live-view'),
+    ('owner','job-board'),
+    ('owner','pnl-statement'),
+    ('owner','ar-ap'),
+    ('owner','employee-directory'),
+    ('owner','payroll-attendance'),
+    ('owner','machine-health'),
+    ('owner','spare-parts'),
 
--- OPERATOR: no page_access rows — they get PWA only, no sidebar
+    ('back-office','landing'),
+    ('back-office','customers'),
+    ('back-office','enquiries'),
+    ('back-office','quotations'),
+    ('back-office','sales-orders'),
+    ('back-office','jobs'),
+    ('back-office','dispatch-challans'),
+    ('back-office','suppliers'),
+    ('back-office','purchase-orders'),
+    ('back-office','purchase-requisitions'),
+    ('back-office','grn'),
+    ('back-office','inventory'),
+    ('back-office','vendor-bills'),
+    ('back-office','customer-invoices'),
+    ('back-office','expenses'),
+
+    ('floor_supervisor','landing'),
+    ('floor_supervisor','jobs'),
+    ('floor_supervisor','step-assignment'),
+    ('floor_supervisor','scrap-rework'),
+    ('floor_supervisor','machine-config'),
+    ('floor_supervisor','die-loading'),
+
+    ('operator','operator'),
+
+    ('qa_inspector','landing'),
+    ('qa_inspector','inward-inspection'),
+    ('qa_inspector','in-process-inspection'),
+    ('qa_inspector','trial-run-logs'),
+    ('qa_inspector','final-inspection'),
+
+    ('die_designer','landing'),
+    ('die_designer','die-library'),
+    ('die_designer','die-design-tasks'),
+    ('die_designer','cnc-machine-programming')
+)
+INSERT INTO role_pages (role_id, page_id)
+SELECT r.id, p.id
+FROM role_page_seed s
+JOIN roles r ON r.name = s.role_name
+JOIN pages p ON p.key = s.page_key
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM role_pages rp
+  WHERE rp.role_id = r.id
+    AND rp.page_id = p.id
+);
+
+-- 3. Assign ALL existing pages to the 'super-admin' role automatically
+INSERT INTO role_pages (role_id, page_id)
+SELECT r.id, p.id
+FROM roles r
+CROSS JOIN pages p
+WHERE r.name = 'super-admin'
+AND NOT EXISTS (
+  SELECT 1
+  FROM role_pages rp
+  WHERE rp.role_id = r.id
+    AND rp.page_id = p.id
+);
+
+COMMIT;
+
+--assign pages to super admin
+INSERT INTO role_pages (role_id, page_id) VALUES
+(1, 1),
+(1, 2),
+(1, 3),
+(1, 4),
+(1, 5),
+(1, 6),
+(1, 7),
+(1, 8),
+(1, 9),
+(1, 10),
+(1, 11),
+(1, 12),
+(1, 13),
+(1, 14),
+(1, 15),
+(1, 16),
+(1, 17),
+(1, 18),
+(1, 19),
+(1, 20),
+(1, 21),
+(1, 22),
+(1, 23),
+(1, 24),
+(1, 25),
+(1, 26),
+(1, 27),
+(1, 28),
+(1, 29),
+(1, 30),
+(1, 31),
+(1, 32),
+(1, 33),
+(1, 34),
+(1, 35),
+(1,37);
+

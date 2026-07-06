@@ -27,8 +27,14 @@ export function useLoginMutation() {
   return useMutation({
     mutationFn: (payload: LoginInput) => login(payload),
     onSuccess: async (result) => {
+      if (!result.success) {
+        toast.error(result.message || "Login failed");
+        return;
+      }
+
       setAccessToken(result.data.accessToken);
       await queryClient.invalidateQueries({ queryKey: authKeys.me() });
+      toast.success(result.message || "Login successful");
     },
     onError: (error) => {
       toast.error(

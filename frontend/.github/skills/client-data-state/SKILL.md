@@ -26,15 +26,15 @@ Full conventions in **[nextjs.md](../../../nextjs.md)**. This skill adds repo-sp
 
 ## ⚠️ Critical Rules
 
-| Rule                                          | Detail                                                                     |
-| ----------------------------------------------- | ----------------------------------------------------------------------------- |
-| No `"use server"`                              | Backend is a separate service. Frontend only calls it over HTTP via `api.*`. |
-| No axios, no raw `fetch()` in components/hooks | Always `api.get/post/put/patch/delete` from `@/lib/api/client`.             |
-| No `useState` + `useEffect` for server data     | Always `useQuery` / `useMutation`.                                          |
-| No `router.refresh()` after mutations           | Invalidate the TanStack Query cache instead.                                |
-| Zustand = UI state only                        | Modals, selections, active tabs. Never server data. Don't create a store    |
-|                                                 | until a feature actually needs cross-component UI state.                    |
-| Errors are always `ApiClientError`              | `import { ApiClientError } from "@/lib/api/client"` — check with `instanceof`. |
+| Rule                                           | Detail                                                                         |
+| ---------------------------------------------- | ------------------------------------------------------------------------------ |
+| No `"use server"`                              | Backend is a separate service. Frontend only calls it over HTTP via `api.*`.   |
+| No axios, no raw `fetch()` in components/hooks | Always `api.get/post/put/patch/delete` from `@/lib/api/client`.                |
+| No `useState` + `useEffect` for server data    | Always `useQuery` / `useMutation`.                                             |
+| No `router.refresh()` after mutations          | Invalidate the TanStack Query cache instead.                                   |
+| Zustand = UI state only                        | Modals, selections, active tabs. Never server data. Don't create a store       |
+|                                                | until a feature actually needs cross-component UI state.                       |
+| Errors are always `ApiClientError`             | `import { ApiClientError } from "@/lib/api/client"` — check with `instanceof`. |
 
 ## Real API Client Shape (this repo)
 
@@ -76,10 +76,18 @@ import { api } from "@/lib/api/client";
 import { API_ROUTES } from "@/lib/api/routes";
 import type { LoginInput } from "@/types/auth";
 
-export type LoginResponse = {
-  success: true;
-  data: { accessToken: string; user: { id: string; email: string; role: string } };
-};
+// Two-shape response: success carries data, failure carries a message.
+// Backend returns HTTP 200 for both, so the mutation must branch on `success`.
+export type LoginResponse =
+  | {
+      success: true;
+      message?: string;
+      data: {
+        accessToken: string;
+        user: { id: string; email: string; role: string };
+      };
+    }
+  | { success: false; message: string; data?: null };
 
 export function login(input: LoginInput) {
   return api.post<LoginResponse, LoginInput>(API_ROUTES.auth.login, input, {
@@ -118,12 +126,20 @@ export function useLoginMutation() {
   return useMutation({
     mutationFn: (payload: LoginInput) => login(payload),
     onSuccess: async (result) => {
+      // Backend may return HTTP 200 with { success: false, message }
+      if (!result.success) {
+        toast.error(result.message || "Login failed");
+        return;
+      }
+
       setAccessToken(result.data.accessToken);
       await queryClient.invalidateQueries({ queryKey: authKeys.me() });
-      toast.success("Signed in");
+      toast.success(result.message || "Signed in");
     },
     onError: (error) => {
-      toast.error(error instanceof ApiClientError ? error.message : "Login failed");
+      toast.error(
+        error instanceof ApiClientError ? error.message : "Login failed",
+      );
     },
   });
 }
@@ -143,7 +159,10 @@ const jobs = await getJobs({ status: "in_production" });
 return <FeatureView initialJobs={jobs} />;
 
 // FeatureView.tsx — 'use client'
-const { data: jobs = initialJobs } = useJobs({ status: "in_production" }, { initialData: initialJobs });
+const { data: jobs = initialJobs } = useJobs(
+  { status: "in_production" },
+  { initialData: initialJobs },
+);
 ```
 
 Not every page needs this — `/login` and `/dashboard` in this repo are pure CSR (no SSR fetch)
@@ -186,13 +205,13 @@ pagination offset to `0` when a filter changes.
 
 ## State Placement Decision
 
-| State type                             | Where                          |
-| ----------------------------------------- | --------------------------------- |
-| Transient form field                   | Local `useState` / RHF field state |
-| Server data (any async fetch)          | `useQuery`                       |
-| Mutation loading state                 | `isPending` from `useMutation`   |
-| Open modal / selected row / active tab | Zustand store (only if genuinely shared) |
-| URL filter / pagination                | `useQueryState` from `nuqs`      |
+| State type                             | Where                                                           |
+| -------------------------------------- | --------------------------------------------------------------- |
+| Transient form field                   | Local `useState` / RHF field state                              |
+| Server data (any async fetch)          | `useQuery`                                                      |
+| Mutation loading state                 | `isPending` from `useMutation`                                  |
+| Open modal / selected row / active tab | Zustand store (only if genuinely shared)                        |
+| URL filter / pagination                | `useQueryState` from `nuqs`                                     |
 | Access token                           | `src/lib/auth/token.ts` (localStorage + cookie) — never Zustand |
 
 ## Handoff

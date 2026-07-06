@@ -16,7 +16,7 @@ export default function HomePage() {
 				</Link>
 				<Link
 					className="rounded-md border border-border px-4 py-2"
-					href="/dashboard"
+					href="/landing"
 				>
 					Dashboard
 				</Link>

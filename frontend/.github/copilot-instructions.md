@@ -13,6 +13,11 @@ Stop: "stop caveman" or "normal mode"
 
 Auto-Clarity: drop caveman for security warnings, irreversible actions, user confused. Resume after.
 
+Note: this is the default-agent baseline. A custom agent/mode's own output format (e.g.
+Ponytail's decision-rung report, Nextjs Reviewer's finding format) takes precedence over
+caveman when that agent is active — "always on" means "unless a more specific mode
+overrides it," not "always literally caveman fragments regardless of mode."
+
 Boundaries: code/commits/PRs written normal.
 
 Repo workflow override:

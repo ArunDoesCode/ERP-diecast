@@ -9,23 +9,23 @@ import {
   FormControl,
   FormField,
   FormItem,
-  FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
 import { useLoginMutation } from "@/lib/api/auth/queries";
 import { type LoginInput, loginSchema } from "@/types/auth";
+import { FloatingLabelInput } from "@/components/ui/floating-label";
 
 export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
   const loginMutation = useLoginMutation();
 
   const form = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: "owner@example.com", password: "password123" },
+    defaultValues: { email: "vsdhnanjay16@gmail.com", password: "Macbookm2$$" },
   });
 
   function onSubmit(data: LoginInput) {
     loginMutation.mutate(data, { onSuccess });
+    
   }
 
   return (
@@ -35,10 +35,14 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
           control={form.control}
           name="email"
           render={({ field }) => (
-            <FormItem>
-              <FormLabel>Email</FormLabel>
+            <FormItem className="min-h-19">
               <FormControl>
-                <Input type="email" {...field} />
+                <FloatingLabelInput
+                  {...field}
+                  id="email"
+                  label="Email"
+                  type="email"
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -49,10 +53,14 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
           control={form.control}
           name="password"
           render={({ field }) => (
-            <FormItem>
-              <FormLabel>Password</FormLabel>
+            <FormItem className="min-h-19">
               <FormControl>
-                <Input type="password" {...field} />
+                <FloatingLabelInput
+                  {...field}
+                  id="password"
+                  label="Password"
+                  type="password"
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -63,6 +71,7 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
           className="w-full"
           type="submit"
           disabled={loginMutation.isPending}
+          // size={"lg"}
         >
           {loginMutation.isPending ? "Signing in..." : "Sign in"}
         </Button>

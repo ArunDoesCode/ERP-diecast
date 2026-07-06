@@ -13,6 +13,17 @@ description: >
 
 Cavecrew = three subagent presets that emit caveman output. Same job as Anthropic defaults (`Explore`, edit-style agents, reviewer); difference is the tool-result they return is compressed, so main context shrinks per delegation.
 
+All three run on `Auto` (`model:` frontmatter in each `.agent.md`) — locate/single-file-edit/
+fast-diff-review tasks don't need the main orchestrator's manually-picked flagship model.
+Only override this if `Auto` is actually producing wrong output for a given task.
+
+## Run cavecrew calls in parallel when independent
+
+Spawning subagents is a normal tool call — issue multiple `runSubagent` calls for
+independent cavecrew tasks in the **same** message/turn instead of one-at-a-time. Serialize
+only when one call's output feeds the next (e.g. investigator's result determines which
+file to hand to builder). See "Parallel scout" below.
+
 ## When to use cavecrew vs alternatives
 
 | Task | Use |

@@ -5,12 +5,20 @@ import {
   boolean,
   integer,
   timestamp,
+  unique,
 } from "drizzle-orm/pg-core";
-import { roleEnum } from "./00_enums";
 
 export const roles = pgTable("roles", {
   id: serial("id").primaryKey(),
-  name: roleEnum("name").notNull().unique(),
+  name: text("name").notNull().unique(),
+  isSystem: boolean("is_system").notNull().default(false), // seed Owner, BackOffice, super-admin as true
+  createdBy: integer("created_by").references((): any => employees.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const modules = pgTable("modules", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
 });
 
 export const pages = pgTable("pages", {
@@ -19,18 +27,26 @@ export const pages = pgTable("pages", {
   label: text("label").notNull(),
   path: text("path").notNull(),
   sortOrder: integer("sort_order").notNull().default(0),
+  moduleId: integer("module_id").references(() => modules.id),
   createdBy: integer("created_by").references((): any => employees.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const rolePages = pgTable("role_pages", {
-  roleId: integer("role_id")
-    .notNull()
-    .references(() => roles.id, { onDelete: "cascade" }),
-  pageId: integer("page_id")
-    .notNull()
-    .references(() => pages.id, { onDelete: "cascade" }),
-});
+export const rolePages = pgTable(
+  "role_pages",
+  {
+    id: serial("id").primaryKey(),
+    roleId: integer("role_id")
+      .notNull()
+      .references(() => roles.id, { onDelete: "cascade" }),
+    pageId: integer("page_id")
+      .notNull()
+      .references(() => pages.id, { onDelete: "cascade" }),
+  },
+  (table) => [
+    unique("role_pages_role_id_page_id_unique").on(table.roleId, table.pageId),
+  ],
+);
 
 export const employees = pgTable("employees", {
   id: serial("id").primaryKey(),

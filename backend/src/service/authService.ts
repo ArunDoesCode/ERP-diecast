@@ -1,4 +1,5 @@
 import { authRepository } from "../repository/authRepository";
+import { UnauthorizedError } from "../lib/errors";
 import {
   type Role,
   sha256,
@@ -66,6 +67,7 @@ export const authService = {
     // Generate tokens
     const payload = {
       userId: employee.id,
+      userName: employee.name,
       role: employee.roleName as Role,
       allowedPages,
     };
@@ -99,14 +101,18 @@ export const authService = {
   },
 
   async refresh(refreshToken: string) {
-    // Verify refresh token
-    const payload = await verifyRefreshToken(refreshToken);
+    // Verify refresh token — jose throws its own error class for
+    // expired/malformed JWTs; normalize to a proper 401 instead of
+    // letting it fall through to the generic 500 handler.
+    const payload = await verifyRefreshToken(refreshToken).catch(() => {
+      throw new UnauthorizedError("Refresh token invalid");
+    });
     const refreshHash = await sha256(refreshToken);
 
     // Get stored refresh token
     const token = await authRepository.getRefreshTokenByHash(refreshHash);
     if (!token) {
-      throw new Error("Refresh token invalid");
+      throw new UnauthorizedError("Refresh token invalid");
     }
 
     // Delete old refresh token
@@ -115,6 +121,7 @@ export const authService = {
     // Generate new tokens
     const nextPayload = {
       userId: payload.userId,
+      userName: payload.userName,
       role: payload.role,
       allowedPages: payload.allowedPages,
     };

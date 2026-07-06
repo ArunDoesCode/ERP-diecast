@@ -9,7 +9,7 @@ const envSchema = z.object({
   ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().positive().default(900),
   REFRESH_TOKEN_TTL_SECONDS: z.coerce.number().positive().default(604800),
   NODE_ENV: z
-    .enum(["development", "test", "production"])
+    .enum(["development", "production"])
     .default("development"),
 });
 
