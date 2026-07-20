@@ -2,6 +2,8 @@ const API_Header = {
   auth: "/auth",
   files: "/files",
   setup: "/setup",
+  supplier: "/supplier",
+  asset: "/asset",
 };
 export const API_ROUTES = {
   auth: {
@@ -44,6 +46,48 @@ export const API_ROUTES = {
       list: `${API_Header.setup}/permissions`,
       updateForRole: (roleId: number) =>
         `${API_Header.setup}/roles/${roleId}/permissions`,
+    },
+  },
+  suppliers: {
+    listSuppliers: `${API_Header.supplier}/listSuppliers`,
+    createSupplier: `${API_Header.supplier}/createSupplier`,
+    detail: (supplierId: number) =>
+      `${API_Header.supplier}/${supplierId}/detail`,
+    updateSupplier: (supplierId: number) =>
+      `${API_Header.supplier}/updateSupplier/${supplierId}`,
+    listItems: (supplierId: number) =>
+      `${API_Header.supplier}/${supplierId}/listItems`,
+    createItem: (supplierId: number) =>
+      `${API_Header.supplier}/${supplierId}/createItem`,
+    editItem: (supplierId: number) =>
+      `${API_Header.supplier}/${supplierId}/editItem`,
+    listServices: (supplierId: number) =>
+      `${API_Header.supplier}/${supplierId}/listServices`,
+    createService: (supplierId: number) =>
+      `${API_Header.supplier}/${supplierId}/createService`,
+    editService: (supplierId: number) =>
+      `${API_Header.supplier}/${supplierId}/editService`,
+  },
+  assets: {
+    items: `${API_Header.asset}/items`,
+    services: `${API_Header.asset}/services`,
+    machines: {
+      list: `${API_Header.asset}/machines`,
+      create: `${API_Header.asset}/machines`,
+      update: (machineId: number) =>
+        `${API_Header.asset}/machines/${machineId}`,
+    },
+    locations: {
+      list: `${API_Header.asset}/locations`,
+      create: `${API_Header.asset}/locations`,
+      update: (locationId: number) =>
+        `${API_Header.asset}/locations/${locationId}`,
+    },
+    inventory: {
+      movements: {
+        list: `${API_Header.asset}/inventory/movements`,
+        create: `${API_Header.asset}/inventory/movements`,
+      },
     },
   },
 } as const;

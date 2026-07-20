@@ -8,7 +8,36 @@ import { roleController } from "../controller/roleController";
 import { asyncHandler } from "../lib/async-handler";
 import { requireAuth, requireRole } from "../lib/auth-middleware";
 import type { AppEnv } from "../lib/types";
-import { SETUP_ROUTES } from "./end-points";
+
+const SETUP_ROUTES = {
+  modules: {
+    list: "/modules",
+  },
+  employees: {
+    list: "/employees",
+    search: "/employees/search",
+    create: "/employees",
+    update: "/employees/:id",
+    remove: "/employees/:id",
+    generateQr: "/employees/:id/qr",
+  },
+  roles: {
+    list: "/roles",
+    create: "/roles",
+    update: "/roles/:id",
+    remove: "/roles/:id",
+  },
+  pages: {
+    list: "/pages",
+    create: "/pages",
+    update: "/pages/:id",
+    remove: "/pages/:id",
+  },
+  permissions: {
+    list: "/permissions",
+    updateForRole: "/roles/:roleId/permissions",
+  },
+} as const;
 
 const setupRouter = new Hono<AppEnv>();
 

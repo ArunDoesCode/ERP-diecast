@@ -2,18 +2,24 @@
 
 import { EmployeeTable } from "@/components/pages/setup/EmployeeTable";
 import { Button } from "@/components/ui/button";
-import { useSetupDrawerStore } from "@/lib/store/setupDrawerStore";
+import type { Employee } from "@/types/setup";
 
-export function EmployeesTab() {
-	const openCreate = useSetupDrawerStore((state) => state.openCreate);
+type EmployeesTabProps = {
+  onCreateEmployee: () => void;
+  onEditEmployee: (employee: Employee) => void;
+};
 
-	return (
-		<div className="flex flex-col gap-4">
-			<div className="flex justify-end">
-				<Button onClick={() => openCreate("employee")}>+ New Employee</Button>
-			</div>
+export function EmployeesTab({
+  onCreateEmployee,
+  onEditEmployee,
+}: EmployeesTabProps) {
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex justify-end">
+        <Button onClick={onCreateEmployee}>+ New Employee</Button>
+      </div>
 
-			<EmployeeTable />
-		</div>
-	);
+      <EmployeeTable onEditEmployee={onEditEmployee} />
+    </div>
+  );
 }

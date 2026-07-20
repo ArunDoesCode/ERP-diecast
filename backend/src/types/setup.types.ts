@@ -144,3 +144,5 @@ export const rolePermissionDiffSchema = z.record(
 export type rolePermissionDiffSchemaType = z.infer<
   typeof rolePermissionDiffSchema
 >;
+
+export * from "./supplier.types";

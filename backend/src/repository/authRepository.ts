@@ -2,12 +2,12 @@ import { and, eq, gt } from "drizzle-orm";
 
 import { db } from "../db/client";
 import {
-  employees,
   pages,
   refreshTokens,
   rolePages,
   roles,
 } from "../db/schemas/01_auth";
+import { employees } from "../db/schemas/03_hcm";
 
 type CreateEmployeeInput = {
   name: string;

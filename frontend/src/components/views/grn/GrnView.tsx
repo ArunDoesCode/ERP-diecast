@@ -1,12 +1,7 @@
 import { ModulePageShell } from "@/components/common/ModulePageShell";
-import { getPageDefinition } from "@/lib/navigation/pages";
+import { buildShellPage } from "@/lib/path-utils";
 
 export function GrnView() {
-	const page = getPageDefinition("/grn");
-
-	if (!page) {
-		throw new Error("Missing page definition for /grn");
-	}
-
-	return <ModulePageShell page={page} />;
+  const page = buildShellPage("/grn");
+  return <ModulePageShell page={page} />;
 }

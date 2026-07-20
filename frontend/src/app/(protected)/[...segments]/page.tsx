@@ -1,24 +1,20 @@
-import { notFound } from "next/navigation";
-
 import { ModulePageShell } from "@/components/common/ModulePageShell";
-import { getPageDefinition } from "@/lib/navigation/pages";
+import { buildShellPage } from "@/lib/path-utils";
 
 type ProtectedDynamicPageProps = {
-	params: Promise<{
-		segments: string[];
-	}>;
+  params: Promise<{
+    segments: string[];
+  }>;
 };
 
 export default async function ProtectedDynamicPage({
-	params,
+  params,
 }: ProtectedDynamicPageProps) {
-	const resolvedParams = await params;
-	const path = `/${resolvedParams.segments.join("/")}`;
-	const page = getPageDefinition(path);
+  const resolvedParams = await params;
+  const page = buildShellPage(
+    `/${resolvedParams.segments.join("/")}`,
+    "Backend-driven page shell.",
+  );
 
-	if (!page || page.shellless) {
-		notFound();
-	}
-
-	return <ModulePageShell page={page} />;
+  return <ModulePageShell page={page} />;
 }

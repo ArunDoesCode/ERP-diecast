@@ -6,7 +6,9 @@
     "dev": "bun --hot src/index.ts",
     "build": "bun build src/index.ts --outdir dist --target bun",
     "start": "bun run dist/index.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:push": "bun drizzle-kit push",
+    "db:studio": "bun drizzle-kit studio"
   },
   "dependencies": {
     "@hono/node-server": "^2.0.6",

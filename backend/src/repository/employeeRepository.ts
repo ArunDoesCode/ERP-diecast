@@ -1,8 +1,8 @@
 import { asc, count, desc, eq, ilike } from "drizzle-orm";
 
 import { db } from "../db/client";
-import { employees } from "../db/schemas/01_auth";
 import type { employeeSchemaType } from "../types/setup.types";
+import { employees } from "../db/schemas/03_hcm";
 
 const employeeColumns = {
   id: employees.id,

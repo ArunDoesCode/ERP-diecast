@@ -1,12 +1,7 @@
 import { ModulePageShell } from "@/components/common/ModulePageShell";
-import { getPageDefinition } from "@/lib/navigation/pages";
+import { buildShellPage } from "@/lib/path-utils";
 
 export function PurchaseOrdersView() {
-	const page = getPageDefinition("/purchase-orders");
-
-	if (!page) {
-		throw new Error("Missing page definition for /purchase-orders");
-	}
-
-	return <ModulePageShell page={page} />;
+  const page = buildShellPage("/purchase-orders");
+  return <ModulePageShell page={page} />;
 }

@@ -1,7 +1,8 @@
 import { and, asc, count, desc, eq } from "drizzle-orm";
 
 import { db } from "../db/client";
-import { employees, roles } from "../db/schemas/01_auth";
+import { roles } from "../db/schemas/01_auth";
+import { employees } from "../db/schemas/03_hcm";
 
 const roleColumns = {
   id: roles.id,

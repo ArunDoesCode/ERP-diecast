@@ -26,10 +26,13 @@ import {
   useEmployeesQuery,
   useRolesQuery,
 } from "@/lib/api/setup/queries";
-import { useSetupDrawerStore } from "@/lib/store/setupDrawerStore";
 import type { Role, RoleSortField } from "@/types/setup";
 
-export function RoleTable() {
+type RoleTableProps = {
+  onEditRole: (role: Role) => void;
+};
+
+export function RoleTable({ onEditRole }: RoleTableProps) {
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize: 10,
@@ -46,7 +49,6 @@ export function RoleTable() {
   });
   const employeesQuery = useEmployeesQuery();
   const deleteRoleMutation = useDeleteRoleMutation();
-  const openEdit = useSetupDrawerStore((state) => state.openEdit);
   const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
 
   const roles = rolesQuery.data?.data ?? [];
@@ -94,7 +96,7 @@ export function RoleTable() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onSelect={() => openEdit("role", role)}>
+                <DropdownMenuItem onSelect={() => onEditRole(role)}>
                   Edit
                 </DropdownMenuItem>
                 {!role.isSystem && (
@@ -111,7 +113,7 @@ export function RoleTable() {
         },
       },
     ];
-  }, [employees, openEdit]);
+  }, [employees, onEditRole]);
 
   const table = useReactTable({
     data: roles,

@@ -2,18 +2,21 @@
 
 import { PageTable } from "@/components/pages/setup/PageTable";
 import { Button } from "@/components/ui/button";
-import { useSetupDrawerStore } from "@/lib/store/setupDrawerStore";
+import type { Page } from "@/types/setup";
 
-export function PagesTab() {
-  const openCreate = useSetupDrawerStore((state) => state.openCreate);
+type PagesTabProps = {
+  onCreatePage: () => void;
+  onEditPage: (page: Page) => void;
+};
 
+export function PagesTab({ onCreatePage, onEditPage }: PagesTabProps) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex justify-end">
-        <Button onClick={() => openCreate("page")}>+ New Page</Button>
+        <Button onClick={onCreatePage}>+ New Page</Button>
       </div>
 
-      <PageTable />
+      <PageTable onEditPage={onEditPage} />
     </div>
   );
 }

@@ -1,0 +1,334 @@
+import {
+  pgTable,
+  serial,
+  text,
+  integer,
+  timestamp,
+  boolean,
+  pgEnum,
+  doublePrecision,
+} from "drizzle-orm/pg-core";
+import { employees } from "./03_hcm";
+import { itemMaster } from "./02_procurement-catalog";
+import { supplierMaster } from "./02_procurement-suppliers";
+
+// 1. Define the Enum
+export const prTypeEnum = pgEnum("pr_type", [
+  "project", // Tied to a specific Sales Order / Job Order
+  "stock_reorder", // Standard replenishment of raw materials/consumables
+  "maintenance", // Machine spares, furnace repairs, MRO
+  "tooling", // H13 steel, die bases, tool room supplies
+  "subcontracting", // Outsourced CNC, plating, external QA
+  "misc", // Admin, PPE, general factory supplies
+]);
+
+export const prStatusEnum = pgEnum("pr_status", [
+  "draft",
+  "pending_approval",
+  "approved",
+  "rejected",
+  "partial_ordered",
+  "fully_ordered",
+  "cancelled",
+]);
+
+// --- 1. PURCHASE REQUEST (PR) ---
+export const purchaseRequests = pgTable("purchase_requests", {
+  id: serial("id").primaryKey(),
+  prNumber: text("pr_number").unique().notNull(),
+  type: prTypeEnum("type").notNull(),
+  saleOrderId: integer("sale_order_id"), // Null if stock_reorder or someother option
+  assetId: integer("asset_id"), // Only populated if type is 'maintenance' or 'tooling' (Optional: link to a specific machine/die)
+  status: prStatusEnum("status").default("draft").notNull(),
+  requestedBy: integer("requested_by").references(() => employees.id),
+  approvedBy: integer("approved_by").references(() => employees.id),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const purchaseRequestItems = pgTable("purchase_request_items", {
+  id: serial("id").primaryKey(),
+  prId: integer("pr_id").references(() => purchaseRequests.id),
+  itemId: integer("item_id").references(() => itemMaster.id), // Link to your items/master table
+  requestedQty: doublePrecision("requested_qty").notNull(),
+  issuedQty: doublePrecision("issued_qty").default(0), // How much has been converted to PO
+  uom: text("uom").notNull(),
+  expectedDate: timestamp("expected_date"),
+});
+
+export const poStatusEnum = pgEnum("po_status", [
+  "draft",
+  "pending_approval",
+  "approved",
+  "dispatched",
+  "partial_received",
+  "fully_received",
+  "invoiced",
+  "closed",
+  "cancelled",
+]);
+
+// --- 2. PURCHASE ORDER (PO) ---
+export const purchaseOrders = pgTable("purchase_orders", {
+  id: serial("id").primaryKey(),
+  poNumber: text("po_number").unique().notNull(),
+  supplierId: integer("supplier_id")
+    .references(() => supplierMaster.id)
+    .notNull(), // Link to suppliers table
+  status: poStatusEnum("status").default("draft").notNull(),
+  // Financials (stored in paise to avoid floating point issues)
+  subtotalPaise: integer("subtotal_paise").default(0),
+  taxAmountPaise: integer("tax_amount_paise").default(0),
+  totalAmountPaise: integer("total_amount_paise").default(0),
+  // Terms
+  paymentTermsDays: integer("payment_terms_days").default(0), // e.g., 30 for Net 30
+  deliveryTerms: text("delivery_terms"),
+  approvedBy: integer("approved_by").references(() => employees.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  createdBy: integer("created_by").references(() => employees.id),
+});
+
+export const purchaseOrderItems = pgTable("purchase_order_items", {
+  id: serial("id").primaryKey(),
+  poId: integer("po_id").references(() => purchaseOrders.id),
+  itemId: integer("item_id")
+    .references(() => itemMaster.id)
+    .notNull(), // Add reference,
+  qty: doublePrecision("qty").notNull(),
+  receivedQty: doublePrecision("received_qty").default(0), // Updated by GRN
+  unitPricePaise: integer("unit_price_paise").notNull(),
+  uom: text("uom").notNull(),
+});
+
+// --- 3. PR TO PO MAPPING (Many-to-Many Resolution) ---
+// Because 1 PR can have multiple POs, and 1 PO can have multiple PRs
+export const prPoItemLinks = pgTable("pr_po_item_links", {
+  id: serial("id").primaryKey(),
+  prItemId: integer("pr_item_id").references(() => purchaseRequestItems.id),
+  poItemId: integer("po_item_id").references(() => purchaseOrderItems.id),
+  linkedQty: doublePrecision("linked_qty").notNull(),
+});
+
+export const scoStatusEnum = pgEnum("sco_status", [
+  "draft",
+  "approved",
+  "material_issued",
+  "material_received",
+  "closed",
+  "cancelled",
+]);
+
+export const subcontractingOrders = pgTable("subcontracting_orders", {
+  id: serial("id").primaryKey(),
+  scoNumber: text("sco_number").unique().notNull(),
+  vendorId: integer("vendor_id")
+    .references(() => supplierMaster.id)
+    .notNull(),
+  status: scoStatusEnum("status").default("draft").notNull(),
+
+  // Link to the internal Job Order or Project this service is for (for cost accounting)
+  projectRef: text("project_ref"),
+
+  notes: text("notes"),
+  createdBy: integer("created_by").references(() => employees.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const subcontractingOrderItems = pgTable("subcontracting_order_items", {
+  id: serial("id").primaryKey(),
+  scoId: integer("sco_id")
+    .references(() => subcontractingOrders.id)
+    .notNull(),
+
+  // 1. WHAT WE SEND OUT (Raw Material OR WIP)
+  // We keep it linked to the `itemMaster` (e.g., "Pump Housing - Raw Cast"),
+  // but we add Batch/Heat tracking for die-casting traceability.
+  rawItemId: integer("raw_item_id")
+    .references(() => itemMaster.id)
+    .notNull(),
+  rawItemBatch: text("raw_item_batch"), // CRITICAL: Heat Number or Melt Number for traceability!
+  rawQtyToIssue: doublePrecision("raw_qty_to_issue").notNull(),
+
+  // 2. THE SERVICE (Decoupled from the physical `itemMaster`!)
+  // Services don't have stock, so they don't belong in the `itemMaster` table.
+  serviceDescription: text("service_description").notNull(), // e.g., "5-Axis CNC Machining"
+  serviceHsnSacCode: text("service_hsn_sac_code"), // GST SAC Code (e.g., 9988 for manufacturing services)
+  serviceUnitPricePaise: integer("service_unit_price_paise").notNull(),
+  serviceTaxPercentage: doublePrecision("service_tax_percentage")
+    .default(18)
+    .notNull(), // Usually 18% for job work
+
+  // 3. WHAT WE GET BACK (Finished Good)
+  finishedItemId: integer("finished_item_id")
+    .references(() => itemMaster.id)
+    .notNull(),
+  expectedReturnQty: doublePrecision("expected_return_qty").notNull(),
+});
+
+export const grnStatusEnum = pgEnum("grn_status", [
+  "draft",
+  "pending_qa",
+  "accepted",
+  "rejected",
+  "partial_accepted",
+]);
+
+// --- 4. GOODS RECEIVED NOTE (GRN) ---
+export const grns = pgTable("grns", {
+  id: serial("id").primaryKey(),
+  grnNumber: text("grn_number").unique().notNull(),
+  poId: integer("po_id").references(() => purchaseOrders.id),
+  supplierId: integer("supplier_id")
+    .references(() => supplierMaster.id)
+    .notNull(),
+  status: grnStatusEnum("status").default("draft").notNull(),
+  receivedDate: timestamp("received_date").defaultNow(),
+  createdBy: integer("created_by").references(() => employees.id),
+});
+
+// Add these to your existing `grnItems` table definition
+export const grnItems = pgTable("grn_items", {
+  id: serial("id").primaryKey(),
+  grnId: integer("grn_id").references(() => grns.id),
+  poItemId: integer("po_item_id").references(() => purchaseOrderItems.id),
+
+  // Quantities
+  receivedQty: doublePrecision("received_qty").notNull(),
+  acceptedQty: doublePrecision("accepted_qty").notNull(), // THIS updates the inventory ledger
+  rejectedQty: doublePrecision("rejected_qty").default(0),
+
+  // Standard QA
+  qaStatus: text("qa_status").default("pending"), // 'pending', 'passed', 'failed', 'waived'
+
+  // FAST-TRACK / BYPASS LOGIC
+  isQaBypassed: boolean("is_qa_bypassed").default(false),
+  qaBypassReason: text("qa_bypass_reason"), // Mandatory if bypassed
+  qaBypassedBy: integer("qa_bypassed_by").references(() => employees.id),
+  challanPhotoUrl: text("challan_photo_url"), // Proof of receipt
+});
+
+export const qaTests = pgTable("qa_tests", {
+  id: serial("id").primaryKey(),
+  grnItemId: integer("grn_item_id")
+    .references(() => grnItems.id)
+    .notNull(), // Link to GRN Item
+  type: text("type").notNull(), // 'internal' or 'external'
+  status: text("status").notNull(), // 'pending', 'passed', 'failed', 'waived'
+
+  // External Lab Details
+  externalLabName: text("external_lab_name"),
+  testReportUrl: text("test_report_url"), // Link to S3/Cloudinary for PDF/Image
+
+  // Internal/General Details
+  testedBy: integer("tested_by").references(() => employees.id),
+  testedAt: timestamp("tested_at"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const subcontractingGrns = pgTable("subcontracting_grns", {
+  id: serial("id").primaryKey(),
+  grnNumber: text("grn_number").unique().notNull(), // Can use a prefix like SCO-GRN-001
+  scoId: integer("sco_id")
+    .references(() => subcontractingOrders.id)
+    .notNull(),
+  vendorId: integer("vendor_id")
+    .references(() => supplierMaster.id)
+    .notNull(),
+  status: grnStatusEnum("status").default("draft").notNull(),
+  receivedDate: timestamp("received_date").defaultNow(),
+  createdBy: integer("created_by").references(() => employees.id),
+});
+
+export const subcontractingGrnItems = pgTable("subcontracting_grn_items", {
+  id: serial("id").primaryKey(),
+  scoGrnId: integer("sco_grn_id")
+    .references(() => subcontractingGrns.id)
+    .notNull(),
+  scoItemId: integer("sco_item_id")
+    .references(() => subcontractingOrderItems.id)
+    .notNull(),
+  receivedQty: doublePrecision("received_qty").notNull(),
+  acceptedQty: doublePrecision("accepted_qty").notNull(), // Triggers sco_receipt in ledger
+  rejectedQty: doublePrecision("rejected_qty").default(0),
+  qaStatus: text("qa_status").default("pending"),
+  isQaBypassed: boolean("is_qa_bypassed").default(false),
+  qaBypassReason: text("qa_bypass_reason"),
+});
+
+// --- GAP 2: PURCHASE RETURN ORDERS (PRO) ---
+export const purchaseReturns = pgTable("purchase_returns", {
+  id: serial("id").primaryKey(),
+  proNumber: text("pro_number").unique().notNull(),
+  poId: integer("po_id")
+    .references(() => purchaseOrders.id)
+    .notNull(),
+  supplierId: integer("supplier_id")
+    .references(() => supplierMaster.id)
+    .notNull(),
+  status: text("status").default("draft").notNull(), // draft, dispatched, closed
+  reason: text("reason").notNull(),
+  debitNoteAmountPaise: integer("debit_note_amount_paise").default(0).notNull(),
+  createdBy: integer("created_by").references(() => employees.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const purchaseReturnItems = pgTable("purchase_return_items", {
+  id: serial("id").primaryKey(),
+  proId: integer("pro_id")
+    .references(() => purchaseReturns.id)
+    .notNull(),
+  itemId: integer("item_id")
+    .references(() => itemMaster.id)
+    .notNull(),
+  returnQty: doublePrecision("return_qty").notNull(),
+  unitPricePaise: integer("unit_price_paise").notNull(),
+});
+
+// --- 5. SUPPLIER INVOICE & 3-WAY MATCH ---
+export const supplierInvoices = pgTable("supplier_invoices", {
+  id: serial("id").primaryKey(),
+  invoiceNumber: text("invoice_number").notNull(), //supplier invoice number
+  invoiceDate: timestamp("invoice_date").notNull(),
+  poId: integer("po_id").references(() => purchaseOrders.id),
+  supplierId: integer("supplier_id")
+    .references(() => supplierMaster.id)
+    .notNull(),
+  billedAmountPaise: integer("billed_amount_paise").notNull(),
+  // 3-way match status
+  matchStatus: text("match_status").default("pending"), // 'matched', 'exception', 'approved'
+  paymentStatus: text("payment_status").default("unpaid"), // 'unpaid', 'scheduled', 'paid'
+  dueDate: timestamp("due_date"), // Calculated: GRN Date + paymentTermsDays
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const supplierBankDetails = pgTable("supplier_bank_details", {
+  id: serial("id").primaryKey(),
+  supplierId: integer("supplier_id")
+    .references(() => supplierMaster.id)
+    .notNull(),
+  accountName: text("account_name").notNull(),
+  accountNumber: text("account_number").notNull(),
+  ifscCode: text("ifsc_code").notNull(),
+  bankName: text("bank_name").notNull(),
+  branchName: text("branch_name"),
+  isDefault: boolean("is_default").notNull().default(false),
+});
+
+// --- GAP 3: SUPPLIER PAYMENTS ---
+export const supplierPayments = pgTable("supplier_payments", {
+  id: serial("id").primaryKey(),
+  invoiceId: integer("invoice_id")
+    .references(() => supplierInvoices.id)
+    .notNull(),
+  amountPaidPaise: integer("amount_paid_paise").notNull(),
+  paymentDate: timestamp("payment_date").notNull(),
+  paymentMethod: text("payment_method").notNull(), // 'NEFT', 'RTGS', 'UPI', 'Cheque'
+  transactionRef: text("transaction_ref"), // UTR Number or Cheque Number
+  notes: text("notes"),
+  createdBy: integer("created_by")
+    .references(() => employees.id)
+    .notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});

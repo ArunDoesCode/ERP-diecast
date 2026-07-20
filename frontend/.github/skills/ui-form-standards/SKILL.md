@@ -6,10 +6,6 @@ argument-hint: "Describe the form or UI component you are building."
 
 # UI & Form Standards
 
-Full conventions in **[nextjs.md](../../../nextjs.md)**. This skill is a decision guide for
-`frontend/` — a standalone repo (no `packages/*`), using shadcn's "radix-mira" style with the
-tabler icon set.
-
 ## Owns
 
 - shadcn form wiring (RHF + Zod + `Form`, `FormField`, `FormItem`, `FormControl`, `FormMessage`)

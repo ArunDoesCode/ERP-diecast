@@ -2,18 +2,21 @@
 
 import { RoleTable } from "@/components/pages/setup/RoleTable";
 import { Button } from "@/components/ui/button";
-import { useSetupDrawerStore } from "@/lib/store/setupDrawerStore";
+import type { Role } from "@/types/setup";
 
-export function RolesTab() {
-  const openCreate = useSetupDrawerStore((state) => state.openCreate);
+type RolesTabProps = {
+  onCreateRole: () => void;
+  onEditRole: (role: Role) => void;
+};
 
+export function RolesTab({ onCreateRole, onEditRole }: RolesTabProps) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex justify-end">
-        <Button onClick={() => openCreate("role")}>+ New Role</Button>
+        <Button onClick={onCreateRole}>+ New Role</Button>
       </div>
 
-      <RoleTable />
+      <RoleTable onEditRole={onEditRole} />
     </div>
   );
 }

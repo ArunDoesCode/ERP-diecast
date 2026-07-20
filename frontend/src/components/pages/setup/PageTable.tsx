@@ -25,10 +25,13 @@ import {
   useModulesQuery,
   usePagesQuery,
 } from "@/lib/api/setup/queries";
-import { useSetupDrawerStore } from "@/lib/store/setupDrawerStore";
 import type { Page, PageSortField } from "@/types/setup";
 
-export function PageTable() {
+type PageTableProps = {
+  onEditPage: (page: Page) => void;
+};
+
+export function PageTable({ onEditPage }: PageTableProps) {
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize: 10,
@@ -45,7 +48,6 @@ export function PageTable() {
   });
   const modulesQuery = useModulesQuery();
   const deletePageMutation = useDeletePageMutation();
-  const openEdit = useSetupDrawerStore((state) => state.openEdit);
   const [pageToDelete, setPageToDelete] = useState<Page | null>(null);
 
   const pages = pagesQuery.data?.data ?? [];
@@ -99,7 +101,7 @@ export function PageTable() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onSelect={() => openEdit("page", page)}>
+                <DropdownMenuItem onSelect={() => onEditPage(page)}>
                   Edit
                 </DropdownMenuItem>
                 <DropdownMenuItem
@@ -114,7 +116,7 @@ export function PageTable() {
         },
       },
     ];
-  }, [modules, openEdit]);
+  }, [modules, onEditPage]);
 
   const table = useReactTable({
     data: pages,

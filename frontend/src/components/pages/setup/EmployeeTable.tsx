@@ -26,10 +26,13 @@ import {
   useEmployeesQuery,
   useRolesQuery,
 } from "@/lib/api/setup/queries";
-import { useSetupDrawerStore } from "@/lib/store/setupDrawerStore";
 import type { Employee, EmployeeSortField } from "@/types/setup";
 
-export function EmployeeTable() {
+type EmployeeTableProps = {
+  onEditEmployee: (employee: Employee) => void;
+};
+
+export function EmployeeTable({ onEditEmployee }: EmployeeTableProps) {
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize: 10,
@@ -46,7 +49,6 @@ export function EmployeeTable() {
   });
   const rolesQuery = useRolesQuery();
   const deleteEmployeeMutation = useDeleteEmployeeMutation();
-  const openEdit = useSetupDrawerStore((state) => state.openEdit);
   const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(
     null,
   );
@@ -116,9 +118,7 @@ export function EmployeeTable() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  onSelect={() => openEdit("employee", employee)}
-                >
+                <DropdownMenuItem onSelect={() => onEditEmployee(employee)}>
                   Edit
                 </DropdownMenuItem>
                 <DropdownMenuItem
@@ -133,7 +133,7 @@ export function EmployeeTable() {
         },
       },
     ];
-  }, [roles, openEdit]);
+  }, [roles, onEditEmployee]);
 
   const table = useReactTable({
     data: employees,
