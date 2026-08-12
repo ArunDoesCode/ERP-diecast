@@ -13,7 +13,6 @@ if (!process.env.DATABASE_URL) {
 //   },
 // } satisfies Config;
 
-
 import { defineConfig } from "drizzle-kit";
 
 export default defineConfig({

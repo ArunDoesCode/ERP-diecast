@@ -59,10 +59,10 @@ export const roleRepository = {
     return row;
   },
 
-  async update(id: number, name: string) {
+  async update(id: number, data: { name?: string | undefined }) {
     const [row] = await db
       .update(roles)
-      .set({ name })
+      .set(data)
       .where(eq(roles.id, id))
       .returning(roleColumns);
     return row;

@@ -3,7 +3,11 @@ import type { Context } from "hono";
 import { BadRequestError } from "../lib/errors";
 import type { AppEnv } from "../lib/types";
 import { roleService } from "../service/roleService";
-import { roleInputSchema, roleListQuerySchema } from "../types/setup.types";
+import {
+  roleInputSchema,
+  roleListQuerySchema,
+  roleUpdateSchema,
+} from "../types/setup.types";
 
 function parseIdParam(c: Context<AppEnv>) {
   const id = Number(c.req.param("id"));
@@ -31,7 +35,7 @@ export const roleController = {
 
   async update(c: Context<AppEnv>) {
     const id = parseIdParam(c);
-    const body = roleInputSchema.parse(await c.req.json());
+    const body = roleUpdateSchema.parse(await c.req.json());
     const data = await roleService.update(id, body);
     return c.json({ success: true, data });
   },

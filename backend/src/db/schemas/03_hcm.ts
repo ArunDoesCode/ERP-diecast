@@ -1,9 +1,9 @@
 import {
+  boolean,
+  integer,
   pgTable,
   serial,
   text,
-  boolean,
-  integer,
   timestamp,
   unique,
 } from "drizzle-orm/pg-core";

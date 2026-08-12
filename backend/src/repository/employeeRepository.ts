@@ -1,8 +1,8 @@
 import { asc, count, desc, eq, ilike } from "drizzle-orm";
 
 import { db } from "../db/client";
-import type { employeeSchemaType } from "../types/setup.types";
 import { employees } from "../db/schemas/03_hcm";
+import type { employeeSchemaType } from "../types/setup.types";
 
 const employeeColumns = {
   id: employees.id,
@@ -22,16 +22,12 @@ function toEmployee(row: EmployeeRow): employeeSchemaType {
   return { ...row, qrToken: null };
 }
 
-type EmployeeWriteData = {
-  name: string;
-  phone?: string | undefined;
-  dailyRatePaise?: number | undefined;
-  roleId: number;
-  email: string | null;
-  passwordHash: string | null;
-  qrToken: string | null;
-  createdBy?: number | undefined;
-};
+type EmployeeInsert = typeof employees.$inferInsert;
+
+type EmployeeWriteData = Required<
+  Pick<EmployeeInsert, "name" | "roleId" | "email" | "passwordHash" | "qrToken">
+> &
+  Pick<EmployeeInsert, "phone" | "dailyRatePaise" | "createdBy">;
 
 type EmployeeListParams = {
   page: number;
@@ -44,6 +40,8 @@ type EmployeeSearchParams = {
   q: string;
   page: number;
   pageSize: number;
+  sortBy?: string | undefined;
+  sortDir: "asc" | "desc";
 };
 
 const employeeSortColumns = {
@@ -75,6 +73,12 @@ export const employeeRepository = {
   },
 
   async search(params: EmployeeSearchParams) {
+    const sortColumn =
+      params.sortBy && params.sortBy in employeeSortColumns
+        ? employeeSortColumns[params.sortBy as keyof typeof employeeSortColumns]
+        : employees.id;
+    const orderFn = params.sortDir === "desc" ? desc : asc;
+
     const whereClause = ilike(employees.name, `%${params.q}%`);
 
     const [rows, [totalRow]] = await Promise.all([
@@ -82,7 +86,7 @@ export const employeeRepository = {
         .select(employeeColumns)
         .from(employees)
         .where(whereClause)
-        .orderBy(asc(employees.id))
+        .orderBy(orderFn(sortColumn), asc(employees.id))
         .limit(params.pageSize)
         .offset((params.page - 1) * params.pageSize),
       db.select({ value: count() }).from(employees).where(whereClause),

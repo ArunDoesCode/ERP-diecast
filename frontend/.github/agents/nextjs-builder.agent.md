@@ -105,8 +105,22 @@ version-specific fact/gotcha not already listed there, add a one-line bullet to 
 | Next.js version/API behavior                | `nextjs-standards`  | Data-flow concern -> `client-data-state`                |
 | shadcn component add/fix/style/compose      | `shadcn`            | Form involved -> `ui-form-standards`                    |
 
+## Backend Contract Lookup (mandatory, before writing types/fetchers)
+
+The backend publishes a generated contract for every route — query it instead of guessing or recalling a prior session's payload shape. Never hand-derive a request/response type from memory when the backend can tell you directly.
+
+```
+bun run --cwd ../backend contract:query "<resource or search term>"     # e.g. "purchase order" — lists matching routes + one-line summaries
+bun run --cwd ../backend contract:query "<METHOD> /api/<path>"          # e.g. "POST /api/pr/createpr" — full descriptor: request/response schema, auth roles, pagination fields
+```
+
+If `.contracts/api-manifest.json` doesn't exist yet or looks stale (backend changed recently), ask the backend agent/session to run `bun run contract:generate`, or run it yourself via `bun run --cwd ../backend contract:generate` — this repo does not commit that file, it's generated on demand.
+
+Use the queried descriptor to write `src/types/[feature].ts` and the fetcher's generic type args in step 1 and 3 below — don't invent field names/types that aren't in the descriptor.
+
 ## Implementation Order Per Feature
 
+0. Query the backend contract (above) for every endpoint this feature touches.
 1. Define schema/type in `src/types/[feature].ts` (Zod + inferred TS type).
 2. Add route constants in `src/lib/api/routes.ts` if missing.
 3. Add fetchers in `src/lib/api/[feature]/fetchers.ts` via `api.*` only.
@@ -119,6 +133,7 @@ version-specific fact/gotcha not already listed there, add a one-line bullet to 
 
 ## Quality Gates Before Finishing
 
+- [ ] Request/response types in `src/types/[feature].ts` match the backend contract from `bun run --cwd ../backend contract:query`, not guessed/recalled
 - [ ] No `"use server"` in new files
 - [ ] No axios and no raw `fetch()` in feature code
 - [ ] API calls use `api.*` + `API_ROUTES`

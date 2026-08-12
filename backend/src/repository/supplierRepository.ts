@@ -5,6 +5,7 @@ import {
   desc,
   eq,
   exists,
+  getTableColumns,
   ilike,
   inArray,
   or,
@@ -18,122 +19,51 @@ import {
   supplierMaster,
   supplierServices,
 } from "../db/schemas/02_procurement";
+import { AppError } from "../lib/errors";
+import type { PartialUpdate } from "../lib/types";
 import type {
   supplierCreateSchemaType,
   supplierItemCreateSchemaType,
-  supplierItemInputSchemaType,
   supplierItemListQuerySchemaType,
+  supplierItemLookupQuerySchemaType,
   supplierListQuerySchemaType,
   supplierServiceCreateSchemaType,
   supplierServiceListQuerySchemaType,
 } from "../types/supplier.types";
 
-const supplierColumns = {
-  id: supplierMaster.id,
-  name: supplierMaster.name,
-  type: supplierMaster.type,
-  gstNumber: supplierMaster.gstNumber,
-  panNumber: supplierMaster.panNumber,
-  contactPerson: supplierMaster.contactPerson,
-  email: supplierMaster.email,
-  phone: supplierMaster.phone,
-  address: supplierMaster.address,
-  defaultPaymentTermsDays: supplierMaster.defaultPaymentTermsDays,
-  isActive: supplierMaster.isActive,
-  createdBy: supplierMaster.createdBy,
-  createdAt: supplierMaster.createdAt,
-};
+const supplierColumns = getTableColumns(supplierMaster);
 
-const supplierItemColumns = {
-  id: supplierItems.id,
-  supplierId: supplierItems.supplierId,
-  itemId: supplierItems.itemId,
-  supplierSku: supplierItems.supplierSku,
-  supplierUnitPricePaise: supplierItems.supplierUnitPricePaise,
-  taxPercentage: supplierItems.taxPercentage,
-  leadTimeDays: supplierItems.leadTimeDays,
-  qty: supplierItems.qty,
-  uom: supplierItems.uom,
-  isActive: supplierItems.isActive,
-  createdBy: supplierItems.createdBy,
-  createdAt: supplierItems.createdAt,
-  lastUpdatedBy: supplierItems.lastUpdatedBy,
-  lastUpdatedAt: supplierItems.lastUpdatedAt,
-};
+const supplierItemColumns = getTableColumns(supplierItems);
 
-const supplierServiceColumns = {
-  id: supplierServices.id,
-  supplierId: supplierServices.supplierId,
-  serviceId: supplierServices.serviceId,
-  serviceUnitPricePaise: supplierServices.serviceUnitPricePaise,
-  taxPercentage: supplierServices.taxPercentage,
-  leadTimeDays: supplierServices.leadTimeDays,
-  isActive: supplierServices.isActive,
-  createdBy: supplierServices.createdBy,
-  createdAt: supplierServices.createdAt,
-  lastUpdatedBy: supplierServices.lastUpdatedBy,
-  lastUpdatedAt: supplierServices.lastUpdatedAt,
-};
+const supplierServiceColumns = getTableColumns(supplierServices);
 
 type SupplierCreateData = Omit<supplierCreateSchemaType, "supplierItems">;
 
-type SupplierMasterUpdateData = {
-  name?: string | undefined;
-  type?: SupplierCreateData["type"] | undefined;
-  gstNumber?: string | null | undefined;
-  panNumber?: string | null | undefined;
-  contactPerson?: string | null | undefined;
-  email?: string | null | undefined;
-  phone?: string | null | undefined;
-  address?: string | null | undefined;
-  defaultPaymentTermsDays?: number | undefined;
-  isActive?: boolean | undefined;
-};
+type SupplierMasterUpdateData = PartialUpdate<
+  Omit<typeof supplierMaster.$inferInsert, "id" | "createdBy" | "createdAt">
+>;
 
-type SupplierItemCreateData = supplierItemInputSchemaType;
+type SupplierItemCreateData = supplierItemCreateSchemaType;
 
 type SupplierItemCreateBatchData = supplierItemCreateSchemaType;
 
 type SupplierServiceCreateData = supplierServiceCreateSchemaType;
 
-type SupplierItemUpdateData = {
-  supplierSku?: string | null | undefined;
-  supplierUnitPricePaise?: number | undefined;
-  taxPercentage?: number | undefined;
-  leadTimeDays?: number | undefined;
-  qty?: number | undefined;
-  uom?: string | undefined;
-  isActive?: boolean | undefined;
-  lastUpdatedBy?: number | undefined;
-  lastUpdatedAt?: Date | undefined;
-};
+type SupplierItemUpdateData = PartialUpdate<
+  Omit<
+    typeof supplierItems.$inferInsert,
+    "id" | "supplierId" | "itemId" | "createdBy" | "createdAt"
+  >
+>;
 
-type SupplierItemLookupParams = {
-  page: number;
-  pageSize: number;
-  q?: string | undefined;
-};
+type SupplierItemEditData = SupplierItemUpdateData;
 
-type SupplierItemEditData = {
-  supplierSku?: string | null | undefined;
-  supplierUnitPricePaise?: number | undefined;
-  taxPercentage?: number | undefined;
-  leadTimeDays?: number | undefined;
-  qty?: number | undefined;
-  uom?: string | undefined;
-  isActive?: boolean | undefined;
-  lastUpdatedBy?: number | undefined;
-  lastUpdatedAt?: Date | undefined;
-};
-
-type SupplierServiceEditData = {
-  serviceUnitPricePaise?: number | undefined;
-  taxPercentage?: number | undefined;
-  leadTimeDays?: number | undefined;
-  isActive?: boolean | undefined;
-  lastUpdatedBy?: number | undefined;
-  lastUpdatedAt?: Date | undefined;
-};
+type SupplierServiceEditData = PartialUpdate<
+  Omit<
+    typeof supplierServices.$inferInsert,
+    "id" | "supplierId" | "serviceId" | "createdBy" | "createdAt"
+  >
+>;
 
 const supplierSortColumns = {
   name: supplierMaster.name,
@@ -257,7 +187,7 @@ export const supplierRepository = {
     return new Set(rows.map((row) => row.id));
   },
 
-  async listItems(params: SupplierItemLookupParams) {
+  async listItems(params: supplierItemLookupQuerySchemaType) {
     const q = params.q?.trim();
     const pattern = q ? `%${q}%` : undefined;
 
@@ -316,11 +246,16 @@ export const supplierRepository = {
         .orderBy(asc(supplierItems.id))
         .limit(params.pageSize)
         .offset((params.page - 1) * params.pageSize),
-      db
-        .select({ value: count() })
-        .from(supplierItems)
-        .innerJoin(itemMaster, eq(itemMaster.id, supplierItems.itemId))
-        .where(whereClause),
+      pattern
+        ? db
+            .select({ value: count() })
+            .from(supplierItems)
+            .innerJoin(itemMaster, eq(itemMaster.id, supplierItems.itemId))
+            .where(whereClause)
+        : db
+            .select({ value: count() })
+            .from(supplierItems)
+            .where(eq(supplierItems.supplierId, supplierId)),
     ]);
 
     return { rows, total: totalRow?.value ?? 0 };
@@ -355,14 +290,19 @@ export const supplierRepository = {
         .orderBy(asc(supplierServices.id))
         .limit(params.pageSize)
         .offset((params.page - 1) * params.pageSize),
-      db
-        .select({ value: count() })
-        .from(supplierServices)
-        .innerJoin(
-          serviceMaster,
-          eq(serviceMaster.id, supplierServices.serviceId),
-        )
-        .where(whereClause),
+      pattern
+        ? db
+            .select({ value: count() })
+            .from(supplierServices)
+            .innerJoin(
+              serviceMaster,
+              eq(serviceMaster.id, supplierServices.serviceId),
+            )
+            .where(whereClause)
+        : db
+            .select({ value: count() })
+            .from(supplierServices)
+            .where(eq(supplierServices.supplierId, supplierId)),
     ]);
 
     return { rows, total: totalRow?.value ?? 0 };
@@ -421,7 +361,11 @@ export const supplierRepository = {
         .returning(supplierColumns);
 
       if (!supplier) {
-        throw new Error("Failed to create supplier");
+        throw new AppError(
+          "Failed to create supplier",
+          500,
+          "SUPPLIER_CREATE_FAILED",
+        );
       }
 
       const createdSupplierItems =

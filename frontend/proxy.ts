@@ -1,65 +1,87 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-type AccessTokenPayload = {
-  userId: string;
-  role: string;
-  allowedPages: string[];
-  exp: number;
-};
+const PUBLIC_PATHS = ["/", "/login"];
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
 
-function decodePayload(token: string): AccessTokenPayload | null {
-  try {
-    const payloadPart = token.split(".")[1];
-    if (!payloadPart) {
-      return null;
-    }
+function normalizePath(path: string) {
+	if (path === "/") {
+		return "/";
+	}
 
-    const padded = payloadPart
-      .replace(/-/g, "+")
-      .replace(/_/g, "/")
-      .padEnd(Math.ceil(payloadPart.length / 4) * 4, "=");
-    const decoded = atob(padded);
-
-    return JSON.parse(decoded) as AccessTokenPayload;
-  } catch {
-    return null;
-  }
+	const withLeadingSlash = path.startsWith("/") ? path : `/${path}`;
+	return withLeadingSlash.endsWith("/")
+		? withLeadingSlash.slice(0, -1)
+		: withLeadingSlash;
 }
 
-const PUBLIC_PATHS = ["/", "/login"];
+function isPathAllowed(pathname: string, allowedPages: string[]) {
+	const normalizedPathname = normalizePath(pathname);
 
-export function proxy(request: NextRequest) {
-  const pathname = request.nextUrl.pathname;
-  if (PUBLIC_PATHS.includes(pathname)) {
-    return NextResponse.next();
-  }
+	return allowedPages.some((allowedPage) => {
+		const normalizedAllowed = normalizePath(allowedPage);
+		if (normalizedAllowed === "/") {
+			return normalizedPathname === "/";
+		}
 
-  const accessToken = request.cookies.get("access_token")?.value;
-  if (!accessToken) {
-    return NextResponse.redirect(new URL("/login", request.url));
-  }
+		return (
+			normalizedPathname === normalizedAllowed ||
+			normalizedPathname.startsWith(`${normalizedAllowed}/`)
+		);
+	});
+}
 
-  const payload = decodePayload(accessToken);
-  if (!payload) {
-    return NextResponse.redirect(new URL("/login", request.url));
-  }
+async function fetchAllowedPages(accessToken: string) {
+	if (!apiBaseUrl) {
+		return null;
+	}
 
-  const isExpired = payload.exp * 1000 <= Date.now();
-  if (isExpired) {
-    return NextResponse.redirect(new URL("/login", request.url));
-  }
+	const response = await fetch(`${apiBaseUrl}/auth/me`, {
+		method: "GET",
+		headers: {
+			Authorization: `Bearer ${accessToken}`,
+		},
+		cache: "no-store",
+	});
 
-  const isAllowed = payload.allowedPages.some((allowedPage) =>
-    pathname.startsWith(allowedPage),
-  );
+	if (!response.ok) {
+		return null;
+	}
 
-  if (!isAllowed) {
-    return NextResponse.redirect(new URL("/", request.url));
-  }
+	const payload = (await response.json()) as {
+		success: true;
+		data: { allowedPages: string[] };
+	};
 
-  return NextResponse.next();
+	return Array.isArray(payload.data.allowedPages)
+		? payload.data.allowedPages
+		: null;
+}
+
+export async function proxy(request: NextRequest) {
+	const pathname = request.nextUrl.pathname;
+	if (PUBLIC_PATHS.includes(normalizePath(pathname))) {
+		return NextResponse.next();
+	}
+
+	const accessToken = request.cookies.get("access_token")?.value;
+	if (!accessToken) {
+		return NextResponse.redirect(new URL("/login", request.url));
+	}
+
+	const allowedPages = await fetchAllowedPages(accessToken);
+	if (!allowedPages) {
+		return NextResponse.redirect(new URL("/login", request.url));
+	}
+
+	if (!isPathAllowed(pathname, allowedPages)) {
+		return NextResponse.redirect(new URL("/", request.url));
+	}
+
+	return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+	matcher: [
+		"/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|txt|xml)$).*)",
+	],
 };

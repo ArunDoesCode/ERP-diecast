@@ -1,64 +1,101 @@
+import { createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
+import {
+  supplierItems,
+  supplierMaster,
+  supplierServices,
+  supplierTypeEnum,
+} from "../db/schemas/02_procurement-suppliers";
 
-export const supplierTypeSchema = z.enum([
-  "raw_material",
-  "consumables",
-  "service_provider",
-  "trader",
-  "both",
-]);
+export const supplierTypeSchema = z.enum(supplierTypeEnum.enumValues);
 
-export const supplierSchema = z.object({
-  id: z.number(),
-  name: z.string(),
-  type: supplierTypeSchema,
-  gstNumber: z.string().nullable(),
-  panNumber: z.string().nullable(),
-  contactPerson: z.string().nullable(),
-  email: z.string().nullable(),
-  phone: z.string().nullable(),
-  address: z.string().nullable(),
-  defaultPaymentTermsDays: z.number().nullable(),
-  isActive: z.boolean(),
-  createdBy: z.number().nullable(),
-  createdAt: z.date(),
-});
+export const supplierSchema = createSelectSchema(supplierMaster);
 export type supplierSchemaType = z.infer<typeof supplierSchema>;
 
-export const supplierItemSchema = z.object({
-  id: z.number(),
-  supplierId: z.number(),
-  itemId: z.number(),
-  supplierSku: z.string().nullable(),
-  supplierUnitPricePaise: z.number(),
-  taxPercentage: z.number(),
-  leadTimeDays: z.number(),
-  qty: z.number(),
-  uom: z.string(),
-  isActive: z.boolean(),
-  createdBy: z.number().nullable(),
-  createdAt: z.date(),
-  lastUpdatedBy: z.number().nullable(),
-  lastUpdatedAt: z.date(),
-});
+export const supplierItemSchema = createSelectSchema(supplierItems);
 export type supplierItemSchemaType = z.infer<typeof supplierItemSchema>;
 
-export const supplierServiceSchema = z.object({
-  id: z.number(),
-  supplierId: z.number(),
-  serviceId: z.number(),
+export const supplierServiceSchema = createSelectSchema(
+  supplierServices,
+).extend({
   serviceCode: z.string(),
   serviceName: z.string(),
-  serviceUnitPricePaise: z.number(),
-  taxPercentage: z.number(),
-  leadTimeDays: z.number(),
-  isActive: z.boolean(),
-  createdBy: z.number().nullable(),
-  createdAt: z.date(),
-  lastUpdatedBy: z.number().nullable(),
-  lastUpdatedAt: z.date(),
 });
 export type supplierServiceSchemaType = z.infer<typeof supplierServiceSchema>;
+
+// GET /:supplierId/detail response payload — supplier master plus item/service counts.
+export const supplierDetailSchema = z.object({
+  supplier: supplierSchema,
+  itemCount: z.number().int().nonnegative(),
+  serviceCount: z.number().int().nonnegative(),
+});
+export type supplierDetailSchemaType = z.infer<typeof supplierDetailSchema>;
+
+// Bespoke response shapes for the two batch-edit routes below — these
+// controllers spread the service result directly ({success, data, summary}),
+// not the standard {success, data} envelope. See routes/supplier.ts register()
+// notes for the documented deviation.
+const batchEditSelectorSchema = z.object({
+  supplierItemsId: z.number().int().positive().optional(),
+  itemId: z.number().int().positive().optional(),
+});
+
+export const supplierItemBatchEditResultSchema = z.object({
+  index: z.number().int().nonnegative(),
+  selector: batchEditSelectorSchema,
+  success: z.boolean(),
+  data: supplierItemSchema.optional(),
+  error: z.string().optional(),
+});
+export type supplierItemBatchEditResultSchemaType = z.infer<
+  typeof supplierItemBatchEditResultSchema
+>;
+
+export const supplierBatchEditSummarySchema = z.object({
+  total: z.number().int().nonnegative(),
+  success: z.number().int().nonnegative(),
+  failed: z.number().int().nonnegative(),
+});
+export type supplierBatchEditSummarySchemaType = z.infer<
+  typeof supplierBatchEditSummarySchema
+>;
+
+const batchEditServiceSelectorSchema = z.object({
+  supplierServiceId: z.number().int().positive().optional(),
+  serviceId: z.number().int().positive().optional(),
+});
+
+export const supplierServiceBatchEditResultSchema = z.object({
+  index: z.number().int().nonnegative(),
+  selector: batchEditServiceSelectorSchema,
+  success: z.boolean(),
+  data: supplierServiceSchema.optional(),
+  error: z.string().optional(),
+});
+export type supplierServiceBatchEditResultSchemaType = z.infer<
+  typeof supplierServiceBatchEditResultSchema
+>;
+
+// Full response envelope for PATCH .../editItem — {success, ...serviceResult},
+// not the standard {success, data}. Documented deviation, not normalized.
+export const supplierItemEditResponseSchema = z.object({
+  success: z.literal(true),
+  data: z.array(supplierItemBatchEditResultSchema),
+  summary: supplierBatchEditSummarySchema,
+});
+export type supplierItemEditResponseSchemaType = z.infer<
+  typeof supplierItemEditResponseSchema
+>;
+
+// Full response envelope for PATCH .../editService — same deviation as above.
+export const supplierServiceEditResponseSchema = z.object({
+  success: z.literal(true),
+  data: z.array(supplierServiceBatchEditResultSchema),
+  summary: supplierBatchEditSummarySchema,
+});
+export type supplierServiceEditResponseSchemaType = z.infer<
+  typeof supplierServiceEditResponseSchema
+>;
 
 export const supplierListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -98,7 +135,7 @@ export type supplierDetailQuerySchemaType = z.infer<
   typeof supplierDetailQuerySchema
 >;
 
-export const supplierItemInputSchema = z.object({
+export const supplierItemCreateSchema = z.object({
   itemId: z.number().int().positive(),
   supplierSku: z.string().optional(),
   supplierUnitPricePaise: z.number().int().nonnegative(),
@@ -108,19 +145,19 @@ export const supplierItemInputSchema = z.object({
   uom: z.string().min(1),
   isActive: z.boolean().optional(),
 });
-export type supplierItemInputSchemaType = z.infer<
-  typeof supplierItemInputSchema
+export type supplierItemCreateSchemaType = z.infer<
+  typeof supplierItemCreateSchema
 >;
 
-export const supplierServiceInputSchema = z.object({
+export const supplierServiceCreateSchema = z.object({
   serviceId: z.number().int().positive(),
   serviceUnitPricePaise: z.number().int().nonnegative(),
   taxPercentage: z.number().nonnegative().optional(),
   leadTimeDays: z.number().int().nonnegative().optional(),
   isActive: z.boolean().optional(),
 });
-export type supplierServiceInputSchemaType = z.infer<
-  typeof supplierServiceInputSchema
+export type supplierServiceCreateSchemaType = z.infer<
+  typeof supplierServiceCreateSchema
 >;
 
 export const supplierCreateSchema = z.object({
@@ -134,7 +171,7 @@ export const supplierCreateSchema = z.object({
   address: z.string().optional(),
   defaultPaymentTermsDays: z.number().int().nonnegative().optional(),
   isActive: z.boolean().optional(),
-  supplierItems: z.array(supplierItemInputSchema).optional(),
+  supplierItems: z.array(supplierItemCreateSchema).optional(),
 });
 export type supplierCreateSchemaType = z.infer<typeof supplierCreateSchema>;
 
@@ -229,11 +266,6 @@ export type supplierItemListQuerySchemaType = z.infer<
   typeof supplierItemListQuerySchema
 >;
 
-export const supplierItemCreateSchema = supplierItemInputSchema;
-export type supplierItemCreateSchemaType = z.infer<
-  typeof supplierItemCreateSchema
->;
-
 export const supplierItemEditSchema = z
   .object({
     supplierItemsId: z.number().int().positive().optional(),
@@ -281,11 +313,6 @@ export const supplierItemBatchEditSchema = z.union([
 ]);
 export type supplierItemBatchEditSchemaType = z.infer<
   typeof supplierItemBatchEditSchema
->;
-
-export const supplierServiceCreateSchema = supplierServiceInputSchema;
-export type supplierServiceCreateSchemaType = z.infer<
-  typeof supplierServiceCreateSchema
 >;
 
 export const supplierServiceEditSchema = z

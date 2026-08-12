@@ -4,6 +4,7 @@ import { pageRepository } from "../repository/pageRepository";
 import type {
   pageInputSchemaType,
   pageListQuerySchemaType,
+  pageUpdateSchemaType,
 } from "../types/setup.types";
 
 async function assertValidModuleId(moduleId: number | null) {
@@ -33,10 +34,11 @@ export const pageService = {
     return pageRepository.create({ ...input, createdBy: actorId });
   },
 
-  async update(id: number, input: pageInputSchemaType) {
-    await assertValidModuleId(input.moduleId);
+  async update(id: number, input: pageUpdateSchemaType) {
+    if (input.moduleId !== undefined) {
+      await assertValidModuleId(input.moduleId);
+    }
 
-    // key is immutable — strip it from the update payload even if sent
     const { label, path, sortOrder, moduleId } = input;
 
     const updated = await pageRepository.update(id, {

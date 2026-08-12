@@ -74,7 +74,9 @@ You are a backend implementation specialist for the DiecastOS Hono API (`backend
 - DO NOT add `try/catch` inside controllers — async handler + global error middleware handle it.
 - DO NOT use hardcoded endpoint strings — all paths come from `src/routes/end-points.ts`.
 - DO NOT use `any` types anywhere.
-- DO NOT inline Supabase/DB client instantiation — import from `src/lib/supabase.ts` or the designated client module.
+- DO NOT define repository DTO/union types by hand when Drizzle schema already defines them.
+- DO NOT hand-declare Zod field types/nullability in `src/types/*.types.ts` when a table's shape is already covered by a `drizzle-zod` `createSelectSchema`/`createInsertSchema`/`createUpdateSchema` derivation — `.pick()`/`.omit()`/`.extend()` the generated schema for the API-facing variant instead. Keep a field hand-authored only when the contract deliberately diverges from the column's nullability, with a comment explaining why.
+- DO NOT inline DB client instantiation — import from `src/db/client.ts`.
 - DO NOT ship an endpoint without OpenAPI metadata.
 - DO NOT ship a list/index endpoint without mandatory server-side pagination — see skill `pagination-contract` (`.github/skills/pagination-contract/SKILL.md`). `page`/`pageSize` always default (`1`/`10`, max `100`), never optional/opt-in — an unparameterized request still returns a paginated response, never the full table.
 
@@ -82,13 +84,13 @@ You are a backend implementation specialist for the DiecastOS Hono API (`backend
 
 Three strict layers — no cross-layer calls:
 
-| Layer      | File                                    | Responsibility                         |
-| ---------- | --------------------------------------- | -------------------------------------- |
-| Controller | `src/controller/<feature>Controller.ts` | Zod parse → call service → return HTTP |
-| Service    | `src/service/<feature>Service.ts`       | Business rules, orchestration          |
-| Repository | `src/repository/<feature>Repository.ts` | DB queries only, returns typed data    |
+| Layer      | File                                    | Responsibility                                                         |
+| ---------- | --------------------------------------- | ---------------------------------------------------------------------- |
+| Controller | `src/controller/<feature>Controller.ts` | Zod parse → call service → return HTTP                                 |
+| Service    | `src/service/<feature>Service.ts`       | Business rules, orchestration (Zod-inferred contracts)                 |
+| Repository | `src/repository/<feature>Repository.ts` | DB queries only, Drizzle-derived types (`$inferInsert`/`$inferSelect`) |
 
-Helpers and utilities live in `src/lib/*`. Middleware in `src/middleware/*`.
+Helpers and utilities live in `src/lib/*`. Auth middleware in `src/lib/auth-middleware.ts`.
 
 ## Single Source Of Truth
 
@@ -117,6 +119,13 @@ Helpers and utilities live in `src/lib/*`. Middleware in `src/middleware/*`.
 7. Mount feature router in `src/routes/index.ts` with auth + `requireRole()` middleware.
 8. Add OpenAPI summary, tags, request/response schema, and security metadata to every descriptor.
 9. Run `bun run lint && bun run typecheck && bun test` — fix all failures before finishing.
+10. Run `bun run contract:generate` to refresh `.contracts/api-manifest.json`.
+
+## Contract Publication (mandatory)
+
+`src/lib/route-registry.ts` is the single source of truth the frontend agent queries against — it never reads `backend/src` directly. Every new/changed route needs a `registry.register(...)` call (step 6 above; `bun test`'s drift check fails otherwise), and after that, `bun run contract:generate` must be re-run so `.contracts/api-manifest.json` reflects the change. A stale manifest after a backend change is a shipped bug for the frontend agent, same as a broken endpoint — treat it as part of "done," not an optional follow-up.
+
+The frontend agent (or you, to sanity-check your own work) queries the manifest with `bun run contract:query "<search term>"` (free-text across path/summary/tags) or `bun run contract:query "<METHOD> <path>"` (exact route, full descriptor) — run from `backend/`, or `bun run --cwd <path-to-backend> contract:query "..."` from the frontend repo.
 
 ## Quality Gates Before Finish
 
@@ -125,6 +134,8 @@ Helpers and utilities live in `src/lib/*`. Middleware in `src/middleware/*`.
 - Controllers do not call DB/ORM clients directly.
 - Service has no HTTP status logic.
 - Repository returns raw typed data and no HTTP concerns.
+- Controller/service contracts are Zod-inferred from `src/types/*.types.ts`.
+- Repository contracts are Drizzle-derived; no duplicated handwritten DB-shape DTOs.
 - Response and error shapes are uniform.
 - No duplicated schema or duplicated endpoint string.
 - Every endpoint has OpenAPI summary/tags/schemas/security metadata.

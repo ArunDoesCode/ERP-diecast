@@ -9,6 +9,7 @@ import {
   assetItemCreateSchema,
   assetItemListQuerySchema,
   assetItemUpdateSchema,
+  assetLastRateQuerySchema,
   assetLocationCreateSchema,
   assetLocationListQuerySchema,
   assetLocationUpdateSchema,
@@ -48,6 +49,15 @@ export const assetController = {
     const id = parseId(c.req.param("id"), "item id");
     const body = assetItemUpdateSchema.parse(await c.req.json());
     const data = await assetService.updateItem(id, body);
+    return c.json({ success: true, data });
+  },
+
+  async getLastRate(c: Context<AppEnv>) {
+    const itemId = parseId(c.req.param("itemId"), "item id");
+    const query = assetLastRateQuerySchema.parse(
+      Object.fromEntries(new URL(c.req.url).searchParams),
+    );
+    const data = await assetService.getLastRate(itemId, query);
     return c.json({ success: true, data });
   },
 

@@ -1,15 +1,16 @@
 import {
+  boolean,
+  doublePrecision,
+  index,
+  integer,
+  pgEnum,
   pgTable,
   serial,
   text,
-  integer,
   timestamp,
-  boolean,
-  doublePrecision,
-  pgEnum,
 } from "drizzle-orm/pg-core";
-import { employees } from "./03_hcm";
 import { supplierMaster } from "./02_procurement-suppliers";
+import { employees } from "./03_hcm";
 
 // Catalog master data used by supplier, purchasing, and inventory modules.
 export const itemMaster = pgTable("item_master", {
@@ -21,7 +22,7 @@ export const itemMaster = pgTable("item_master", {
   uom: text("uom").notNull(), // 'kg', 'pcs', 'ltr'
   reorderLevel: doublePrecision("reorder_level").default(0).notNull(),
   currentStock: doublePrecision("current_stock").default(0).notNull(),
-  averageCostPaise: integer("average_cost_paise").default(0),
+  averageCostPaise: integer("average_cost_paise").default(0).notNull(),
   isActive: boolean("is_active").notNull().default(true),
   createdBy: integer("created_by").references(() => employees.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -40,7 +41,6 @@ export const serviceMaster = pgTable("service_master", {
   lastUpdatedBy: integer("last_updated_by").references(() => employees.id),
   lastUpdatedAt: timestamp("last_updated_at").defaultNow().notNull(),
 });
-
 
 // 1. Direction of movement
 export const inventoryTxTypeEnum = pgEnum("inventory_tx_type", [
@@ -80,41 +80,49 @@ export const locations = pgTable("locations", {
 });
 
 // 3. The Ledger Engine
-export const inventoryLedger = pgTable("inventory_ledger", {
-  id: serial("id").primaryKey(),
-  itemId: integer("item_id")
-    .references(() => itemMaster.id)
-    .notNull(),
+export const inventoryLedger = pgTable(
+  "inventory_ledger",
+  {
+    id: serial("id").primaryKey(),
+    itemId: integer("item_id")
+      .references(() => itemMaster.id)
+      .notNull(),
 
-  // LOCATION (Perimeter only: Main Store, Vendor, Finished Goods, Scrap)
-  locationId: integer("location_id")
-    .references(() => locations.id)
-    .notNull(),
+    // LOCATION (Perimeter only: Main Store, Vendor, Finished Goods, Scrap)
+    locationId: integer("location_id")
+      .references(() => locations.id)
+      .notNull(),
 
-  // TRACEABILITY (Melt / Heat Number)
-  batchNumber: text("batch_number"),
+    // TRACEABILITY (Melt / Heat Number)
+    batchNumber: text("batch_number"),
 
-  // MOVEMENT DATA
-  transactionType: inventoryTxTypeEnum("transaction_type").notNull(),
-  referenceType: inventoryRefTypeEnum("reference_type").notNull(),
-  referenceId: integer("reference_id").notNull(), // ID of the GRN, SCO, or Job Order
+    // MOVEMENT DATA
+    transactionType: inventoryTxTypeEnum("transaction_type").notNull(),
+    referenceType: inventoryRefTypeEnum("reference_type").notNull(),
+    referenceId: integer("reference_id").notNull(), // ID of the GRN, SCO, or Job Order
 
-  // QUANTITY
-  quantityChange: doublePrecision("quantity_change").notNull(), // + for IN, - for OUT
-  balanceAfter: doublePrecision("balance_after").notNull(),
+    // QUANTITY
+    quantityChange: doublePrecision("quantity_change").notNull(), // + for IN, - for OUT
+    balanceAfter: doublePrecision("balance_after").notNull(),
 
-  // FINANCIAL VALUATION (Costing at the exact moment of movement)
-  unitCostPaise: integer("unit_cost_paise").notNull(),
-  totalValueChangePaise: integer("total_value_change_paise").notNull(),
+    // FINANCIAL VALUATION (Costing at the exact moment of movement)
+    unitCostPaise: integer("unit_cost_paise").notNull(),
+    totalValueChangePaise: integer("total_value_change_paise").notNull(),
 
-  // METADATA
-  notes: text("notes"),
-  createdBy: integer("created_by")
-    .references(() => employees.id)
-    .notNull(), // System uses a 'System' user ID for backflush
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
+    // METADATA
+    notes: text("notes"),
+    createdBy: integer("created_by")
+      .references(() => employees.id)
+      .notNull(), // System uses a 'System' user ID for backflush
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    itemLocationIdx: index("idx_inventory_ledger_item_location").on(
+      table.itemId,
+      table.locationId,
+    ),
+  }),
+);
 
 export const machineStatusEnum = pgEnum("machine_status", [
   "idle",

@@ -1,20 +1,21 @@
 import {
+  boolean,
+  doublePrecision,
+  index,
+  integer,
+  pgEnum,
   pgTable,
   serial,
   text,
-  integer,
   timestamp,
-  boolean,
-  pgEnum,
-  doublePrecision,
 } from "drizzle-orm/pg-core";
-import { employees } from "./03_hcm";
 import { itemMaster } from "./02_procurement-catalog";
 import { supplierMaster } from "./02_procurement-suppliers";
+import { employees } from "./03_hcm";
 
 // 1. Define the Enum
 export const prTypeEnum = pgEnum("pr_type", [
-  "project", // Tied to a specific Sales Order / Job Order
+  "sale_order", // Tied to a specific Sales Order / Job Order
   "stock_reorder", // Standard replenishment of raw materials/consumables
   "maintenance", // Machine spares, furnace repairs, MRO
   "tooling", // H13 steel, die bases, tool room supplies
@@ -40,22 +41,46 @@ export const purchaseRequests = pgTable("purchase_requests", {
   saleOrderId: integer("sale_order_id"), // Null if stock_reorder or someother option
   assetId: integer("asset_id"), // Only populated if type is 'maintenance' or 'tooling' (Optional: link to a specific machine/die)
   status: prStatusEnum("status").default("draft").notNull(),
-  requestedBy: integer("requested_by").references(() => employees.id),
+  requestedBy: integer("requested_by")
+    .references(() => employees.id)
+    .notNull(),
   approvedBy: integer("approved_by").references(() => employees.id),
+  currentApprovalLevel: integer("current_approval_level").default(0).notNull(),
+  totalApprovalLevels: integer("total_approval_levels").default(0).notNull(),
   notes: text("notes"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  estimatedAmountPaise: integer("estimated_amount_paise").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const purchaseRequestItems = pgTable("purchase_request_items", {
-  id: serial("id").primaryKey(),
-  prId: integer("pr_id").references(() => purchaseRequests.id),
-  itemId: integer("item_id").references(() => itemMaster.id), // Link to your items/master table
-  requestedQty: doublePrecision("requested_qty").notNull(),
-  issuedQty: doublePrecision("issued_qty").default(0), // How much has been converted to PO
-  uom: text("uom").notNull(),
-  expectedDate: timestamp("expected_date"),
-});
+export const prItemStatusEnum = pgEnum("pr_item_status", [
+  "pending",
+  "po_draft",
+  "ordered",
+  "closed",
+  "cancelled",
+]);
+
+export const purchaseRequestItems = pgTable(
+  "purchase_request_items",
+  {
+    id: serial("id").primaryKey(),
+    prId: integer("pr_id")
+      .references(() => purchaseRequests.id)
+      .notNull(),
+    itemId: integer("item_id")
+      .references(() => itemMaster.id)
+      .notNull(), // Link to your items/master table
+    requestedQty: doublePrecision("requested_qty").notNull(),
+    issuedQty: doublePrecision("issued_qty").default(0), // How much has been converted to PO
+    uom: text("uom").notNull(),
+    expectedDate: timestamp("expected_date"),
+    status: prItemStatusEnum("status").default("pending").notNull(),
+  },
+  (table) => ({
+    prIdIdx: index("idx_pr_items_pr_id").on(table.prId),
+  }),
+);
 
 export const poStatusEnum = pgEnum("po_status", [
   "draft",
@@ -78,28 +103,56 @@ export const purchaseOrders = pgTable("purchase_orders", {
     .notNull(), // Link to suppliers table
   status: poStatusEnum("status").default("draft").notNull(),
   // Financials (stored in paise to avoid floating point issues)
-  subtotalPaise: integer("subtotal_paise").default(0),
-  taxAmountPaise: integer("tax_amount_paise").default(0),
-  totalAmountPaise: integer("total_amount_paise").default(0),
+  subtotalPaise: integer("subtotal_paise").default(0).notNull(),
+  taxAmountPaise: integer("tax_amount_paise").default(0).notNull(),
+  totalAmountPaise: integer("total_amount_paise").default(0).notNull(),
   // Terms
   paymentTermsDays: integer("payment_terms_days").default(0), // e.g., 30 for Net 30
   deliveryTerms: text("delivery_terms"),
+  notes: text("notes"),
+  expectedDeliveryDate: timestamp("expected_delivery_date"),
   approvedBy: integer("approved_by").references(() => employees.id),
-  createdAt: timestamp("created_at").defaultNow(),
-  createdBy: integer("created_by").references(() => employees.id),
+  currentApprovalLevel: integer("current_approval_level").default(0).notNull(),
+  totalApprovalLevels: integer("total_approval_levels").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  createdBy: integer("created_by")
+    .references(() => employees.id)
+    .notNull(),
+  // Delay tracking — expectedDeliveryDate is never overwritten (audit
+  // trail); these hold the supplier's revised promise once one is given.
+  revisedDeliveryDate: timestamp("revised_delivery_date"),
+  delayReason: text("delay_reason"),
+  // Supplier confirmation of receipt/acceptance of the PO — informational
+  // only, never blocks a status transition.
+  supplierConfirmed: boolean("supplier_confirmed").default(false).notNull(),
+  confirmationMethod: text("confirmation_method"),
+  confirmedAt: timestamp("confirmed_at"),
+  confirmedBy: integer("confirmed_by").references(() => employees.id),
+  confirmationNote: text("confirmation_note"),
+  // Terminal close audit trail — set when a PO transitions to `closed`
+  // (legal from `fully_received` or `invoiced`).
+  closedAt: timestamp("closed_at"),
+  closedBy: integer("closed_by").references(() => employees.id),
+  closeNote: text("close_note"),
 });
 
-export const purchaseOrderItems = pgTable("purchase_order_items", {
-  id: serial("id").primaryKey(),
-  poId: integer("po_id").references(() => purchaseOrders.id),
-  itemId: integer("item_id")
-    .references(() => itemMaster.id)
-    .notNull(), // Add reference,
-  qty: doublePrecision("qty").notNull(),
-  receivedQty: doublePrecision("received_qty").default(0), // Updated by GRN
-  unitPricePaise: integer("unit_price_paise").notNull(),
-  uom: text("uom").notNull(),
-});
+export const purchaseOrderItems = pgTable(
+  "purchase_order_items",
+  {
+    id: serial("id").primaryKey(),
+    poId: integer("po_id").references(() => purchaseOrders.id),
+    itemId: integer("item_id")
+      .references(() => itemMaster.id)
+      .notNull(), // Add reference,
+    qty: doublePrecision("qty").notNull(),
+    receivedQty: doublePrecision("received_qty").default(0), // Updated by GRN
+    unitPricePaise: integer("unit_price_paise").notNull(),
+    uom: text("uom").notNull(),
+  },
+  (table) => ({
+    poIdIdx: index("idx_po_items_po_id").on(table.poId),
+  }),
+);
 
 // --- 3. PR TO PO MAPPING (Many-to-Many Resolution) ---
 // Because 1 PR can have multiple POs, and 1 PO can have multiple PRs
@@ -110,9 +163,50 @@ export const prPoItemLinks = pgTable("pr_po_item_links", {
   linkedQty: doublePrecision("linked_qty").notNull(),
 });
 
+export const poCommunicationTypeEnum = pgEnum("po_communication_type", [
+  "po_sent",
+  "reminder",
+  "escalation",
+]);
+
+export const poCommunicationChannelEnum = pgEnum("po_communication_channel", [
+  "email",
+  "whatsapp",
+  "phone",
+  "in_person",
+]);
+
+export const poCommunicationStatusEnum = pgEnum("po_communication_status", [
+  "logged",
+  "success",
+  "failed",
+]);
+
+// Manual-log-only communication trail for now (no SMTP wiring in this repo
+// yet) — shaped so real auto-email can be added later without a schema
+// change. `type=po_sent`'s latest row is what flips a PO to `dispatched`;
+// `reminder`/`escalation` rows are just log entries for the overdue queue.
+export const poCommunications = pgTable("po_communications", {
+  id: serial("id").primaryKey(),
+  poId: integer("po_id")
+    .references(() => purchaseOrders.id)
+    .notNull(),
+  type: poCommunicationTypeEnum("type").notNull(),
+  channel: poCommunicationChannelEnum("channel").notNull(),
+  status: poCommunicationStatusEnum("status").default("logged").notNull(),
+  toEmail: text("to_email"),
+  note: text("note"),
+  errorMessage: text("error_message"),
+  sentBy: integer("sent_by").references(() => employees.id),
+  sentAt: timestamp("sent_at").defaultNow().notNull(),
+});
+
 export const scoStatusEnum = pgEnum("sco_status", [
   "draft",
+  "pending_approval",
   "approved",
+  "rejected",
+  "require_more_info",
   "material_issued",
   "material_received",
   "closed",
@@ -185,28 +279,42 @@ export const grns = pgTable("grns", {
   status: grnStatusEnum("status").default("draft").notNull(),
   receivedDate: timestamp("received_date").defaultNow(),
   createdBy: integer("created_by").references(() => employees.id),
+  // Header fields the delivery person actually fills in on arrival.
+  challanNo: text("challan_no"),
+  challanDate: timestamp("challan_date"),
+  vehicleNo: text("vehicle_no"),
+  driverName: text("driver_name"),
+  driverPhone: text("driver_phone"),
+  remarks: text("remarks"),
 });
 
 // Add these to your existing `grnItems` table definition
-export const grnItems = pgTable("grn_items", {
-  id: serial("id").primaryKey(),
-  grnId: integer("grn_id").references(() => grns.id),
-  poItemId: integer("po_item_id").references(() => purchaseOrderItems.id),
+export const grnItems = pgTable(
+  "grn_items",
+  {
+    id: serial("id").primaryKey(),
+    grnId: integer("grn_id").references(() => grns.id),
+    poItemId: integer("po_item_id").references(() => purchaseOrderItems.id),
 
-  // Quantities
-  receivedQty: doublePrecision("received_qty").notNull(),
-  acceptedQty: doublePrecision("accepted_qty").notNull(), // THIS updates the inventory ledger
-  rejectedQty: doublePrecision("rejected_qty").default(0),
+    // Quantities
+    receivedQty: doublePrecision("received_qty").notNull(),
+    acceptedQty: doublePrecision("accepted_qty").notNull(), // THIS updates the inventory ledger
+    rejectedQty: doublePrecision("rejected_qty").default(0),
 
-  // Standard QA
-  qaStatus: text("qa_status").default("pending"), // 'pending', 'passed', 'failed', 'waived'
+    // Standard QA
+    qaStatus: text("qa_status").default("pending"), // 'pending', 'passed', 'failed', 'waived'
 
-  // FAST-TRACK / BYPASS LOGIC
-  isQaBypassed: boolean("is_qa_bypassed").default(false),
-  qaBypassReason: text("qa_bypass_reason"), // Mandatory if bypassed
-  qaBypassedBy: integer("qa_bypassed_by").references(() => employees.id),
-  challanPhotoUrl: text("challan_photo_url"), // Proof of receipt
-});
+    // FAST-TRACK / BYPASS LOGIC
+    isQaBypassed: boolean("is_qa_bypassed").default(false),
+    qaBypassReason: text("qa_bypass_reason"), // Mandatory if bypassed
+    qaBypassedBy: integer("qa_bypassed_by").references(() => employees.id),
+    challanPhotoUrl: text("challan_photo_url"), // Proof of receipt
+  },
+  (table) => ({
+    grnIdIdx: index("idx_grn_items_grn_id").on(table.grnId),
+    poItemIdIdx: index("idx_grn_items_po_item_id").on(table.poItemId),
+  }),
+);
 
 export const qaTests = pgTable("qa_tests", {
   id: serial("id").primaryKey(),

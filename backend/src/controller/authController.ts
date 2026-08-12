@@ -1,13 +1,13 @@
-import { type Context } from "hono";
-import { authService } from "../service/authService";
+import type { Context } from "hono";
 import { UnauthorizedError } from "../lib/errors";
 import {
-  setRefreshCookie,
   clearRefreshCookie,
   readRefreshCookie,
+  setRefreshCookie,
 } from "../lib/http";
 import type { AppEnv } from "../lib/types";
-import { registerSchema, loginSchema } from "../types/auth.types";
+import { authService } from "../service/authService";
+import { loginSchema, registerSchema } from "../types/auth.types";
 
 export const authController = {
   async register(c: Context<AppEnv>) {

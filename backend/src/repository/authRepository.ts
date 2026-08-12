@@ -1,12 +1,7 @@
 import { and, eq, gt } from "drizzle-orm";
 
 import { db } from "../db/client";
-import {
-  pages,
-  refreshTokens,
-  rolePages,
-  roles,
-} from "../db/schemas/01_auth";
+import { pages, refreshTokens, rolePages, roles } from "../db/schemas/01_auth";
 import { employees } from "../db/schemas/03_hcm";
 
 type CreateEmployeeInput = {
@@ -22,7 +17,7 @@ export const authRepository = {
     const [role] = await db
       .select()
       .from(roles)
-      .where(eq(roles.name, roleName as any))
+      .where(eq(roles.name, roleName))
       .limit(1);
     return role;
   },

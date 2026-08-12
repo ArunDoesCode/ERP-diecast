@@ -117,5 +117,23 @@ Before implementation, produce concise contract summary:
 3. response shapes
 4. error matrix
 5. unresolved questions list
+6. new routes must also call `registry.register(...)` (see `src/lib/route-registry.ts`) directly below the route declaration, or `bun test`'s drift-prevention check will fail
 
 Do not code until unresolved questions are answered.
+
+## 16) Contract publication (mandatory, after coding)
+
+1. Run `bun run contract:generate` to refresh `.contracts/api-manifest.json` — this is the manifest the frontend agent queries via `bun run contract:query`, not backend source. A route shipped without a fresh manifest is a shipped bug for the frontend agent, same as a broken endpoint.
+2. Spot-check the new/changed route with `bun run contract:query "<METHOD> <path>"` before calling the task done — confirm the descriptor's request/response shape, auth, and pagination fields match what you built.
+
+## 15) Type boundary contract (mandatory)
+
+Confirm before coding:
+
+1. Controller parses with Zod schema and forwards inferred payload type to service.
+2. Service accepts Zod-inferred contract types only (no DB row-shape duplication).
+3. Repository uses Drizzle schema-derived types (`$inferInsert`/`$inferSelect`) for create/update/select contracts.
+4. Any special domain requirement is expressed as a minimal overlay on inferred type, not a full handwritten duplicate.
+5. No duplicated status/type unions across controller/service/repository.
+6. Zod schemas that mirror a Drizzle table are generated via `drizzle-zod` (`createSelectSchema`/`createInsertSchema`/`createUpdateSchema`), not hand-declared field-by-field — hand-author only the specific fields where the API contract deliberately diverges from column nullability, with a comment explaining why.
+7. Repository select column sets use `getTableColumns(table)` unless the projection excludes specific columns.

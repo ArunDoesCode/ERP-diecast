@@ -19,3 +19,5 @@ Repo workflow override:
 
 - Frontend app data flow backend-first.
 - Route feature calls through Hono API client, no direct Supabase queries in frontend feature modules.
+- Type boundary strict: controller + service use Zod-inferred contracts from `src/types/*.types.ts`; repository uses Drizzle schema-derived types (`$inferInsert`/`$inferSelect`, `Pick`/`Partial` overlays).
+- No duplicated hardcoded DTO/union shapes across layers. If domain rule needed, extend inferred base type minimally.

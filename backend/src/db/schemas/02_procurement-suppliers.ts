@@ -1,16 +1,16 @@
 import {
+  boolean,
+  doublePrecision,
+  integer,
+  pgEnum,
   pgTable,
   serial,
   text,
-  integer,
   timestamp,
-  boolean,
-  pgEnum,
-  doublePrecision,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { employees } from "./03_hcm";
 import { itemMaster, serviceMaster } from "./02_procurement-catalog";
+import { employees } from "./03_hcm";
 
 export const supplierTypeEnum = pgEnum("supplier_type", [
   "raw_material", // Hindalco, local scrap/ingot sellers
@@ -30,7 +30,9 @@ export const supplierMaster = pgTable("supplier_master", {
   email: text("email"),
   phone: text("phone"),
   address: text("address"),
-  defaultPaymentTermsDays: integer("default_payment_terms_days").default(0), // e.g., 30 days
+  defaultPaymentTermsDays: integer("default_payment_terms_days")
+    .default(0)
+    .notNull(), // e.g., 30 days
   isActive: boolean("is_active").notNull().default(true),
   createdBy: integer("created_by").references(() => employees.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),

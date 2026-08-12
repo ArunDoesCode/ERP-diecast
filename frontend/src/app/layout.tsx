@@ -8,24 +8,24 @@ import { cn } from "@/lib/utils";
 const manrope = Manrope({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
-  title: "DieCast ERP",
-  description: "DieCast ERP",
+	title: "DieCast ERP",
+	description: "DieCast ERP",
 };
 
 export default function RootLayout({
-  children,
+	children,
 }: {
-  children: React.ReactNode;
+	children: React.ReactNode;
 }) {
-  return (
-    <html
-      lang="en"
-      className={cn("font-sans", manrope.variable)}
-      suppressHydrationWarning
-    >
-      <body>
-        <Providers>{children}</Providers>
-      </body>
-    </html>
-  );
+	return (
+		<html
+			lang="en"
+			className={cn("font-sans", manrope.variable)}
+			suppressHydrationWarning
+		>
+			<body>
+				<Providers>{children}</Providers>
+			</body>
+		</html>
+	);
 }

@@ -1,9 +1,9 @@
 import {
+  boolean,
+  integer,
   pgTable,
   serial,
   text,
-  boolean,
-  integer,
   timestamp,
   unique,
 } from "drizzle-orm/pg-core";
@@ -49,8 +49,6 @@ export const rolePages = pgTable(
   ],
 );
 
-
-
 export const refreshTokens = pgTable("refresh_tokens", {
   id: serial("id").primaryKey(),
   employeeId: integer("employee_id")
@@ -61,3 +59,24 @@ export const refreshTokens = pgTable("refresh_tokens", {
   createdBy: integer("created_by").references(() => employees.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// Shared numbering series for business documents (PR/PO/SCO/etc.) by period.
+export const documentNumberCounters = pgTable(
+  "document_number_counters",
+  {
+    id: serial("id").primaryKey(),
+    docType: text("doc_type").notNull(),
+    periodKey: text("period_key").notNull(), // Example: 2026-07 or FY26-27
+    lastSeq: integer("last_seq").notNull().default(0),
+    createdBy: integer("created_by").references(() => employees.id),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    lastUpdatedBy: integer("last_updated_by").references(() => employees.id),
+    lastUpdatedAt: timestamp("last_updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    unique("document_number_counters_doc_type_period_key_unique").on(
+      table.docType,
+      table.periodKey,
+    ),
+  ],
+);

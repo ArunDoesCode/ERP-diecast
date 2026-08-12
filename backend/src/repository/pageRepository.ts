@@ -2,6 +2,7 @@ import { asc, count, desc, eq, inArray } from "drizzle-orm";
 
 import { db } from "../db/client";
 import { pages } from "../db/schemas/01_auth";
+import type { PartialUpdate } from "../lib/types";
 
 const pageColumns = {
   id: pages.id,
@@ -21,7 +22,7 @@ type PageCreateData = {
   createdBy?: number | undefined;
 };
 
-type PageUpdateData = Omit<Partial<PageCreateData>, "key">;
+type PageUpdateData = Omit<PartialUpdate<PageCreateData>, "key">;
 
 type PageListParams = {
   page: number;

@@ -66,6 +66,17 @@ export const API_ROUTES = {
 } as const;
 ```
 
+## Backend Contract Lookup (do this before writing a fetcher's types)
+
+The backend generates a queryable contract for every route — use it instead of guessing field names/types or copying an old fetcher's shape from memory:
+
+```
+bun run --cwd ../backend contract:query "<resource or search term>"     # list matching routes + summaries
+bun run --cwd ../backend contract:query "<METHOD> /api/<path>"          # full descriptor: request/response schema, auth, pagination
+```
+
+If the manifest is missing or looks stale, run `bun run --cwd ../backend contract:generate` first (it's generated on demand, not committed). Base the fetcher's generic type args and the response type on what the descriptor actually says — a mismatch here is exactly the class of bug this lookup exists to prevent.
+
 ## Fetcher Pattern
 
 Raw async functions in `lib/api/[feature]/fetchers.ts`. No directive, no hooks:

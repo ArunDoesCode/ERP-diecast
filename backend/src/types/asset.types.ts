@@ -1,37 +1,90 @@
+import {
+  createInsertSchema,
+  createSelectSchema,
+  createUpdateSchema,
+} from "drizzle-zod";
 import { z } from "zod";
+import {
+  inventoryLedger,
+  itemMaster,
+  locations,
+  machines,
+  serviceMaster,
+} from "../db/schemas/02_procurement-catalog";
+
+// Response shapes for stored rows — distinct from the *CreateSchema /
+// *UpdateSchema write contracts below, which omit server-assigned columns
+// (id, createdAt, ...).
+export const assetItemSchema = createSelectSchema(itemMaster);
+export type assetItemSchemaType = z.infer<typeof assetItemSchema>;
+
+export const assetServiceSchema = createSelectSchema(serviceMaster);
+export type assetServiceSchemaType = z.infer<typeof assetServiceSchema>;
+
+export const assetLocationSchema = createSelectSchema(locations);
+export type assetLocationSchemaType = z.infer<typeof assetLocationSchema>;
+
+export const assetMachineSchema = createSelectSchema(machines);
+export type assetMachineSchemaType = z.infer<typeof assetMachineSchema>;
 
 export const assetItemListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(10),
   q: z.string().optional(),
+  sortBy: z
+    .enum(["sku", "name", "category", "currentStock", "createdAt"])
+    .optional(),
+  sortDir: z.enum(["asc", "desc"]).default("asc"),
 });
 export type assetItemListQuerySchemaType = z.infer<
   typeof assetItemListQuerySchema
 >;
 
-export const assetItemCreateSchema = z.object({
-  sku: z.string().min(1),
-  name: z.string().min(1),
-  description: z.string().nullable().optional(),
-  category: z.string().min(1),
-  uom: z.string().min(1),
-  reorderLevel: z.number().nonnegative().optional(),
-  currentStock: z.number().nonnegative().optional(),
-  averageCostPaise: z.number().int().nonnegative().optional(),
-  isActive: z.boolean().optional(),
-});
+export const assetItemCreateSchema = createInsertSchema(itemMaster)
+  .omit({ id: true, createdBy: true, createdAt: true })
+  .extend({
+    sku: z.string().min(1),
+    name: z.string().min(1),
+    category: z.string().min(1),
+    uom: z.string().min(1),
+    reorderLevel: z.number().nonnegative().optional(),
+    currentStock: z.number().nonnegative().optional(),
+    averageCostPaise: z.number().int().nonnegative().optional(),
+  });
 export type assetItemCreateSchemaType = z.infer<typeof assetItemCreateSchema>;
 
-export const assetItemUpdateSchema = z
-  .object({
+// GET /asset/items/:itemId/last-rate query + response — fallback chain:
+// latest PO price for that supplier+item, then the supplier's catalog
+// price, then the item master's average cost (the PR estimate).
+export const assetLastRateQuerySchema = z.object({
+  supplierId: z.coerce.number().int().positive(),
+});
+export type assetLastRateQuerySchemaType = z.infer<
+  typeof assetLastRateQuerySchema
+>;
+
+export const assetLastRateSourceSchema = z.enum([
+  "po_history",
+  "supplier_catalog",
+  "pr_estimate",
+]);
+
+export const assetLastRateSchema = z.object({
+  ratePaise: z.number().int().nonnegative(),
+  source: assetLastRateSourceSchema,
+});
+export type assetLastRateSchemaType = z.infer<typeof assetLastRateSchema>;
+
+export const assetItemUpdateSchema = createUpdateSchema(itemMaster)
+  .omit({ id: true, createdBy: true, createdAt: true })
+  .extend({
     sku: z.string().min(1).optional(),
     name: z.string().min(1).optional(),
-    description: z.string().nullable().optional(),
     category: z.string().min(1).optional(),
     uom: z.string().min(1).optional(),
     reorderLevel: z.number().nonnegative().optional(),
     currentStock: z.number().nonnegative().optional(),
-    averageCostPaise: z.number().int().nonnegative().nullable().optional(),
+    averageCostPaise: z.number().int().nonnegative().optional(),
     isActive: z.boolean().optional(),
   })
   .superRefine((data, ctx) => {
@@ -59,31 +112,42 @@ export const assetServiceListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(10),
   q: z.string().optional(),
+  sortBy: z.enum(["code", "name", "createdAt"]).optional(),
+  sortDir: z.enum(["asc", "desc"]).default("asc"),
 });
 export type assetServiceListQuerySchemaType = z.infer<
   typeof assetServiceListQuerySchema
 >;
 
-export const assetServiceCreateSchema = z.object({
-  code: z.string().min(1),
-  name: z.string().min(1),
-  description: z.string().nullable().optional(),
-  sacCode: z.string().nullable().optional(),
-  defaultUom: z.string().min(1),
-  isActive: z.boolean().optional(),
-});
+export const assetServiceCreateSchema = createInsertSchema(serviceMaster)
+  .omit({
+    id: true,
+    createdBy: true,
+    createdAt: true,
+    lastUpdatedBy: true,
+    lastUpdatedAt: true,
+  })
+  .extend({
+    code: z.string().min(1),
+    name: z.string().min(1),
+    defaultUom: z.string().min(1),
+  });
 export type assetServiceCreateSchemaType = z.infer<
   typeof assetServiceCreateSchema
 >;
 
-export const assetServiceUpdateSchema = z
-  .object({
+export const assetServiceUpdateSchema = createUpdateSchema(serviceMaster)
+  .omit({
+    id: true,
+    createdBy: true,
+    createdAt: true,
+    lastUpdatedBy: true,
+    lastUpdatedAt: true,
+  })
+  .extend({
     code: z.string().min(1).optional(),
     name: z.string().min(1).optional(),
-    description: z.string().nullable().optional(),
-    sacCode: z.string().nullable().optional(),
     defaultUom: z.string().min(1).optional(),
-    isActive: z.boolean().optional(),
   })
   .superRefine((data, ctx) => {
     const hasUpdateField =
@@ -132,6 +196,10 @@ export const assetInventoryMovementListQuerySchema = z
     transactionType: inventoryTransactionTypeSchema.optional(),
     fromDate: z.coerce.date().optional(),
     toDate: z.coerce.date().optional(),
+    sortBy: z
+      .enum(["createdAt", "transactionType", "quantityChange"])
+      .optional(),
+    sortDir: z.enum(["asc", "desc"]).default("asc"),
   })
   .superRefine((data, ctx) => {
     if (data.fromDate && data.toDate && data.fromDate > data.toDate) {
@@ -150,33 +218,27 @@ export const assetLocationListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(10),
   q: z.string().optional(),
+  sortBy: z.enum(["name", "type", "createdAt"]).optional(),
+  sortDir: z.enum(["asc", "desc"]).default("asc"),
 });
 export type assetLocationListQuerySchemaType = z.infer<
   typeof assetLocationListQuerySchema
 >;
 
-export const assetLocationCreateSchema = z.object({
-  name: z.string().min(1),
-  type: z.enum([
-    "main_store",
-    "vendor_premise",
-    "finished_goods",
-    "scrap_yard",
-  ]),
-  isVirtual: z.boolean().optional(),
-  linkedVendorId: z.number().int().positive().nullable().optional(),
-});
+export const assetLocationCreateSchema = createInsertSchema(locations)
+  .omit({ id: true, createdAt: true })
+  .extend({
+    name: z.string().min(1),
+    linkedVendorId: z.number().int().positive().nullable().optional(),
+  });
 export type assetLocationCreateSchemaType = z.infer<
   typeof assetLocationCreateSchema
 >;
 
-export const assetLocationUpdateSchema = z
-  .object({
+export const assetLocationUpdateSchema = createUpdateSchema(locations)
+  .omit({ id: true, createdAt: true })
+  .extend({
     name: z.string().min(1).optional(),
-    type: z
-      .enum(["main_store", "vendor_premise", "finished_goods", "scrap_yard"])
-      .optional(),
-    isVirtual: z.boolean().optional(),
     linkedVendorId: z.number().int().positive().nullable().optional(),
   })
   .superRefine((data, ctx) => {
@@ -214,6 +276,12 @@ export type assetInventoryMovementCreateSchemaType = z.infer<
   typeof assetInventoryMovementCreateSchema
 >;
 
+// Response shape for a stored inventory ledger row.
+export const assetInventoryMovementSchema = createSelectSchema(inventoryLedger);
+export type assetInventoryMovementSchemaType = z.infer<
+  typeof assetInventoryMovementSchema
+>;
+
 export const machineStatusSchema = z.enum([
   "idle",
   "running",
@@ -226,25 +294,40 @@ export const assetMachineListQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(10),
   q: z.string().optional(),
   status: machineStatusSchema.optional(),
+  sortBy: z.enum(["name", "type", "status", "createdAt"]).optional(),
+  sortDir: z.enum(["asc", "desc"]).default("asc"),
 });
 export type assetMachineListQuerySchemaType = z.infer<
   typeof assetMachineListQuerySchema
 >;
 
-export const assetMachineCreateSchema = z.object({
-  name: z.string().min(1),
-  type: z.string().nullable().optional(),
-  status: machineStatusSchema.optional(),
-  lastMaintenanceAt: z.coerce.date().nullable().optional(),
-});
+export const assetMachineCreateSchema = createInsertSchema(machines)
+  .omit({
+    id: true,
+    createdBy: true,
+    createdAt: true,
+    lastUpdatedBy: true,
+    lastUpdatedAt: true,
+  })
+  .extend({
+    name: z.string().min(1),
+    status: machineStatusSchema.optional(),
+    lastMaintenanceAt: z.coerce.date().nullable().optional(),
+  });
 export type assetMachineCreateSchemaType = z.infer<
   typeof assetMachineCreateSchema
 >;
 
-export const assetMachineUpdateSchema = z
-  .object({
+export const assetMachineUpdateSchema = createUpdateSchema(machines)
+  .omit({
+    id: true,
+    createdBy: true,
+    createdAt: true,
+    lastUpdatedBy: true,
+    lastUpdatedAt: true,
+  })
+  .extend({
     name: z.string().min(1).optional(),
-    type: z.string().nullable().optional(),
     status: machineStatusSchema.optional(),
     lastMaintenanceAt: z.coerce.date().nullable().optional(),
   })

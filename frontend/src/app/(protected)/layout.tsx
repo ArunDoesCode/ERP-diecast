@@ -14,10 +14,8 @@ export default function ProtectedLayout({
 		<SidebarProvider>
 			<NavSidebar />
 			<SidebarInset>
-				<header className="sticky top-0 z-20 flex h-14 items-center border-b bg-background/90 px-3 backdrop-blur">
-					<SidebarTrigger size="lg" />
-				</header>
-				<div className="flex flex-1 flex-col">{children}</div>
+				<SidebarTrigger size="lg" className="flex justify-start w-fit" />
+				<div className="">{children}</div>
 			</SidebarInset>
 		</SidebarProvider>
 	);

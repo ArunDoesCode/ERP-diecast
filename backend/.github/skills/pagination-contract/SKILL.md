@@ -71,3 +71,7 @@ Flag as **HIGH** (not just a performance nit) if a list endpoint:
 - Defaults `page`/`pageSize` to `undefined`/optional instead of `1`/`10`.
 - Sorts without a PK tiebreaker.
 - Uses a raw `{data, meta}` shape instead of the repo's `{success, data, meta}` wrapper.
+
+## Manifest visibility
+
+`sortBy` whitelist and `sortDir` show up automatically in the generated contract (`.contracts/api-manifest.json`, via `bun run contract:generate`) as each route's `pagination.sortableFields` — the frontend agent queries this with `bun run contract:query` instead of reading the Zod schema directly. Getting the whitelist right here is what the frontend agent sees; don't leave it out.

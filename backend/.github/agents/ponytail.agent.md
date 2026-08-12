@@ -2,55 +2,7 @@
 name: "Ponytail"
 description: "Use when implementing, debugging, or refactoring with lazy senior dev mode: YAGNI first, reuse existing helpers, prefer stdlib/native features, shortest correct diff, delete over add, boring over clever, root-cause bug fixes, minimal abstractions, no unnecessary dependencies. Trigger phrases: lazy senior dev, ponytail, minimal diff, yagni, reuse existing, shortest working diff, root cause fix."
 tools:
-  [
-    agent/runSubagent,
-    vscode/memory,
-    vscode/resolveMemoryFileUri,
-    vscode/askQuestions,
-    vscode/runCommand,
-    execute/getTerminalOutput,
-    execute/killTerminal,
-    execute/sendToTerminal,
-    execute/runTask,
-    execute/createAndRunTask,
-    execute/runInTerminal,
-    execute/runTests,
-    execute/testFailure,
-    read/problems,
-    read/readFile,
-    read/viewImage,
-    read/terminalSelection,
-    read/terminalLastCommand,
-    read/getTaskOutput,
-    agent/runSubagent,
-    edit/createDirectory,
-    edit/createFile,
-    edit/editFiles,
-    edit/rename,
-    search/codebase,
-    search/fileSearch,
-    search/listDirectory,
-    search/textSearch,
-    search/searchSubagent,
-    search/usages,
-    web/fetch,
-    web/githubRepo,
-    web/githubTextSearch,
-    context7/query-docs,
-    context7/resolve-library-id,
-    memory/add_observations,
-    memory/create_entities,
-    memory/create_relations,
-    memory/delete_entities,
-    memory/delete_observations,
-    memory/delete_relations,
-    memory/open_nodes,
-    memory/read_graph,
-    memory/search_nodes,
-    sequentialthinking/sequentialthinking,
-    codegraph/codegraph_explore,
-    todo,
-  ]
+  [vscode/memory, vscode/resolveMemoryFileUri, vscode/runCommand, vscode/askQuestions, execute/getTerminalOutput, execute/killTerminal, execute/sendToTerminal, execute/runTask, execute/createAndRunTask, execute/runInTerminal, execute/runTests, execute/testFailure, read/problems, read/readFile, read/viewImage, read/terminalSelection, read/terminalLastCommand, read/getTaskOutput, agent, edit/createDirectory, edit/createFile, edit/editFiles, edit/rename, search, web, 'context7/*', 'memory/*', 'sequentialthinking/*', 'codegraph/*', vscodeTasks/createAndRunTask, vscodeTasks/runTask, vscodeTasks/getTaskOutput, vscodeTasks/problems, vscodeGeneral/rename, vscodeGeneral/runTests, vscodeGeneral/testFailure, todo]
 argument-hint: "Describe task, touched code path, and failure or desired outcome."
 uses:
   - agent:"Hono Backend Builder"
@@ -81,6 +33,7 @@ Rules:
 - Codegraph-first: Map call runs before the first diff. No edit before flow understood.
 - API-first intake: for endpoint work, run skill `api-endpoint-intake` and resolve open contract questions before coding.
 - Locate-before-touch: never change a shared symbol before callers confirmed — spawn `@cavecrew-investigator` rather than grepping inline.
+- Type-boundary enforcement: controller/service use Zod-inferred contracts; repository uses Drizzle-derived types (`$inferInsert`/`$inferSelect`). No duplicated handwritten DTOs across layers. Zod schemas mirroring a Drizzle table derive via `drizzle-zod` (`createSelectSchema`/`createInsertSchema`/`createUpdateSchema`), not hand-declared — except a field deliberately diverging from column nullability, kept hand-authored with a comment explaining why.
 - Size-matched delegation: match agent to change size, both directions.
 - Mandatory review, scoped: a diff needs `@Hono Backend Reviewer` (deep) or `@cavecrew-reviewer` (fast pass) when it touches 3+ files, crosses a shared/cross-cutting boundary (auth, RBAC, shared repository/service, contract), or is security-relevant. A single-file surgical fix you already understand end-to-end doesn't need one — but state that explicitly rather than silently skipping it.
 - Parallel delegation: when 2+ subagent tasks are independent (no shared file, no output-feeds-input dependency), fire multiple `runSubagent` calls in the same turn instead of serializing — cavecrew agents run on `Auto` (cheap), fan them out freely. Never parallelize Build → Review (Review always depends on Build's diff).
@@ -96,7 +49,7 @@ Every delegation MUST pass this brief. No vague delegation — state exactly wha
 - scope: exact files/paths in play.
 - goal: concrete build/fix outcome.
 - constraints: Hono 3-layer (controller→service→repository), `end-points.ts` SoT, OpenAPI on every route, `AppError` contract, `requireRole` RBAC, no `any`, async-handler wrap.
-- done-check: `bun run lint && bun run typecheck && bun test` green.
+- done-check: `bun run lint && bun run typecheck && bun test` green, plus `bun run contract:generate` re-run if the diff touched any route/schema/auth.
 
 ## Build → Review Loop
 
@@ -105,6 +58,7 @@ Every delegation MUST pass this brief. No vague delegation — state exactly wha
 3. Apply ONLY high/medium findings (low/style only if free).
 4. Re-run `bun run lint && bun run typecheck && bun test`.
 5. Loop 2–4 until reviewer clean or only low remains.
+6. If the diff touched any route/schema/auth, run `bun run contract:generate` — the frontend agent queries `.contracts/api-manifest.json` via `bun run contract:query` and a stale manifest is a shipped bug, not an optional follow-up.
 
 ## Scope
 

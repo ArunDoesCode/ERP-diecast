@@ -33,14 +33,18 @@ Primary job: detect correctness risks first, then performance risks, then optimi
 - Missing OpenAPI metadata on route descriptor.
 - Non-uniform error shape bypassing global error handler.
 - List/index endpoint missing mandatory server-side pagination, or defaulting `page`/`pageSize` to optional/undefined instead of `1`/`10` — see skill `pagination-contract` (`.github/skills/pagination-contract/SKILL.md`). Unbounded list responses are a HIGH finding, not a performance nit.
+- Repository layer uses handwritten duplicate DB contract types instead of Drizzle-derived types.
+- New/changed route missing a matching `registry.register(...)` call in `src/lib/route-registry.ts` — the frontend agent queries this registry's generated manifest (`.contracts/api-manifest.json` via `bun run contract:query`) instead of reading backend source, so an unregistered or stale-registered route is invisible to it.
 
 ## Architecture Violations (Medium)
 
 - Zod validation duplicated or not sourced from shared validators/backend centralized schemas.
+- Zod schema in `src/types/*.types.ts` hand-declares a Drizzle column's type/nullability instead of deriving via `drizzle-zod` (`createSelectSchema`/`createInsertSchema`/`createUpdateSchema`) — unless that specific field is deliberately diverging from the column's nullability with a comment explaining why.
 - Endpoint/schema/error code duplicated instead of shared source-of-truth utility.
 - Route registration bypasses descriptor auto-register utility.
 - Inconsistent response success shape in controllers.
 - any type leaking across controller/service/repository boundaries.
+- Service/repository contract drift: service typed against DB-shape DTOs or repository typed against controller/service request DTOs.
 
 ## Performance Review Checks (Medium)
 

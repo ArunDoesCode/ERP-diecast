@@ -86,6 +86,14 @@ function toPaginatedMeta(page: number, pageSize: number, total: number) {
   };
 }
 
+function buildBatchSummary(results: { success: boolean }[]) {
+  return {
+    total: results.length,
+    success: results.filter((result) => result.success).length,
+    failed: results.filter((result) => !result.success).length,
+  };
+}
+
 type BatchItemResult<T> =
   | {
       index: number;
@@ -303,7 +311,7 @@ export const supplierService = {
   async update(id: number, input: supplierUpdateSchemaType, actorId: number) {
     if (input.mode === "master") {
       const { mode: _, ...updateData } = input;
-      let updated;
+      let updated: Awaited<ReturnType<typeof supplierRepository.updateMaster>>;
       try {
         updated = await supplierRepository.updateMaster(
           id,
@@ -359,7 +367,9 @@ export const supplierService = {
       lastUpdatedAt: new Date(),
     };
 
-    let updated;
+    let updated: Awaited<
+      ReturnType<typeof supplierRepository.updateItemBySupplierItemsId>
+    >;
     try {
       updated =
         supplierItemsId !== undefined
@@ -408,89 +418,83 @@ export const supplierService = {
         ? await supplierRepository.findExistingItemIds(itemIds)
         : new Set<number>();
 
-    const results: BatchItemResult<unknown>[] = [];
+    const results: BatchItemResult<unknown>[] = await Promise.all(
+      edits.map(async (edit, index): Promise<BatchItemResult<unknown>> => {
+        const selector = {
+          supplierItemsId: edit.supplierItemsId,
+          itemId: edit.itemId,
+        };
 
-    for (const [index, edit] of edits.entries()) {
-      const selector = {
-        supplierItemsId: edit.supplierItemsId,
-        itemId: edit.itemId,
-      };
-
-      if (edit.itemId !== undefined && !existingItemIds.has(edit.itemId)) {
-        results.push({
-          index,
-          selector,
-          success: false,
-          error: `Invalid itemId: ${edit.itemId}`,
-        });
-        continue;
-      }
-
-      const updateData = {
-        ...(edit.supplierSku !== undefined
-          ? { supplierSku: edit.supplierSku }
-          : {}),
-        ...(edit.supplierUnitPricePaise !== undefined
-          ? { supplierUnitPricePaise: edit.supplierUnitPricePaise }
-          : {}),
-        ...(edit.taxPercentage !== undefined
-          ? { taxPercentage: edit.taxPercentage }
-          : {}),
-        ...(edit.leadTimeDays !== undefined
-          ? { leadTimeDays: edit.leadTimeDays }
-          : {}),
-        ...(edit.qty !== undefined ? { qty: edit.qty } : {}),
-        ...(edit.uom !== undefined ? { uom: edit.uom } : {}),
-        ...(edit.isActive !== undefined ? { isActive: edit.isActive } : {}),
-        lastUpdatedBy: actorId,
-        lastUpdatedAt: new Date(),
-      };
-
-      try {
-        const updated =
-          edit.supplierItemsId !== undefined
-            ? await supplierRepository.editSupplierItemBySupplierItemsId(
-                supplierId,
-                edit.supplierItemsId,
-                updateData,
-              )
-            : await supplierRepository.editSupplierItemByItemId(
-                supplierId,
-                edit.itemId as number,
-                updateData,
-              );
-
-        if (!updated) {
-          results.push({
+        if (edit.itemId !== undefined && !existingItemIds.has(edit.itemId)) {
+          return {
             index,
             selector,
             success: false,
-            error: "Supplier item not found",
-          });
-          continue;
+            error: `Invalid itemId: ${edit.itemId}`,
+          };
         }
 
-        results.push({ index, selector, success: true, data: updated });
-      } catch (error) {
-        const conflictError = getConflictError(error);
-        results.push({
-          index,
-          selector,
-          success: false,
-          error:
-            conflictError?.message ??
-            (error instanceof Error ? error.message : "Update failed"),
-        });
-      }
-    }
+        const updateData = {
+          ...(edit.supplierSku !== undefined
+            ? { supplierSku: edit.supplierSku }
+            : {}),
+          ...(edit.supplierUnitPricePaise !== undefined
+            ? { supplierUnitPricePaise: edit.supplierUnitPricePaise }
+            : {}),
+          ...(edit.taxPercentage !== undefined
+            ? { taxPercentage: edit.taxPercentage }
+            : {}),
+          ...(edit.leadTimeDays !== undefined
+            ? { leadTimeDays: edit.leadTimeDays }
+            : {}),
+          ...(edit.qty !== undefined ? { qty: edit.qty } : {}),
+          ...(edit.uom !== undefined ? { uom: edit.uom } : {}),
+          ...(edit.isActive !== undefined ? { isActive: edit.isActive } : {}),
+          lastUpdatedBy: actorId,
+          lastUpdatedAt: new Date(),
+        };
+
+        try {
+          const updated =
+            edit.supplierItemsId !== undefined
+              ? await supplierRepository.editSupplierItemBySupplierItemsId(
+                  supplierId,
+                  edit.supplierItemsId,
+                  updateData,
+                )
+              : await supplierRepository.editSupplierItemByItemId(
+                  supplierId,
+                  edit.itemId as number,
+                  updateData,
+                );
+
+          if (!updated) {
+            return {
+              index,
+              selector,
+              success: false,
+              error: "Supplier item not found",
+            };
+          }
+
+          return { index, selector, success: true, data: updated };
+        } catch (error) {
+          const conflictError = getConflictError(error);
+          return {
+            index,
+            selector,
+            success: false,
+            error:
+              conflictError?.message ??
+              (error instanceof Error ? error.message : "Update failed"),
+          };
+        }
+      }),
+    );
 
     return {
       data: results,
-      summary: {
-        total: results.length,
-        success: results.filter((result) => result.success).length,
-        failed: results.filter((result) => !result.success).length,
-      },
+      summary: buildBatchSummary(results),
     };
   },
 
@@ -514,87 +518,81 @@ export const supplierService = {
         ? await supplierRepository.findExistingServiceIds(serviceIds)
         : new Set<number>();
 
-    const results: BatchServiceResult<unknown>[] = [];
+    const results: BatchServiceResult<unknown>[] = await Promise.all(
+      edits.map(async (edit, index): Promise<BatchServiceResult<unknown>> => {
+        const selector = {
+          supplierServiceId: edit.supplierServiceId,
+          serviceId: edit.serviceId,
+        };
 
-    for (const [index, edit] of edits.entries()) {
-      const selector = {
-        supplierServiceId: edit.supplierServiceId,
-        serviceId: edit.serviceId,
-      };
-
-      if (
-        edit.serviceId !== undefined &&
-        !existingServiceIds.has(edit.serviceId)
-      ) {
-        results.push({
-          index,
-          selector,
-          success: false,
-          error: `Invalid serviceId: ${edit.serviceId}`,
-        });
-        continue;
-      }
-
-      const updateData = {
-        ...(edit.serviceUnitPricePaise !== undefined
-          ? { serviceUnitPricePaise: edit.serviceUnitPricePaise }
-          : {}),
-        ...(edit.taxPercentage !== undefined
-          ? { taxPercentage: edit.taxPercentage }
-          : {}),
-        ...(edit.leadTimeDays !== undefined
-          ? { leadTimeDays: edit.leadTimeDays }
-          : {}),
-        ...(edit.isActive !== undefined ? { isActive: edit.isActive } : {}),
-        lastUpdatedBy: actorId,
-        lastUpdatedAt: new Date(),
-      };
-
-      try {
-        const updated =
-          edit.supplierServiceId !== undefined
-            ? await supplierRepository.editSupplierServiceBySupplierServiceId(
-                supplierId,
-                edit.supplierServiceId,
-                updateData,
-              )
-            : await supplierRepository.editSupplierServiceByServiceId(
-                supplierId,
-                edit.serviceId as number,
-                updateData,
-              );
-
-        if (!updated) {
-          results.push({
+        if (
+          edit.serviceId !== undefined &&
+          !existingServiceIds.has(edit.serviceId)
+        ) {
+          return {
             index,
             selector,
             success: false,
-            error: "Supplier service not found",
-          });
-          continue;
+            error: `Invalid serviceId: ${edit.serviceId}`,
+          };
         }
 
-        results.push({ index, selector, success: true, data: updated });
-      } catch (error) {
-        const conflictError = getConflictError(error);
-        results.push({
-          index,
-          selector,
-          success: false,
-          error:
-            conflictError?.message ??
-            (error instanceof Error ? error.message : "Update failed"),
-        });
-      }
-    }
+        const updateData = {
+          ...(edit.serviceUnitPricePaise !== undefined
+            ? { serviceUnitPricePaise: edit.serviceUnitPricePaise }
+            : {}),
+          ...(edit.taxPercentage !== undefined
+            ? { taxPercentage: edit.taxPercentage }
+            : {}),
+          ...(edit.leadTimeDays !== undefined
+            ? { leadTimeDays: edit.leadTimeDays }
+            : {}),
+          ...(edit.isActive !== undefined ? { isActive: edit.isActive } : {}),
+          lastUpdatedBy: actorId,
+          lastUpdatedAt: new Date(),
+        };
+
+        try {
+          const updated =
+            edit.supplierServiceId !== undefined
+              ? await supplierRepository.editSupplierServiceBySupplierServiceId(
+                  supplierId,
+                  edit.supplierServiceId,
+                  updateData,
+                )
+              : await supplierRepository.editSupplierServiceByServiceId(
+                  supplierId,
+                  edit.serviceId as number,
+                  updateData,
+                );
+
+          if (!updated) {
+            return {
+              index,
+              selector,
+              success: false,
+              error: "Supplier service not found",
+            };
+          }
+
+          return { index, selector, success: true, data: updated };
+        } catch (error) {
+          const conflictError = getConflictError(error);
+          return {
+            index,
+            selector,
+            success: false,
+            error:
+              conflictError?.message ??
+              (error instanceof Error ? error.message : "Update failed"),
+          };
+        }
+      }),
+    );
 
     return {
       data: results,
-      summary: {
-        total: results.length,
-        success: results.filter((result) => result.success).length,
-        failed: results.filter((result) => !result.success).length,
-      },
+      summary: buildBatchSummary(results),
     };
   },
 };

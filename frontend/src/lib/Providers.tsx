@@ -1,11 +1,12 @@
 "use client";
-import { Toaster } from "@/components/ui/sonner";
-import React from "react";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import type { ReactNode } from "react";
+
+import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/ui/theme-provider";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 const queryClient = new QueryClient({
 	defaultOptions: {
@@ -16,22 +17,22 @@ const queryClient = new QueryClient({
 	},
 });
 
-const Providers = ({ children }: { children: React.ReactNode }) => {
+const Providers = ({ children }: { children: ReactNode }) => {
 	return (
-    <ThemeProvider
-      attribute="class"
-      defaultTheme="system"
-      enableSystem
-      disableTransitionOnChange
-    >
-      <NuqsAdapter>
-        <QueryClientProvider client={queryClient}>
-          <TooltipProvider>{children}</TooltipProvider>
-          <Toaster richColors duration={3000} />
-        </QueryClientProvider>
-      </NuqsAdapter>
-    </ThemeProvider>
-  );
+		<ThemeProvider
+			attribute="class"
+			defaultTheme="system"
+			enableSystem
+			disableTransitionOnChange
+		>
+			<NuqsAdapter>
+				<QueryClientProvider client={queryClient}>
+					<TooltipProvider>{children}</TooltipProvider>
+					<Toaster duration={5000} />
+				</QueryClientProvider>
+			</NuqsAdapter>
+		</ThemeProvider>
+	);
 };
 
 export default Providers;

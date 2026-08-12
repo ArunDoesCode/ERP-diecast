@@ -1,4 +1,4 @@
-import { BadRequestError, NotFoundError } from "../lib/errors";
+import { BadRequestError, ConflictError, NotFoundError } from "../lib/errors";
 import { generateRawQrToken } from "../lib/qr-token";
 import { employeeRepository } from "../repository/employeeRepository";
 import { roleRepository } from "../repository/roleRepository";
@@ -8,6 +8,21 @@ import type {
   employeeSearchQuerySchemaType,
   employeeUpdateSchemaType,
 } from "../types/setup.types";
+
+async function assertNotLastActiveSuperAdmin(currentRoleId: number) {
+  const currentRole = await roleRepository.findById(currentRoleId);
+  if (currentRole?.name !== "super-admin") {
+    return;
+  }
+
+  const activeCount = await roleRepository.countActiveEmployees(currentRoleId);
+  if (activeCount <= 1) {
+    throw new ConflictError(
+      "Cannot remove the last active super-admin",
+      "LAST_SUPER_ADMIN",
+    );
+  }
+}
 
 export const employeeService = {
   async list(params: employeeListQuerySchemaType) {
@@ -21,8 +36,7 @@ export const employeeService = {
     };
   },
 
-    async search(params: employeeSearchQuerySchemaType) {
-    console.log("Searching employees with params:", params);
+  async search(params: employeeSearchQuerySchemaType) {
     const { rows, total } = await employeeRepository.search(params);
     const totalPages = Math.max(1, Math.ceil(total / params.pageSize));
     return {
@@ -84,6 +98,15 @@ export const employeeService = {
       throw new BadRequestError("Invalid roleId");
     }
 
+    const existingEmployee = await employeeRepository.findById(id);
+    if (!existingEmployee) {
+      throw new NotFoundError("Employee not found");
+    }
+
+    if (existingEmployee.roleId !== input.roleId) {
+      await assertNotLastActiveSuperAdmin(existingEmployee.roleId);
+    }
+
     const authState = await employeeRepository.findAuthStateById(id);
     if (!authState) {
       throw new NotFoundError("Employee not found");
@@ -138,6 +161,13 @@ export const employeeService = {
   },
 
   async remove(id: number) {
+    const existingEmployee = await employeeRepository.findById(id);
+    if (!existingEmployee) {
+      throw new NotFoundError("Employee not found");
+    }
+
+    await assertNotLastActiveSuperAdmin(existingEmployee.roleId);
+
     const row = await employeeRepository.softDelete(id);
     if (!row) {
       throw new NotFoundError("Employee not found");

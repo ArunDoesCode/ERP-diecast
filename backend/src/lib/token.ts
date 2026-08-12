@@ -16,7 +16,6 @@ export type TokenPayload = {
   userName: string;
   role: Role;
   allowedPages: string[];
-
 };
 
 const accessSecret = new TextEncoder().encode(env.ACCESS_TOKEN_SECRET);

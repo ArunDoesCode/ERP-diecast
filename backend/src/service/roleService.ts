@@ -3,6 +3,7 @@ import { roleRepository } from "../repository/roleRepository";
 import type {
   roleInputSchemaType,
   roleListQuerySchemaType,
+  roleUpdateSchemaType,
 } from "../types/setup.types";
 
 export const roleService = {
@@ -21,7 +22,7 @@ export const roleService = {
     return roleRepository.create(input.name, actorId);
   },
 
-  async update(id: number, input: roleInputSchemaType) {
+  async update(id: number, input: roleUpdateSchemaType) {
     const role = await roleRepository.findById(id);
     if (!role) {
       throw new NotFoundError("Role not found");
@@ -33,7 +34,9 @@ export const roleService = {
       );
     }
 
-    const updated = await roleRepository.update(id, input.name);
+    const updated = await roleRepository.update(id, {
+      name: input.name,
+    });
     if (!updated) {
       throw new NotFoundError("Role not found");
     }

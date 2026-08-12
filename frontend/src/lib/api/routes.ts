@@ -1,93 +1,149 @@
 const API_Header = {
-  auth: "/auth",
-  files: "/files",
-  setup: "/setup",
-  supplier: "/supplier",
-  asset: "/asset",
+	auth: "/auth",
+	files: "/files",
+	setup: "/setup",
+	approval: "/approval",
+	supplier: "/supplier",
+	asset: "/asset",
+	pr: "/pr",
+	po: "/po",
+	grn: "/grn",
 };
 export const API_ROUTES = {
-  auth: {
-    login: `${API_Header.auth}/login`,
-    refresh: `${API_Header.auth}/refresh`,
-    logout: `${API_Header.auth}/logout`,
-    me: `${API_Header.auth}/me`,
-    register: `${API_Header.auth}/register`,
-  },
-  files: {
-    presign: `${API_Header.files}/presign`,
-  },
-  // mirrors backend SETUP_ROUTES (list/create/update/remove per resource); :id/:roleId
-  // params become functions here since api.* needs concrete URLs, not placeholders.
-  setup: {
-    modules: {
-      list: `${API_Header.setup}/modules`,
-    },
-    employees: {
-      list: `${API_Header.setup}/employees`,
-      search: `${API_Header.setup}/employees/search`,
-      create: `${API_Header.setup}/employees`,
-      update: (id: number) => `${API_Header.setup}/employees/${id}`,
-      remove: (id: number) => `${API_Header.setup}/employees/${id}`,
-      generateQr: (id: number) => `${API_Header.setup}/employees/${id}/qr`,
-    },
-    roles: {
-      list: `${API_Header.setup}/roles`,
-      create: `${API_Header.setup}/roles`,
-      update: (id: number) => `${API_Header.setup}/roles/${id}`,
-      remove: (id: number) => `${API_Header.setup}/roles/${id}`,
-    },
-    pages: {
-      list: `${API_Header.setup}/pages`,
-      create: `${API_Header.setup}/pages`,
-      update: (id: number) => `${API_Header.setup}/pages/${id}`,
-      remove: (id: number) => `${API_Header.setup}/pages/${id}`,
-    },
-    permissions: {
-      list: `${API_Header.setup}/permissions`,
-      updateForRole: (roleId: number) =>
-        `${API_Header.setup}/roles/${roleId}/permissions`,
-    },
-  },
-  suppliers: {
-    listSuppliers: `${API_Header.supplier}/listSuppliers`,
-    createSupplier: `${API_Header.supplier}/createSupplier`,
-    detail: (supplierId: number) =>
-      `${API_Header.supplier}/${supplierId}/detail`,
-    updateSupplier: (supplierId: number) =>
-      `${API_Header.supplier}/updateSupplier/${supplierId}`,
-    listItems: (supplierId: number) =>
-      `${API_Header.supplier}/${supplierId}/listItems`,
-    createItem: (supplierId: number) =>
-      `${API_Header.supplier}/${supplierId}/createItem`,
-    editItem: (supplierId: number) =>
-      `${API_Header.supplier}/${supplierId}/editItem`,
-    listServices: (supplierId: number) =>
-      `${API_Header.supplier}/${supplierId}/listServices`,
-    createService: (supplierId: number) =>
-      `${API_Header.supplier}/${supplierId}/createService`,
-    editService: (supplierId: number) =>
-      `${API_Header.supplier}/${supplierId}/editService`,
-  },
-  assets: {
-    items: `${API_Header.asset}/items`,
-    services: `${API_Header.asset}/services`,
-    machines: {
-      list: `${API_Header.asset}/machines`,
-      create: `${API_Header.asset}/machines`,
-      update: (machineId: number) =>
-        `${API_Header.asset}/machines/${machineId}`,
-    },
-    locations: {
-      list: `${API_Header.asset}/locations`,
-      create: `${API_Header.asset}/locations`,
-      update: (locationId: number) =>
-        `${API_Header.asset}/locations/${locationId}`,
-    },
-    inventory: {
-      movements: {
-        list: `${API_Header.asset}/inventory/movements`,
-        create: `${API_Header.asset}/inventory/movements`,
-      },
-    },
-  },
+	auth: {
+		login: `${API_Header.auth}/login`,
+		refresh: `${API_Header.auth}/refresh`,
+		logout: `${API_Header.auth}/logout`,
+		me: `${API_Header.auth}/me`,
+		register: `${API_Header.auth}/register`,
+	},
+	files: {
+		presign: `${API_Header.files}/presign`,
+	},
+	// mirrors backend SETUP_ROUTES (list/create/update/remove per resource); :id/:roleId
+	// params become functions here since api.* needs concrete URLs, not placeholders.
+	setup: {
+		modules: {
+			list: `${API_Header.setup}/modules`,
+		},
+		employees: {
+			list: `${API_Header.setup}/employees`,
+			search: `${API_Header.setup}/employees/search`,
+			create: `${API_Header.setup}/employees`,
+			update: (id: number) => `${API_Header.setup}/employees/${id}`,
+			remove: (id: number) => `${API_Header.setup}/employees/${id}`,
+			generateQr: (id: number) => `${API_Header.setup}/employees/${id}/qr`,
+		},
+		roles: {
+			list: `${API_Header.setup}/roles`,
+			create: `${API_Header.setup}/roles`,
+			update: (id: number) => `${API_Header.setup}/roles/${id}`,
+			remove: (id: number) => `${API_Header.setup}/roles/${id}`,
+		},
+		pages: {
+			list: `${API_Header.setup}/pages`,
+			create: `${API_Header.setup}/pages`,
+			update: (id: number) => `${API_Header.setup}/pages/${id}`,
+			remove: (id: number) => `${API_Header.setup}/pages/${id}`,
+		},
+		permissions: {
+			list: `${API_Header.setup}/permissions`,
+			updateForRole: (roleId: number) =>
+				`${API_Header.setup}/roles/${roleId}/permissions`,
+		},
+	},
+	approval: {
+		getPolicies: `${API_Header.approval}/getPolicies`,
+		getPolicyDetails: (id: number) =>
+			`${API_Header.approval}/getPolicyDetails/${id}`,
+		createPolicy: `${API_Header.approval}/createPolicy`,
+		updatePolicy: (id: number) => `${API_Header.approval}/updatePolicy/${id}`,
+		submitRequest: `${API_Header.approval}/submitRequest`,
+		getRequestDetails: (id: number) =>
+			`${API_Header.approval}/getRequestDetails/${id}`,
+		getRequestTrail: (id: number) =>
+			`${API_Header.approval}/getRequestTrail/${id}`,
+		actOnRequest: (id: number) => `${API_Header.approval}/actOnRequest/${id}`,
+		getMyPendingApprovals: `${API_Header.approval}/getMyPendingApprovals`,
+		getCurrentApprovalByDoc: (docType: string, docId: number) =>
+			`${API_Header.approval}/getCurrentApprovalByDoc/${docType}/${docId}`,
+	},
+	suppliers: {
+		listSuppliers: `${API_Header.supplier}/listSuppliers`,
+		createSupplier: `${API_Header.supplier}/createSupplier`,
+		detail: (supplierId: number) =>
+			`${API_Header.supplier}/${supplierId}/detail`,
+		updateSupplier: (supplierId: number) =>
+			`${API_Header.supplier}/updateSupplier/${supplierId}`,
+		listItems: (supplierId: number) =>
+			`${API_Header.supplier}/${supplierId}/listItems`,
+		createItem: (supplierId: number) =>
+			`${API_Header.supplier}/${supplierId}/createItem`,
+		editItem: (supplierId: number) =>
+			`${API_Header.supplier}/${supplierId}/editItem`,
+		listServices: (supplierId: number) =>
+			`${API_Header.supplier}/${supplierId}/listServices`,
+		createService: (supplierId: number) =>
+			`${API_Header.supplier}/${supplierId}/createService`,
+		editService: (supplierId: number) =>
+			`${API_Header.supplier}/${supplierId}/editService`,
+	},
+	assets: {
+		items: `${API_Header.asset}/items`,
+		itemLastRate: (itemId: number) =>
+			`${API_Header.asset}/items/${itemId}/last-rate`,
+		services: `${API_Header.asset}/services`,
+		machines: {
+			list: `${API_Header.asset}/machines`,
+			create: `${API_Header.asset}/machines`,
+			update: (machineId: number) =>
+				`${API_Header.asset}/machines/${machineId}`,
+		},
+		locations: {
+			list: `${API_Header.asset}/locations`,
+			create: `${API_Header.asset}/locations`,
+			update: (locationId: number) =>
+				`${API_Header.asset}/locations/${locationId}`,
+		},
+		inventory: {
+			movements: {
+				list: `${API_Header.asset}/inventory/movements`,
+				create: `${API_Header.asset}/inventory/movements`,
+			},
+		},
+	},
+	purchaseRequisitions: {
+		list: `${API_Header.pr}/getprs`,
+		detail: (prId: number) => `${API_Header.pr}/getprdetails/${prId}`,
+		create: `${API_Header.pr}/createpr`,
+		update: `${API_Header.pr}/updatepr`,
+		remove: `${API_Header.pr}/deletepr`,
+	},
+	purchaseOrders: {
+		list: `${API_Header.po}/getpos`,
+		detail: (poId: number) => `${API_Header.po}/getpodetails/${poId}`,
+		create: `${API_Header.po}/createpo`,
+		update: `${API_Header.po}/updatepo`,
+		remove: (poId: number) => `${API_Header.po}/deletepo/${poId}`,
+		send: (poId: number) => `${API_Header.po}/${poId}/send`,
+		reminder: (poId: number) => `${API_Header.po}/${poId}/reminder`,
+		escalate: (poId: number) => `${API_Header.po}/${poId}/escalate`,
+		delay: (poId: number) => `${API_Header.po}/${poId}/delay`,
+		confirm: (poId: number) => `${API_Header.po}/${poId}/confirm`,
+		invoice: (poId: number) => `${API_Header.po}/${poId}/invoice`,
+		close: (poId: number) => `${API_Header.po}/${poId}/close`,
+	},
+	grn: {
+		list: `${API_Header.grn}/getgrns`,
+		detail: (grnId: number) => `${API_Header.grn}/getgrndetails/${grnId}`,
+		create: `${API_Header.grn}/creategrn`,
+		update: `${API_Header.grn}/updategrn`,
+		remove: (grnId: number) => `${API_Header.grn}/deletegrn/${grnId}`,
+		qaDecision: (grnId: number, lineId: number) =>
+			`${API_Header.grn}/${grnId}/lines/${lineId}/qa`,
+		bypass: (grnId: number, lineId: number) =>
+			`${API_Header.grn}/${grnId}/lines/${lineId}/bypass`,
+		correction: (grnId: number, lineId: number) =>
+			`${API_Header.grn}/${grnId}/lines/${lineId}/correction`,
+	},
 } as const;

@@ -1,9 +1,5 @@
-import React from 'react'
-
 const LandingView = () => {
-  return (
-    <div>LandingView</div>
-  )
-}
+	return <div>LandingView</div>;
+};
 
-export default LandingView
+export default LandingView;

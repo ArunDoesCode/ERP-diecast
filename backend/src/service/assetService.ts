@@ -1,4 +1,8 @@
-import { ConflictError, NotFoundError } from "../lib/errors";
+import {
+  ConflictError,
+  InternalServerError,
+  NotFoundError,
+} from "../lib/errors";
 import { assetRepository } from "../repository/assetRepository";
 import type {
   assetInventoryMovementCreateSchemaType,
@@ -6,6 +10,7 @@ import type {
   assetItemCreateSchemaType,
   assetItemListQuerySchemaType,
   assetItemUpdateSchemaType,
+  assetLastRateQuerySchemaType,
   assetLocationCreateSchemaType,
   assetLocationListQuerySchemaType,
   assetLocationUpdateSchemaType,
@@ -65,7 +70,7 @@ export const assetService = {
     try {
       const created = await assetRepository.createItem(input, actorId);
       if (!created) {
-        throw new Error("Failed to create item");
+        throw new InternalServerError("Failed to create item");
       }
       return created;
     } catch (error) {
@@ -93,6 +98,16 @@ export const assetService = {
     }
   },
 
+  async getLastRate(itemId: number, params: assetLastRateQuerySchemaType) {
+    const result = await assetRepository.getLastRate(itemId, params.supplierId);
+    if (!result) {
+      throw new NotFoundError(
+        "No PO history, supplier catalog price, or item estimate found for this item.",
+      );
+    }
+    return result;
+  },
+
   async listServices(params: assetServiceListQuerySchemaType) {
     const { rows, total } = await assetRepository.listServices(params);
     return {
@@ -105,7 +120,7 @@ export const assetService = {
     try {
       const created = await assetRepository.createService(input, actorId);
       if (!created) {
-        throw new Error("Failed to create service");
+        throw new InternalServerError("Failed to create service");
       }
       return created;
     } catch (error) {
@@ -165,7 +180,7 @@ export const assetService = {
   async createLocation(input: assetLocationCreateSchemaType) {
     const created = await assetRepository.createLocation(input);
     if (!created) {
-      throw new Error("Failed to create location");
+      throw new InternalServerError("Failed to create location");
     }
     return created;
   },
@@ -187,7 +202,7 @@ export const assetService = {
       actorId,
     );
     if (!created) {
-      throw new Error("Failed to create inventory movement");
+      throw new InternalServerError("Failed to create inventory movement");
     }
     return created;
   },
@@ -203,7 +218,7 @@ export const assetService = {
   async createMachine(input: assetMachineCreateSchemaType, actorId: number) {
     const created = await assetRepository.createMachine(input, actorId);
     if (!created) {
-      throw new Error("Failed to create machine");
+      throw new InternalServerError("Failed to create machine");
     }
     return created;
   },

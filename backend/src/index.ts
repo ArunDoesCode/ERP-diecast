@@ -1,5 +1,6 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
@@ -33,6 +34,8 @@ app.use(
   }),
 );
 
+app.use("*", bodyLimit({ maxSize: 5 * 1024 * 1024 }));
+
 app.get("/health", (c) => c.json({ success: true, data: { status: "ok" } }));
 
 app.route("/api", mainRouter);
@@ -62,7 +65,9 @@ app.onError((error, c) => {
   }
 
   const message =
-    error instanceof Error ? error.message : "Internal server error";
+    env.NODE_ENV === "development" && error instanceof Error
+      ? error.message
+      : "Internal server error";
   return c.json({ success: false, message }, 500);
 });
 

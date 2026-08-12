@@ -1,5 +1,9 @@
-import { authRepository } from "../repository/authRepository";
-import { UnauthorizedError } from "../lib/errors";
+import { env } from "../lib/env";
+import {
+  BadRequestError,
+  ConflictError,
+  UnauthorizedError,
+} from "../lib/errors";
 import {
   type Role,
   sha256,
@@ -7,20 +11,21 @@ import {
   signRefreshToken,
   verifyRefreshToken,
 } from "../lib/token";
-import { type registerSchemaType } from "../types/auth.types";
+import { authRepository } from "../repository/authRepository";
+import type { registerSchemaType } from "../types/auth.types";
 
 export const authService = {
   async register(data: registerSchemaType) {
     // Verify role exists
     const role = await authRepository.getRoleByName(data.role);
     if (!role) {
-      throw new Error("Invalid role");
+      throw new BadRequestError("Invalid role");
     }
 
     // Check email doesn't exist
     const existing = await authRepository.getEmployeeByEmail(data.email);
     if (existing) {
-      throw new Error("Email already exists");
+      throw new ConflictError("Email already exists", "EMAIL_EXISTS");
     }
 
     // Hash password and create employee
@@ -49,7 +54,7 @@ export const authService = {
     // Get employee with role
     const employee = await authRepository.getEmployeeWithRoleByEmail(email);
     if (!employee || !employee.passwordHash) {
-      throw new Error("Invalid credentials");
+      throw new UnauthorizedError("Invalid credentials", "INVALID_CREDENTIALS");
     }
 
     // Verify password
@@ -58,7 +63,7 @@ export const authService = {
       employee.passwordHash,
     );
     if (!isValidPassword) {
-      throw new Error("Invalid credentials");
+      throw new UnauthorizedError("Invalid credentials", "INVALID_CREDENTIALS");
     }
 
     // Get allowed pages
@@ -77,8 +82,7 @@ export const authService = {
 
     // Store refresh token
     const refreshExpiry = new Date(
-      Date.now() +
-        Number(process.env.REFRESH_TOKEN_TTL_SECONDS ?? 604800) * 1000,
+      Date.now() + env.REFRESH_TOKEN_TTL_SECONDS * 1000,
     );
 
     await authRepository.storeRefreshToken({
@@ -133,10 +137,7 @@ export const authService = {
     await authRepository.storeRefreshToken({
       employeeId: Number(payload.userId),
       tokenHash: await sha256(newRefreshToken),
-      expiresAt: new Date(
-        Date.now() +
-          Number(process.env.REFRESH_TOKEN_TTL_SECONDS ?? 604800) * 1000,
-      ),
+      expiresAt: new Date(Date.now() + env.REFRESH_TOKEN_TTL_SECONDS * 1000),
     });
 
     return {

@@ -3,7 +3,11 @@ import type { Context } from "hono";
 import { BadRequestError } from "../lib/errors";
 import type { AppEnv } from "../lib/types";
 import { pageService } from "../service/pageService";
-import { pageInputSchema, pageListQuerySchema } from "../types/setup.types";
+import {
+  pageInputSchema,
+  pageListQuerySchema,
+  pageUpdateSchema,
+} from "../types/setup.types";
 
 function parseIdParam(c: Context<AppEnv>) {
   const id = Number(c.req.param("id"));
@@ -31,7 +35,7 @@ export const pageController = {
 
   async update(c: Context<AppEnv>) {
     const id = parseIdParam(c);
-    const body = pageInputSchema.parse(await c.req.json());
+    const body = pageUpdateSchema.parse(await c.req.json());
     const data = await pageService.update(id, body);
     return c.json({ success: true, data });
   },

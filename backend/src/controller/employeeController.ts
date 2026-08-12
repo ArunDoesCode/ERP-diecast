@@ -27,7 +27,7 @@ export const employeeController = {
     return c.json({ success: true, data, meta });
   },
 
-    async search(c: Context<AppEnv>) {
+  async search(c: Context<AppEnv>) {
     const query = employeeSearchQuerySchema.parse(
       Object.fromEntries(new URL(c.req.url).searchParams),
     );
