@@ -30,7 +30,7 @@ Legend — Spec: none / draft / frozen vN · Code: none / schema only / partial 
 | — | | | | |
 
 ## Waiting on you
-- [ ] Merge the test-independence PR (BL-018/022 tests redone by test-writer). One-time local setup from PR #4:
+- [ ] One-time local setup from PR #4:
   add `DATABASE_URL_TEST` to `backend/.env` (see `.env.example`), `docker compose up -d`, `bun run db:test:prepare`
 - [ ] Answer open questions inline in the three draft specs (grn, purchase-requisition, approval)
 - [ ] Answer `known-defects` spec: SME Q1–Q4, assumptions A1–A15, decisions D1–D2 → `/freeze known-defects`
@@ -40,6 +40,7 @@ Legend — Spec: none / draft / frozen vN · Code: none / schema only / partial 
 - [ ] Maps `approval` and `grn` are 1 commit behind (`5681c94` CI fix) — `/map --stale` when convenient
 
 ## Recently done
+- 2026-09-27 — PR #6 merged: BL-018/BL-022 regression tests redone by test-writer (spec stub `auth-setup.md` BR-AUTH-01/02)
 - 2026-09-27 — PR #4 merged: BL-006 test DB, BL-007 createApp, BL-008 committed manifest + route contract test,
   BL-009 hooks, BL-013 CLAUDE.md drift, BL-018 refresh re-reads RBAC, BL-020 no-change, BL-021 audit statuses,
   BL-022 approval PATCH fix; draft specs grn/approval/purchase-requisition; new items BL-025..BL-037
