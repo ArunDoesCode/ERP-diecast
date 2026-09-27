@@ -73,9 +73,44 @@ Ids are `<agent-prefix>-<n>`: `CR-` code review, `SEC-` security, `PERF-` perfor
 `TEST-` test run, `PR-` PR feedback.
 
 ## Ownership (avoid edit collisions when agents run in parallel)
-- backend-dev: `backend/**` except tests written by test-writer (may edit them only if a brief says so)
-- frontend-dev: `frontend/**`
-- test-writer: `backend/**/*.test.ts`, `backend/src/scenarios/**`, `frontend/e2e/**`
+- backend-dev: `backend/**` **except test files** (never, under any brief)
+- frontend-dev: `frontend/**` **except test files** (never, under any brief)
+- test-writer: **only** test files — `**/*.test.ts`, `backend/src/scenarios/**`, `frontend/e2e/**` — and the
+  manual UI test checklist. Never production code.
+
+## Test independence (who writes tests vs code)
+Tests are the spec turned into code. They must not be shaped by the implementation, so:
+1. **Different agents.** test-writer writes and changes tests; backend-dev / frontend-dev write code. No
+   agent does both, and the coordinator never edits tests or production code itself during `/feature`.
+2. **Tests first.** For each slice, test-writer runs **before** the developers, and its tests are committed
+   on their own: `test(<id>): BR-… tests` — before any implementation commit.
+3. **Zero-context brief for test-writer.** The coordinator passes **no context of its own** — not its
+   understanding of the feature, not a summary or paraphrase of the rules (a paraphrase is already an
+   interpretation), not conversation history, plan notes, developer reports, review findings or "how the
+   code works". test-writer gets **only pointers** and reads the sources itself, using exactly the template
+   below. Always spawn it as `subagent_type: test-writer` in a fresh context — **never as a fork** (a fork
+   inherits the coordinator's whole conversation). Briefs to developers never ask them to adjust tests.
+
+   ```md
+   # Brief NN — test-writer — <mode: tests | regression | checklist>
+   Feature: <id>  Branch: <branch>
+   Spec: docs/specs/<module>.md (vN, frozen)
+   BR ids: BR-XXX-01, BR-XXX-02
+   Contract: .pipeline/<id>/contract.md            (omit if none)
+   Screens touched: .pipeline/<id>/reports/NN-frontend-dev.md#screens-touched   (checklist mode only)
+   Test change request: findings.md#<finding-id>   (only when changing an existing test; the finding must
+                                                    quote the spec rule)
+   Write your report to: .pipeline/<id>/reports/NN-test-writer.md
+   ```
+   Nothing else goes in the brief — no extra sentences. If test-writer needs more, it returns `BLOCKED` and
+   the answer is added to the **spec** (via the spec changelog), never to the brief.
+4. **Changing a test** needs a finding that quotes the spec rule showing the test is wrong (or a spec
+   change via `/freeze`); the coordinator records the decision in `findings.md` and briefs test-writer.
+   "The implementation does X" is never a valid reason.
+5. **Checked mechanically.** test-runner verifies that every change to a test file on the branch is in a
+   `test(<id>):` commit, and every `feat(`/`fix(` commit touches no test file. A violation is a blocker.
+6. **Human checklist is independent too.** The manual UI test checklist in the PR is written by
+   test-writer from the spec, not by the developer who built the screens.
 - coordinator: `.pipeline/**`, `docs/**` (spec changelog, decisions, backlog)
 - reviewers, auditors, test-runner, explorer: read-only (write only their report file)
 

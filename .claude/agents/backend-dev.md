@@ -29,8 +29,13 @@ you hit that the next developer should know (these go into the map's gotchas, no
 - controller → service → repository layering; typed `AppError`s; money in paise; stock only via
   `inventory_ledger`; `requireAuth` + `requireRole` on every state-changing route; transactions for
   multi-table writes.
-- Make the test-writer's BR tests pass. Do not weaken or delete a test to make it pass — if a test looks
-  wrong, return BLOCKED explaining why.
+- Make the test-writer's BR tests pass. **You never create, edit, delete, rename, skip (`.skip`/`.todo`)
+  or move a test file** (`*.test.ts`, `backend/src/scenarios/**`, `frontend/e2e/**`) — not even "just a
+  fixture" or an import path. Tests are written by a separate agent so they stay independent of your code.
+  If you believe a test is wrong, return BLOCKED quoting the spec rule (BR id + text) that contradicts it.
+  "My implementation does X" is not a reason; the coordinator decides against the spec, not your code.
+- Don't special-case test data (`TEST_` prefixes, fixture ids) or detect the test environment in
+  production code to make a test pass.
 - Schema change → `bun run db:push` locally; note it in the report.
 - Before returning: `bun run typecheck && bun run lint && bun test` (all must pass, or report which fail
   and why) and re-run `contract:generate` if routes changed.

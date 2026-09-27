@@ -19,6 +19,11 @@ behaviour are allowed via `/bug`, but a bug that reveals a missing rule becomes 
 **Scope rule:** ideas that are not in the frozen spec go to `docs/backlog.md` (one line), never into the
 current build. Don't "also add" things.
 
+**Test independence rule:** tests are written only by the `test-writer` agent, from the spec, in a fresh
+context with a pointers-only brief (never a fork, never your summary). Developer agents and the coordinator
+never create or edit tests; tests and code go in separate `test(…)` / `feat(…)`/`fix(…)` commits.
+Details: `.claude/pipeline/PROTOCOL.md` → Test independence.
+
 ## Where knowledge lives (layered — details and budgets in `docs/KNOWLEDGE.md`)
 | File | Contains |
 |---|---|

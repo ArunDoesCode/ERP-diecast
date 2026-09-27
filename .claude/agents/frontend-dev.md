@@ -24,7 +24,10 @@ In your report, add a **Map updates** section (new routes, views, components, qu
 - Every form field has a linked `<Label htmlFor>` (a11y lint rule).
 - Before returning: `bunx tsc --noEmit && bun run lint` clean for files you touched (report pre-existing
   errors separately, don't fix them unless the brief says so).
-- In the report, add a **manual test script**: role to log in as, page URL, steps, expected result, for
-  the golden path and one negative path per BR group. The coordinator puts this in the PR.
+- In the report, add a **Screens touched** list: page URL, which role can reach it, and the buttons/fields
+  added or changed. Do **not** write the manual test checklist — test-writer writes it from the spec so the
+  user tests what the spec requires, not what you built.
+- Never create or edit test files (`*.test.ts`, `frontend/e2e/**`). If a test looks wrong, return BLOCKED
+  quoting the spec rule that contradicts it.
 
 Return the protocol block.

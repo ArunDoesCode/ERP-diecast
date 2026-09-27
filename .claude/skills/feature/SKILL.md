@@ -43,13 +43,25 @@ Context you load yourself (cheap, no exploring): `docs/STATUS.md`, the spec, `do
 3. Commit `.pipeline/<id>/` ("chore(<id>): pipeline plan").
 
 ## Phase 2 — Build (per slice, in plan order)
-1. **test-writer**: BR tests for the slice (expect red). FAIL-BUG on existing code for in-scope BRs is
-   expected work; out-of-scope FAIL-BUGs → `docs/backlog.md`.
-2. **backend-dev** (contract step): descriptors + `contract.md` + manifest.
+Follow **Test independence** in `.claude/pipeline/PROTOCOL.md`: test-writer and the developers are separate
+agents with an information wall between them; you never write tests or production code yourself here.
+1. **backend-dev** (contract step only): descriptors + `contract.md` + manifest — interfaces, no logic.
+   Commit `feat(<id>): <slice> contract`.
+2. **test-writer**: BR tests for the slice (expect red). Spawn as `subagent_type: test-writer` (never a
+   fork) with the **zero-context brief template** from PROTOCOL.md — pointers only (spec path + version, BR
+   ids, contract path). Do not add your own summary, interpretation, plan notes or anything from this
+   conversation; test-writer reads the spec itself. FAIL-BUG on existing code
+   for in-scope BRs is expected work; out-of-scope FAIL-BUGs → `docs/backlog.md`.
+   Commit the tests alone: `test(<id>): BR-… tests (red)`.
 3. In parallel (one message, two Agent calls — disjoint ownership):
-   **backend-dev** (implement until slice BR tests green) and **frontend-dev** (screens against `contract.md`).
+   **backend-dev** (implement until slice BR tests green, without touching tests) and **frontend-dev**
+   (screens against `contract.md`). Neither brief includes test-writer's reasoning — only "make these
+   test files pass" and the spec.
 4. On BLOCKED: answer from spec/decisions, or ask the user, then re-brief the same agent with the answer.
-5. Commit per slice: `feat(<id>): <slice> (BR-…)`.
+   A developer claiming a test is wrong must quote the contradicting spec rule; decide against the spec,
+   record it in `findings.md`, and if the test really is wrong, re-brief **test-writer** (not the developer)
+   and commit its change as `test(<id>): …`.
+5. Commit per slice: `feat(<id>): <slice> (BR-…)` — production code only, no test files.
 
 ## Phase 3 — Verify loop (whole feature diff vs base)
 ```
@@ -60,11 +72,13 @@ loop:
        fix now (all blockers, majors unless clearly out of scope) | backlog (minor / out of scope) |
        reject (explain why in findings.md — reviewers can be wrong; check the code yourself)
      If blockers/majors to fix → route by area: backend → backend-dev, frontend → frontend-dev,
-       test → test-writer, spec gap → user question. Independent areas in parallel. Commit
-       "fix(<id>): address <ids>". iteration += 1 → back to A (re-review only the fix diff + spec-reviewer
+       test → test-writer (only with a spec-rule citation), spec gap → user question. Independent areas
+       in parallel. Commit code fixes as "fix(<id>): address <ids>" and test changes separately as
+       "test(<id>): <ids>". iteration += 1 → back to A (re-review only the fix diff + spec-reviewer
        on the full diff).
-  C. Test — spawn test-runner (compare with baseline).
-     New failures → route same as B → commit → iteration += 1 → back to A.
+  C. Test — spawn test-runner (compare with baseline; includes the test-integrity check).
+     New failures → default assumption: **the code is wrong** → developer agent. Route to test-writer
+     only if the failure message contradicts the spec. Commit → iteration += 1 → back to A.
   D. All green (no open blockers/majors, no new test failures) → exit loop.
   If iteration > 3, or the same finding id survives 2 fixes → STOP, summarise to the user, needs input.
 ```
@@ -86,7 +100,8 @@ loop:
    - What changed (backend / frontend), contract changes (from `contract.md`)
    - Audit summary: security / performance / code review — fixed, backlogged, rejected (with reason)
    - Test results (new vs baseline)
-   - **Manual UI test script** from frontend-dev reports (role, URL, steps, expected) as a checkbox list
+   - **Manual UI test checklist** written by **test-writer** from the spec (brief: acceptance criteria +
+     frontend-dev's "Screens touched" list for URLs/roles), as a checkbox list
    - "Reply on this PR to request changes; the watcher picks it up. Merge when satisfied."
    - Footer line: `<!-- pipeline:<id> -->`
    (create label once if missing: `gh label create agent-pipeline`.)
@@ -103,10 +118,14 @@ loop:
 2. Classify each item: bug (behaviour ≠ spec) | spec change (behaviour = spec, user wants different) |
    question | nit. Spec changes: if needed for this milestone → apply via `/freeze` change-request path
    (bump spec version) — otherwise backlog and reply saying so.
-3. Record as `PR-` findings, route fixes (Phase 3 B routing), then run the **full Phase 3 loop** again.
+3. Record as `PR-` findings. For each **bug**: first a regression test by **test-writer** (zero-context
+   brief: spec path + BR id + the PR comment's URL — the user's own words are allowed, your diagnosis is
+   not), committed as `test(<id>): …`; then the fix by the developer agent as `fix(<id>): …`. For each
+   **spec change**: update the spec first, then test-writer updates/adds tests from the new spec version,
+   then the developer changes code. Then run the **full Phase 3 loop** again.
 4. Push; reply to each comment: `🤖 Addressed in <sha>: <one line>` (or backlogged/answered); post a PR
-   comment `🤖 Pipeline re-run complete — ready for another manual test.` with an updated test script for
-   what changed. Update `lastProcessedCommentAt`.
+   comment `🤖 Pipeline re-run complete — ready for another manual test.` with an updated checklist for
+   what changed (written by test-writer, checklist mode). Update `lastProcessedCommentAt`.
 
 ## After merge (detected by /watch-prs)
 Docs already merged with the PR (Phase 4 step 0). Remove the worktree (`git worktree remove`), note the merge

@@ -21,6 +21,15 @@ Read `.claude/pipeline/PROTOCOL.md` and your brief. You run commands and report;
 5. `cd frontend && bunx tsc --noEmit`
 6. `cd frontend && bun run lint`
 7. `cd frontend && bun run build` (only if the brief says so; needs `NEXT_PUBLIC_API_URL`)
+8. **Test integrity** (PROTOCOL.md → Test independence). For each commit in `git log --format='%h %s' <base>..HEAD`:
+   - files = `git show --name-only --format= <sha>`; test files = `*.test.ts`, `backend/src/scenarios/**`,
+     `frontend/e2e/**`.
+   - A commit whose subject starts with `test(` must touch **only** test files.
+   - A commit whose subject starts with `feat(` or `fix(` must touch **no** test files.
+   - Also check uncommitted changes (`git status --short`): uncommitted edits to test files are a violation.
+   Any violation → `TEST-INTEGRITY` finding, severity **blocker**, listing the commit, its subject and the
+   offending files. Also grep the diff (`git diff <base>...HEAD -- ':!*.test.ts'`) for production code that
+   checks `NODE_ENV === "test"` or `TEST_` fixture names — report as `TEST-INTEGRITY` too.
 
 ## Report
 - Summary table: check | pass/fail | counts.

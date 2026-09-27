@@ -52,6 +52,11 @@ have to be re-explained.
   the spec/decisions if it can, otherwise asks you, then records the answer in the spec changelog.
 - **File ownership** (backend-dev → `backend/**`, frontend-dev → `frontend/**`, test-writer → tests)
   prevents parallel agents from editing the same files.
+- **Tests are independent of the code.** test-writer writes tests from the spec *before* the code, in a
+  fresh context, with a brief that contains only file paths and rule ids — the coordinator adds nothing of
+  its own. Developers can't edit tests; if they think one is wrong they must quote the spec. Test and code
+  changes go in separate commits and `test-runner` blocks the PR if that's broken. Your manual checklist in
+  the PR is written by test-writer too, from the spec.
 
 ### Models
 | Agent | Model | Why |

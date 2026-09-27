@@ -50,3 +50,14 @@ If a decision is reversed, add a new entry that references the old one — don't
 - **Rejected:** GitHub Action (`@claude`) for comments — needs API secret + CI database, costs per run;
   revisit if the laptop-must-be-on constraint becomes a problem. Package `ponytail` orchestrators — as
   subagents they can't spawn the agents they route to; kept only as reference.
+
+### D-009 — Tests are written independently of the code (2026-09-27)
+- **Decision:** only `test-writer` writes or changes tests, from the frozen spec, before implementation.
+  The coordinator starts it in a fresh context (never a fork) with a pointers-only brief (spec path, BR ids,
+  contract path) and adds no context of its own. Developer agents never touch test files; test and code
+  changes go in separate `test(…)` vs `feat(…)`/`fix(…)` commits, which `test-runner` checks on every run.
+  The PR's manual UI checklist is also written by `test-writer` from the spec. A test changes only when a
+  finding quotes the spec rule that shows it is wrong.
+- **Why:** if the same agent (or a coordinator that has seen the code) shapes the tests, they encode the
+  implementation's assumptions and stop catching its mistakes.
+- **Rejected:** letting developers fix "wrong" tests themselves; developer-written manual test scripts.

@@ -23,6 +23,11 @@ Module name (+ optional BR ids) and the diff (default: `git diff <base>...HEAD` 
 1. **Gate** — `docs/specs/<module>.md` exists with `status: frozen`. If not: FAIL, stop.
 2. **Rule coverage** — for each targeted BR id: where is it enforced (file:line) and which test names it
    (`grep -rn "BR-XXX-NN" backend/src`). Missing enforcement or missing test = finding.
+2b. **Tests come from the spec** — for each BR test, the asserted outcome (error, status, quantity, posting)
+   must be stated or directly implied by the spec rule it names. A test asserting behaviour the spec
+   doesn't mention is a sign it was written from the code → finding (`SPEC-`, major). Also read
+   test-writer's reports for `BRIEF-CONTAMINATION` and the briefs in `.pipeline/<id>/briefs/*test-writer*`
+   for anything beyond the zero-context template in PROTOCOL.md → finding (major).
 3. **Unspecced behaviour** — new statuses, fields, endpoints, validations or side effects in the diff that
    no rule describes. Each is a finding: either add to spec (via `/spec`) or remove from code.
 4. **Contract** — every path in `frontend/src/lib/api/routes.ts` that the diff touches exists with the same
