@@ -41,8 +41,9 @@ no Turborepo, no `apps/`, no shared `packages/*`.
 ```
 backend/                           ← this repo
 ├── src/
-│   ├── index.ts                   ← app entry, mounts mainRouter
-│   ├── routes/                    ← Hono routers, one per feature (auth, asset, setup, supplier, pr)
+│   ├── index.ts                   ← entry: connects DB, serves createApp()
+│   ├── app.ts                     ← createApp(): middleware, mainRouter, onError (tests use it)
+│   ├── routes/                    ← Hono routers, one per feature (auth, asset, setup, supplier, pr, po, grn, approval)
 │   ├── controller/                ← parses input (Zod), calls service, shapes response
 │   ├── service/                   ← business logic, orchestrates repository calls
 │   ├── repository/                ← Drizzle queries only, no business logic
@@ -51,7 +52,8 @@ backend/                           ← this repo
 │   │   ├── client.ts               ← drizzle-orm/postgres-js client
 │   │   ├── schemas/                ← Drizzle table defs, split by domain (see below)
 │   │   └── migrations/             ← drizzle-kit generated migrations
-│   └── lib/                        ← auth-middleware, token, errors, async-handler, env, http, qr-token
+│   ├── lib/                        ← auth-middleware, token, errors, async-handler, env, http, qr-token, route-registry, …
+│   └── test/setup-env.ts           ← bun test preload: forces DATABASE_URL_TEST
 ├── docs/                            ← audit/remediation notes (see docs/backend-audit-remediation-*.md)
 ├── docker-compose.yaml              ← local Postgres 15 for dev (see "Database" below)
 ├── biome.json                       ← lint + format config (Biome, replaces ESLint/Prettier)
@@ -120,7 +122,7 @@ src/db/schemas/
 ├── 02_procurement-catalog.ts      — itemMaster, serviceMaster, machines
 ├── 02_procurement-suppliers.ts    — supplierMaster, supplierItems, supplierServices
 ├── 02_procurement-purchasing.ts   — purchaseRequests(+items), purchaseOrders(+items), GRN, subcontracting
-├── 02_procurement-approval.ts     — approvalTrails, approvalPolicies (approval workflow, in progress)
+├── 02_procurement-approval.ts     — approvalPolicies, approvalRequests, approvalTrails
 ├── 02_procurement.ts              — barrel re-export of the four 02_procurement-* files above
 ├── 03_hcm.ts                      — employees (full definition), attendance/payroll fields
 └── index.ts                       — re-exports everything for drizzle-kit
@@ -193,26 +195,42 @@ Never retrofit RBAC. Every new route gets `requireAuth` + `requireRole()` on day
 
 ```
 src/
-├── index.ts                  ← app entry, connects DB, mounts mainRouter
+├── index.ts                  ← entry: connectDb(), serve(createApp()), graceful shutdown
+├── app.ts                    ← createApp(): logger, CORS, body limit, /health, /api → mainRouter, onError
 ├── routes/
 │   ├── index.ts               ← mainRouter, mounts everything below under MAIN_ROUTES
+│   ├── end-points.ts          ← END_POINTS path constants per router
 │   ├── auth.ts                ← /auth — register, login, refresh, logout, me
-│   ├── asset.ts                ← /asset — items, services, machines, locations, inventory movements
-│   ├── setup.ts                ← /setup — modules, employees, roles, pages, permissions (super-admin only)
-│   ├── supplier.ts             ← /supplier — supplier master, supplier items, supplier services
-│   └── pr.ts                   ← /pr — purchase requisitions (create/update/cancel/list/details)
-├── controller/                 ← one file per feature, matches routes/
-├── service/                    ← one file per feature, matches routes/
-├── repository/                 ← one file per feature, matches routes/
+│   ├── asset.ts               ← /asset — items, services, machines, locations, inventory movements
+│   ├── setup.ts               ← /setup — modules, employees, roles, pages, permissions (super-admin only)
+│   ├── supplier.ts            ← /supplier — supplier master, supplier items, supplier services
+│   ├── pr.ts                  ← /pr — purchase requisitions
+│   ├── po.ts                  ← /po — purchase orders (create, send, confirm, reminder/escalate/delay, invoice, close)
+│   ├── grn.ts                 ← /grn — goods receipts, QA decision, bypass, correction
+│   └── approval.ts            ← /approval — policies, requests, act, trail, current-by-document
+├── controller/                 ← one file per feature (plus employee/module/page/permission/role for setup)
+├── service/                    ← same split as controller/
+├── repository/                 ← same split; approvalRepository.test.ts is the real-DB test pattern
+├── types/                      ← Zod request schemas per feature (*.types.ts)
 └── lib/
     ├── auth-middleware.ts       ← requireAuth, requireRole
     ├── async-handler.ts         ← asyncHandler() wrapper, logs + rethrows on error
+    ├── route-registry.ts        ← register() route descriptors → contract manifest (+ drift test)
+    ├── response-schemas.ts      ← shared response envelopes for descriptors
+    ├── document-number.ts       ← PR/PO/GRN document numbering
+    ├── rate-limiter.ts          ← auth rate limiting
     ├── token.ts                 ← sign/verify access + refresh JWTs
     ├── errors.ts                ← AppError family
     ├── http.ts                  ← refresh-cookie helpers
     ├── qr-token.ts              ← operator QR token generation
+    ├── test-db-url.ts           ← DATABASE_URL_TEST guard used by the test preload
     └── env.ts                   ← typed env access
 ```
+
+Tests: `bun test` (co-located `*.test.ts`). HTTP-level tests use `createApp().request(...)` —
+see `src/app.test.ts`. Every frontend `API_ROUTES` path must exist in the route registry
+(`src/lib/frontend-routes-contract.test.ts`), and the committed `.contracts/api-manifest.json`
+must be current (`bun run contract:check`, in CI).
 
 There is no `jobs.ts`, `workers.ts`, `payroll.ts`, `enquiries.ts`, `qa.ts`, or `station/` yet —
 those belong to a later phase of the product vision, not the current codebase.

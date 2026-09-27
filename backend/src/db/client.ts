@@ -3,7 +3,8 @@ import postgres from "postgres";
 
 import { env } from "../lib/env";
 
-// Supabase transaction pooler does not support prepared statements.
+// Prepared statements off: kept from the earlier pooled-connection setup so the
+// app also works behind a transaction-mode pooler (e.g. PgBouncer).
 const queryClient = postgres(env.DATABASE_URL, { prepare: false });
 
 export const db = drizzle({ client: queryClient });

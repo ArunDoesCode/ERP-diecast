@@ -18,7 +18,6 @@ Type: defect · infra · feature · debt · idea.
 | BL-010 | P2 | infra | frontend | Playwright for 5–8 golden paths | workflow setup | 2026-09-27 |
 | BL-011 | P2 | debt | backend | Switch `db:push` → generated migrations before UAT-1 (D-004) | decisions | 2026-09-27 |
 | BL-012 | P1 | infra | repo | Protect `main` on GitHub: require PR + CI jobs `backend`, `frontend` | workflow setup | 2026-09-27 |
-| BL-013 | P3 | debt | backend | Refresh drifted `backend/CLAUDE.md` (route list, tests claim) and stale Supabase comment in `drizzle.config.ts` | repo review | 2026-09-27 |
 | BL-014 | P1 | defect | inventory | `itemMaster.currentStock` / `averageCostPaise` never recomputed from `inventory_ledger` postings (GRN accept/bypass/correction, movements). Stock screens and PR cost estimates (`prRepository` uses `averageCostPaise`) read stale values. Decide: derive from ledger vs update in same tx | module mapping (verified) | 2026-09-27 |
 | BL-015 | P2 | defect | inventory | `POST /asset/inventory/movements` posts directly to the ledger without checking `referenceId` points to a real document — second, unguarded posting path | module mapping | 2026-09-27 |
 | BL-016 | P2 | debt | grn | GRN ledger posting (`assetRepository.createInventoryMovement`, own tx) not atomic with grnItems/PO roll-up tx | module mapping | 2026-09-27 |
@@ -39,5 +38,6 @@ Type: defect · infra · feature · debt · idea.
 | BL-007 | `createApp()` in `src/app.ts` (index.ts only serves it); HTTP smoke tests `src/app.test.ts` via `app.request()` | feature/bl-006-test-db | 2026-09-27 |
 | BL-008 | `backend/.contracts/api-manifest.json` committed (deterministic, no timestamp) + CI `contract:check`; `frontend-routes-contract.test.ts` fails on any `API_ROUTES` path without a backend route (`KNOWN_GAPS` allowlist, BL-001 only); removed dead frontend `files.presign` (no backend route, unused) | feature/bl-006-test-db | 2026-09-27 |
 | BL-009 | Project hooks in `.claude/settings.json`: PostToolUse `biome-format.sh` (biome --write on edited backend/frontend file, unfixable errors fed back), Stop `typecheck-on-stop.sh` (tsc only for packages with changed .ts/.tsx, blocks on errors, loop-safe) | feature/bl-006-test-db | 2026-09-27 |
+| BL-013 | `backend/CLAUDE.md` route/lib/schema/test sections match the code; Supabase leftovers removed from `drizzle.config.ts`, `db/client.ts`, `.env.example` | feature/bl-006-test-db | 2026-09-27 |
 
 Next free id: **BL-024**
