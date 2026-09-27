@@ -12,8 +12,7 @@ Type: defect · infra · feature · debt · idea.
 | ID | P | Type | Module | Item | Why / source | Raised |
 |---|---|---|---|---|---|---|
 | BL-001 | P1 | defect | purchase-requisition | Frontend `DELETE /pr/deletepr` sends id in body; backend route is `/pr/deletepr/:id` → 404 | repo review | 2026-09-27 |
-| BL-002 | P1 | defect | approval | Frontend uses `prType`, schema uses `subDocType` → 8 tsc errors **and silent data loss**: the sub-doc type chosen in the policy form is never sent, server defaults to `any` (`approval-policy-helpers.ts`, `types/approval.ts`) | repo review | 2026-09-27 |
-| BL-003 | P1 | defect | frontend | 40 `a11y/noLabelWithoutControl` lint errors (GRN modals, PO dialogs) + 1 backend biome format error — CI red | repo review | 2026-09-27 |
+| BL-002 | P1 | decision | approval | `prType`→`subDocType` fixed (2026-09-27). **Open:** keep `isSaleOrderLinked` as a policy filter (dropdown commented out, backend supports it) — frontend now stops sending it (= any). Decide in approval spec: A keep both / B drop / C defer | CI fix | 2026-09-27 |
 | BL-004 | P1 | infra | auth-setup | `bootstrap-admin` script — `/auth/register` needs an existing super-admin/owner, empty DB can't create first user | workflow setup | 2026-09-27 |
 | BL-005 | P1 | infra | backend | `bun run db:reset` — drop → push → page access seed → approval policies → realistic fixtures | workflow setup | 2026-09-27 |
 | BL-006 | P2 | infra | backend | Separate test database (`DATABASE_URL_TEST`) in docker-compose | workflow setup | 2026-09-27 |
@@ -32,10 +31,13 @@ Type: defect · infra · feature · debt · idea.
 | BL-019 | P2 | defect | purchase-requisition | `pr_item_status` values `ordered`/`closed`/`cancelled` are never written (only `pending`, `po_draft`) — PR lines never advance after PO receipt/close; header status is right via `recomputeHeaderStatusFromItems` (verify in PR spec) | module mapping | 2026-09-27 |
 | BL-020 | P3 | debt | purchase-order | Frontend PO detail route named `purchase-orders/[prId]` but param is a PO id — rename | module mapping | 2026-09-27 |
 | BL-021 | P3 | debt | docs | `backend/docs/backend-audit-remediation-2026-07-21.md` partly stale (numbering + delete fixed backend-side) — mark resolved items | module mapping | 2026-09-27 |
+| BL-022 | P2 | defect | approval | Backend `updateApprovalPolicySchema` gives `subDocType` `.default("any")` → a PATCH without `subDocType` likely resets it to `any` (UI now always sends it). Needs a test | CI fix | 2026-09-27 |
+| BL-023 | P3 | debt | approval | `ApprovalPoliciesView` edit-form effect: review deps/reset flow in approval spec (lint fixed by adding `policyForm.reset`) | CI fix | 2026-09-27 |
 
 ## Done
 | ID | Item | PR / commit | Closed |
 |---|---|---|---|
 | BL-000 | GitHub Actions CI | 0a406f4 | 2026-09-27 |
+| BL-003 | Frontend lint (40 label a11y + format/imports/non-null/deps) + backend format error; `seed_page_access.sql` fixed (stale `::role` casts, duplicate hardcoded super-admin block) | CI-fix commit | 2026-09-27 |
 
-Next free id: **BL-022**
+Next free id: **BL-024**

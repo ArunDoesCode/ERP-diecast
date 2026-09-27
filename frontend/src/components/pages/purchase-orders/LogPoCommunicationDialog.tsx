@@ -171,14 +171,22 @@ export function LogPoCommunicationDialog({
 
 				<div className="space-y-4 px-6 py-5">
 					<div>
-						<label className="mb-1 block text-xs font-medium">Channel</label>
+						<label
+							htmlFor="po-log-communication-channel"
+							className="mb-1 block text-xs font-medium"
+						>
+							Channel
+						</label>
 						<Select
 							value={channel}
 							onValueChange={(value) =>
 								setChannel(value as PoCommunicationChannel)
 							}
 						>
-							<SelectTrigger className="w-full">
+							<SelectTrigger
+								id="po-log-communication-channel"
+								className="w-full"
+							>
 								<SelectValue placeholder="Select channel" />
 							</SelectTrigger>
 							<SelectContent>
@@ -193,10 +201,14 @@ export function LogPoCommunicationDialog({
 
 					{channel === "email" ? (
 						<div>
-							<label className="mb-1 block text-xs font-medium">
+							<label
+								htmlFor="po-log-communication-email"
+								className="mb-1 block text-xs font-medium"
+							>
 								Supplier email
 							</label>
 							<Input
+								id="po-log-communication-email"
 								type="email"
 								value={toEmail}
 								onChange={(event) => setToEmail(event.target.value)}
@@ -206,8 +218,14 @@ export function LogPoCommunicationDialog({
 					) : null}
 
 					<div>
-						<label className="mb-1 block text-xs font-medium">Note</label>
+						<label
+							htmlFor="po-log-communication-note"
+							className="mb-1 block text-xs font-medium"
+						>
+							Note
+						</label>
 						<Textarea
+							id="po-log-communication-note"
 							value={note}
 							onChange={(event) => setNote(event.target.value)}
 							placeholder="Optional"

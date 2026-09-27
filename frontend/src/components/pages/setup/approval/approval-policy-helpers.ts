@@ -3,7 +3,6 @@ import type {
 	ApprovalPolicyCreateInput,
 	ApprovalPolicyDetails,
 	ApprovalPolicyFormInput,
-	ApprovalPolicyPrType,
 	ApprovalPolicyUpdateInput,
 } from "@/types/approval";
 
@@ -24,8 +23,7 @@ export function createDefaultFormValues(): ApprovalPolicyFormInput {
 		isActive: true,
 		priority: 1,
 		docType: "pr",
-		prType: "",
-		isSaleOrderLinked: "any",
+		subDocType: "",
 		minAmountPaise: "",
 		maxAmountPaise: "",
 		autoApprove: false,
@@ -49,13 +47,7 @@ export function mapPolicyToFormValues(
 		isActive: policy.isActive,
 		priority: policy.priority,
 		docType: policy.docType,
-		prType: (policy.prType as ApprovalPolicyPrType | null) ?? "",
-		isSaleOrderLinked:
-			policy.isSaleOrderLinked == null
-				? "any"
-				: policy.isSaleOrderLinked
-					? "yes"
-					: "no",
+		subDocType: policy.subDocType ?? "",
 		minAmountPaise:
 			policy.minAmountPaise == null ? "" : String(policy.minAmountPaise),
 		maxAmountPaise:
@@ -108,11 +100,9 @@ export function toCreatePayload(
 		isActive: form.isActive,
 		priority: form.priority,
 		docType: form.docType,
-		prType: form.prType || undefined,
-		isSaleOrderLinked:
-			form.isSaleOrderLinked === "any"
-				? undefined
-				: form.isSaleOrderLinked === "yes",
+		// isSaleOrderLinked is intentionally not sent until the approval spec decides
+		// whether policies filter on it (BL-002); backend then stores null = any.
+		subDocType: form.subDocType || undefined,
 		minAmountPaise: min ? Number(min) : undefined,
 		maxAmountPaise: max ? Number(max) : undefined,
 		autoApprove: form.autoApprove,
@@ -128,11 +118,7 @@ export function toUpdatePayload(
 		description: form.description || null,
 		isActive: form.isActive,
 		priority: form.priority,
-		prType: form.prType || null,
-		isSaleOrderLinked:
-			form.isSaleOrderLinked === "any"
-				? null
-				: form.isSaleOrderLinked === "yes",
+		subDocType: form.subDocType || "any",
 		minAmountPaise: form.minAmountPaise.trim()
 			? Number(form.minAmountPaise)
 			: null,

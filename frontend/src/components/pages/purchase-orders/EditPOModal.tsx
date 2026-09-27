@@ -184,18 +184,22 @@ export function EditPOModal({
 						<div className="max-h-[70vh] space-y-5 overflow-y-auto px-6 py-5">
 							<div className="grid gap-3 md:grid-cols-[1fr_10rem_1fr]">
 								<div>
-									<label className="mb-1 block text-xs font-medium">
+									<span className="mb-1 block text-xs font-medium">
 										Supplier
-									</label>
+									</span>
 									<div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
 										Supplier #{po.supplierId}
 									</div>
 								</div>
 								<div>
-									<label className="mb-1 block text-xs font-medium">
+									<label
+										htmlFor="po-edit-payment-terms-days"
+										className="mb-1 block text-xs font-medium"
+									>
 										Terms
 									</label>
 									<Input
+										id="po-edit-payment-terms-days"
 										type="number"
 										min={0}
 										value={paymentTermsDays}
@@ -205,10 +209,14 @@ export function EditPOModal({
 									/>
 								</div>
 								<div>
-									<label className="mb-1 block text-xs font-medium">
+									<label
+										htmlFor="po-edit-expected-delivery-date"
+										className="mb-1 block text-xs font-medium"
+									>
 										Delivery date
 									</label>
 									<Input
+										id="po-edit-expected-delivery-date"
 										type="date"
 										value={expectedDeliveryDate}
 										onChange={(event) =>
@@ -347,20 +355,28 @@ export function EditPOModal({
 
 							<div className="grid gap-3 md:grid-cols-2">
 								<div>
-									<label className="mb-1 block text-xs font-medium">
+									<label
+										htmlFor="po-edit-delivery-terms"
+										className="mb-1 block text-xs font-medium"
+									>
 										Delivery terms
 									</label>
 									<Input
+										id="po-edit-delivery-terms"
 										value={deliveryTerms}
 										onChange={(event) => setDeliveryTerms(event.target.value)}
 										placeholder="Door delivery, pickup, freight included"
 									/>
 								</div>
 								<div>
-									<label className="mb-1 block text-xs font-medium">
+									<label
+										htmlFor="po-edit-notes"
+										className="mb-1 block text-xs font-medium"
+									>
 										Notes
 									</label>
 									<Textarea
+										id="po-edit-notes"
 										value={notes}
 										onChange={(event) => setNotes(event.target.value)}
 										placeholder="Optional"

@@ -48,17 +48,20 @@ export function GrnCorrectionAlert({
 					<AlertDialogTitle>Correct · {line.itemName}</AlertDialogTitle>
 					<AlertDialogDescription>
 						Posts a negative stock adjustment against this line's original
-						posting. The original GRN line is not changed. A reason is
-						required.
+						posting. The original GRN line is not changed. A reason is required.
 					</AlertDialogDescription>
 				</AlertDialogHeader>
 
 				<div className="space-y-3">
 					<div>
-						<label className="mb-1 block text-xs font-medium">
+						<label
+							htmlFor="grn-correction-qty"
+							className="mb-1 block text-xs font-medium"
+						>
 							Correction qty
 						</label>
 						<Input
+							id="grn-correction-qty"
 							type="number"
 							min={0}
 							step="any"

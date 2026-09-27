@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
-    bigint,
+  bigint,
   boolean,
   index,
   integer,

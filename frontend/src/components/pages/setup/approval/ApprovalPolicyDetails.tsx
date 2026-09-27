@@ -60,8 +60,6 @@
 //               </p>
 //             </div>
 
-            
-
 //             <div className="flex items-center gap-2">
 //               <Button type="button" variant="outline" onClick={onEdit}>
 //                 Edit Policy

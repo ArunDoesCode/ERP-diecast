@@ -8,8 +8,18 @@ const DRAFT_CRUD_ROLES = [
 	"back_office",
 	"floor_supervisor",
 ];
-const QA_DECISION_ROLES = ["super-admin", "owner", "back_office", "qa_inspector"];
-const BYPASS_ROLES = ["super-admin", "owner", "back_office", "floor_supervisor"];
+const QA_DECISION_ROLES = [
+	"super-admin",
+	"owner",
+	"back_office",
+	"qa_inspector",
+];
+const BYPASS_ROLES = [
+	"super-admin",
+	"owner",
+	"back_office",
+	"floor_supervisor",
+];
 const CORRECTION_ROLES = ["super-admin", "owner", "back_office"];
 const OVER_RECEIPT_EXEMPT_ROLES = ["owner", "back_office"]; // NOT super-admin
 

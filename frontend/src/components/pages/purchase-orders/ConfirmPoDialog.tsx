@@ -96,11 +96,14 @@ export function ConfirmPoDialog({
 
 				<div className="space-y-4 px-6 py-5">
 					<div>
-						<label className="mb-1 block text-xs font-medium">
+						<label
+							htmlFor="po-confirm-method"
+							className="mb-1 block text-xs font-medium"
+						>
 							Confirmation method
 						</label>
 						<Select value={method} onValueChange={setMethod}>
-							<SelectTrigger className="w-full">
+							<SelectTrigger id="po-confirm-method" className="w-full">
 								<SelectValue placeholder="Select method" />
 							</SelectTrigger>
 							<SelectContent>
@@ -115,10 +118,14 @@ export function ConfirmPoDialog({
 
 					{method === "other" ? (
 						<div>
-							<label className="mb-1 block text-xs font-medium">
+							<label
+								htmlFor="po-confirm-method-detail"
+								className="mb-1 block text-xs font-medium"
+							>
 								Method detail
 							</label>
 							<Input
+								id="po-confirm-method-detail"
 								value={customMethod}
 								onChange={(event) => setCustomMethod(event.target.value)}
 								placeholder="How was it confirmed?"
@@ -127,8 +134,14 @@ export function ConfirmPoDialog({
 					) : null}
 
 					<div>
-						<label className="mb-1 block text-xs font-medium">Note</label>
+						<label
+							htmlFor="po-confirm-note"
+							className="mb-1 block text-xs font-medium"
+						>
+							Note
+						</label>
 						<Textarea
+							id="po-confirm-note"
 							value={note}
 							onChange={(event) => setNote(event.target.value)}
 							placeholder="Optional"

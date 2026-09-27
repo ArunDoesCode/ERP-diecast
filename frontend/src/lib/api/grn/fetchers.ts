@@ -29,7 +29,9 @@ function toQueryString(params?: Record<string, unknown>) {
 }
 
 export function getGrns(params?: GrnListParams) {
-	return api.get<GrnListResult>(`${API_ROUTES.grn.list}${toQueryString(params)}`);
+	return api.get<GrnListResult>(
+		`${API_ROUTES.grn.list}${toQueryString(params)}`,
+	);
 }
 
 export function getGrnById(grnId: number) {

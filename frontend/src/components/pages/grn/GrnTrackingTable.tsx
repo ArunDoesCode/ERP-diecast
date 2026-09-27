@@ -100,12 +100,7 @@ export function GrnTrackingTable({ grns, isLoading }: GrnTrackingTableProps) {
 										</TableCell>
 										<TableCell>{formatDate(grn.receivedDate)}</TableCell>
 										<TableCell>
-											<Button
-												type="button"
-												size="sm"
-												variant="outline"
-												asChild
-											>
+											<Button type="button" size="sm" variant="outline" asChild>
 												<Link href={`/grn/${grn.id}`}>View</Link>
 											</Button>
 										</TableCell>
