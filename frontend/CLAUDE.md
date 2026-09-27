@@ -118,5 +118,5 @@ Skills live in [`.claude/skills/`](.claude/skills/): `structure-guard`, `client-
 `ui-form-standards`, `data-table`, `shadcn`, `karpathy-guidelines`, `pwa-runtime-ux` (shelved
 — no PWA infra yet), and `cavecrew` (delegation decision guide).
 
-`.github/agents/` and `.github/skills/` hold the equivalent GitHub Copilot agent format for
-this same roster — kept as reference, not used by Claude Code, not modified by the above.
+Workflow-level agents and skills (`spec-analyst`, `test-writer`, `spec-reviewer`, `/spec`,
+`/freeze`, `/slice`, `/bug`, `/wrap`) live in the repo-root `.claude/` — see `docs/WORKFLOW.md`.
