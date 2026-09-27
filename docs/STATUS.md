@@ -4,7 +4,7 @@
 > every PR), `/watch-prs` (merges), `/status` (on demand) and `/wrap`. Humans: read this, then run `/status`.
 
 **Updated:** 2026-09-27 · **Milestone:** M0 workflow infra → M1 procurement hardening
-**Next action:** merge `worktree-workflow-setup`, then `/spec known-defects` (BL-001..BL-003 so CI goes green)
+**Next action:** merge PR #2 (test independence), then `/spec known-defects` (BL-001, BL-004, BL-005)
 → `/freeze` → `/feature known-defects`. Then `/spec grn` — it must decide BL-014 (item stock/avg cost never
 updated from the ledger), the most serious defect found so far.
 
@@ -30,8 +30,10 @@ Legend — Spec: none / draft / frozen vN · Code: none / schema only / partial 
 | — | | | | |
 
 ## Waiting on you
-- [ ] Merge PR for `worktree-workflow-setup`
-- [ ] Protect `main` on GitHub (require PR + CI) — BL-012
+- [ ] Merge PR #2 — enforce test independence in the agent pipeline (CI green)
+- [ ] BL-012 blocked: branch protection needs GitHub Pro or a public repo (API 403) — decide: upgrade / keep private + discipline
+- [ ] Maps are 1 commit behind (`5681c94` CI fix, mostly formatting + approval `subDocType`) — `/map --stale` when convenient
 
 ## Recently done
+- 2026-09-27 — PR #1 merged: workflow setup + CI green (approval subDocType, lint, seed)
 - 2026-09-27 — spec-first + autonomous pipeline tooling, CI, module maps for 7 existing modules
