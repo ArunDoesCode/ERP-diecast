@@ -128,10 +128,11 @@ gets a full re-audit.
 ### A. Bring it up
 ```bash
 cd backend
-docker compose up -d                       # Postgres 15, db "diecast", port 5432
+docker compose up -d                       # dev Postgres :5432 "diecast" + test Postgres :5433 "diecast_test" (in-memory)
 cp .env.example .env                       # set DATABASE_URL=postgres://postgres:postgres@localhost:5432/diecast
-                                           # and two different ≥32-char secrets (no "replace" in them)
-bun install && bun run db:push             # create schema
+                                           # (DATABASE_URL_TEST is prefilled) and two different ≥32-char secrets (no "replace")
+bun install && bun run db:push             # create schema (dev DB)
+bun run db:test:prepare                    # schema + page-access seed into the test DB (re-run after container restart)
 psql "$DATABASE_URL" -f src/db/seed_page_access.sql   # roles, pages, role→page access
 bun run db:seed:approval-policies          # approval policy rules
 bun run dev                                # API on :4000
@@ -146,7 +147,7 @@ the backlog; ask Claude to write it as your first M0 task.
 
 ### B. Automated checks you can run now
 ```bash
-cd backend  && bun run typecheck && bun run lint && bun test   # 2 test files today
+cd backend  && bun run typecheck && bun run lint && bun test   # runs against diecast_test only (BL-006)
 cd frontend && bunx tsc --noEmit && bun run lint               # expect 8 tsc + ~58 lint errors (backlog)
 ```
 

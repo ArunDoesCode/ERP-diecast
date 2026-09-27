@@ -12,6 +12,7 @@
     "format": "biome format --write .",
     "db:push": "bun drizzle-kit push",
     "db:studio": "bun drizzle-kit studio",
+    "db:test:prepare": "bun scripts/prepare-test-db.ts",
     "db:seed:approval-policies": "bun scripts/seed-approval-policies.ts",
     "contract:generate": "bun scripts/generate-api-manifest.ts",
     "contract:query": "bun scripts/query-api-manifest.ts",

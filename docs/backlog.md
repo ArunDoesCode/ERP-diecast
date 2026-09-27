@@ -15,7 +15,6 @@ Type: defect · infra · feature · debt · idea.
 | BL-002 | P1 | decision | approval | `prType`→`subDocType` fixed (2026-09-27). **Open:** keep `isSaleOrderLinked` as a policy filter (dropdown commented out, backend supports it) — frontend now stops sending it (= any). Decide in approval spec: A keep both / B drop / C defer | CI fix | 2026-09-27 |
 | BL-004 | P1 | infra | auth-setup | `bootstrap-admin` script — `/auth/register` needs an existing super-admin/owner, empty DB can't create first user | workflow setup | 2026-09-27 |
 | BL-005 | P1 | infra | backend | `bun run db:reset` — drop → push → page access seed → approval policies → realistic fixtures | workflow setup | 2026-09-27 |
-| BL-006 | P2 | infra | backend | Separate test database (`DATABASE_URL_TEST`) in docker-compose | workflow setup | 2026-09-27 |
 | BL-007 | P2 | infra | backend | Export `createApp()` from `src/index.ts` so HTTP tests get the real error handler | workflow setup | 2026-09-27 |
 | BL-008 | P2 | infra | repo | Commit `backend/.contracts/api-manifest.json` + test that every frontend `API_ROUTES` path exists in it | workflow setup | 2026-09-27 |
 | BL-009 | P2 | infra | repo | Claude Code hooks: biome on edited file, typecheck on stop | workflow setup | 2026-09-27 |
@@ -39,5 +38,6 @@ Type: defect · infra · feature · debt · idea.
 |---|---|---|---|
 | BL-000 | GitHub Actions CI | 0a406f4 | 2026-09-27 |
 | BL-003 | Frontend lint (40 label a11y + format/imports/non-null/deps) + backend format error; `seed_page_access.sql` fixed (stale `::role` casts, duplicate hardcoded super-admin block) | CI-fix commit | 2026-09-27 |
+| BL-006 | Separate test DB: compose `postgres-test` (:5433, tmpfs, `diecast_test`), `bun test` preload swaps to `DATABASE_URL_TEST` with `_test`-name guard, `db:test:prepare`, CI uses it | feature/bl-006-test-db | 2026-09-27 |
 
 Next free id: **BL-024**

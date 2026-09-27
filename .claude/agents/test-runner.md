@@ -14,7 +14,7 @@ Read `.claude/pipeline/PROTOCOL.md` and your brief. You run commands and report;
 1. `cd backend && bun run typecheck`
 2. `cd backend && bun run lint`
 3. `cd backend && bun test` (needs Postgres: if connection fails, report `TEST-ENV` and stop — the
-   coordinator will run `docker compose up -d && bun run db:push`)
+   coordinator will run `docker compose up -d && bun run db:test:prepare`)
 4. `cd backend && bun run contract:generate`, then for every path in `frontend/src/lib/api/routes.ts`
    touched by `git diff <base>...HEAD`, check it exists with the same method in
    `backend/.contracts/api-manifest.json` (use `bun run contract:query`)

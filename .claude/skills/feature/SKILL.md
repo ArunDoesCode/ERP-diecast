@@ -25,7 +25,7 @@ limit hit, (c) the PR is ready. Everything else you decide and record.
    `feature/<epic>--<sub>` with base `epic/<epic>`).
 4. Worktree: `git worktree add -b feature/<id> .claude/worktrees/<id> <base>` then EnterWorktree with that
    path (on `--resume`: EnterWorktree the existing path; recreate from the remote branch if missing).
-5. Infra: `cd backend && docker compose up -d && bun run db:push`.
+5. Infra: `cd backend && docker compose up -d && bun run db:push && bun run db:test:prepare`.
 6. Create `.pipeline/<id>/` (state.json, plan.md, findings.md, questions.md). On `--resume` read them and
    continue from `state.json.phase` — never re-plan or re-explore a resumed run.
 7. Baseline: spawn **test-runner** with `mode: baseline` → `reports/00-test-runner-baseline.md`.

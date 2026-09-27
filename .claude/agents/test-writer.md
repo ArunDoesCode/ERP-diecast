@@ -68,4 +68,5 @@ path plus at least one negative path (wrong role, over-quantity, invalid status)
 3. Report per test: PASS (behaviour already correct), FAIL-EXPECTED (red, feature not built yet), or
    FAIL-BUG (code exists and violates the rule — include the file:line you suspect). FAIL-BUG results are
    the valuable output; list them first.
-4. If the DB isn't reachable, say: run `docker compose up -d && bun run db:push` in `backend/`.
+4. If the DB isn't reachable, say: run `docker compose up -d && bun run db:test:prepare` in `backend/`. Tests run
+   only against `DATABASE_URL_TEST` (the `bun test` preload enforces it) — never point them at the dev DB.

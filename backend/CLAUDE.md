@@ -88,14 +88,21 @@ conventions as authoritative for that side; this file only governs `backend/`.
 ### Local dev setup
 
 ```bash
-docker compose up -d        # starts local Postgres on :5432 (see docker-compose.yaml)
-bun run db:push             # push current schema to that DB (drizzle-kit push)
+docker compose up -d        # dev Postgres :5432 + test Postgres :5433 (see docker-compose.yaml)
+bun run db:push             # push current schema to the dev DB (drizzle-kit push)
+bun run db:test:prepare     # push schema + page-access seed to the test DB
 bun run db:studio           # drizzle-kit studio, browse the DB
 ```
 
 `DATABASE_URL` in `.env` points at the local Docker Postgres in dev. There is currently
 no production database — this project is dev-only, no deployed environment yet.
-`bun test` currently has no test files to run — see `docs/backend-audit-remediation-2026-07-21.md`.
+
+**Tests never touch the dev DB.** `bunfig.toml` preloads `src/test/setup-env.ts`, which replaces
+`DATABASE_URL` with `DATABASE_URL_TEST` before any module loads, and refuses to run if that variable
+is missing, equals `DATABASE_URL`, or names a database that doesn't end in `_test`
+(`src/lib/test-db-url.ts`). The `postgres-test` container is in-memory (tmpfs), so after a container
+restart run `bun run db:test:prepare` again. Tests still clean up their own fixtures (prefix names,
+delete in `afterAll`) — the test DB is shared by every test file in a run.
 
 ### Schema discipline
 
