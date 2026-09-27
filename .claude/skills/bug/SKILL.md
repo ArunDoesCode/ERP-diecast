@@ -18,10 +18,15 @@ description: >
    - Rule exists → it's a code bug, continue.
    - No rule covers it → it's a **spec gap**. Tell the user, propose the rule, add it via `/freeze`'s
      change-request path (or to the draft spec) before fixing.
-4. **Red** — delegate to **test-writer**: a regression test named `BR-<MOD>-NN regression: <short>`
-   (or `UAT-NNN`). It must fail before the fix. Frontend-only bugs: describe the manual repro instead.
-5. **Fix** — smallest change that makes the test pass (use hono-builder / nextjs-builder for >2 files,
-   otherwise fix directly). No refactors, no extra features.
+4. **Red** — delegate to **test-writer** (`subagent_type: test-writer`, never a fork) using the
+   **zero-context brief template** in `.claude/pipeline/PROTOCOL.md`, mode `regression`: spec path, BR id,
+   and the bug's `docs/uat-log.md` row id (the reporter's expected-vs-actual). Do **not** pass what you found
+   while locating the code in step 2 — no suspected cause, file names or fix ideas. Test named
+   `BR-<MOD>-NN regression: <short>` (or `UAT-NNN`); it must fail before the fix. Commit it alone as
+   `test(bug): …`. Frontend-only bugs: test-writer writes the manual repro steps instead.
+5. **Fix** — smallest change that makes the test pass (backend-dev / frontend-dev, or directly for a
+   1–2 line fix). Never edit the regression test while fixing; if it looks wrong, go back to step 3 and
+   check the spec. Commit as `fix(bug): …` with no test files. No refactors, no extra features.
 6. **Verify** — the test passes, `bun test` whole suite passes, typecheck + lint clean.
 7. **Log** — if this bug pattern could recur (e.g. path param vs body, stale enum after rename), add an entry
    to `frontend/docs/gotchas.md` or `docs/decisions.md`. Update `docs/uat-log.md` row to `fixed` with commit.

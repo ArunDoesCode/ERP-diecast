@@ -23,8 +23,12 @@ endpoints). Answers come from the spec — only ask the user what the spec doesn
 answer to the spec).
 
 ## 2. Red — tests first
-Delegate to **test-writer** with module + BR ids. Expect FAIL-EXPECTED for new behaviour. Any FAIL-BUG on
-existing code is in scope only if it's one of the slice's BRs; otherwise log it in `docs/backlog.md`.
+Delegate to **test-writer** (`subagent_type: test-writer`, never a fork) with the **zero-context brief
+template** from `.claude/pipeline/PROTOCOL.md`: spec path + version, BR ids, contract path — nothing from
+this conversation or your own reading of the spec/code. Commit its tests alone as `test(<module>): …`.
+Expect FAIL-EXPECTED for new behaviour. Any FAIL-BUG on existing code is in scope only if it's one of the
+slice's BRs; otherwise log it in `docs/backlog.md`. From here on neither you nor the builder agents edit
+test files (see PROTOCOL.md → Test independence).
 
 ## 3. Green — backend
 Delegate to **hono-builder** (`backend/.claude/agents/hono-builder.md`) with: the BR list, the failing test

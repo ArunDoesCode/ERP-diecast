@@ -23,9 +23,11 @@ You are the coordinator (see `/feature` and `.claude/pipeline/PROTOCOL.md`).
 3. Show the decomposition to the user **once** (AskUserQuestion: approve / adjust). This is the only extra
    approval an epic needs.
 4. `git switch -c epic/<module> main && git push -u origin epic/<module>`; commit `epic.md` there.
-5. Scenario test for the whole epic: spawn **test-writer** to write the end-to-end scenario (e.g.
-   SO → explosion → net requirement vs stock → draft PRs/SCOs) up front in `backend/src/scenarios/`; it stays
-   red until the last sub-feature — each sub-feature PR shows how much of it passes.
+5. Scenario test for the whole epic: spawn **test-writer** (`subagent_type: test-writer`, never a fork)
+   with the zero-context brief template (spec path + all BR ids of the epic — not `epic.md` or your
+   decomposition notes) to write the end-to-end scenario (e.g. SO → explosion → net requirement vs stock →
+   draft PRs/SCOs) up front in `backend/src/scenarios/`; commit it alone as `test(epic-<module>): …`. It
+   stays red until the last sub-feature — each sub-feature PR shows how much of it passes.
 
 ## 2. Run sub-features
 For each sub-feature in order whose dependencies are merged into `epic/<module>`:
