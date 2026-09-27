@@ -1,0 +1,3 @@
+[test]
+# Redirects DATABASE_URL to DATABASE_URL_TEST for every test run (BL-006).
+preload = ["./src/test/setup-env.ts"]

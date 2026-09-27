@@ -61,10 +61,11 @@ the dev/review agents read.
 - CI (`.github/workflows/ci.yml`) must be green before a PR is handed to the user.
 
 ## Checks (run before calling anything done)
-- Backend: `cd backend && bun run typecheck && bun run lint && bun test` (needs `docker compose up -d` + `bun run db:push`)
+- Backend: `cd backend && bun run typecheck && bun run lint && bun test` (needs `docker compose up -d` + `bun run db:test:prepare`; tests only ever run against the `diecast_test` DB)
 - Frontend: `cd frontend && bunx tsc --noEmit && bun run lint`
-- Contract: `cd backend && bun run contract:generate`, then check frontend `src/lib/api/routes.ts` paths
-  against `bun run contract:query "<METHOD /path>"`
+- Contract: `cd backend && bun run contract:generate` and commit `.contracts/api-manifest.json` (CI runs
+  `contract:check`). `bun test` fails if a frontend `API_ROUTES` path has no backend route; check methods and
+  payloads with `bun run contract:query "<METHOD /path>"`
 
 ## Domain invariants (never break)
 - Money = integer paise. Quantities: check the spec for units/decimals before assuming.

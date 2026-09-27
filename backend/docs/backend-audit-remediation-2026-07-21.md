@@ -5,6 +5,26 @@ Scope: Backend changes currently in working tree (`src/**`) focused on Purchase 
 
 Environment: Dev-only. No production deployment or external users yet. Several findings below are re-prioritized with this in mind — see inline "Dev-only note" callouts on affected items.
 
+> **Status as of 2026-09-27** (BL-021 — every item re-checked against current `backend/src` / `frontend/src`; status tags are inline on each item)
+>
+> 25 items: **13 resolved**, **4 partially resolved** (remainder open), **7 open**, **1 no-action** (backend) with a frontend follow-up.
+> Section numbering (1–16, 11.1, P0.1–P2.4, S1–S7, B1–B4) checked — already sequential, no renumbering needed.
+>
+> Open and tracked: P0.3 → BL-011 (generated migrations, D-004) · P2.3 frontend side → BL-001.
+>
+> Open and **not in `docs/backlog.md`**:
+> - P1.2 — `prService.update` still writes PR lines one row at a time (`prRepository.updatePrItemById` / `createPrItem` in loops); reads are batched now.
+> - §4 — `prService.update` has not been split into helpers (still one ~200-line function).
+> - §5 — no PR route/service tests yet (covered by milestone M1 "PR spec + BR tests", no BL id).
+> - §14 — no supplier tests.
+> - S1 — supplier batch edit now runs `Promise.all` over the whole batch with no concurrency cap and no `.max()` on the batch array (`supplierService.editSupplierItems` / `editSupplierServices`, `supplier.types.ts` `supplierItemBatchEditSchema` / `supplierServiceBatchEditSchema`).
+> - S2 — no `pg_trgm` / trigram indexes; supplier search still uses `OR + ILIKE + EXISTS` (`supplierRepository.list`).
+> - S4 — item and service create/batch-edit logic is still duplicated (`supplierService.createSupplierItem` vs `createSupplierService`, `editSupplierItems` vs `editSupplierServices`).
+> - B1 remainder — `q` still ILIKE-matches `type::text` / `status::text` (`prRepository.list`), and the frontend still sends status/type through `q` (`PurchaseRequisitionsView` → `usePurchaseRequisitionsQuery({ q })`).
+> - B2 remainder — supplier batch edit rows return the raw `error.message` for non-conflict errors (`supplierService.editSupplierItems` / `editSupplierServices` catch blocks).
+> - B3 — access token is still returned in the JSON body and read only from `Authorization` (`authController`, `auth-middleware.ts` `requireAuth`); frontend keeps it in localStorage, a JS cookie and Zustand persist (`frontend/src/lib/auth/token.ts`, `auth-session-store.ts`).
+> - B4 follow-up (frontend) — `frontend/proxy.ts` still fetches `/auth/me` on navigation.
+
 ## 1) Executive Summary
 
 This document translates the backend audit findings into an implementation-ready remediation plan.
@@ -16,7 +36,7 @@ Primary risk themes:
 - Performance scaling risk (month-wide sequence scans, update-path N+1 queries).
 - Delivery risk (no automated tests and no lint gate in current scripts).
 
-Current checks observed:
+Current checks observed (as of 2026-07-21 — **stale 2026-09-27:** `lint` = `biome check .`, `bun test` has tests, both run in `.github/workflows/ci.yml`; see §6):
 
 - Typecheck: passing (`bun run typecheck`).
 - Lint: script missing.
@@ -41,6 +61,8 @@ Current checks observed:
 ### P0 (Do First: correctness + integrity)
 
 #### P0.1 Enforce non-null integrity for PR core columns
+
+**[RESOLVED 2026-09-27 — `src/db/schemas/02_procurement-purchasing.ts`: `purchaseRequests.requestedBy/createdAt/updatedAt` and `purchaseRequestItems.prId/itemId` are all `.notNull()`; applied via `db:push`, no backfill needed (dev-only)]**
 
 > **Dev-only note:** No production data exists yet, so skip the backfill/quarantine ceremony below. Add `NOT NULL` directly and reset/reseed the local dev DB if any rows violate it. Revisit the full backfill-safe version of this migration only before staging/production use with real data.
 
@@ -107,6 +129,8 @@ Acceptance criteria:
 
 #### P0.2 Remove raw `Error` throw path; use AppError contract
 
+**[RESOLVED 2026-09-27 — `prRepository.createWithItems` throws `AppError("Failed to create purchase request", 500, "PR_CREATE_FAILED")`; no raw `Error` left in PR files]**
+
 Problem:
 
 - `prRepository.createWithItems()` throws generic `Error`.
@@ -122,6 +146,8 @@ Acceptance criteria:
 - All PR API failures return stable JSON error shape and expected HTTP status.
 
 #### P0.3 Generate and apply migration for new schema fields
+
+**[OPEN — tracked as BL-011 (switch to generated migrations before UAT-1, D-004). Schema has `currentApprovalLevel`/`totalApprovalLevels` + approval tables and is applied with `db:push`, but `src/db/migrations/` stops at `20260702160914_add_role_pages_unique` and has none of them]**
 
 > **Dev-only note:** Still worth doing now to keep Drizzle migration history in sync with schema, but no data-loss risk since there's no production data. Safe to `drizzle-kit push` directly during active dev.
 
@@ -150,6 +176,8 @@ Acceptance criteria:
 ### P1 (Performance + complexity)
 
 #### P1.1 Replace month-wide PR number scan with atomic sequence strategy
+
+**[RESOLVED 2026-09-27 — `src/lib/document-number.ts` `allocateDocumentSequence` does one atomic `INSERT … ON CONFLICT DO UPDATE last_seq = last_seq + 1 RETURNING` on `document_number_counters` (`01_auth.ts`, keyed by `docType` + `periodKey`), called inside the `prRepository.createWithItems` transaction; `getMonthlyPrNumbers` and the retry loop are gone. Shared with PO/GRN numbering]**
 
 > **Dev-only note:** Concurrency collisions are unlikely with a single/small dev team creating PRs. Safe to defer until before shared/staging use or once PR volume grows — the existing retry loop is functionally correct today, just not scalable.
 
@@ -192,6 +220,8 @@ Acceptance criteria:
 
 #### P1.2 Collapse update path N+1 queries into batched transaction
 
+**[PARTIAL — OPEN, not in backlog. Done: `prService.update` runs in one `db.transaction`, fetches existing lines once (`findPrItemsByPrId`) and item master once (`findItemMasterByIds`), validates duplicates in memory, deletes in one call (`deletePrItemsByIds`). Open: updates and inserts are still one query per row (`prRepository.updatePrItemById` / `createPrItem` inside `for` loops), so round-trips still grow with item count]**
+
 Problem:
 
 - `prService.update()` issues per-item existence checks + updates sequentially.
@@ -222,6 +252,8 @@ Acceptance criteria:
 
 #### P1.3 Add status transition guardrails
 
+**[RESOLVED 2026-09-27 — `prService.ts` `PR_STATUS_TRANSITIONS` + `assertValidStatusTransition` (throws `BadRequestError`), used by `prService.update` and `prService.cancel`; approval-owned statuses (`approved`, `rejected`, `partial_ordered`, `fully_ordered`) are rejected on PATCH (`APPROVAL_OWNED_STATUSES`). Rules not yet spec'd / tested — PR spec is still draft]**
+
 Problem:
 
 - Status updates/cancel do not enforce transition policy.
@@ -244,6 +276,8 @@ Acceptance criteria:
 
 #### P2.1 Remove request-body debug logs
 
+**[RESOLVED 2026-09-27 — no `console.log` in `prController.ts` (or any controller/service); only the request logger in `src/app.ts` and startup logs in `src/index.ts` remain]**
+
 Problem:
 
 - Raw body logs in controller create/update handlers.
@@ -258,6 +292,8 @@ Acceptance criteria:
 - No payload dumps in production logs.
 
 #### P2.2 Validate actor ID from auth context
+
+**[RESOLVED 2026-09-27 — `prController.ts` `parseActorId` checks integer > 0, throws `UnauthorizedError("Invalid user session")`; used by `create`]**
 
 Problem:
 
@@ -274,6 +310,8 @@ Acceptance criteria:
 
 #### P2.3 Align delete contract to path param
 
+**[RESOLVED (backend) 2026-09-27 — `END_POINTS.pr.remove = "/deletepr/:id"`, `prController.remove` reads `c.req.param("id")`. Frontend OPEN — tracked as BL-001: `frontend/src/lib/api/routes.ts` still has `remove: .../deletepr` with the id in the body → 404]**
+
 Problem:
 
 - Delete endpoint uses JSON body for PR id.
@@ -288,6 +326,8 @@ Acceptance criteria:
 - Delete works with standard REST client/proxy behaviors.
 
 #### P2.4 Remove `uom` from create payload contract
+
+**[RESOLVED 2026-09-27 — `pr.types.ts` `createPrItemSchema` picks only `itemId`, `requestedQty`; `prService.create` / `update` take `uom` from item master]**
 
 Problem:
 
@@ -304,6 +344,8 @@ Acceptance criteria:
 
 ## 4) Complexity Reduction Plan (Refactor Structure)
 
+**[OPEN — not in backlog. `prService.update` is still one ~200-line function; none of the helpers below exist]**
+
 Target split for `prService.update()`:
 
 - `validateUpdateRequest(input, existingPr)`
@@ -318,6 +360,8 @@ Benefits:
 - Fewer regressions when modifying business rules.
 
 ## 5) Test Strategy (Minimum Viable Coverage)
+
+**[OPEN — no BL id; covered by milestone M1 (PR spec + business-rule tests). There are no PR tests: current tests are `app.test.ts`, `approvalRepository.test.ts`, `approval.types.test.ts`, `route-registry.test.ts`, `test-db-url.test.ts`, `frontend-routes-contract.test.ts`. Test DB infra is in place (BL-006). Note: `parseExpectedDate` no longer exists in `src/`; the sequence test now targets `allocateDocumentSequence`]**
 
 Add tests under `src/**/__tests__` or `src/**/*.test.ts`.
 
@@ -351,6 +395,8 @@ Add tests under `src/**/__tests__` or `src/**/*.test.ts`.
 - transition matrix validation
 
 ## 6) Quality Gates to Add
+
+**[RESOLVED 2026-09-27 — `package.json` has `typecheck`, `lint` (`biome check .`), `lint:fix`, `format`, `test`; Biome in devDependencies + `biome.json`; `.github/workflows/ci.yml` runs typecheck → lint → `bun test` → `contract:check` (BL-000)]**
 
 Current gap:
 
@@ -460,6 +506,8 @@ Files reviewed:
 
 ### S1 (Medium) Sequential batch edit writes
 
+**[PARTIAL — OPEN, not in backlog. Done: `supplierService.editSupplierItems` / `editSupplierServices` no longer `await` in a loop; they run `Promise.all` over the batch and keep the per-row `success`/`error` result + `buildBatchSummary`. Open: concurrency is unbounded (no cap of 5–10) and `supplierItemBatchEditSchema` / `supplierServiceBatchEditSchema` have no `.max()`, so one request can open as many concurrent queries as it has rows]**
+
 Locations:
 
 - `src/service/supplierService.ts` (`editSupplierItems`, `editSupplierServices`)
@@ -486,6 +534,8 @@ Acceptance criteria:
 - No partial data corruption on mixed-success batches.
 
 ### S2 (Medium) Supplier list search likely to degrade at scale
+
+**[OPEN — not in backlog. `supplierRepository.list` still uses `OR` of `ILIKE` on name/contactPerson/email/phone + `EXISTS` subquery on `item_master.sku`; no `pg_trgm` extension or trigram indexes in `src/db/schemas/`]**
 
 Locations:
 
@@ -534,6 +584,8 @@ Acceptance criteria:
 
 ### S3 (Medium) Count queries are heavier than needed
 
+**[RESOLVED 2026-09-27 — `supplierRepository.listSupplierItems` / `listSupplierServices` count only `supplier_items` / `supplier_services` by `supplierId` when there is no `q`; the joined count runs only when a search pattern is present]**
+
 Locations:
 
 - `src/repository/supplierRepository.ts` (`listSupplierItems`, `listSupplierServices` count branches)
@@ -557,6 +609,8 @@ Acceptance criteria:
 - Lower DB cost for default list pages with no search text.
 
 ### S4 (Medium) Duplicated service logic for item/service workflows
+
+**[OPEN — not in backlog. Only small helpers are shared (`getConflictError`, `normalizeToArray`, `buildBatchSummary`); `createSupplierItem`/`createSupplierService` and `editSupplierItems`/`editSupplierServices` in `supplierService.ts` are still near-copies]**
 
 Locations:
 
@@ -587,6 +641,8 @@ Acceptance criteria:
 
 ### S5 (Medium) API/DB contract ambiguity on payment terms nullability
 
+**[RESOLVED 2026-09-27 — `supplierMaster.defaultPaymentTermsDays` is `.default(0).notNull()` (`02_procurement-suppliers.ts`) and the response schema is `supplierSchema = createSelectSchema(supplierMaster)` (`supplier.types.ts`), so the API type is a non-null number; create/update take `z.number().int().nonnegative().optional()`]**
+
 Locations:
 
 - `src/types/supplier.types.ts` (`defaultPaymentTermsDays` in response schema)
@@ -613,6 +669,8 @@ Acceptance criteria:
 
 ### S6 (Low) Duplicate legacy route aliases
 
+**[RESOLVED 2026-09-27 — `editItemLegacy` / `editServiceLegacy` and the `EditItem`/`EditService` paths are gone from `src/routes/supplier.ts` and `END_POINTS.supplier`; only the lowercase `editItem` / `editService` remain]**
+
 Locations:
 
 - `src/routes/supplier.ts` (`editItemLegacy`, `editServiceLegacy`)
@@ -636,6 +694,8 @@ Acceptance criteria:
 - Single canonical endpoint per operation.
 
 ### S7 (Low) Raw `Error` throw in supplier repository create transaction
+
+**[RESOLVED 2026-09-27 — `supplierRepository.create` throws `AppError("Failed to create supplier", 500, "SUPPLIER_CREATE_FAILED")`]**
 
 Locations:
 
@@ -677,6 +737,8 @@ Acceptance criteria:
 
 ## 14) Supplier Test Additions
 
+**[OPEN — not in backlog. No supplier tests exist. Supplier is not in the M1 scope (PR, Approval, PO, GRN). The "legacy routes" case no longer applies (S6 resolved)]**
+
 Minimum coverage to add:
 
 - Batch item edit with mixed success/failure and summary counts.
@@ -711,6 +773,8 @@ Context: Frontend audit (`ERP-diecast/frontend`) reviewed separately. Per stated
 
 ### B1 (Medium) PR list should expose explicit `status`/`type` filters instead of relying on free-text `q`
 
+**[PARTIAL — OPEN, not in backlog. Done: `prListQuerySchema` has `status` (comma-separated list of `prStatusSchema`) and `type` (`prTypeSchema`); `prRepository.list` applies them as `inArray` / `eq`, separate from `q`. Open: `q` still ILIKE-matches `type::text` and `status::text` too, and the frontend still sends status/type through `q` (`PurchaseRequisitionsView` calls `usePurchaseRequisitionsQuery({ q, … })` with no `status`/`type` params)]**
+
 Problem:
 
 - Frontend list controls push `status`/`type` values into the generic `q` search param because `prListQuerySchema` only has `q`, `sortBy`, `sortDir`, `page`, `pageSize`.
@@ -729,6 +793,8 @@ Acceptance criteria:
 
 ### B2 (Medium) Error contract: guarantee only safe messages leave the backend
 
+**[PARTIAL — OPEN, not in backlog. Done: P0.2 and S7 resolved; `src/app.ts` `onError` returns "Internal server error" for any non-`AppError`/`HTTPException`/`ZodError` outside `NODE_ENV=development`. Open: the supplier batch-edit catch blocks (`supplierService.editSupplierItems` / `editSupplierServices`) put the raw `error.message` into the row's `error` field for non-conflict errors, so a DB-driver message can reach the UI inside a 200 response]**
+
 Problem:
 
 - Frontend shows backend `error.message` verbatim in toasts. This is only safe if the backend guarantees every thrown error has an intentional, user-safe message.
@@ -744,6 +810,8 @@ Acceptance criteria:
 - Every error response across PR/Supplier flows originates from a typed `AppError` subclass with a deliberate, user-safe message.
 
 ### B3 (Low, deferred) Access token exposure — architecture decision, not urgent in dev
+
+**[OPEN (deferred) — not in backlog. `authController` still returns `accessToken` in the JSON body; `auth-middleware.ts` `requireAuth` reads only the `Authorization: Bearer` header; the frontend still keeps the token in `localStorage` + a JS cookie (`frontend/src/lib/auth/token.ts`) and Zustand `persist` (`auth-session-store.ts`)]**
 
 Problem:
 
@@ -765,6 +833,8 @@ Acceptance criteria (when picked up):
 - Access token never touches `localStorage` or any client-JS-readable storage.
 
 ### B4 (No action needed) `allowedPages` already embedded in JWT — backend contract is correct
+
+**[NO ACTION (backend) — still true: `authService` login/refresh put `allowedPages` in the token payload. Note that BL-018 (refresh reuses stale `role`/`allowedPages`) affects this. Frontend follow-up OPEN — not in backlog: `frontend/proxy.ts` still fetches `/auth/me`]**
 
 - Frontend audit finding #8 flags `proxy.ts` re-fetching `/auth/me` on every navigation even though `allowedPages` is already in the JWT payload (see `authService.login`/`refresh` payload construction).
 - This is a frontend caching/decoding fix only (decode the JWT locally instead of calling `/auth/me` every route change). No backend change required — confirms the token payload already carries the right data.

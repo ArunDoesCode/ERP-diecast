@@ -208,7 +208,9 @@ export type createApprovalPolicySchemaType = z.infer<
 export const updateApprovalPolicySchema = createUpdateSchema(approvalPolicies, {
   name: (schema) => schema.min(1),
   priority: z.number().int().positive().optional(),
-  subDocType: () => z.enum(procurementCategoryEnum.enumValues).default("any"),
+  // No .default() here: PATCH is partial, an omitted subDocType must stay
+  // unchanged instead of resetting to "any" (BL-022).
+  subDocType: () => z.enum(procurementCategoryEnum.enumValues).optional(),
   minAmountPaise: z.coerce
     .number()
     .int()
@@ -245,6 +247,8 @@ export const updateApprovalPolicySchema = createUpdateSchema(approvalPolicies, {
       data.priority !== undefined ||
       data.subDocType !== undefined ||
       data.isSaleOrderLinked !== undefined ||
+      data.minAmountPaise !== undefined ||
+      data.maxAmountPaise !== undefined ||
       data.autoApprove !== undefined ||
       data.approvalChain !== undefined;
 

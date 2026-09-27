@@ -19,7 +19,6 @@ type ManifestRoute = {
 
 type Manifest = {
   version: string;
-  generatedAt: string;
   baseUrl: string;
   errorEnvelope: unknown;
   routes: ManifestRoute[];

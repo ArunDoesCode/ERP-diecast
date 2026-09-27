@@ -12,5 +12,21 @@ services:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
 
+  # Test database (BL-006) — used only by `bun test` via DATABASE_URL_TEST.
+  # tmpfs = in-memory and wiped when the container restarts, so re-run
+  # `bun run db:test:prepare` after `docker compose up -d`.
+  postgres-test:
+    image: postgres:15
+    container_name: diecast-postgres-test
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: diecast_test
+    ports:
+      - "5433:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    restart: unless-stopped
+
 volumes:
   postgres_data:

@@ -1,0 +1,3455 @@
+{
+  "version": "1.0.0",
+  "baseUrl": "/api",
+  "errorEnvelope": {
+    "success": false,
+    "message": "string",
+    "code": "string.optional"
+  },
+  "routes": [
+    {
+      "id": "GET /api/approval/getPolicies",
+      "method": "GET",
+      "path": "/api/approval/getPolicies",
+      "tags": [
+        "approval"
+      ],
+      "summary": "List approval policies, paginated.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "owner",
+          "back_office"
+        ]
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "docType": "enum:pr,po,sco.optional",
+          "isActive": "boolean.optional",
+          "q": "string.nonempty.optional",
+          "sortBy": "enum:name,priority,docType,isActive,createdAt.optional",
+          "sortDir": "enum:asc,desc.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "name",
+          "priority",
+          "docType",
+          "isActive",
+          "createdAt"
+        ],
+        "searchable": true
+      }
+    },
+    {
+      "id": "GET /api/approval/getPolicyDetails/:id",
+      "method": "GET",
+      "path": "/api/approval/getPolicyDetails/:id",
+      "tags": [
+        "approval"
+      ],
+      "summary": "Get a single approval policy's full definition.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "owner",
+          "back_office"
+        ]
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "unrepresentable.required",
+            "name": "string.required",
+            "description": "string.nullable.required",
+            "isActive": "boolean.required",
+            "priority": "unrepresentable.required",
+            "docType": "enum:pr,po,sco.required",
+            "subDocType": "enum:any,sale_order,stock_reorder,maintenance,tooling,subcontracting,misc.required",
+            "isSaleOrderLinked": "boolean.nullable.required",
+            "minAmountPaise": "unrepresentable.nullable.required",
+            "maxAmountPaise": "unrepresentable.nullable.required",
+            "autoApprove": "boolean.required",
+            "approvalLevels": "unrepresentable.required",
+            "approvalChain": "array<object>.required",
+            "createdAt": "unrepresentable.required",
+            "createdBy": "unrepresentable.nullable.required",
+            "lastUpdatedAt": "unrepresentable.required",
+            "lastUpdatedBy": "unrepresentable.nullable.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/approval/createPolicy",
+      "method": "POST",
+      "path": "/api/approval/createPolicy",
+      "tags": [
+        "approval"
+      ],
+      "summary": "Create an approval policy (priority + docType + approval chain).",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin"
+        ]
+      },
+      "request": {
+        "body": {
+          "name": "string.nonempty.required",
+          "isActive": "boolean.optional",
+          "priority": "integer.positive.required",
+          "docType": "enum:pr,po,sco.required",
+          "autoApprove": "boolean.optional",
+          "approvalChain": "array<object>.required",
+          "description": "string.optional",
+          "subDocType": "enum:any,sale_order,stock_reorder,maintenance,tooling,subcontracting,misc.required",
+          "isSaleOrderLinked": "boolean.optional",
+          "minAmountPaise": "integer.nonnegative.nullable.optional",
+          "maxAmountPaise": "integer.nonnegative.nullable.optional"
+        }
+      },
+      "responses": {
+        "201": {
+          "success": "boolean.required",
+          "data": {
+            "id": "unrepresentable.required",
+            "name": "string.required",
+            "description": "string.nullable.required",
+            "isActive": "boolean.required",
+            "priority": "unrepresentable.required",
+            "docType": "enum:pr,po,sco.required",
+            "subDocType": "enum:any,sale_order,stock_reorder,maintenance,tooling,subcontracting,misc.required",
+            "isSaleOrderLinked": "boolean.nullable.required",
+            "minAmountPaise": "unrepresentable.nullable.required",
+            "maxAmountPaise": "unrepresentable.nullable.required",
+            "autoApprove": "boolean.required",
+            "approvalLevels": "unrepresentable.required",
+            "approvalChain": "array<object>.required",
+            "createdAt": "unrepresentable.required",
+            "createdBy": "unrepresentable.nullable.required",
+            "lastUpdatedAt": "unrepresentable.required",
+            "lastUpdatedBy": "unrepresentable.nullable.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "PATCH /api/approval/updatePolicy/:id",
+      "method": "PATCH",
+      "path": "/api/approval/updatePolicy/:id",
+      "tags": [
+        "approval"
+      ],
+      "summary": "Update an approval policy.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin"
+        ]
+      },
+      "request": {
+        "body": {
+          "name": "string.nonempty.optional",
+          "description": "string.nullable.optional",
+          "isActive": "boolean.optional",
+          "priority": "integer.positive.optional",
+          "subDocType": "enum:any,sale_order,stock_reorder,maintenance,tooling,subcontracting,misc.optional",
+          "isSaleOrderLinked": "boolean.nullable.optional",
+          "minAmountPaise": "integer.nonnegative.nullable.optional",
+          "maxAmountPaise": "integer.nonnegative.nullable.optional",
+          "autoApprove": "boolean.optional",
+          "approvalChain": "array<object>.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "unrepresentable.required",
+            "name": "string.required",
+            "description": "string.nullable.required",
+            "isActive": "boolean.required",
+            "priority": "unrepresentable.required",
+            "docType": "enum:pr,po,sco.required",
+            "subDocType": "enum:any,sale_order,stock_reorder,maintenance,tooling,subcontracting,misc.required",
+            "isSaleOrderLinked": "boolean.nullable.required",
+            "minAmountPaise": "unrepresentable.nullable.required",
+            "maxAmountPaise": "unrepresentable.nullable.required",
+            "autoApprove": "boolean.required",
+            "approvalLevels": "unrepresentable.required",
+            "approvalChain": "array<object>.required",
+            "createdAt": "unrepresentable.required",
+            "createdBy": "unrepresentable.nullable.required",
+            "lastUpdatedAt": "unrepresentable.required",
+            "lastUpdatedBy": "unrepresentable.nullable.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/approval/submitRequest",
+      "method": "POST",
+      "path": "/api/approval/submitRequest",
+      "tags": [
+        "approval"
+      ],
+      "summary": "Submit a PR/PO/SCO document for approval against its matching policy.",
+      "auth": {
+        "type": "any-authenticated"
+      },
+      "request": {
+        "body": {
+          "docType": "enum:pr,po,sco.required",
+          "docId": "integer.positive.required"
+        }
+      },
+      "responses": {
+        "201": {
+          "success": "boolean.required",
+          "data": {
+            "id": "unrepresentable.required",
+            "docType": "enum:pr,po,sco.required",
+            "docId": "unrepresentable.required",
+            "policyId": "unrepresentable.required",
+            "status": "enum:pending_approval,approved,rejected,require_more_info,partial_ordered,fully_ordered,auto_approved,cancelled.required",
+            "currentLevel": "unrepresentable.required",
+            "totalLevels": "unrepresentable.required",
+            "chainSnapshot": "array<object>.required",
+            "currentApproverRole": "string.nullable.required",
+            "currentApproverEmployeeId": "unrepresentable.nullable.required",
+            "requestedBy": "unrepresentable.required",
+            "requestedAt": "unrepresentable.required",
+            "completedAt": "unrepresentable.nullable.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "GET /api/approval/getRequestDetails/:id",
+      "method": "GET",
+      "path": "/api/approval/getRequestDetails/:id",
+      "tags": [
+        "approval"
+      ],
+      "summary": "Get an approval request's details, joined with its policy name/description.",
+      "auth": {
+        "type": "any-authenticated"
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "unrepresentable.required",
+            "docType": "enum:pr,po,sco.required",
+            "docId": "unrepresentable.required",
+            "policyId": "unrepresentable.required",
+            "status": "enum:pending_approval,approved,rejected,require_more_info,partial_ordered,fully_ordered,auto_approved,cancelled.required",
+            "currentLevel": "unrepresentable.required",
+            "totalLevels": "unrepresentable.required",
+            "chainSnapshot": "array<object>.required",
+            "currentApproverRole": "string.nullable.required",
+            "currentApproverEmployeeId": "unrepresentable.nullable.required",
+            "requestedBy": "unrepresentable.required",
+            "requestedAt": "unrepresentable.required",
+            "completedAt": "unrepresentable.nullable.required",
+            "policyName": "string.required",
+            "policyDescription": "string.nullable.required",
+            "docSummary": {
+              "docNumber": "string.required",
+              "amountPaise": "integer.required",
+              "supplierName": "string.nullable.optional"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "GET /api/approval/getRequestTrail/:id",
+      "method": "GET",
+      "path": "/api/approval/getRequestTrail/:id",
+      "tags": [
+        "approval"
+      ],
+      "summary": "Get the full action trail (submit/approve/reject/...) for an approval request.",
+      "auth": {
+        "type": "any-authenticated"
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required"
+        }
+      }
+    },
+    {
+      "id": "POST /api/approval/actOnRequest/:id",
+      "method": "POST",
+      "path": "/api/approval/actOnRequest/:id",
+      "tags": [
+        "approval"
+      ],
+      "summary": "Act on the current approval level of a request (approve/reject/sent_back/cancel).",
+      "auth": {
+        "type": "any-authenticated"
+      },
+      "request": {
+        "body": {
+          "action": "enum:approve,reject,sent_back,cancel.required",
+          "notes": "string.nonempty.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "unrepresentable.required",
+            "docType": "enum:pr,po,sco.required",
+            "docId": "unrepresentable.required",
+            "policyId": "unrepresentable.required",
+            "status": "enum:pending_approval,approved,rejected,require_more_info,partial_ordered,fully_ordered,auto_approved,cancelled.required",
+            "currentLevel": "unrepresentable.required",
+            "totalLevels": "unrepresentable.required",
+            "chainSnapshot": "array<object>.required",
+            "currentApproverRole": "string.nullable.required",
+            "currentApproverEmployeeId": "unrepresentable.nullable.required",
+            "requestedBy": "unrepresentable.required",
+            "requestedAt": "unrepresentable.required",
+            "completedAt": "unrepresentable.nullable.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "GET /api/approval/getMyPendingApprovals",
+      "method": "GET",
+      "path": "/api/approval/getMyPendingApprovals",
+      "tags": [
+        "approval"
+      ],
+      "summary": "List approval requests currently pending on the caller (or, for super-admin, another employee).",
+      "auth": {
+        "type": "any-authenticated"
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "employeeId": "integer.positive.optional",
+          "docType": "enum:pr,po,sco.optional",
+          "sortBy": "enum:requestedAt,docType,status.optional",
+          "sortDir": "enum:asc,desc.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "requestedAt",
+          "docType",
+          "status"
+        ],
+        "searchable": false
+      }
+    },
+    {
+      "id": "GET /api/approval/getCurrentApprovalByDoc/:docType/:docId",
+      "method": "GET",
+      "path": "/api/approval/getCurrentApprovalByDoc/:docType/:docId",
+      "tags": [
+        "approval"
+      ],
+      "summary": "Look up the currently open approval request for a given document, if any.",
+      "auth": {
+        "type": "any-authenticated"
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "unrepresentable.required",
+            "docType": "enum:pr,po,sco.required",
+            "docId": "unrepresentable.required",
+            "policyId": "unrepresentable.required",
+            "status": "enum:pending_approval,approved,rejected,require_more_info,partial_ordered,fully_ordered,auto_approved,cancelled.required",
+            "currentLevel": "unrepresentable.required",
+            "totalLevels": "unrepresentable.required",
+            "chainSnapshot": "array<object>.required",
+            "currentApproverRole": "string.nullable.required",
+            "currentApproverEmployeeId": "unrepresentable.nullable.required",
+            "requestedBy": "unrepresentable.required",
+            "requestedAt": "unrepresentable.required",
+            "completedAt": "unrepresentable.nullable.required",
+            "policyName": "string.required",
+            "docSummary": {
+              "docNumber": "string.required",
+              "amountPaise": "integer.required",
+              "supplierName": "string.nullable.optional"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "GET /api/asset/machines",
+      "method": "GET",
+      "path": "/api/asset/machines",
+      "tags": [
+        "asset"
+      ],
+      "summary": "List machines, paginated.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "back_office"
+        ]
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "q": "string.optional",
+          "status": "enum:idle,running,maintenance,breakdown.optional",
+          "sortBy": "enum:name,type,status,createdAt.optional",
+          "sortDir": "enum:asc,desc.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "name",
+          "type",
+          "status",
+          "createdAt"
+        ],
+        "searchable": true
+      }
+    },
+    {
+      "id": "POST /api/asset/machines",
+      "method": "POST",
+      "path": "/api/asset/machines",
+      "tags": [
+        "asset"
+      ],
+      "summary": "Create a machine.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "back_office"
+        ]
+      },
+      "request": {
+        "body": {
+          "name": "string.nonempty.required",
+          "type": "string.nullable.optional",
+          "status": "enum:idle,running,maintenance,breakdown.optional",
+          "lastMaintenanceAt": "unrepresentable.nullable.optional"
+        }
+      },
+      "responses": {
+        "201": {
+          "success": "boolean.required",
+          "data": {
+            "id": "unrepresentable.required",
+            "name": "string.required",
+            "type": "string.nullable.required",
+            "status": "enum:idle,running,maintenance,breakdown.required",
+            "lastMaintenanceAt": "unrepresentable.nullable.required",
+            "createdBy": "unrepresentable.nullable.required",
+            "createdAt": "unrepresentable.required",
+            "lastUpdatedBy": "unrepresentable.nullable.required",
+            "lastUpdatedAt": "unrepresentable.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "PATCH /api/asset/machines/:id",
+      "method": "PATCH",
+      "path": "/api/asset/machines/:id",
+      "tags": [
+        "asset"
+      ],
+      "summary": "Update a machine.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "back_office"
+        ]
+      },
+      "request": {
+        "body": {
+          "name": "string.nonempty.optional",
+          "type": "string.nullable.optional",
+          "status": "enum:idle,running,maintenance,breakdown.optional",
+          "lastMaintenanceAt": "unrepresentable.nullable.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "unrepresentable.required",
+            "name": "string.required",
+            "type": "string.nullable.required",
+            "status": "enum:idle,running,maintenance,breakdown.required",
+            "lastMaintenanceAt": "unrepresentable.nullable.required",
+            "createdBy": "unrepresentable.nullable.required",
+            "createdAt": "unrepresentable.required",
+            "lastUpdatedBy": "unrepresentable.nullable.required",
+            "lastUpdatedAt": "unrepresentable.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "GET /api/asset/items",
+      "method": "GET",
+      "path": "/api/asset/items",
+      "tags": [
+        "asset"
+      ],
+      "summary": "List item master rows, paginated.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "back_office"
+        ]
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "q": "string.optional",
+          "sortBy": "enum:sku,name,category,currentStock,createdAt.optional",
+          "sortDir": "enum:asc,desc.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "sku",
+          "name",
+          "category",
+          "currentStock",
+          "createdAt"
+        ],
+        "searchable": true
+      }
+    },
+    {
+      "id": "POST /api/asset/items",
+      "method": "POST",
+      "path": "/api/asset/items",
+      "tags": [
+        "asset"
+      ],
+      "summary": "Create an item master row.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "back_office"
+        ]
+      },
+      "request": {
+        "body": {
+          "sku": "string.nonempty.required",
+          "name": "string.nonempty.required",
+          "description": "string.nullable.optional",
+          "category": "string.nonempty.required",
+          "uom": "string.nonempty.required",
+          "reorderLevel": "number.nonnegative.optional",
+          "currentStock": "number.nonnegative.optional",
+          "averageCostPaise": "integer.nonnegative.optional",
+          "isActive": "boolean.optional"
+        }
+      },
+      "responses": {
+        "201": {
+          "success": "boolean.required",
+          "data": {
+            "id": "unrepresentable.required",
+            "sku": "string.required",
+            "name": "string.required",
+            "description": "string.nullable.required",
+            "category": "string.required",
+            "uom": "string.required",
+            "reorderLevel": "unrepresentable.required",
+            "currentStock": "unrepresentable.required",
+            "averageCostPaise": "unrepresentable.required",
+            "isActive": "boolean.required",
+            "createdBy": "unrepresentable.nullable.required",
+            "createdAt": "unrepresentable.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "PATCH /api/asset/items/:id",
+      "method": "PATCH",
+      "path": "/api/asset/items/:id",
+      "tags": [
+        "asset"
+      ],
+      "summary": "Update an item master row.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "back_office"
+        ]
+      },
+      "request": {
+        "body": {
+          "sku": "string.nonempty.optional",
+          "name": "string.nonempty.optional",
+          "description": "string.nullable.optional",
+          "category": "string.nonempty.optional",
+          "uom": "string.nonempty.optional",
+          "reorderLevel": "number.nonnegative.optional",
+          "currentStock": "number.nonnegative.optional",
+          "averageCostPaise": "integer.nonnegative.optional",
+          "isActive": "boolean.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "unrepresentable.required",
+            "sku": "string.required",
+            "name": "string.required",
+            "description": "string.nullable.required",
+            "category": "string.required",
+            "uom": "string.required",
+            "reorderLevel": "unrepresentable.required",
+            "currentStock": "unrepresentable.required",
+            "averageCostPaise": "unrepresentable.required",
+            "isActive": "boolean.required",
+            "createdBy": "unrepresentable.nullable.required",
+            "createdAt": "unrepresentable.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "GET /api/asset/items/:itemId/last-rate",
+      "method": "GET",
+      "path": "/api/asset/items/:itemId/last-rate",
+      "tags": [
+        "asset"
+      ],
+      "summary": "Look up the rate to prefill for an item+supplier: latest PO price, falling back to the supplier's catalog price, falling back to the item master's average cost estimate.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "back_office"
+        ]
+      },
+      "request": {
+        "query": {
+          "supplierId": "integer.positive.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "ratePaise": "integer.nonnegative.required",
+            "source": "enum:po_history,supplier_catalog,pr_estimate.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "GET /api/asset/services",
+      "method": "GET",
+      "path": "/api/asset/services",
+      "tags": [
+        "asset"
+      ],
+      "summary": "List service master rows, paginated.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "back_office"
+        ]
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "q": "string.optional",
+          "sortBy": "enum:code,name,createdAt.optional",
+          "sortDir": "enum:asc,desc.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "code",
+          "name",
+          "createdAt"
+        ],
+        "searchable": true
+      }
+    },
+    {
+      "id": "POST /api/asset/services",
+      "method": "POST",
+      "path": "/api/asset/services",
+      "tags": [
+        "asset"
+      ],
+      "summary": "Create a service master row.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "back_office"
+        ]
+      },
+      "request": {
+        "body": {
+          "code": "string.nonempty.required",
+          "name": "string.nonempty.required",
+          "description": "string.nullable.optional",
+          "sacCode": "string.nullable.optional",
+          "defaultUom": "string.nonempty.required",
+          "isActive": "boolean.optional"
+        }
+      },
+      "responses": {
+        "201": {
+          "success": "boolean.required",
+          "data": {
+            "id": "unrepresentable.required",
+            "code": "string.required",
+            "name": "string.required",
+            "description": "string.nullable.required",
+            "sacCode": "string.nullable.required",
+            "defaultUom": "string.required",
+            "isActive": "boolean.required",
+            "createdBy": "unrepresentable.nullable.required",
+            "createdAt": "unrepresentable.required",
+            "lastUpdatedBy": "unrepresentable.nullable.required",
+            "lastUpdatedAt": "unrepresentable.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "PATCH /api/asset/services/:id",
+      "method": "PATCH",
+      "path": "/api/asset/services/:id",
+      "tags": [
+        "asset"
+      ],
+      "summary": "Update a service master row.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "back_office"
+        ]
+      },
+      "request": {
+        "body": {
+          "code": "string.nonempty.optional",
+          "name": "string.nonempty.optional",
+          "description": "string.nullable.optional",
+          "sacCode": "string.nullable.optional",
+          "defaultUom": "string.nonempty.optional",
+          "isActive": "boolean.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "unrepresentable.required",
+            "code": "string.required",
+            "name": "string.required",
+            "description": "string.nullable.required",
+            "sacCode": "string.nullable.required",
+            "defaultUom": "string.required",
+            "isActive": "boolean.required",
+            "createdBy": "unrepresentable.nullable.required",
+            "createdAt": "unrepresentable.required",
+            "lastUpdatedBy": "unrepresentable.nullable.required",
+            "lastUpdatedAt": "unrepresentable.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "GET /api/asset/inventory/movements",
+      "method": "GET",
+      "path": "/api/asset/inventory/movements",
+      "tags": [
+        "asset"
+      ],
+      "summary": "List inventory movement rows, paginated.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "back_office"
+        ]
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "itemId": "integer.positive.optional",
+          "locationId": "integer.positive.optional",
+          "referenceType": "enum:grn,grn_bypass,pro,sco_issue,sco_receipt,job_order_issue,scrap_dispatch,stock_adjustment.optional",
+          "transactionType": "enum:in,out,adjustment.optional",
+          "fromDate": "unrepresentable.optional",
+          "toDate": "unrepresentable.optional",
+          "sortBy": "enum:createdAt,transactionType,quantityChange.optional",
+          "sortDir": "enum:asc,desc.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "createdAt",
+          "transactionType",
+          "quantityChange"
+        ],
+        "searchable": false
+      }
+    },
+    {
+      "id": "POST /api/asset/inventory/movements",
+      "method": "POST",
+      "path": "/api/asset/inventory/movements",
+      "tags": [
+        "asset"
+      ],
+      "summary": "Record an inventory movement (in/out/adjustment).",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "back_office"
+        ]
+      },
+      "request": {
+        "body": {
+          "itemId": "integer.positive.required",
+          "locationId": "integer.positive.required",
+          "batchNumber": "string.nullable.optional",
+          "transactionType": "enum:in,out,adjustment.required",
+          "referenceType": "enum:grn,grn_bypass,pro,sco_issue,sco_receipt,job_order_issue,scrap_dispatch,stock_adjustment.required",
+          "referenceId": "integer.positive.required",
+          "quantityChange": "number.required",
+          "unitCostPaise": "integer.nonnegative.required",
+          "notes": "string.nullable.optional"
+        }
+      },
+      "responses": {
+        "201": {
+          "success": "boolean.required",
+          "data": {
+            "id": "unrepresentable.required",
+            "itemId": "unrepresentable.required",
+            "locationId": "unrepresentable.required",
+            "batchNumber": "string.nullable.required",
+            "transactionType": "enum:in,out,adjustment.required",
+            "referenceType": "enum:grn,grn_bypass,pro,sco_issue,sco_receipt,job_order_issue,scrap_dispatch,stock_adjustment.required",
+            "referenceId": "unrepresentable.required",
+            "quantityChange": "unrepresentable.required",
+            "balanceAfter": "unrepresentable.required",
+            "unitCostPaise": "unrepresentable.required",
+            "totalValueChangePaise": "unrepresentable.required",
+            "notes": "string.nullable.required",
+            "createdBy": "unrepresentable.required",
+            "createdAt": "unrepresentable.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "GET /api/asset/locations",
+      "method": "GET",
+      "path": "/api/asset/locations",
+      "tags": [
+        "asset"
+      ],
+      "summary": "List inventory locations, paginated.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "back_office"
+        ]
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "q": "string.optional",
+          "sortBy": "enum:name,type,createdAt.optional",
+          "sortDir": "enum:asc,desc.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "name",
+          "type",
+          "createdAt"
+        ],
+        "searchable": true
+      }
+    },
+    {
+      "id": "POST /api/asset/locations",
+      "method": "POST",
+      "path": "/api/asset/locations",
+      "tags": [
+        "asset"
+      ],
+      "summary": "Create an inventory location.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "back_office"
+        ]
+      },
+      "request": {
+        "body": {
+          "name": "string.nonempty.required",
+          "type": "enum:main_store,vendor_premise,finished_goods,scrap_yard.required",
+          "isVirtual": "boolean.optional",
+          "linkedVendorId": "integer.positive.nullable.optional"
+        }
+      },
+      "responses": {
+        "201": {
+          "success": "boolean.required",
+          "data": {
+            "id": "unrepresentable.required",
+            "name": "string.required",
+            "type": "enum:main_store,vendor_premise,finished_goods,scrap_yard.required",
+            "isVirtual": "boolean.required",
+            "linkedVendorId": "unrepresentable.nullable.required",
+            "createdAt": "unrepresentable.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "PATCH /api/asset/locations/:id",
+      "method": "PATCH",
+      "path": "/api/asset/locations/:id",
+      "tags": [
+        "asset"
+      ],
+      "summary": "Update an inventory location.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "back_office"
+        ]
+      },
+      "request": {
+        "body": {
+          "name": "string.nonempty.optional",
+          "type": "enum:main_store,vendor_premise,finished_goods,scrap_yard.optional",
+          "isVirtual": "boolean.optional",
+          "linkedVendorId": "integer.positive.nullable.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "unrepresentable.required",
+            "name": "string.required",
+            "type": "enum:main_store,vendor_premise,finished_goods,scrap_yard.required",
+            "isVirtual": "boolean.required",
+            "linkedVendorId": "unrepresentable.nullable.required",
+            "createdAt": "unrepresentable.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/auth/register",
+      "method": "POST",
+      "path": "/api/auth/register",
+      "tags": [
+        "auth"
+      ],
+      "summary": "Register a new desk-worker employee (email/password login).",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "owner"
+        ]
+      },
+      "request": {
+        "body": {
+          "name": "string.nonempty.required",
+          "email": "string.email.required",
+          "password": "string.nonempty.required",
+          "role": "enum:owner,back_office,floor_supervisor,qa_inspector,die_designer,operator,super-admin.required",
+          "phone": "string.optional"
+        }
+      },
+      "responses": {
+        "201": {
+          "success": "boolean.required",
+          "data": {
+            "id": "number.required",
+            "name": "string.required",
+            "email": "string.nullable.required"
+          },
+          "message": "string.required"
+        }
+      }
+    },
+    {
+      "id": "POST /api/auth/login",
+      "method": "POST",
+      "path": "/api/auth/login",
+      "tags": [
+        "auth"
+      ],
+      "summary": "Log in with email/password, returns access token + sets refresh cookie.",
+      "auth": {
+        "type": "public"
+      },
+      "request": {
+        "body": {
+          "email": "string.email.required",
+          "password": "string.nonempty.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "message": "string.required",
+          "data": {
+            "accessToken": "string.required",
+            "user": {
+              "id": "number.required",
+              "name": "string.required",
+              "email": "string.nullable.required",
+              "role": "string.required",
+              "allowedPages": "array<string>.required"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/auth/refresh",
+      "method": "POST",
+      "path": "/api/auth/refresh",
+      "tags": [
+        "auth"
+      ],
+      "summary": "Exchange the refresh cookie for a new access token.",
+      "auth": {
+        "type": "public"
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "accessToken": "string.required"
+          },
+          "message": "string.required"
+        }
+      }
+    },
+    {
+      "id": "POST /api/auth/logout",
+      "method": "POST",
+      "path": "/api/auth/logout",
+      "tags": [
+        "auth"
+      ],
+      "summary": "Clear the refresh cookie and revoke the refresh token.",
+      "auth": {
+        "type": "public"
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "message": "string.required"
+        }
+      }
+    },
+    {
+      "id": "GET /api/auth/me",
+      "method": "GET",
+      "path": "/api/auth/me",
+      "tags": [
+        "auth"
+      ],
+      "summary": "Return the authenticated user's own profile.",
+      "auth": {
+        "type": "any-authenticated"
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "userId": "union<number.required|string.required>.required",
+            "userName": "string.required",
+            "role": "enum:owner,back_office,floor_supervisor,qa_inspector,die_designer,operator,super-admin.required",
+            "allowedPages": "array<string>.required"
+          },
+          "message": "string.required"
+        }
+      }
+    },
+    {
+      "id": "GET /api/grn/getgrns",
+      "method": "GET",
+      "path": "/api/grn/getgrns",
+      "tags": [
+        "grn"
+      ],
+      "summary": "List GRNs, paginated. Filterable by poId/status/qaStatus.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "owner",
+          "back_office",
+          "floor_supervisor",
+          "qa_inspector",
+          "die_designer"
+        ]
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "sortBy": "enum:id,grnNumber,status,receivedDate.optional",
+          "sortDir": "enum:asc,desc.required",
+          "poId": "integer.positive.optional",
+          "status": "enum:draft,pending_qa,accepted,rejected,partial_accepted.optional",
+          "qaStatus": "enum:pending,passed,failed,waived.optional",
+          "q": "string.nonempty.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "id",
+          "grnNumber",
+          "status",
+          "receivedDate"
+        ],
+        "searchable": true
+      }
+    },
+    {
+      "id": "GET /api/grn/getgrndetails/:id",
+      "method": "GET",
+      "path": "/api/grn/getgrndetails/:id",
+      "tags": [
+        "grn"
+      ],
+      "summary": "Get a GRN with its line items, joined back to item master + PO-item ordered qty.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "owner",
+          "back_office",
+          "floor_supervisor",
+          "qa_inspector",
+          "die_designer"
+        ]
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "grn": {
+              "id": "unrepresentable.required",
+              "grnNumber": "string.required",
+              "poId": "unrepresentable.nullable.required",
+              "supplierId": "unrepresentable.required",
+              "status": "enum:draft,pending_qa,accepted,rejected,partial_accepted.required",
+              "receivedDate": "unrepresentable.nullable.required",
+              "createdBy": "unrepresentable.nullable.required",
+              "challanNo": "string.nullable.required",
+              "challanDate": "unrepresentable.nullable.required",
+              "vehicleNo": "string.nullable.required",
+              "driverName": "string.nullable.required",
+              "driverPhone": "string.nullable.required",
+              "remarks": "string.nullable.required"
+            },
+            "items": "array<object>.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/grn/creategrn",
+      "method": "POST",
+      "path": "/api/grn/creategrn",
+      "tags": [
+        "grn"
+      ],
+      "summary": "Record a goods receipt against a dispatched/partial_received PO. Created as draft — no stock effect until a line is QA-accepted or bypassed.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "owner",
+          "back_office",
+          "floor_supervisor"
+        ]
+      },
+      "request": {
+        "body": {
+          "poId": "integer.positive.required",
+          "challanNo": "string.optional",
+          "challanDate": "unrepresentable.optional",
+          "vehicleNo": "string.optional",
+          "driverName": "string.optional",
+          "driverPhone": "string.optional",
+          "remarks": "string.optional",
+          "lines": "array<object>.required"
+        }
+      },
+      "responses": {
+        "201": {
+          "success": "boolean.required",
+          "data": {
+            "grn": {
+              "id": "unrepresentable.required",
+              "grnNumber": "string.required",
+              "poId": "unrepresentable.nullable.required",
+              "supplierId": "unrepresentable.required",
+              "status": "enum:draft,pending_qa,accepted,rejected,partial_accepted.required",
+              "receivedDate": "unrepresentable.nullable.required",
+              "createdBy": "unrepresentable.nullable.required",
+              "challanNo": "string.nullable.required",
+              "challanDate": "unrepresentable.nullable.required",
+              "vehicleNo": "string.nullable.required",
+              "driverName": "string.nullable.required",
+              "driverPhone": "string.nullable.required",
+              "remarks": "string.nullable.required"
+            },
+            "items": "array<object>.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "PATCH /api/grn/updategrn",
+      "method": "PATCH",
+      "path": "/api/grn/updategrn",
+      "tags": [
+        "grn"
+      ],
+      "summary": "Update a draft GRN's header fields and/or line arrivedQty. Only legal while draft.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "owner",
+          "back_office",
+          "floor_supervisor"
+        ]
+      },
+      "request": {
+        "body": {
+          "grnId": "integer.positive.required",
+          "challanNo": "string.nullable.optional",
+          "challanDate": "unrepresentable.nullable.optional",
+          "vehicleNo": "string.nullable.optional",
+          "driverName": "string.nullable.optional",
+          "driverPhone": "string.nullable.optional",
+          "remarks": "string.nullable.optional",
+          "lines": "unrepresentable.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "grn": {
+              "id": "unrepresentable.required",
+              "grnNumber": "string.required",
+              "poId": "unrepresentable.nullable.required",
+              "supplierId": "unrepresentable.required",
+              "status": "enum:draft,pending_qa,accepted,rejected,partial_accepted.required",
+              "receivedDate": "unrepresentable.nullable.required",
+              "createdBy": "unrepresentable.nullable.required",
+              "challanNo": "string.nullable.required",
+              "challanDate": "unrepresentable.nullable.required",
+              "vehicleNo": "string.nullable.required",
+              "driverName": "string.nullable.required",
+              "driverPhone": "string.nullable.required",
+              "remarks": "string.nullable.required"
+            },
+            "items": "array<object>.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "DELETE /api/grn/deletegrn/:id",
+      "method": "DELETE",
+      "path": "/api/grn/deletegrn/:id",
+      "tags": [
+        "grn"
+      ],
+      "summary": "Delete a draft GRN. Only legal while draft.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "owner",
+          "back_office",
+          "floor_supervisor"
+        ]
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "unrepresentable.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/grn/:id/lines/:lineId/qa",
+      "method": "POST",
+      "path": "/api/grn/:id/lines/:lineId/qa",
+      "tags": [
+        "grn"
+      ],
+      "summary": "QA accept/reject a GRN line. Accept posts to the inventory ledger (referenceType=grn) and rolls the PO item/status forward. Blocked past 105% of ordered qty unless the actor is owner/back_office.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "owner",
+          "back_office",
+          "qa_inspector"
+        ]
+      },
+      "request": {
+        "body": {
+          "decision": "enum:accept,reject.required",
+          "acceptedQty": "number.nonnegative.optional",
+          "rejectedQty": "number.nonnegative.optional",
+          "remarks": "string.optional",
+          "certificateUrl": "string.uri.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "unrepresentable.required",
+            "grnId": "unrepresentable.nullable.required",
+            "poItemId": "unrepresentable.nullable.required",
+            "receivedQty": "unrepresentable.required",
+            "acceptedQty": "unrepresentable.required",
+            "rejectedQty": "unrepresentable.nullable.required",
+            "qaStatus": "string.nullable.required",
+            "isQaBypassed": "boolean.nullable.required",
+            "qaBypassReason": "string.nullable.required",
+            "qaBypassedBy": "unrepresentable.nullable.required",
+            "challanPhotoUrl": "string.nullable.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/grn/:id/lines/:lineId/bypass",
+      "method": "POST",
+      "path": "/api/grn/:id/lines/:lineId/bypass",
+      "tags": [
+        "grn"
+      ],
+      "summary": "Fast-track QA bypass for a GRN line (mandatory reason). Posts to the inventory ledger immediately (referenceType=grn_bypass) and rolls the PO item/status forward.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "owner",
+          "back_office",
+          "floor_supervisor"
+        ]
+      },
+      "request": {
+        "body": {
+          "bypassReason": "string.nonempty.required",
+          "acceptedQty": "number.positive.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "unrepresentable.required",
+            "grnId": "unrepresentable.nullable.required",
+            "poItemId": "unrepresentable.nullable.required",
+            "receivedQty": "unrepresentable.required",
+            "acceptedQty": "unrepresentable.required",
+            "rejectedQty": "unrepresentable.nullable.required",
+            "qaStatus": "string.nullable.required",
+            "isQaBypassed": "boolean.nullable.required",
+            "qaBypassReason": "string.nullable.required",
+            "qaBypassedBy": "unrepresentable.nullable.required",
+            "challanPhotoUrl": "string.nullable.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/grn/:id/lines/:lineId/correction",
+      "method": "POST",
+      "path": "/api/grn/:id/lines/:lineId/correction",
+      "tags": [
+        "grn"
+      ],
+      "summary": "Correct a previously posted GRN line — posts a negative stock_adjustment ledger entry without mutating the original GRN line row.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "owner",
+          "back_office"
+        ]
+      },
+      "request": {
+        "body": {
+          "qty": "number.positive.required",
+          "reason": "string.nonempty.required"
+        }
+      },
+      "responses": {
+        "201": {
+          "success": "boolean.required",
+          "data": {
+            "id": "unrepresentable.required",
+            "itemId": "unrepresentable.required",
+            "locationId": "unrepresentable.required",
+            "batchNumber": "string.nullable.required",
+            "transactionType": "enum:in,out,adjustment.required",
+            "referenceType": "enum:grn,grn_bypass,pro,sco_issue,sco_receipt,job_order_issue,scrap_dispatch,stock_adjustment.required",
+            "referenceId": "unrepresentable.required",
+            "quantityChange": "unrepresentable.required",
+            "balanceAfter": "unrepresentable.required",
+            "unitCostPaise": "unrepresentable.required",
+            "totalValueChangePaise": "unrepresentable.required",
+            "notes": "string.nullable.required",
+            "createdBy": "unrepresentable.required",
+            "createdAt": "unrepresentable.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "GET /api/po/getpos",
+      "method": "GET",
+      "path": "/api/po/getpos",
+      "tags": [
+        "po"
+      ],
+      "summary": "List purchase orders, paginated. `overdue=true` filters to dispatched/partial_received POs past their expected delivery date with remaining qty.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "owner",
+          "back_office"
+        ]
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "sortBy": "enum:id,poNumber,status,createdAt.optional",
+          "sortDir": "enum:asc,desc.required",
+          "status": "array<enum:draft,pending_approval,approved,dispatched,partial_received,fully_received,invoiced,closed,cancelled>.optional",
+          "supplierId": "integer.positive.optional",
+          "q": "string.nonempty.optional",
+          "overdue": "unrepresentable.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "id",
+          "poNumber",
+          "status",
+          "createdAt"
+        ],
+        "searchable": true
+      }
+    },
+    {
+      "id": "GET /api/po/getpodetails/:id",
+      "method": "GET",
+      "path": "/api/po/getpodetails/:id",
+      "tags": [
+        "po"
+      ],
+      "summary": "Get a purchase order with its line items, joined back to the source PR lines for traceability.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "owner",
+          "back_office"
+        ]
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "po": {
+              "id": "unrepresentable.required",
+              "poNumber": "string.required",
+              "supplierId": "unrepresentable.required",
+              "status": "enum:draft,pending_approval,approved,dispatched,partial_received,fully_received,invoiced,closed,cancelled.required",
+              "subtotalPaise": "unrepresentable.required",
+              "taxAmountPaise": "unrepresentable.required",
+              "totalAmountPaise": "unrepresentable.required",
+              "paymentTermsDays": "unrepresentable.nullable.required",
+              "deliveryTerms": "string.nullable.required",
+              "notes": "string.nullable.required",
+              "expectedDeliveryDate": "unrepresentable.nullable.required",
+              "approvedBy": "unrepresentable.nullable.required",
+              "currentApprovalLevel": "unrepresentable.required",
+              "totalApprovalLevels": "unrepresentable.required",
+              "createdAt": "unrepresentable.required",
+              "createdBy": "unrepresentable.required",
+              "revisedDeliveryDate": "unrepresentable.nullable.required",
+              "delayReason": "string.nullable.required",
+              "supplierConfirmed": "boolean.required",
+              "confirmationMethod": "string.nullable.required",
+              "confirmedAt": "unrepresentable.nullable.required",
+              "confirmedBy": "unrepresentable.nullable.required",
+              "confirmationNote": "string.nullable.required",
+              "closedAt": "unrepresentable.nullable.required",
+              "closedBy": "unrepresentable.nullable.required",
+              "closeNote": "string.nullable.required"
+            },
+            "items": "array<object>.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/po/createpo",
+      "method": "POST",
+      "path": "/api/po/createpo",
+      "tags": [
+        "po"
+      ],
+      "summary": "Create a purchase order by drafting lines from pending PR items (full remaining PR-item quantity always used).",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "owner",
+          "back_office"
+        ]
+      },
+      "request": {
+        "body": {
+          "supplierId": "integer.positive.required",
+          "paymentTermsDays": "integer.nonnegative.optional",
+          "deliveryTerms": "string.optional",
+          "expectedDeliveryDate": "unrepresentable.optional",
+          "notes": "string.optional",
+          "lines": "array<object>.required"
+        }
+      },
+      "responses": {
+        "201": {
+          "success": "boolean.required",
+          "data": {
+            "po": {
+              "id": "unrepresentable.required",
+              "poNumber": "string.required",
+              "supplierId": "unrepresentable.required",
+              "status": "enum:draft,pending_approval,approved,dispatched,partial_received,fully_received,invoiced,closed,cancelled.required",
+              "subtotalPaise": "unrepresentable.required",
+              "taxAmountPaise": "unrepresentable.required",
+              "totalAmountPaise": "unrepresentable.required",
+              "paymentTermsDays": "unrepresentable.nullable.required",
+              "deliveryTerms": "string.nullable.required",
+              "notes": "string.nullable.required",
+              "expectedDeliveryDate": "unrepresentable.nullable.required",
+              "approvedBy": "unrepresentable.nullable.required",
+              "currentApprovalLevel": "unrepresentable.required",
+              "totalApprovalLevels": "unrepresentable.required",
+              "createdAt": "unrepresentable.required",
+              "createdBy": "unrepresentable.required",
+              "revisedDeliveryDate": "unrepresentable.nullable.required",
+              "delayReason": "string.nullable.required",
+              "supplierConfirmed": "boolean.required",
+              "confirmationMethod": "string.nullable.required",
+              "confirmedAt": "unrepresentable.nullable.required",
+              "confirmedBy": "unrepresentable.nullable.required",
+              "confirmationNote": "string.nullable.required",
+              "closedAt": "unrepresentable.nullable.required",
+              "closedBy": "unrepresentable.nullable.required",
+              "closeNote": "string.nullable.required"
+            },
+            "items": "array<object>.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "PATCH /api/po/updatepo",
+      "method": "PATCH",
+      "path": "/api/po/updatepo",
+      "tags": [
+        "po"
+      ],
+      "summary": "Update a draft purchase order's fields and/or insert/reprice/delete line items.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "owner",
+          "back_office"
+        ]
+      },
+      "request": {
+        "body": {
+          "paymentTermsDays": "integer.nonnegative.nullable.required",
+          "deliveryTerms": "string.nullable.required",
+          "notes": "string.nullable.required",
+          "expectedDeliveryDate": "unrepresentable.nullable.required",
+          "poId": "integer.positive.required",
+          "inserts": "unrepresentable.required",
+          "updates": "unrepresentable.required",
+          "deletes": "unrepresentable.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "po": {
+              "id": "unrepresentable.required",
+              "poNumber": "string.required",
+              "supplierId": "unrepresentable.required",
+              "status": "enum:draft,pending_approval,approved,dispatched,partial_received,fully_received,invoiced,closed,cancelled.required",
+              "subtotalPaise": "unrepresentable.required",
+              "taxAmountPaise": "unrepresentable.required",
+              "totalAmountPaise": "unrepresentable.required",
+              "paymentTermsDays": "unrepresentable.nullable.required",
+              "deliveryTerms": "string.nullable.required",
+              "notes": "string.nullable.required",
+              "expectedDeliveryDate": "unrepresentable.nullable.required",
+              "approvedBy": "unrepresentable.nullable.required",
+              "currentApprovalLevel": "unrepresentable.required",
+              "totalApprovalLevels": "unrepresentable.required",
+              "createdAt": "unrepresentable.required",
+              "createdBy": "unrepresentable.required",
+              "revisedDeliveryDate": "unrepresentable.nullable.required",
+              "delayReason": "string.nullable.required",
+              "supplierConfirmed": "boolean.required",
+              "confirmationMethod": "string.nullable.required",
+              "confirmedAt": "unrepresentable.nullable.required",
+              "confirmedBy": "unrepresentable.nullable.required",
+              "confirmationNote": "string.nullable.required",
+              "closedAt": "unrepresentable.nullable.required",
+              "closedBy": "unrepresentable.nullable.required",
+              "closeNote": "string.nullable.required"
+            },
+            "items": "array<object>.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "DELETE /api/po/deletepo/:id",
+      "method": "DELETE",
+      "path": "/api/po/deletepo/:id",
+      "tags": [
+        "po"
+      ],
+      "summary": "Cancel a purchase order — reverts linked PR items back to pending. Rejected if the PO has GRN(s) recorded. `reason` is required unless the PO is still a draft.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "owner",
+          "back_office"
+        ]
+      },
+      "request": {
+        "body": {
+          "reason": "string.nonempty.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "unrepresentable.required",
+            "poNumber": "string.required",
+            "supplierId": "unrepresentable.required",
+            "status": "enum:draft,pending_approval,approved,dispatched,partial_received,fully_received,invoiced,closed,cancelled.required",
+            "subtotalPaise": "unrepresentable.required",
+            "taxAmountPaise": "unrepresentable.required",
+            "totalAmountPaise": "unrepresentable.required",
+            "paymentTermsDays": "unrepresentable.nullable.required",
+            "deliveryTerms": "string.nullable.required",
+            "notes": "string.nullable.required",
+            "expectedDeliveryDate": "unrepresentable.nullable.required",
+            "approvedBy": "unrepresentable.nullable.required",
+            "currentApprovalLevel": "unrepresentable.required",
+            "totalApprovalLevels": "unrepresentable.required",
+            "createdAt": "unrepresentable.required",
+            "createdBy": "unrepresentable.required",
+            "revisedDeliveryDate": "unrepresentable.nullable.required",
+            "delayReason": "string.nullable.required",
+            "supplierConfirmed": "boolean.required",
+            "confirmationMethod": "string.nullable.required",
+            "confirmedAt": "unrepresentable.nullable.required",
+            "confirmedBy": "unrepresentable.nullable.required",
+            "confirmationNote": "string.nullable.required",
+            "closedAt": "unrepresentable.nullable.required",
+            "closedBy": "unrepresentable.nullable.required",
+            "closeNote": "string.nullable.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/po/:id/send",
+      "method": "POST",
+      "path": "/api/po/:id/send",
+      "tags": [
+        "po"
+      ],
+      "summary": "Mark a PO as sent to the supplier (approved -> dispatched) and log the communication.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "owner",
+          "back_office"
+        ]
+      },
+      "request": {
+        "body": {
+          "channel": "enum:email,whatsapp,phone,in_person.required",
+          "note": "string.optional",
+          "toEmail": "string.email.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "unrepresentable.required",
+            "poNumber": "string.required",
+            "supplierId": "unrepresentable.required",
+            "status": "enum:draft,pending_approval,approved,dispatched,partial_received,fully_received,invoiced,closed,cancelled.required",
+            "subtotalPaise": "unrepresentable.required",
+            "taxAmountPaise": "unrepresentable.required",
+            "totalAmountPaise": "unrepresentable.required",
+            "paymentTermsDays": "unrepresentable.nullable.required",
+            "deliveryTerms": "string.nullable.required",
+            "notes": "string.nullable.required",
+            "expectedDeliveryDate": "unrepresentable.nullable.required",
+            "approvedBy": "unrepresentable.nullable.required",
+            "currentApprovalLevel": "unrepresentable.required",
+            "totalApprovalLevels": "unrepresentable.required",
+            "createdAt": "unrepresentable.required",
+            "createdBy": "unrepresentable.required",
+            "revisedDeliveryDate": "unrepresentable.nullable.required",
+            "delayReason": "string.nullable.required",
+            "supplierConfirmed": "boolean.required",
+            "confirmationMethod": "string.nullable.required",
+            "confirmedAt": "unrepresentable.nullable.required",
+            "confirmedBy": "unrepresentable.nullable.required",
+            "confirmationNote": "string.nullable.required",
+            "closedAt": "unrepresentable.nullable.required",
+            "closedBy": "unrepresentable.nullable.required",
+            "closeNote": "string.nullable.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/po/:id/reminder",
+      "method": "POST",
+      "path": "/api/po/:id/reminder",
+      "tags": [
+        "po"
+      ],
+      "summary": "Log a reminder sent to the supplier for an overdue PO.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "owner",
+          "back_office"
+        ]
+      },
+      "request": {
+        "body": {
+          "channel": "enum:email,whatsapp,phone,in_person.required",
+          "note": "string.optional",
+          "toEmail": "string.email.optional"
+        }
+      },
+      "responses": {
+        "201": {
+          "success": "boolean.required",
+          "data": {
+            "id": "unrepresentable.required",
+            "poId": "unrepresentable.required",
+            "type": "enum:po_sent,reminder,escalation.required",
+            "channel": "enum:email,whatsapp,phone,in_person.required",
+            "status": "enum:logged,success,failed.required",
+            "toEmail": "string.nullable.required",
+            "note": "string.nullable.required",
+            "errorMessage": "string.nullable.required",
+            "sentBy": "unrepresentable.nullable.required",
+            "sentAt": "unrepresentable.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/po/:id/escalate",
+      "method": "POST",
+      "path": "/api/po/:id/escalate",
+      "tags": [
+        "po"
+      ],
+      "summary": "Log an escalation action taken for an overdue PO.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "owner",
+          "back_office"
+        ]
+      },
+      "request": {
+        "body": {
+          "channel": "enum:email,whatsapp,phone,in_person.required",
+          "note": "string.optional",
+          "toEmail": "string.email.optional"
+        }
+      },
+      "responses": {
+        "201": {
+          "success": "boolean.required",
+          "data": {
+            "id": "unrepresentable.required",
+            "poId": "unrepresentable.required",
+            "type": "enum:po_sent,reminder,escalation.required",
+            "channel": "enum:email,whatsapp,phone,in_person.required",
+            "status": "enum:logged,success,failed.required",
+            "toEmail": "string.nullable.required",
+            "note": "string.nullable.required",
+            "errorMessage": "string.nullable.required",
+            "sentBy": "unrepresentable.nullable.required",
+            "sentAt": "unrepresentable.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "PATCH /api/po/:id/delay",
+      "method": "PATCH",
+      "path": "/api/po/:id/delay",
+      "tags": [
+        "po"
+      ],
+      "summary": "Record a supplier-revised delivery date and delay reason. expectedDeliveryDate is never overwritten.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "owner",
+          "back_office"
+        ]
+      },
+      "request": {
+        "body": {
+          "revisedDeliveryDate": "unrepresentable.optional",
+          "delayReason": "string.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "unrepresentable.required",
+            "poNumber": "string.required",
+            "supplierId": "unrepresentable.required",
+            "status": "enum:draft,pending_approval,approved,dispatched,partial_received,fully_received,invoiced,closed,cancelled.required",
+            "subtotalPaise": "unrepresentable.required",
+            "taxAmountPaise": "unrepresentable.required",
+            "totalAmountPaise": "unrepresentable.required",
+            "paymentTermsDays": "unrepresentable.nullable.required",
+            "deliveryTerms": "string.nullable.required",
+            "notes": "string.nullable.required",
+            "expectedDeliveryDate": "unrepresentable.nullable.required",
+            "approvedBy": "unrepresentable.nullable.required",
+            "currentApprovalLevel": "unrepresentable.required",
+            "totalApprovalLevels": "unrepresentable.required",
+            "createdAt": "unrepresentable.required",
+            "createdBy": "unrepresentable.required",
+            "revisedDeliveryDate": "unrepresentable.nullable.required",
+            "delayReason": "string.nullable.required",
+            "supplierConfirmed": "boolean.required",
+            "confirmationMethod": "string.nullable.required",
+            "confirmedAt": "unrepresentable.nullable.required",
+            "confirmedBy": "unrepresentable.nullable.required",
+            "confirmationNote": "string.nullable.required",
+            "closedAt": "unrepresentable.nullable.required",
+            "closedBy": "unrepresentable.nullable.required",
+            "closeNote": "string.nullable.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/po/:id/confirm",
+      "method": "POST",
+      "path": "/api/po/:id/confirm",
+      "tags": [
+        "po"
+      ],
+      "summary": "Record supplier confirmation of the PO. Informational only, never blocks a status transition.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "owner",
+          "back_office"
+        ]
+      },
+      "request": {
+        "body": {
+          "confirmationMethod": "string.nonempty.required",
+          "note": "string.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "unrepresentable.required",
+            "poNumber": "string.required",
+            "supplierId": "unrepresentable.required",
+            "status": "enum:draft,pending_approval,approved,dispatched,partial_received,fully_received,invoiced,closed,cancelled.required",
+            "subtotalPaise": "unrepresentable.required",
+            "taxAmountPaise": "unrepresentable.required",
+            "totalAmountPaise": "unrepresentable.required",
+            "paymentTermsDays": "unrepresentable.nullable.required",
+            "deliveryTerms": "string.nullable.required",
+            "notes": "string.nullable.required",
+            "expectedDeliveryDate": "unrepresentable.nullable.required",
+            "approvedBy": "unrepresentable.nullable.required",
+            "currentApprovalLevel": "unrepresentable.required",
+            "totalApprovalLevels": "unrepresentable.required",
+            "createdAt": "unrepresentable.required",
+            "createdBy": "unrepresentable.required",
+            "revisedDeliveryDate": "unrepresentable.nullable.required",
+            "delayReason": "string.nullable.required",
+            "supplierConfirmed": "boolean.required",
+            "confirmationMethod": "string.nullable.required",
+            "confirmedAt": "unrepresentable.nullable.required",
+            "confirmedBy": "unrepresentable.nullable.required",
+            "confirmationNote": "string.nullable.required",
+            "closedAt": "unrepresentable.nullable.required",
+            "closedBy": "unrepresentable.nullable.required",
+            "closeNote": "string.nullable.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/po/:id/invoice",
+      "method": "POST",
+      "path": "/api/po/:id/invoice",
+      "tags": [
+        "po"
+      ],
+      "summary": "Record a supplier invoice against a fully-received PO and move it to invoiced.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "owner",
+          "back_office"
+        ]
+      },
+      "request": {
+        "body": {
+          "invoiceNumber": "string.nonempty.required",
+          "invoiceDate": "unrepresentable.required",
+          "billedAmountPaise": "integer.nonnegative.required",
+          "dueDate": "unrepresentable.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "unrepresentable.required",
+            "poNumber": "string.required",
+            "supplierId": "unrepresentable.required",
+            "status": "enum:draft,pending_approval,approved,dispatched,partial_received,fully_received,invoiced,closed,cancelled.required",
+            "subtotalPaise": "unrepresentable.required",
+            "taxAmountPaise": "unrepresentable.required",
+            "totalAmountPaise": "unrepresentable.required",
+            "paymentTermsDays": "unrepresentable.nullable.required",
+            "deliveryTerms": "string.nullable.required",
+            "notes": "string.nullable.required",
+            "expectedDeliveryDate": "unrepresentable.nullable.required",
+            "approvedBy": "unrepresentable.nullable.required",
+            "currentApprovalLevel": "unrepresentable.required",
+            "totalApprovalLevels": "unrepresentable.required",
+            "createdAt": "unrepresentable.required",
+            "createdBy": "unrepresentable.required",
+            "revisedDeliveryDate": "unrepresentable.nullable.required",
+            "delayReason": "string.nullable.required",
+            "supplierConfirmed": "boolean.required",
+            "confirmationMethod": "string.nullable.required",
+            "confirmedAt": "unrepresentable.nullable.required",
+            "confirmedBy": "unrepresentable.nullable.required",
+            "confirmationNote": "string.nullable.required",
+            "closedAt": "unrepresentable.nullable.required",
+            "closedBy": "unrepresentable.nullable.required",
+            "closeNote": "string.nullable.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/po/:id/close",
+      "method": "POST",
+      "path": "/api/po/:id/close",
+      "tags": [
+        "po"
+      ],
+      "summary": "Close a PO (legal from fully_received or invoiced) — terminal, no further transitions.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "owner",
+          "back_office"
+        ]
+      },
+      "request": {
+        "body": {
+          "note": "string.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "unrepresentable.required",
+            "poNumber": "string.required",
+            "supplierId": "unrepresentable.required",
+            "status": "enum:draft,pending_approval,approved,dispatched,partial_received,fully_received,invoiced,closed,cancelled.required",
+            "subtotalPaise": "unrepresentable.required",
+            "taxAmountPaise": "unrepresentable.required",
+            "totalAmountPaise": "unrepresentable.required",
+            "paymentTermsDays": "unrepresentable.nullable.required",
+            "deliveryTerms": "string.nullable.required",
+            "notes": "string.nullable.required",
+            "expectedDeliveryDate": "unrepresentable.nullable.required",
+            "approvedBy": "unrepresentable.nullable.required",
+            "currentApprovalLevel": "unrepresentable.required",
+            "totalApprovalLevels": "unrepresentable.required",
+            "createdAt": "unrepresentable.required",
+            "createdBy": "unrepresentable.required",
+            "revisedDeliveryDate": "unrepresentable.nullable.required",
+            "delayReason": "string.nullable.required",
+            "supplierConfirmed": "boolean.required",
+            "confirmationMethod": "string.nullable.required",
+            "confirmedAt": "unrepresentable.nullable.required",
+            "confirmedBy": "unrepresentable.nullable.required",
+            "confirmationNote": "string.nullable.required",
+            "closedAt": "unrepresentable.nullable.required",
+            "closedBy": "unrepresentable.nullable.required",
+            "closeNote": "string.nullable.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "GET /api/pr/getprs",
+      "method": "GET",
+      "path": "/api/pr/getprs",
+      "tags": [
+        "pr"
+      ],
+      "summary": "List purchase requisitions (PRs feed into purchase order creation), paginated.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "owner",
+          "floor_supervisor",
+          "back_office"
+        ]
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "sortBy": "enum:id,prNumber,type,status,createdAt.optional",
+          "sortDir": "enum:asc,desc.required",
+          "status": "array<enum:draft,pending_approval,approved,rejected,partial_ordered,fully_ordered,cancelled>.optional",
+          "type": "enum:sale_order,stock_reorder,maintenance,tooling,subcontracting,misc.optional",
+          "q": "string.nonempty.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "id",
+          "prNumber",
+          "type",
+          "status",
+          "createdAt"
+        ],
+        "searchable": true
+      }
+    },
+    {
+      "id": "GET /api/pr/getprdetails/:id",
+      "method": "GET",
+      "path": "/api/pr/getprdetails/:id",
+      "tags": [
+        "pr"
+      ],
+      "summary": "Get a purchase requisition with its line items.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "owner",
+          "floor_supervisor",
+          "back_office"
+        ]
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "pr": {
+              "id": "unrepresentable.required",
+              "prNumber": "string.required",
+              "type": "enum:sale_order,stock_reorder,maintenance,tooling,subcontracting,misc.required",
+              "saleOrderId": "unrepresentable.nullable.required",
+              "assetId": "unrepresentable.nullable.required",
+              "status": "enum:draft,pending_approval,approved,rejected,partial_ordered,fully_ordered,cancelled.required",
+              "requestedBy": "unrepresentable.required",
+              "approvedBy": "unrepresentable.nullable.required",
+              "currentApprovalLevel": "unrepresentable.required",
+              "totalApprovalLevels": "unrepresentable.required",
+              "notes": "string.nullable.required",
+              "estimatedAmountPaise": "unrepresentable.required",
+              "createdAt": "unrepresentable.required",
+              "updatedAt": "unrepresentable.required",
+              "requestedByName": "string.required"
+            },
+            "items": "array<object>.required",
+            "linkedPos": "array<object>.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/pr/createpr",
+      "method": "POST",
+      "path": "/api/pr/createpr",
+      "tags": [
+        "pr"
+      ],
+      "summary": "Create a purchase requisition with its line items.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "owner",
+          "floor_supervisor",
+          "back_office"
+        ]
+      },
+      "request": {
+        "body": {
+          "type": "enum:sale_order,stock_reorder,maintenance,tooling,subcontracting,misc.required",
+          "saleOrderId": "integer.positive.optional",
+          "assetId": "integer.positive.optional",
+          "notes": "string.nonempty.required",
+          "items": "array<object>.required"
+        }
+      },
+      "responses": {
+        "201": {
+          "success": "boolean.required",
+          "data": {
+            "pr": {
+              "id": "unrepresentable.required",
+              "prNumber": "string.required",
+              "type": "enum:sale_order,stock_reorder,maintenance,tooling,subcontracting,misc.required",
+              "saleOrderId": "unrepresentable.nullable.required",
+              "assetId": "unrepresentable.nullable.required",
+              "status": "enum:draft,pending_approval,approved,rejected,partial_ordered,fully_ordered,cancelled.required",
+              "requestedBy": "unrepresentable.required",
+              "approvedBy": "unrepresentable.nullable.required",
+              "currentApprovalLevel": "unrepresentable.required",
+              "totalApprovalLevels": "unrepresentable.required",
+              "notes": "string.nullable.required",
+              "estimatedAmountPaise": "unrepresentable.required",
+              "createdAt": "unrepresentable.required",
+              "updatedAt": "unrepresentable.required"
+            },
+            "items": "array<object>.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "PATCH /api/pr/updatepr",
+      "method": "PATCH",
+      "path": "/api/pr/updatepr",
+      "tags": [
+        "pr"
+      ],
+      "summary": "Update a purchase requisition's fields and/or insert/update/delete line items.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "owner",
+          "floor_supervisor",
+          "back_office"
+        ]
+      },
+      "request": {
+        "body": {
+          "type": "enum:sale_order,stock_reorder,maintenance,tooling,subcontracting,misc.optional",
+          "saleOrderId": "integer.positive.nullable.required",
+          "assetId": "integer.positive.nullable.required",
+          "notes": "string.nonempty.required",
+          "status": "enum:draft,pending_approval,approved,rejected,partial_ordered,fully_ordered,cancelled.optional",
+          "prId": "integer.positive.required",
+          "inserts": "unrepresentable.required",
+          "updates": "unrepresentable.required",
+          "deletes": "unrepresentable.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "pr": {
+              "id": "unrepresentable.required",
+              "prNumber": "string.required",
+              "type": "enum:sale_order,stock_reorder,maintenance,tooling,subcontracting,misc.required",
+              "saleOrderId": "unrepresentable.nullable.required",
+              "assetId": "unrepresentable.nullable.required",
+              "status": "enum:draft,pending_approval,approved,rejected,partial_ordered,fully_ordered,cancelled.required",
+              "requestedBy": "unrepresentable.required",
+              "approvedBy": "unrepresentable.nullable.required",
+              "currentApprovalLevel": "unrepresentable.required",
+              "totalApprovalLevels": "unrepresentable.required",
+              "notes": "string.nullable.required",
+              "estimatedAmountPaise": "unrepresentable.required",
+              "createdAt": "unrepresentable.required",
+              "updatedAt": "unrepresentable.required"
+            },
+            "items": "array<object>.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "DELETE /api/pr/deletepr/:id",
+      "method": "DELETE",
+      "path": "/api/pr/deletepr/:id",
+      "tags": [
+        "pr"
+      ],
+      "summary": "Cancel a purchase requisition.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "owner",
+          "floor_supervisor",
+          "back_office"
+        ]
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "unrepresentable.required",
+            "prNumber": "string.required",
+            "type": "enum:sale_order,stock_reorder,maintenance,tooling,subcontracting,misc.required",
+            "saleOrderId": "unrepresentable.nullable.required",
+            "assetId": "unrepresentable.nullable.required",
+            "status": "enum:draft,pending_approval,approved,rejected,partial_ordered,fully_ordered,cancelled.required",
+            "requestedBy": "unrepresentable.required",
+            "approvedBy": "unrepresentable.nullable.required",
+            "currentApprovalLevel": "unrepresentable.required",
+            "totalApprovalLevels": "unrepresentable.required",
+            "notes": "string.nullable.required",
+            "estimatedAmountPaise": "unrepresentable.required",
+            "createdAt": "unrepresentable.required",
+            "updatedAt": "unrepresentable.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "GET /api/setup/modules",
+      "method": "GET",
+      "path": "/api/setup/modules",
+      "tags": [
+        "setup",
+        "modules"
+      ],
+      "summary": "List all modules.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin"
+        ]
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required"
+        }
+      },
+      "notes": [
+        "Bounded reference data (all modules) — pagination intentionally omitted"
+      ]
+    },
+    {
+      "id": "GET /api/setup/employees",
+      "method": "GET",
+      "path": "/api/setup/employees",
+      "tags": [
+        "setup",
+        "employees"
+      ],
+      "summary": "List employees, paginated.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin"
+        ]
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "sortBy": "enum:name,roleId,dailyRatePaise,isActive.optional",
+          "sortDir": "enum:asc,desc.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "name",
+          "roleId",
+          "dailyRatePaise",
+          "isActive"
+        ],
+        "searchable": false
+      }
+    },
+    {
+      "id": "GET /api/setup/employees/search",
+      "method": "GET",
+      "path": "/api/setup/employees/search",
+      "tags": [
+        "setup",
+        "employees"
+      ],
+      "summary": "Debounced name-search over employees, paginated.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin"
+        ]
+      },
+      "request": {
+        "query": {
+          "q": "string.nonempty.required",
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "sortBy": "enum:name,roleId,dailyRatePaise,isActive.optional",
+          "sortDir": "enum:asc,desc.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "name",
+          "roleId",
+          "dailyRatePaise",
+          "isActive"
+        ],
+        "searchable": true
+      }
+    },
+    {
+      "id": "POST /api/setup/employees",
+      "method": "POST",
+      "path": "/api/setup/employees",
+      "tags": [
+        "setup",
+        "employees"
+      ],
+      "summary": "Create an employee (desk-worker password login or operator QR login).",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin"
+        ]
+      },
+      "request": {
+        "body": {
+          "name": "string.nonempty.required",
+          "roleId": "unrepresentable.required",
+          "phone": "string.optional",
+          "dailyRatePaise": "integer.nonnegative.optional",
+          "loginMethod": "enum:password,qr.required",
+          "email": "string.email.optional",
+          "password": "string.nonempty.optional"
+        }
+      },
+      "responses": {
+        "201": {
+          "success": "boolean.required",
+          "data": {
+            "id": "unrepresentable.required",
+            "name": "string.required",
+            "email": "string.nullable.required",
+            "phone": "string.nullable.required",
+            "qrToken": "null.required",
+            "roleId": "unrepresentable.required",
+            "dailyRatePaise": "unrepresentable.nullable.required",
+            "isActive": "boolean.required",
+            "createdAt": "unrepresentable.required",
+            "lastUpdatedAt": "unrepresentable.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "PATCH /api/setup/employees/:id",
+      "method": "PATCH",
+      "path": "/api/setup/employees/:id",
+      "tags": [
+        "setup",
+        "employees"
+      ],
+      "summary": "Update an employee.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin"
+        ]
+      },
+      "request": {
+        "body": {
+          "name": "string.nonempty.required",
+          "roleId": "unrepresentable.required",
+          "phone": "string.optional",
+          "dailyRatePaise": "integer.nonnegative.optional",
+          "loginMethod": "enum:password,qr.required",
+          "email": "string.email.optional",
+          "password": "string.nonempty.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "unrepresentable.required",
+            "name": "string.required",
+            "email": "string.nullable.required",
+            "phone": "string.nullable.required",
+            "qrToken": "null.required",
+            "roleId": "unrepresentable.required",
+            "dailyRatePaise": "unrepresentable.nullable.required",
+            "isActive": "boolean.required",
+            "createdAt": "unrepresentable.required",
+            "lastUpdatedAt": "unrepresentable.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "DELETE /api/setup/employees/:id",
+      "method": "DELETE",
+      "path": "/api/setup/employees/:id",
+      "tags": [
+        "setup",
+        "employees"
+      ],
+      "summary": "Soft-delete (deactivate) an employee.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin"
+        ]
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required"
+        }
+      }
+    },
+    {
+      "id": "POST /api/setup/employees/:id/qr",
+      "method": "POST",
+      "path": "/api/setup/employees/:id/qr",
+      "tags": [
+        "setup",
+        "employees"
+      ],
+      "summary": "Regenerate an operator's QR login token (returned once, raw).",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin"
+        ]
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "qrToken": "string.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "GET /api/setup/roles",
+      "method": "GET",
+      "path": "/api/setup/roles",
+      "tags": [
+        "setup",
+        "roles"
+      ],
+      "summary": "List roles, paginated.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin"
+        ]
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "sortBy": "enum:name.optional",
+          "sortDir": "enum:asc,desc.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "name"
+        ],
+        "searchable": false
+      }
+    },
+    {
+      "id": "POST /api/setup/roles",
+      "method": "POST",
+      "path": "/api/setup/roles",
+      "tags": [
+        "setup",
+        "roles"
+      ],
+      "summary": "Create a role.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin"
+        ]
+      },
+      "request": {
+        "body": {
+          "name": "string.nonempty.required"
+        }
+      },
+      "responses": {
+        "201": {
+          "success": "boolean.required",
+          "data": {
+            "id": "number.required",
+            "name": "string.required",
+            "isSystem": "boolean.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "PATCH /api/setup/roles/:id",
+      "method": "PATCH",
+      "path": "/api/setup/roles/:id",
+      "tags": [
+        "setup",
+        "roles"
+      ],
+      "summary": "Update a role.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin"
+        ]
+      },
+      "request": {
+        "body": {
+          "name": "string.nonempty.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "number.required",
+            "name": "string.required",
+            "isSystem": "boolean.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "DELETE /api/setup/roles/:id",
+      "method": "DELETE",
+      "path": "/api/setup/roles/:id",
+      "tags": [
+        "setup",
+        "roles"
+      ],
+      "summary": "Delete a role.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin"
+        ]
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required"
+        }
+      }
+    },
+    {
+      "id": "GET /api/setup/pages",
+      "method": "GET",
+      "path": "/api/setup/pages",
+      "tags": [
+        "setup",
+        "pages"
+      ],
+      "summary": "List pages, paginated.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin"
+        ]
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "sortBy": "enum:label,path,moduleId,sortOrder.optional",
+          "sortDir": "enum:asc,desc.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "label",
+          "path",
+          "moduleId",
+          "sortOrder"
+        ],
+        "searchable": false
+      }
+    },
+    {
+      "id": "POST /api/setup/pages",
+      "method": "POST",
+      "path": "/api/setup/pages",
+      "tags": [
+        "setup",
+        "pages"
+      ],
+      "summary": "Create a page.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin"
+        ]
+      },
+      "request": {
+        "body": {
+          "key": "string.nonempty.required",
+          "label": "string.nonempty.required",
+          "path": "string.nonempty.required",
+          "sortOrder": "number.optional",
+          "moduleId": "number.nullable.required"
+        }
+      },
+      "responses": {
+        "201": {
+          "success": "boolean.required",
+          "data": {
+            "id": "number.required",
+            "key": "string.required",
+            "label": "string.required",
+            "path": "string.required",
+            "sortOrder": "number.required",
+            "moduleId": "number.nullable.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "PATCH /api/setup/pages/:id",
+      "method": "PATCH",
+      "path": "/api/setup/pages/:id",
+      "tags": [
+        "setup",
+        "pages"
+      ],
+      "summary": "Update a page (key is immutable).",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin"
+        ]
+      },
+      "request": {
+        "body": {
+          "label": "string.nonempty.optional",
+          "path": "string.nonempty.optional",
+          "sortOrder": "number.optional",
+          "moduleId": "number.nullable.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "number.required",
+            "key": "string.required",
+            "label": "string.required",
+            "path": "string.required",
+            "sortOrder": "number.required",
+            "moduleId": "number.nullable.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "DELETE /api/setup/pages/:id",
+      "method": "DELETE",
+      "path": "/api/setup/pages/:id",
+      "tags": [
+        "setup",
+        "pages"
+      ],
+      "summary": "Delete a page.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin"
+        ]
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required"
+        }
+      }
+    },
+    {
+      "id": "GET /api/setup/permissions",
+      "method": "GET",
+      "path": "/api/setup/permissions",
+      "tags": [
+        "setup",
+        "permissions"
+      ],
+      "summary": "List all role-page permission assignments.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin"
+        ]
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required"
+        }
+      },
+      "notes": [
+        "Bounded reference data (all role-page pairs) — pagination intentionally omitted"
+      ]
+    },
+    {
+      "id": "POST /api/setup/roles/:roleId/permissions",
+      "method": "POST",
+      "path": "/api/setup/roles/:roleId/permissions",
+      "tags": [
+        "setup",
+        "permissions"
+      ],
+      "summary": "Apply an added/deleted page-permission diff for a role.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin"
+        ]
+      },
+      "request": {
+        "body": {}
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required"
+        }
+      }
+    },
+    {
+      "id": "GET /api/supplier/listSuppliers",
+      "method": "GET",
+      "path": "/api/supplier/listSuppliers",
+      "tags": [
+        "supplier"
+      ],
+      "summary": "List suppliers, paginated.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "back_office"
+        ]
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "sortBy": "enum:name,type,contactPerson,isActive,createdAt.optional",
+          "sortDir": "enum:asc,desc.required",
+          "q": "string.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "name",
+          "type",
+          "contactPerson",
+          "isActive",
+          "createdAt"
+        ],
+        "searchable": true
+      }
+    },
+    {
+      "id": "GET /api/supplier/:supplierId/listItems",
+      "method": "GET",
+      "path": "/api/supplier/:supplierId/listItems",
+      "tags": [
+        "supplier"
+      ],
+      "summary": "List a supplier's item catalog entries, paginated.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "back_office"
+        ]
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "q": "string.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [],
+        "searchable": true
+      }
+    },
+    {
+      "id": "GET /api/supplier/:supplierId/listServices",
+      "method": "GET",
+      "path": "/api/supplier/:supplierId/listServices",
+      "tags": [
+        "supplier"
+      ],
+      "summary": "List a supplier's service catalog entries, paginated.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "back_office"
+        ]
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "q": "string.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [],
+        "searchable": true
+      }
+    },
+    {
+      "id": "GET /api/supplier/:supplierId/detail",
+      "method": "GET",
+      "path": "/api/supplier/:supplierId/detail",
+      "tags": [
+        "supplier"
+      ],
+      "summary": "Get a supplier's master record plus item/service counts.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "back_office"
+        ]
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "supplier": {
+              "id": "unrepresentable.required",
+              "name": "string.required",
+              "type": "enum:raw_material,consumables,service_provider,trader,both.required",
+              "gstNumber": "string.nullable.required",
+              "panNumber": "string.nullable.required",
+              "contactPerson": "string.nullable.required",
+              "email": "string.nullable.required",
+              "phone": "string.nullable.required",
+              "address": "string.nullable.required",
+              "defaultPaymentTermsDays": "unrepresentable.required",
+              "isActive": "boolean.required",
+              "createdBy": "unrepresentable.nullable.required",
+              "createdAt": "unrepresentable.required"
+            },
+            "itemCount": "integer.nonnegative.required",
+            "serviceCount": "integer.nonnegative.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/supplier/createSupplier",
+      "method": "POST",
+      "path": "/api/supplier/createSupplier",
+      "tags": [
+        "supplier"
+      ],
+      "summary": "Create a supplier, optionally seeding its item catalog.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "back_office"
+        ]
+      },
+      "request": {
+        "body": {
+          "name": "string.nonempty.required",
+          "type": "enum:raw_material,consumables,service_provider,trader,both.optional",
+          "gstNumber": "string.optional",
+          "panNumber": "string.optional",
+          "contactPerson": "string.optional",
+          "email": "string.email.optional",
+          "phone": "string.optional",
+          "address": "string.optional",
+          "defaultPaymentTermsDays": "integer.nonnegative.optional",
+          "isActive": "boolean.optional",
+          "supplierItems": "array<object>.optional"
+        }
+      },
+      "responses": {
+        "201": {
+          "success": "boolean.required",
+          "data": {
+            "id": "unrepresentable.required",
+            "name": "string.required",
+            "type": "enum:raw_material,consumables,service_provider,trader,both.required",
+            "gstNumber": "string.nullable.required",
+            "panNumber": "string.nullable.required",
+            "contactPerson": "string.nullable.required",
+            "email": "string.nullable.required",
+            "phone": "string.nullable.required",
+            "address": "string.nullable.required",
+            "defaultPaymentTermsDays": "unrepresentable.required",
+            "isActive": "boolean.required",
+            "createdBy": "unrepresentable.nullable.required",
+            "createdAt": "unrepresentable.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/supplier/:supplierId/createItem",
+      "method": "POST",
+      "path": "/api/supplier/:supplierId/createItem",
+      "tags": [
+        "supplier"
+      ],
+      "summary": "Add a single item catalog entry to a supplier.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "back_office"
+        ]
+      },
+      "request": {
+        "body": {
+          "itemId": "integer.positive.required",
+          "supplierSku": "string.optional",
+          "supplierUnitPricePaise": "integer.nonnegative.required",
+          "taxPercentage": "number.nonnegative.optional",
+          "leadTimeDays": "integer.nonnegative.optional",
+          "qty": "number.nonnegative.optional",
+          "uom": "string.nonempty.required",
+          "isActive": "boolean.optional"
+        }
+      },
+      "responses": {
+        "201": {
+          "success": "boolean.required",
+          "data": {
+            "id": "unrepresentable.required",
+            "supplierId": "unrepresentable.required",
+            "itemId": "unrepresentable.required",
+            "supplierSku": "string.nullable.required",
+            "supplierUnitPricePaise": "unrepresentable.required",
+            "taxPercentage": "unrepresentable.required",
+            "leadTimeDays": "unrepresentable.required",
+            "qty": "unrepresentable.required",
+            "uom": "string.required",
+            "isActive": "boolean.required",
+            "createdBy": "unrepresentable.nullable.required",
+            "createdAt": "unrepresentable.required",
+            "lastUpdatedBy": "unrepresentable.nullable.required",
+            "lastUpdatedAt": "unrepresentable.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/supplier/:supplierId/createService",
+      "method": "POST",
+      "path": "/api/supplier/:supplierId/createService",
+      "tags": [
+        "supplier"
+      ],
+      "summary": "Add a single service catalog entry to a supplier.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "back_office"
+        ]
+      },
+      "request": {
+        "body": {
+          "serviceId": "integer.positive.required",
+          "serviceUnitPricePaise": "integer.nonnegative.required",
+          "taxPercentage": "number.nonnegative.optional",
+          "leadTimeDays": "integer.nonnegative.optional",
+          "isActive": "boolean.optional"
+        }
+      },
+      "responses": {
+        "201": {
+          "success": "boolean.required",
+          "data": {
+            "id": "unrepresentable.required",
+            "supplierId": "unrepresentable.required",
+            "serviceId": "unrepresentable.required",
+            "serviceUnitPricePaise": "unrepresentable.required",
+            "taxPercentage": "unrepresentable.required",
+            "leadTimeDays": "unrepresentable.required",
+            "isActive": "boolean.required",
+            "createdBy": "unrepresentable.nullable.required",
+            "createdAt": "unrepresentable.required",
+            "lastUpdatedBy": "unrepresentable.nullable.required",
+            "lastUpdatedAt": "unrepresentable.required",
+            "serviceCode": "string.required",
+            "serviceName": "string.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "PATCH /api/supplier/updateSupplier/:id",
+      "method": "PATCH",
+      "path": "/api/supplier/updateSupplier/:id",
+      "tags": [
+        "supplier"
+      ],
+      "summary": "Update a supplier — discriminated by mode: master fields or a single supplier-item row.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "back_office"
+        ]
+      },
+      "request": {
+        "body": "union<[object Object]|[object Object]>.required"
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "unrepresentable.required",
+            "name": "string.required",
+            "type": "enum:raw_material,consumables,service_provider,trader,both.required",
+            "gstNumber": "string.nullable.required",
+            "panNumber": "string.nullable.required",
+            "contactPerson": "string.nullable.required",
+            "email": "string.nullable.required",
+            "phone": "string.nullable.required",
+            "address": "string.nullable.required",
+            "defaultPaymentTermsDays": "unrepresentable.required",
+            "isActive": "boolean.required",
+            "createdBy": "unrepresentable.nullable.required",
+            "createdAt": "unrepresentable.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "PATCH /api/supplier/:supplierId/editItem",
+      "method": "PATCH",
+      "path": "/api/supplier/:supplierId/editItem",
+      "tags": [
+        "supplier"
+      ],
+      "summary": "Batch-edit one or more of a supplier's item catalog entries.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "back_office"
+        ]
+      },
+      "request": {
+        "body": "union<[object Object]|array<object>.required>.required"
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "summary": {
+            "total": "integer.nonnegative.required",
+            "success": "integer.nonnegative.required",
+            "failed": "integer.nonnegative.required"
+          }
+        }
+      },
+      "notes": [
+        "response spreads service result fields directly ({success, data, summary}), not {success,data} — documented deviation, not normalized"
+      ]
+    },
+    {
+      "id": "PATCH /api/supplier/:supplierId/editService",
+      "method": "PATCH",
+      "path": "/api/supplier/:supplierId/editService",
+      "tags": [
+        "supplier"
+      ],
+      "summary": "Batch-edit one or more of a supplier's service catalog entries.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "back_office"
+        ]
+      },
+      "request": {
+        "body": "union<[object Object]|array<object>.required>.required"
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "summary": {
+            "total": "integer.nonnegative.required",
+            "success": "integer.nonnegative.required",
+            "failed": "integer.nonnegative.required"
+          }
+        }
+      },
+      "notes": [
+        "response spreads service result fields directly ({success, data, summary}), not {success,data} — documented deviation, not normalized"
+      ]
+    }
+  ]
+}

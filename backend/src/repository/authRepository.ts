@@ -57,6 +57,21 @@ export const authRepository = {
     return row;
   },
 
+  async getActiveEmployeeWithRoleById(id: number) {
+    const [row] = await db
+      .select({
+        id: employees.id,
+        name: employees.name,
+        roleId: employees.roleId,
+        roleName: roles.name,
+      })
+      .from(employees)
+      .innerJoin(roles, eq(roles.id, employees.roleId))
+      .where(and(eq(employees.id, id), eq(employees.isActive, true)))
+      .limit(1);
+    return row;
+  },
+
   async getPagesByRoleId(roleId: number) {
     const pageRows = await db
       .select({ key: pages.key })

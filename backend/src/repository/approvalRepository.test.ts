@@ -10,7 +10,7 @@
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { eq, inArray } from "drizzle-orm";
-import { db, disconnectDb } from "../db/client";
+import { db } from "../db/client";
 import { roles } from "../db/schemas/01_auth";
 import {
   approvalPolicies,
@@ -150,7 +150,8 @@ afterAll(async () => {
   await db
     .delete(employees)
     .where(inArray(employees.id, [ownerEmployeeId, requestorEmployeeId]));
-  await disconnectDb();
+  // No disconnectDb() here: all test files share one client in one process;
+  // src/test/setup-env.ts closes it once after every file has run.
 });
 
 describe("approvalRepository.findMatchingActivePolicy", () => {

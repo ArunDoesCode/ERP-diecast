@@ -4,8 +4,11 @@
  * `.contracts/api-manifest.json` at the repo root.
  *
  * Usage: `bun run contract:generate` (see package.json).
+ * `--check` (`bun run contract:check`, run in CI) writes nothing and exits 1
+ * if the committed manifest differs from what the code would generate. The
+ * output is deterministic (no timestamp) so it can be committed (BL-008).
  */
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { ZodType } from "zod";
 import { z } from "zod";
@@ -171,7 +174,6 @@ async function main() {
 
   const manifest = {
     version: "1.0.0",
-    generatedAt: new Date().toISOString(),
     baseUrl: "/api",
     errorEnvelope: {
       success: false,
@@ -184,7 +186,21 @@ async function main() {
   const outDir = path.resolve(import.meta.dir, "..", ".contracts");
   await mkdir(outDir, { recursive: true });
   const outPath = path.join(outDir, "api-manifest.json");
-  await writeFile(outPath, JSON.stringify(manifest, null, 2));
+  const content = `${JSON.stringify(manifest, null, 2)}\n`;
+
+  if (process.argv.includes("--check")) {
+    const committed = await readFile(outPath, "utf8").catch(() => "");
+    if (committed !== content) {
+      console.error(
+        "backend/.contracts/api-manifest.json is out of date — run `bun run contract:generate` and commit it.",
+      );
+      process.exit(1);
+    }
+    console.log(`API manifest up to date (${routes.length} routes).`);
+    return;
+  }
+
+  await writeFile(outPath, content);
 
   console.log(
     `Wrote ${routes.length} route descriptors to ${path.relative(process.cwd(), outPath)}`,

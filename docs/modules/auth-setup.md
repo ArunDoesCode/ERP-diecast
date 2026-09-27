@@ -83,9 +83,9 @@ Full shapes: `cd backend && bun run contract:query "<METHOD /path>"`.
   `refreshTokens` → controller sets refresh cookie (`setRefreshCookie`, `lib/http.ts`) and
   returns `{accessToken, user}`.
 - `refresh`: reads refresh cookie → `verifyRefreshToken` → look up stored hash → delete old
-  row → re-sign both tokens with the *same* payload carried over from the old JWT (roles/
-  pages are not re-fetched from DB on refresh — see gotchas) → store new refresh hash → set
-  new cookie.
+  row → `authRepository.getActiveEmployeeWithRoleById` (401 if missing/inactive) → re-sign
+  both tokens with the employee's *current* name, role and `getPagesByRoleId` pages → store
+  new refresh hash → set new cookie (BL-018, `authService.test.ts`).
 - `requireAuth`/`requireRole`: every protected Hono router does
   `router.use("*", requireAuth, requireRole(...))` (see `setupRouter`) or applies both
   per-route (see `authRouter.register`). `requireAuth` verifies the Bearer access token and
@@ -114,10 +114,10 @@ Full shapes: `cd backend && bun run contract:query "<METHOD /path>"`.
   `/setup/approval` (see `approval.md`).
 
 ## Invariants & gotchas
-- `refresh` does **not** re-query the DB for the employee's current role/pages — it reuses
-  the payload embedded in the old (still-valid) refresh JWT. If an admin changes a user's
-  role or page grants, that user's `allowedPages`/`role` won't change until they log out and
-  back in (or until the refresh JWT itself expires), not on the next silent refresh.
+- `refresh` re-reads role/pages from the DB (fixed 2026-09-27, BL-018), so a role or page
+  grant change applies on the next silent refresh (≤ access-token TTL, default 15 min), and a
+  deactivated employee can no longer refresh. Already-issued access tokens stay valid until
+  they expire — there is no access-token revocation.
 - There is no login path for `operator`/QR-token employees in `backend/src/routes/auth.ts` —
   `POST /api/auth/login` only accepts `loginSchema` (email+password). `qr-token.ts`,
   `employeeService.regenerateQr`, and the `operator` role/enum value all exist, but nothing
@@ -149,9 +149,8 @@ Full shapes: `cd backend && bun run contract:query "<METHOD /path>"`.
 - `authService.ts` still uses some ad-hoc error paths rather than exclusively `AppError`
   subclasses in a couple of spots noted by backend `CLAUDE.md` as pre-existing debt; not
   re-verified line-by-line here.
-- Refresh does not refresh RBAC state from DB (see gotchas) — stale `allowedPages`/`role`
-  can persist across a role change until re-login.
-- No automated tests found for auth or setup modules on either side.
+- Auth tests: `backend/src/service/authService.test.ts` (refresh re-reads RBAC, BL-018) and
+  `backend/src/app.test.ts` (401/403 mapping). Setup module still has none.
 
 ## History
 | Date | PR / commit | Change |
