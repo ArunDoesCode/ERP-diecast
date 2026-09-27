@@ -60,17 +60,20 @@ export function GrnBypassAlert({
 				<AlertDialogHeader>
 					<AlertDialogTitle>Bypass QA · {line.itemName}</AlertDialogTitle>
 					<AlertDialogDescription>
-						Posts straight to inventory without a QA pass. A reason is
-						required.
+						Posts straight to inventory without a QA pass. A reason is required.
 					</AlertDialogDescription>
 				</AlertDialogHeader>
 
 				<div className="space-y-3">
 					<div>
-						<label className="mb-1 block text-xs font-medium">
+						<label
+							htmlFor="grn-bypass-accepted-qty"
+							className="mb-1 block text-xs font-medium"
+						>
 							Accepted qty
 						</label>
 						<Input
+							id="grn-bypass-accepted-qty"
 							type="number"
 							min={0}
 							value={acceptedQty}

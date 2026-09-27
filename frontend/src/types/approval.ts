@@ -53,7 +53,9 @@ export type ApprovalPolicyChainLevelInput = {
 	employeeId?: number;
 };
 
+// Sub doc type filter on a policy (backend `procurement_category` enum).
 export type ApprovalPolicyPrType =
+	| "any"
 	| "sale_order"
 	| "stock_reorder"
 	| "maintenance"
@@ -68,7 +70,7 @@ export type ApprovalPolicySummary = {
 	isActive: boolean;
 	priority: number;
 	docType: ApprovalDocType;
-	prType: ApprovalPolicyPrType | string | null;
+	subDocType: ApprovalPolicyPrType;
 	isSaleOrderLinked: boolean | null;
 	minAmountPaise: number | null;
 	maxAmountPaise: number | null;
@@ -88,8 +90,7 @@ export type ApprovalPolicyUpdateInput = Partial<{
 	description: string | null;
 	isActive: boolean;
 	priority: number;
-	prType: ApprovalPolicyPrType | null;
-	isSaleOrderLinked: boolean | null;
+	subDocType: ApprovalPolicyPrType;
 	minAmountPaise: number | null;
 	maxAmountPaise: number | null;
 	autoApprove: boolean;
@@ -102,8 +103,7 @@ export type ApprovalPolicyCreateInput = {
 	isActive?: boolean;
 	priority: number;
 	docType: ApprovalDocType;
-	prType?: ApprovalPolicyPrType;
-	isSaleOrderLinked?: boolean;
+	subDocType?: ApprovalPolicyPrType;
 	minAmountPaise?: number;
 	maxAmountPaise?: number;
 	autoApprove?: boolean;
@@ -199,37 +199,37 @@ export type ApprovalTrailEntry = {
 export type ApprovalCurrentByDocResponse = ApprovalRequestSummary | null;
 
 export const approvalPolicyFormSchema = z.object({
-  name: z.string().min(1, "Policy name is required"),
-  description: z.string().optional().default(""),
-  isActive: z.boolean().default(true),
-  priority: z.coerce.number().int().min(1, "Priority must be greater than 0"),
-  docType: z.enum(["pr", "po", "sco"]),
-  subDocType: z
-    .enum([
-      "any",
-      "sale_order",
-      "stock_reorder",
-      "maintenance",
-      "tooling",
-      "subcontracting",
-      "misc",
-    ])
-    .or(z.literal(""))
-    .default(""),
-  // isSaleOrderLinked: z.enum(["any", "yes", "no"]).default("any"),
-  minAmountPaise: z.string().optional().default(""),
-  maxAmountPaise: z.string().optional().default(""),
-  autoApprove: z.boolean().default(false),
-  approvalChain: z
-    .array(
-      z.object({
-        approverType: z.enum(["role", "specific"]),
-        role: z.string().default(""),
-        employeeId: z.number().nullable().default(null),
-        employeeSearch: z.string().default(""),
-      }),
-    )
-    .min(1),
+	name: z.string().min(1, "Policy name is required"),
+	description: z.string().optional().default(""),
+	isActive: z.boolean().default(true),
+	priority: z.coerce.number().int().min(1, "Priority must be greater than 0"),
+	docType: z.enum(["pr", "po", "sco"]),
+	subDocType: z
+		.enum([
+			"any",
+			"sale_order",
+			"stock_reorder",
+			"maintenance",
+			"tooling",
+			"subcontracting",
+			"misc",
+		])
+		.or(z.literal(""))
+		.default(""),
+	// isSaleOrderLinked: z.enum(["any", "yes", "no"]).default("any"),
+	minAmountPaise: z.string().optional().default(""),
+	maxAmountPaise: z.string().optional().default(""),
+	autoApprove: z.boolean().default(false),
+	approvalChain: z
+		.array(
+			z.object({
+				approverType: z.enum(["role", "specific"]),
+				role: z.string().default(""),
+				employeeId: z.number().nullable().default(null),
+				employeeSearch: z.string().default(""),
+			}),
+		)
+		.min(1),
 });
 
 export type ApprovalPolicyFormInput = z.infer<typeof approvalPolicyFormSchema>;

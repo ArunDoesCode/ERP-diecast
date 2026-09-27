@@ -106,12 +106,19 @@ export function GrnQaDecisionModal({
 
 				<div className="space-y-4 px-6 py-5">
 					<div>
-						<label className="mb-1 block text-xs font-medium">Decision</label>
+						<label
+							htmlFor="grn-qa-decision"
+							className="mb-1 block text-xs font-medium"
+						>
+							Decision
+						</label>
 						<Select
 							value={decision}
-							onValueChange={(value) => setDecision(value as "accept" | "reject")}
+							onValueChange={(value) =>
+								setDecision(value as "accept" | "reject")
+							}
 						>
-							<SelectTrigger className="w-full">
+							<SelectTrigger id="grn-qa-decision" className="w-full">
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent>
@@ -123,10 +130,14 @@ export function GrnQaDecisionModal({
 
 					{decision === "accept" ? (
 						<div>
-							<label className="mb-1 block text-xs font-medium">
+							<label
+								htmlFor="grn-qa-accepted-qty"
+								className="mb-1 block text-xs font-medium"
+							>
 								Accepted qty
 							</label>
 							<Input
+								id="grn-qa-accepted-qty"
 								type="number"
 								min={0}
 								value={acceptedQty}
@@ -135,10 +146,14 @@ export function GrnQaDecisionModal({
 						</div>
 					) : (
 						<div>
-							<label className="mb-1 block text-xs font-medium">
+							<label
+								htmlFor="grn-qa-rejected-qty"
+								className="mb-1 block text-xs font-medium"
+							>
 								Rejected qty
 							</label>
 							<Input
+								id="grn-qa-rejected-qty"
 								type="number"
 								min={0}
 								value={rejectedQty}
@@ -156,10 +171,14 @@ export function GrnQaDecisionModal({
 					) : null}
 
 					<div>
-						<label className="mb-1 block text-xs font-medium">
+						<label
+							htmlFor="grn-qa-certificate-url"
+							className="mb-1 block text-xs font-medium"
+						>
 							Certificate URL
 						</label>
 						<Input
+							id="grn-qa-certificate-url"
 							value={certificateUrl}
 							onChange={(event) => setCertificateUrl(event.target.value)}
 							placeholder="Optional QA certificate link"
@@ -167,8 +186,14 @@ export function GrnQaDecisionModal({
 					</div>
 
 					<div>
-						<label className="mb-1 block text-xs font-medium">Remarks</label>
+						<label
+							htmlFor="grn-qa-remarks"
+							className="mb-1 block text-xs font-medium"
+						>
+							Remarks
+						</label>
 						<Textarea
+							id="grn-qa-remarks"
 							value={remarks}
 							onChange={(event) => setRemarks(event.target.value)}
 							placeholder="Optional"
@@ -184,7 +209,11 @@ export function GrnQaDecisionModal({
 					>
 						Cancel
 					</Button>
-					<Button type="button" disabled={mutation.isPending} onClick={onSubmit}>
+					<Button
+						type="button"
+						disabled={mutation.isPending}
+						onClick={onSubmit}
+					>
 						Submit decision
 					</Button>
 				</DialogFooter>

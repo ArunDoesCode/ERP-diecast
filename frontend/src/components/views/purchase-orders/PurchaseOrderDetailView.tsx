@@ -908,7 +908,7 @@ function CreatePOModal({
 				<div className="max-h-[70vh] space-y-5 overflow-y-auto px-6 py-5">
 					<div className="grid gap-3 md:grid-cols-[1fr_10rem_1fr]">
 						<div>
-							<label className="mb-1 block text-xs font-medium">Supplier</label>
+							<span className="mb-1 block text-xs font-medium">Supplier</span>
 							<SearchableSelect
 								value={supplierId ? String(supplierId) : undefined}
 								options={supplierOptions}
@@ -922,8 +922,14 @@ function CreatePOModal({
 							/>
 						</div>
 						<div>
-							<label className="mb-1 block text-xs font-medium">Terms</label>
+							<label
+								htmlFor="po-create-payment-terms-days"
+								className="mb-1 block text-xs font-medium"
+							>
+								Terms
+							</label>
 							<Input
+								id="po-create-payment-terms-days"
 								type="number"
 								min={0}
 								value={paymentTermsDays}
@@ -931,10 +937,14 @@ function CreatePOModal({
 							/>
 						</div>
 						<div>
-							<label className="mb-1 block text-xs font-medium">
+							<label
+								htmlFor="po-create-expected-delivery-date"
+								className="mb-1 block text-xs font-medium"
+							>
 								Delivery date
 							</label>
 							<Input
+								id="po-create-expected-delivery-date"
 								type="date"
 								value={expectedDeliveryDate}
 								onChange={(event) =>
@@ -976,18 +986,28 @@ function CreatePOModal({
 
 					<div className="grid gap-3 md:grid-cols-2">
 						<div>
-							<label className="mb-1 block text-xs font-medium">
+							<label
+								htmlFor="po-create-delivery-terms"
+								className="mb-1 block text-xs font-medium"
+							>
 								Delivery terms
 							</label>
 							<Input
+								id="po-create-delivery-terms"
 								value={deliveryTerms}
 								onChange={(event) => setDeliveryTerms(event.target.value)}
 								placeholder="Door delivery, pickup, freight included"
 							/>
 						</div>
 						<div>
-							<label className="mb-1 block text-xs font-medium">Notes</label>
+							<label
+								htmlFor="po-create-notes"
+								className="mb-1 block text-xs font-medium"
+							>
+								Notes
+							</label>
 							<Textarea
+								id="po-create-notes"
 								value={notes}
 								onChange={(event) => setNotes(event.target.value)}
 								placeholder="Optional"
@@ -1114,12 +1134,16 @@ function CreatePOLine({
 			</div>
 
 			<div>
-				<label className="mb-1 block text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase">
+				<label
+					htmlFor={`po-create-line-rate-${line.id}`}
+					className="mb-1 block text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase"
+				>
 					Negotiated rate
 				</label>
 				<div className="relative">
 					<IconCurrencyRupee className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
 					<Input
+						id={`po-create-line-rate-${line.id}`}
 						type="number"
 						min={0}
 						step={1}

@@ -2,10 +2,9 @@
 
 These are native [Claude Code subagents](https://code.claude.com/docs/en/sub-agents) — plain
 markdown files with YAML frontmatter (`name`, `description`, `tools`) plus a system prompt body.
-They mirror the roster in [`.github/agents/`](../../.github/agents/) (GitHub Copilot's format)
-and [`.claude/skills/ponytail`](../skills/ponytail/SKILL.md) / [`cavecrew`](../skills/cavecrew/SKILL.md)
-(routing skills for the main thread). Keep behavior in sync across all three when editing prompts —
-each platform needs its own tool names, but the routing rules and constraints should match.
+They pair with [`.claude/skills/ponytail`](../skills/ponytail/SKILL.md) / [`cavecrew`](../skills/cavecrew/SKILL.md)
+(routing skills for the main thread). Keep behavior in sync across both when editing prompts.
+Workflow-level agents (spec-analyst, test-writer, spec-reviewer) live in the repo-root `.claude/agents/`.
 
 Claude Code discovers any `.md` file in `.claude/agents/` automatically; `name:` is what you pass
 as `subagent_type` to the `Agent` tool, and the `description:` is what the main thread's

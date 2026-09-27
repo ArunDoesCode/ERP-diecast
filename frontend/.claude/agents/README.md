@@ -2,11 +2,11 @@
 
 These are native [Claude Code subagents](https://code.claude.com/docs/en/sub-agents) — plain
 markdown files with YAML frontmatter (`name`, `description`, `tools`) plus a system prompt
-body. They mirror the roster in [`.github/agents/`](../../.github/agents/) (GitHub Copilot's
-format, kept for reference — not touched by this migration) and the backend's own
+body. They mirror the backend's own
 [`../backend/.claude/agents/`](../../../backend/.claude/agents/) roster. Keep behavior in sync
 across the two when editing prompts — each side needs its own tool names and contract-lookup
-commands, but the routing rules and constraints should match.
+commands, but the routing rules and constraints should match. Workflow-level agents
+(spec-analyst, test-writer, spec-reviewer) live in the repo-root `.claude/agents/`.
 
 Claude Code discovers any `.md` file in `.claude/agents/` automatically; `name:` is what you
 pass as `subagent_type` to the `Agent` tool, and `description:` is what auto-delegation

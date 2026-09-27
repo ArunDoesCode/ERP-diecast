@@ -1,4 +1,7 @@
-import type { ApiResult, PaginatedResponse } from "@/types/purchase-requisitions";
+import type {
+	ApiResult,
+	PaginatedResponse,
+} from "@/types/purchase-requisitions";
 
 export const grnStatusValues = [
 	"draft",

@@ -106,7 +106,9 @@ export function CreateGrnModal({
 		>
 			<DialogContent className="min-w-[min(56rem,calc(100vw-2rem))] gap-0 p-0">
 				<DialogHeader className="border-b px-6 py-5">
-					<DialogTitle>Receive goods · {po?.poNumber ?? `PO #${poId}`}</DialogTitle>
+					<DialogTitle>
+						Receive goods · {po?.poNumber ?? `PO #${poId}`}
+					</DialogTitle>
 					<DialogDescription>
 						Record what physically arrived against this PO's remaining lines.
 					</DialogDescription>
@@ -122,47 +124,67 @@ export function CreateGrnModal({
 						<div className="max-h-[70vh] space-y-5 overflow-y-auto px-6 py-5">
 							<div className="grid gap-3 md:grid-cols-3">
 								<div>
-									<label className="mb-1 block text-xs font-medium">
+									<label
+										htmlFor="grn-create-challan-no"
+										className="mb-1 block text-xs font-medium"
+									>
 										Challan no
 									</label>
 									<Input
+										id="grn-create-challan-no"
 										value={challanNo}
 										onChange={(event) => setChallanNo(event.target.value)}
 									/>
 								</div>
 								<div>
-									<label className="mb-1 block text-xs font-medium">
+									<label
+										htmlFor="grn-create-challan-date"
+										className="mb-1 block text-xs font-medium"
+									>
 										Challan date
 									</label>
 									<Input
+										id="grn-create-challan-date"
 										type="date"
 										value={challanDate}
 										onChange={(event) => setChallanDate(event.target.value)}
 									/>
 								</div>
 								<div>
-									<label className="mb-1 block text-xs font-medium">
+									<label
+										htmlFor="grn-create-vehicle-no"
+										className="mb-1 block text-xs font-medium"
+									>
 										Vehicle no
 									</label>
 									<Input
+										id="grn-create-vehicle-no"
 										value={vehicleNo}
 										onChange={(event) => setVehicleNo(event.target.value)}
 									/>
 								</div>
 								<div>
-									<label className="mb-1 block text-xs font-medium">
+									<label
+										htmlFor="grn-create-driver-name"
+										className="mb-1 block text-xs font-medium"
+									>
 										Driver name
 									</label>
 									<Input
+										id="grn-create-driver-name"
 										value={driverName}
 										onChange={(event) => setDriverName(event.target.value)}
 									/>
 								</div>
 								<div>
-									<label className="mb-1 block text-xs font-medium">
+									<label
+										htmlFor="grn-create-driver-phone"
+										className="mb-1 block text-xs font-medium"
+									>
 										Driver phone
 									</label>
 									<Input
+										id="grn-create-driver-phone"
 										value={driverPhone}
 										onChange={(event) => setDriverPhone(event.target.value)}
 									/>
@@ -170,10 +192,14 @@ export function CreateGrnModal({
 							</div>
 
 							<div>
-								<label className="mb-1 block text-xs font-medium">
+								<label
+									htmlFor="grn-create-remarks"
+									className="mb-1 block text-xs font-medium"
+								>
 									Remarks
 								</label>
 								<Textarea
+									id="grn-create-remarks"
 									value={remarks}
 									onChange={(event) => setRemarks(event.target.value)}
 									placeholder="Optional"
@@ -203,10 +229,14 @@ export function CreateGrnModal({
 											</p>
 										</div>
 										<div>
-											<label className="mb-1 block text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase">
+											<label
+												htmlFor={`grn-create-arrived-qty-${item.id}`}
+												className="mb-1 block text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase"
+											>
 												Arrived qty
 											</label>
 											<Input
+												id={`grn-create-arrived-qty-${item.id}`}
 												type="number"
 												min={0}
 												max={remainingQty(item)}

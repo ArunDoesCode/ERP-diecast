@@ -123,9 +123,7 @@ function DetailHeader({
 		<div className="flex flex-col gap-3 border-b pb-4 lg:flex-row lg:items-end lg:justify-between">
 			<div>
 				<div className="flex flex-wrap items-center gap-2">
-					<h2 className="font-heading text-xl font-medium">
-						{grn.grnNumber}
-					</h2>
+					<h2 className="font-heading text-xl font-medium">{grn.grnNumber}</h2>
 					<Badge variant={badgeStyle.variant} className={badgeStyle.className}>
 						{humanizeStatusLabel(grn.status)}
 					</Badge>

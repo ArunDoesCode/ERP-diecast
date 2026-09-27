@@ -116,47 +116,67 @@ export function EditGrnModal({
 						<div className="max-h-[70vh] space-y-5 overflow-y-auto px-6 py-5">
 							<div className="grid gap-3 md:grid-cols-3">
 								<div>
-									<label className="mb-1 block text-xs font-medium">
+									<label
+										htmlFor="grn-edit-challan-no"
+										className="mb-1 block text-xs font-medium"
+									>
 										Challan no
 									</label>
 									<Input
+										id="grn-edit-challan-no"
 										value={challanNo}
 										onChange={(event) => setChallanNo(event.target.value)}
 									/>
 								</div>
 								<div>
-									<label className="mb-1 block text-xs font-medium">
+									<label
+										htmlFor="grn-edit-challan-date"
+										className="mb-1 block text-xs font-medium"
+									>
 										Challan date
 									</label>
 									<Input
+										id="grn-edit-challan-date"
 										type="date"
 										value={challanDate}
 										onChange={(event) => setChallanDate(event.target.value)}
 									/>
 								</div>
 								<div>
-									<label className="mb-1 block text-xs font-medium">
+									<label
+										htmlFor="grn-edit-vehicle-no"
+										className="mb-1 block text-xs font-medium"
+									>
 										Vehicle no
 									</label>
 									<Input
+										id="grn-edit-vehicle-no"
 										value={vehicleNo}
 										onChange={(event) => setVehicleNo(event.target.value)}
 									/>
 								</div>
 								<div>
-									<label className="mb-1 block text-xs font-medium">
+									<label
+										htmlFor="grn-edit-driver-name"
+										className="mb-1 block text-xs font-medium"
+									>
 										Driver name
 									</label>
 									<Input
+										id="grn-edit-driver-name"
 										value={driverName}
 										onChange={(event) => setDriverName(event.target.value)}
 									/>
 								</div>
 								<div>
-									<label className="mb-1 block text-xs font-medium">
+									<label
+										htmlFor="grn-edit-driver-phone"
+										className="mb-1 block text-xs font-medium"
+									>
 										Driver phone
 									</label>
 									<Input
+										id="grn-edit-driver-phone"
 										value={driverPhone}
 										onChange={(event) => setDriverPhone(event.target.value)}
 									/>
@@ -164,10 +184,14 @@ export function EditGrnModal({
 							</div>
 
 							<div>
-								<label className="mb-1 block text-xs font-medium">
+								<label
+									htmlFor="grn-edit-remarks"
+									className="mb-1 block text-xs font-medium"
+								>
 									Remarks
 								</label>
 								<Textarea
+									id="grn-edit-remarks"
 									value={remarks}
 									onChange={(event) => setRemarks(event.target.value)}
 									placeholder="Optional"
@@ -193,10 +217,14 @@ export function EditGrnModal({
 											<p>{item.orderedQty}</p>
 										</div>
 										<div>
-											<label className="mb-1 block text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase">
+											<label
+												htmlFor={`grn-edit-arrived-qty-${item.id}`}
+												className="mb-1 block text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase"
+											>
 												Arrived qty
 											</label>
 											<Input
+												id={`grn-edit-arrived-qty-${item.id}`}
 												type="number"
 												min={0}
 												value={arrivedQty[item.id] ?? ""}

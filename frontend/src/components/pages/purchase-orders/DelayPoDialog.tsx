@@ -89,10 +89,14 @@ export function DelayPoDialog({
 
 				<div className="space-y-4 px-6 py-5">
 					<div>
-						<label className="mb-1 block text-xs font-medium">
+						<label
+							htmlFor="po-delay-revised-delivery-date"
+							className="mb-1 block text-xs font-medium"
+						>
 							Revised delivery date
 						</label>
 						<Input
+							id="po-delay-revised-delivery-date"
 							type="date"
 							value={revisedDeliveryDate}
 							onChange={(event) => setRevisedDeliveryDate(event.target.value)}
@@ -100,10 +104,14 @@ export function DelayPoDialog({
 					</div>
 
 					<div>
-						<label className="mb-1 block text-xs font-medium">
+						<label
+							htmlFor="po-delay-reason"
+							className="mb-1 block text-xs font-medium"
+						>
 							Delay reason
 						</label>
 						<Textarea
+							id="po-delay-reason"
 							value={delayReason}
 							onChange={(event) => setDelayReason(event.target.value)}
 							placeholder="Why is delivery delayed?"
