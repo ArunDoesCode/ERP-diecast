@@ -25,6 +25,11 @@ Type: defect · infra · feature · debt · idea.
 | BL-019 | P2 | defect | purchase-requisition | `pr_item_status` values `ordered`/`closed`/`cancelled` are never written (only `pending`, `po_draft`) — PR lines never advance after PO receipt/close; header status is right via `recomputeHeaderStatusFromItems` (verify in PR spec) | module mapping | 2026-09-27 |
 | BL-021 | P3 | debt | docs | `backend/docs/backend-audit-remediation-2026-07-21.md` partly stale (numbering + delete fixed backend-side) — mark resolved items | module mapping | 2026-09-27 |
 | BL-023 | P3 | debt | approval | `ApprovalPoliciesView` edit-form effect: review deps/reset flow in approval spec (lint fixed by adding `policyForm.reset`) | CI fix | 2026-09-27 |
+| BL-024 | P1 | defect | approval | Policy form labels amounts in ₹ but sends the typed number as paise → ₹50,000 saved as ₹500 (spec draft approval.md §12, verify) | approval spec draft | 2026-09-27 |
+| BL-025 | P1 | defect | purchase-requisition | `prService.update` has no status check and PATCH accepts `status` (`pending_approval`/`cancelled`) → edit after submit, approval bypass (purchase-requisition.md §12, verify) | PR spec draft | 2026-09-27 |
+| BL-026 | P1 | defect | grn | QA accept "already decided" check runs outside the tx without a lock → concurrent accepts double-post stock; `acceptedQty` not bounded by arrived qty; stacked corrections can exceed accepted (grn.md §12, verify) | GRN spec draft | 2026-09-27 |
+| BL-027 | P2 | defect | approval | PO approval reject skips `setStatusCancelled` → PR lines stuck `po_draft`; PO/SCO always match category `any`, SCO amount 0 → seeded tooling/maintenance/SCO policies never match (approval.md §12, verify) | approval spec draft | 2026-09-27 |
+| BL-028 | P2 | defect | purchase-order | Cancelling a PO recomputes PR header without checking PR status → can resurrect a cancelled PR (purchase-requisition.md §12, verify) | PR spec draft | 2026-09-27 |
 
 ## Done
 | ID | Item | PR / commit | Closed |
@@ -40,4 +45,4 @@ Type: defect · infra · feature · debt · idea.
 | BL-022 | Confirmed + fixed: `updateApprovalPolicySchema.subDocType` had `.default("any")` → every PATCH reset it (and an empty PATCH passed). Now optional; amount-only PATCH counts as an update. Regression test `src/types/approval.types.test.ts` | feature/bl-006-test-db | 2026-09-27 |
 | BL-018 | Confirmed + fixed: `authService.refresh` re-reads active employee + role + pages (401 if deactivated — was also refreshing forever). Regression test `src/service/authService.test.ts`. Also fixed test isolation: per-file `disconnectDb()` moved to a global afterAll in the test preload | feature/bl-006-test-db | 2026-09-27 |
 
-Next free id: **BL-024**
+Next free id: **BL-029**
