@@ -122,12 +122,21 @@ export const authService = {
     // Delete old refresh token
     await authRepository.deleteRefreshToken(token.id);
 
+    // Re-read role and pages so role/permission changes and deactivation take
+    // effect on the next refresh, not only after a full re-login (BL-018).
+    const employee = await authRepository.getActiveEmployeeWithRoleById(
+      Number(payload.userId),
+    );
+    if (!employee) {
+      throw new UnauthorizedError("Refresh token invalid");
+    }
+
     // Generate new tokens
     const nextPayload = {
-      userId: payload.userId,
-      userName: payload.userName,
-      role: payload.role,
-      allowedPages: payload.allowedPages,
+      userId: employee.id,
+      userName: employee.name,
+      role: employee.roleName as Role,
+      allowedPages: await authRepository.getPagesByRoleId(employee.roleId),
     };
 
     const newAccessToken = await signAccessToken(nextPayload);
