@@ -38,6 +38,7 @@ Type: defect · infra · feature · debt · idea.
 | BL-035 | P2 | defect | suppliers | Batch-edit catch blocks put raw `error.message` into per-row results → DB error text reaches the UI in a 200 (audit B2) | BL-021 audit | 2026-09-27 |
 | BL-036 | P3 | debt | auth-setup | Access token returned in JSON and stored in localStorage + JS-readable cookie + persisted Zustand (`frontend/src/lib/auth/token.ts`, `auth-session-store.ts`) — XSS exposure (audit B3, deferred) | BL-021 audit | 2026-09-27 |
 | BL-037 | P3 | debt | frontend | `frontend/proxy.ts` fetches `/auth/me` on every navigation although `allowedPages` is in the JWT (audit B4) | BL-021 audit | 2026-09-27 |
+| BL-038 | P2 | infra | repo | Worktree bootstrap: new `.claude/worktrees/*` have no `backend/.env` or `node_modules`, so agents must export env by hand to run `bun test` — add a `scripts/worktree-setup.sh` (copy/symlink `.env`, `bun install` both packages, `db:test:prepare`) and call it from `/feature` | test-writer report (PR #6) | 2026-09-27 |
 
 ## Done
 | ID | Item | PR / commit | Closed |
@@ -50,8 +51,8 @@ Type: defect · infra · feature · debt · idea.
 | BL-009 | Project hooks in `.claude/settings.json`: PostToolUse `biome-format.sh` (biome --write on edited backend/frontend file, unfixable errors fed back), Stop `typecheck-on-stop.sh` (tsc only for packages with changed .ts/.tsx, blocks on errors, loop-safe) | PR #4 | 2026-09-27 |
 | BL-013 | `backend/CLAUDE.md` route/lib/schema/test sections match the code; Supabase leftovers removed from `drizzle.config.ts`, `db/client.ts`, `.env.example` | PR #4 | 2026-09-27 |
 | BL-020 | No change — premise was wrong: `purchase-orders/[prId]` receives a PR id (queue card pushes `pr.id`, view loads PR detail). Module map corrected | PR #4 | 2026-09-27 |
-| BL-022 | Confirmed + fixed: `updateApprovalPolicySchema.subDocType` had `.default("any")` → every PATCH reset it (and an empty PATCH passed). Now optional; amount-only PATCH counts as an update. Regression test `src/types/approval.types.test.ts` | PR #4 | 2026-09-27 |
-| BL-018 | Confirmed + fixed: `authService.refresh` re-reads active employee + role + pages (401 if deactivated — was also refreshing forever). Regression test `src/service/authService.test.ts`. Also fixed test isolation: per-file `disconnectDb()` moved to a global afterAll in the test preload | PR #4 | 2026-09-27 |
+| BL-022 | Confirmed + fixed: `updateApprovalPolicySchema.subDocType` had `.default("any")` → every PATCH reset it (and an empty PATCH passed). Now optional; amount-only PATCH counts as an update. Regression test `src/types/approval.types.test.ts` | PR #4 (fix), PR #6 (tests by test-writer) | 2026-09-27 |
+| BL-018 | Confirmed + fixed: `authService.refresh` re-reads active employee + role + pages (401 if deactivated — was also refreshing forever). Regression test `src/service/authService.test.ts`. Also fixed test isolation: per-file `disconnectDb()` moved to a global afterAll in the test preload | PR #4 (fix), PR #6 (tests by test-writer) | 2026-09-27 |
 | BL-021 | Audit doc statuses verified against code: 13 resolved, 4 partial, 7 open, 1 frontend-only; status block at top. Open items not already tracked → BL-030..BL-037 | PR #4 | 2026-09-27 |
 
-Next free id: **BL-038**
+Next free id: **BL-039**
