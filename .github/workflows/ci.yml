@@ -46,8 +46,8 @@ jobs:
           # Approval-policy seed needs a super-admin employee; add it back with the
           # bootstrap-admin / db:reset scripts (BL-004, BL-005). Tests don't need it.
       - run: bun test
-      - name: Contract manifest
-        run: bun run contract:generate
+      - name: Contract manifest is committed and current
+        run: bun run contract:check
 
   frontend:
     runs-on: ubuntu-latest

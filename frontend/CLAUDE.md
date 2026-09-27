@@ -75,8 +75,10 @@ bun run --cwd ../backend contract:query "<resource or search term>"     # e.g. "
 bun run --cwd ../backend contract:query "<METHOD> /api/<path>"          # full request/response/auth/pagination descriptor
 ```
 
-If `../backend/.contracts/api-manifest.json` is missing or stale, run
-`bun run --cwd ../backend contract:generate` first — it's generated on demand, not committed.
+`../backend/.contracts/api-manifest.json` is committed and CI fails if it is stale
+(`contract:check`). A backend test also fails if any `API_ROUTES` path has no backend route
+(`backend/src/lib/frontend-routes-contract.test.ts`) — so add/rename paths here only to match
+a real backend route.
 These are **read-only** shell commands against the sibling backend package; never edit files
 under `../backend` from this project.
 

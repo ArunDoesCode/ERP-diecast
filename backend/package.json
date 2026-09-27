@@ -15,7 +15,8 @@
     "db:test:prepare": "bun scripts/prepare-test-db.ts",
     "db:seed:approval-policies": "bun scripts/seed-approval-policies.ts",
     "contract:generate": "bun scripts/generate-api-manifest.ts",
-    "contract:query": "bun scripts/query-api-manifest.ts",
+    "contract:check": "bun scripts/generate-api-manifest.ts --check",
+    "contract:query":"bun scripts/query-api-manifest.ts",
     "test": "bun test",
     "test:watch": "bun test --watch"
   },

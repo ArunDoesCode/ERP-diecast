@@ -1,6 +1,5 @@
 const API_Header = {
 	auth: "/auth",
-	files: "/files",
 	setup: "/setup",
 	approval: "/approval",
 	supplier: "/supplier",
@@ -16,9 +15,6 @@ export const API_ROUTES = {
 		logout: `${API_Header.auth}/logout`,
 		me: `${API_Header.auth}/me`,
 		register: `${API_Header.auth}/register`,
-	},
-	files: {
-		presign: `${API_Header.files}/presign`,
 	},
 	// mirrors backend SETUP_ROUTES (list/create/update/remove per resource); :id/:roleId
 	// params become functions here since api.* needs concrete URLs, not placeholders.

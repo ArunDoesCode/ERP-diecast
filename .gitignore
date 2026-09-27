@@ -86,8 +86,8 @@ id_ed25519.pub
 backend/uploads/
 backend/storage/
 
-# --- Generated API contract manifest (see backend/scripts/generate-api-manifest.ts) ---
-backend/.contracts/
+# backend/.contracts/api-manifest.json is generated AND committed (BL-008);
+# CI's `contract:check` fails if it is stale.
 
 # --- Tooling ---
 .turbo/
