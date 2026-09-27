@@ -33,6 +33,7 @@ Type: defect · infra · feature · debt · idea.
 | BL-021 | P3 | debt | docs | `backend/docs/backend-audit-remediation-2026-07-21.md` partly stale (numbering + delete fixed backend-side) — mark resolved items | module mapping | 2026-09-27 |
 | BL-022 | P2 | defect | approval | Backend `updateApprovalPolicySchema` gives `subDocType` `.default("any")` → a PATCH without `subDocType` likely resets it to `any` (UI now always sends it). Needs a test | CI fix | 2026-09-27 |
 | BL-023 | P3 | debt | approval | `ApprovalPoliciesView` edit-form effect: review deps/reset flow in approval spec (lint fixed by adding `policyForm.reset`) | CI fix | 2026-09-27 |
+| BL-024 | P1 | defect | auth-setup | Privilege escalation: an `owner` can register a `super-admin` via `/auth/register` (`routes/auth.ts:49`, `types/auth.types.ts:7-15`); also register doesn't set `createdBy` (`authService.ts:18-51`) | known-defects spec | 2026-09-27 |
 
 ## Done
 | ID | Item | PR / commit | Closed |
@@ -40,4 +41,4 @@ Type: defect · infra · feature · debt · idea.
 | BL-000 | GitHub Actions CI | 0a406f4 | 2026-09-27 |
 | BL-003 | Frontend lint (40 label a11y + format/imports/non-null/deps) + backend format error; `seed_page_access.sql` fixed (stale `::role` casts, duplicate hardcoded super-admin block) | CI-fix commit | 2026-09-27 |
 
-Next free id: **BL-024**
+Next free id: **BL-025**

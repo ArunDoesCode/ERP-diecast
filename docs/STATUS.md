@@ -13,7 +13,7 @@ updated from the ledger), the most serious defect found so far.
 |---|---|---|---|---|---|---|
 | auth-setup | none | [map](modules/auth-setup.md) | full | route-registry only | — | spec in M1 |
 | approval | none | [map](modules/approval.md) | full | approvalRepository.test | — | spec in M1 |
-| purchase-requisition | none | [map](modules/purchase-requisition.md) | full (delete bug BL-001) | none | — | `/spec purchase-requisition` |
+| purchase-requisition | via known-defects (draft) | [map](modules/purchase-requisition.md) | full (delete bug BL-001) | none | — | `/spec purchase-requisition` |
 | purchase-order | none | [map](modules/purchase-order.md) | full | none | — | spec in M1 |
 | grn | none | [map](modules/grn.md) | full | none | — | `/spec grn` (pilot) |
 | inventory | none | [map](modules/inventory.md) | full (stock/avg cost stale BL-014) | none | — | spec with GRN |
@@ -31,6 +31,7 @@ Legend — Spec: none / draft / frozen vN · Code: none / schema only / partial 
 
 ## Waiting on you
 - [ ] Merge PR #2 — enforce test independence in the agent pipeline (CI green)
+- [ ] Answer `known-defects` spec: SME Q1–Q4, assumptions A1–A15, decisions D1–D2 → `/freeze known-defects`
 - [ ] BL-012 blocked: branch protection needs GitHub Pro or a public repo (API 403) — decide: upgrade / keep private + discipline
 - [ ] Maps are 1 commit behind (`5681c94` CI fix, mostly formatting + approval `subDocType`) — `/map --stale` when convenient
 
