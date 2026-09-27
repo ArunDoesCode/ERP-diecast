@@ -23,13 +23,20 @@ Type: defect · infra · feature · debt · idea.
 | BL-016 | P2 | debt | grn | GRN ledger posting (`assetRepository.createInventoryMovement`, own tx) not atomic with grnItems/PO roll-up tx | module mapping | 2026-09-27 |
 | BL-017 | P3 | feature | auth-setup | Operator QR login has no route — QR token issuance exists (`qr-token.ts`, `employeeService.regenerateQr`) but `/auth/login` is email+password only. Needed for floor PWA (later milestone) | module mapping (verified) | 2026-09-27 |
 | BL-019 | P2 | defect | purchase-requisition | `pr_item_status` values `ordered`/`closed`/`cancelled` are never written (only `pending`, `po_draft`) — PR lines never advance after PO receipt/close; header status is right via `recomputeHeaderStatusFromItems` (verify in PR spec) | module mapping | 2026-09-27 |
-| BL-021 | P3 | debt | docs | `backend/docs/backend-audit-remediation-2026-07-21.md` partly stale (numbering + delete fixed backend-side) — mark resolved items | module mapping | 2026-09-27 |
 | BL-023 | P3 | debt | approval | `ApprovalPoliciesView` edit-form effect: review deps/reset flow in approval spec (lint fixed by adding `policyForm.reset`) | CI fix | 2026-09-27 |
 | BL-024 | P1 | defect | approval | Policy form labels amounts in ₹ but sends the typed number as paise → ₹50,000 saved as ₹500 (spec draft approval.md §12, verify) | approval spec draft | 2026-09-27 |
 | BL-025 | P1 | defect | purchase-requisition | `prService.update` has no status check and PATCH accepts `status` (`pending_approval`/`cancelled`) → edit after submit, approval bypass (purchase-requisition.md §12, verify) | PR spec draft | 2026-09-27 |
 | BL-026 | P1 | defect | grn | QA accept "already decided" check runs outside the tx without a lock → concurrent accepts double-post stock; `acceptedQty` not bounded by arrived qty; stacked corrections can exceed accepted (grn.md §12, verify) | GRN spec draft | 2026-09-27 |
 | BL-027 | P2 | defect | approval | PO approval reject skips `setStatusCancelled` → PR lines stuck `po_draft`; PO/SCO always match category `any`, SCO amount 0 → seeded tooling/maintenance/SCO policies never match (approval.md §12, verify) | approval spec draft | 2026-09-27 |
 | BL-028 | P2 | defect | purchase-order | Cancelling a PO recomputes PR header without checking PR status → can resurrect a cancelled PR (purchase-requisition.md §12, verify) | PR spec draft | 2026-09-27 |
+| BL-029 | P2 | debt | purchase-requisition | `prService.update` writes lines one row at a time (`updatePrItemById`/`createPrItem` in loops) and is one ~200-line function — batch + split (audit P1.2, §4) | BL-021 audit | 2026-09-27 |
+| BL-030 | P2 | debt | suppliers | `editSupplierItems`/`editSupplierServices` run unbounded `Promise.all` (one query per row); batch-edit Zod schemas have no `.max()` (audit S1) | BL-021 audit | 2026-09-27 |
+| BL-031 | P3 | debt | suppliers | `supplierRepository.list` search = OR + ILIKE + EXISTS, no `pg_trgm` indexes (audit S2) | BL-021 audit | 2026-09-27 |
+| BL-032 | P3 | debt | suppliers | Item vs service create/batch-edit in `supplierService.ts` are near-duplicates (audit S4) | BL-021 audit | 2026-09-27 |
+| BL-033 | P2 | defect | purchase-requisition | `prRepository.list` `q` still matches `type::text`/`status::text`; frontend sends status/type through `q` instead of the `status`/`type` params (audit B1) | BL-021 audit | 2026-09-27 |
+| BL-034 | P2 | defect | suppliers | Batch-edit catch blocks put raw `error.message` into per-row results → DB error text reaches the UI in a 200 (audit B2) | BL-021 audit | 2026-09-27 |
+| BL-035 | P3 | debt | auth-setup | Access token returned in JSON and stored in localStorage + JS-readable cookie + persisted Zustand (`frontend/src/lib/auth/token.ts`, `auth-session-store.ts`) — XSS exposure (audit B3, deferred) | BL-021 audit | 2026-09-27 |
+| BL-036 | P3 | debt | frontend | `frontend/proxy.ts` fetches `/auth/me` on every navigation although `allowedPages` is in the JWT (audit B4) | BL-021 audit | 2026-09-27 |
 
 ## Done
 | ID | Item | PR / commit | Closed |
@@ -44,5 +51,6 @@ Type: defect · infra · feature · debt · idea.
 | BL-020 | No change — premise was wrong: `purchase-orders/[prId]` receives a PR id (queue card pushes `pr.id`, view loads PR detail). Module map corrected | feature/bl-006-test-db | 2026-09-27 |
 | BL-022 | Confirmed + fixed: `updateApprovalPolicySchema.subDocType` had `.default("any")` → every PATCH reset it (and an empty PATCH passed). Now optional; amount-only PATCH counts as an update. Regression test `src/types/approval.types.test.ts` | feature/bl-006-test-db | 2026-09-27 |
 | BL-018 | Confirmed + fixed: `authService.refresh` re-reads active employee + role + pages (401 if deactivated — was also refreshing forever). Regression test `src/service/authService.test.ts`. Also fixed test isolation: per-file `disconnectDb()` moved to a global afterAll in the test preload | feature/bl-006-test-db | 2026-09-27 |
+| BL-021 | Audit doc statuses verified against code: 13 resolved, 4 partial, 7 open, 1 frontend-only; status block at top. Open items not already tracked → BL-029..BL-036 | feature/bl-006-test-db | 2026-09-27 |
 
-Next free id: **BL-029**
+Next free id: **BL-037**
