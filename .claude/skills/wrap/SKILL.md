@@ -10,19 +10,24 @@ description: >
 
 Review this session's conversation and produce a short list of candidate entries, each routed to one place:
 
+Route by **scope** — the narrower the scope, the deeper the layer (full table: `docs/KNOWLEDGE.md`):
+
 | Kind | Goes to |
 |---|---|
-| User corrected Claude on a convention / preference (esp. more than once) | `CLAUDE.md` (root if cross-package, else package `CLAUDE.md`) — one line, imperative |
-| Product/architecture decision with a reason | `docs/decisions.md` (date, decision, why, alternatives rejected) |
-| Recurring bug pattern + fix | `frontend/docs/gotchas.md` (or a backend section there) |
+| Trap / quirk in one module | `docs/modules/<module>.md` → Invariants & gotchas |
 | New/changed business rule | the module spec (via `/spec` or `/freeze` change path) — don't edit frozen specs silently |
-| Idea not in current scope | `docs/backlog.md` |
+| Convention for all backend or all frontend code | package `CLAUDE.md`, or the matching skill if it's detailed |
+| How to do one kind of task (lists, forms, endpoints) | the matching skill |
+| Rule that applies to every session everywhere (rare) | root `CLAUDE.md` — one line, imperative |
+| Product/architecture decision with a reason | `docs/decisions.md` (date, decision, why, alternatives rejected) |
+| Idea / defect not in current scope | `docs/backlog.md` with next free `BL-` id |
 | Personal working-style preference (tone, plan format, how much to ask) | Claude memory |
-| Progress on BRs | spec "Implementation status" table |
+| Progress, what's next | `docs/STATUS.md` |
 
 Rules:
 - Show the list to the user first; write only what they accept.
 - Deduplicate: search the target file before adding; update an existing line rather than adding a near-copy.
-- Keep `CLAUDE.md` files lean — if a root/package CLAUDE.md passes ~150 lines, propose moving detail into a
-  skill or doc and linking it.
-- Finish with: what's the next slice / next step, in one line, so the next session can start with it.
+- Budgets (`docs/KNOWLEDGE.md`): root `CLAUDE.md` ≤ 100 lines, package ≤ 150, map ≤ 250. Over budget →
+  propose moving detail down a layer and leaving a one-line pointer.
+- Finish by updating `docs/STATUS.md` **Next action** (one concrete command) so the next session — or
+  `/status` — starts from it.

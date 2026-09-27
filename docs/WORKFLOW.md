@@ -72,8 +72,17 @@ gets a full re-audit.
 ### One-time setup
 1. `brew install gh && gh auth login` (the pipeline creates PRs and reads comments with `gh`).
 2. GitHub → Settings → Branches → protect `main`: require PR + CI (`backend`, `frontend` jobs) to pass.
-3. Permissions so the pipeline doesn't stop for every command: allow `git`, `gh`, `bun`, `bunx`,
-   `docker compose` in `.claude/settings.json` (or run `/fewer-permission-prompts` after a first run).
+3. Permissions: `.claude/settings.json` (committed) allows the git/gh/bun/docker commands the pipeline needs
+   and **denies** force-push, pushing to `main`, `gh pr merge` (merging is yours), hard reset, `rm -rf` and
+   reading `.env`. Add more with `/fewer-permission-prompts` after a first run.
+
+### Documentation & picking up work
+- **Pick up:** `/status` (or open `docs/STATUS.md`) — what's waiting on you, active pipelines, next action.
+- **Specs** (`docs/specs/`) say what should happen; **module maps** (`docs/modules/`) say what the code does
+  and where; **backlog** (`docs/backlog.md`, `BL-NNN`) holds everything deferred. All three are updated in
+  the same PR as the code, so `main` is always documented.
+- Agents read the map and only explore code changed since its `last_verified_commit` — no full re-exploration.
+- How knowledge is layered and how it scales as the codebase grows: `docs/KNOWLEDGE.md`.
 4. Fix the known defects in `docs/backlog.md` first (a good first `/feature` run), otherwise CI starts red.
 
 ---

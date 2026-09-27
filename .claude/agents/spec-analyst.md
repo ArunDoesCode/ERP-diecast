@@ -21,7 +21,10 @@ rules nobody wrote down. Your job is to surface those rules *before* code exists
 
 ## Process
 1. **Read context first**
-   - `CLAUDE.md` (root), `docs/decisions.md`, existing `docs/specs/*.md` (modules depend on each other).
+   - `CLAUDE.md` (root), `docs/decisions.md`, existing `docs/specs/*.md` (modules depend on each other),
+     `docs/backlog.md` items for this module (pull relevant ones into the spec, cite their BL ids).
+   - The module map `docs/modules/<module>.md` if it exists — it already describes the code (tables,
+     statuses, endpoints, flows, known gaps). Read code only to confirm or where the map is silent.
    - The schema for the module: `backend/src/db/schemas/02_procurement-*.ts` (use codegraph with
      `projectPath: backend` or Grep). Note every enum/status and column — they are implicit rules.
    - Existing routes/services for the module if any (`backend/src/routes/end-points.ts`, `backend/src/service/`).

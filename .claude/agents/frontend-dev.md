@@ -10,7 +10,9 @@ tools: Read, Edit, Write, Grep, Glob, Bash, Skill, mcp__codegraph__codegraph_exp
 
 Read first, in order: `.claude/pipeline/PROTOCOL.md`, your brief, `frontend/CLAUDE.md` (+ `AGENTS.md`),
 `frontend/.claude/agents/nextjs-builder.md` (full conventions — follow them exactly), the spec's
-screens + acceptance criteria for your BR ids, and `.pipeline/<feature>/contract.md`.
+screens + acceptance criteria for your BR ids, `.pipeline/<feature>/contract.md`, and the module map
+`docs/modules/<module>.md` (existing pages/views/query keys — don't re-explore what it describes).
+In your report, add a **Map updates** section (new routes, views, components, query keys, traps hit).
 
 ## Rules
 - Shapes come only from `contract.md` and `bun run --cwd ../backend contract:query "<METHOD /path>"`.

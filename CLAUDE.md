@@ -19,17 +19,20 @@ behaviour are allowed via `/bug`, but a bug that reveals a missing rule becomes 
 **Scope rule:** ideas that are not in the frozen spec go to `docs/backlog.md` (one line), never into the
 current build. Don't "also add" things.
 
-## Where knowledge lives
+## Where knowledge lives (layered — details and budgets in `docs/KNOWLEDGE.md`)
 | File | Contains |
 |---|---|
-| `docs/specs/<module>.md` | Business behaviour: states, numbered rules `BR-<MOD>-NN`, acceptance criteria |
-| `docs/decisions.md` | Architecture/product decisions with the why (append-only) |
-| `docs/backlog.md` | Deferred ideas + change requests |
-| `docs/uat-log.md` | Bugs found by the factory during UAT |
-| `frontend/docs/gotchas.md` | Recurring bug patterns and fixes |
-| `backend/CLAUDE.md`, `frontend/CLAUDE.md` | Tech conventions per package |
+| `docs/STATUS.md` | **Start here.** Where every module stands, active pipelines, what's waiting, next action |
+| `docs/modules/<module>.md` | As-built map: code locations, data model, API, flows, module gotchas, history |
+| `docs/specs/<module>.md` | Should-be behaviour: states, rules `BR-<MOD>-NN`, acceptance criteria |
+| `docs/backlog.md` | Deferred ideas, defects, change requests (`BL-NNN`) |
+| `docs/decisions.md` | Decisions with the why (append-only) |
+| `docs/uat-log.md` | Factory UAT bugs |
+| package `CLAUDE.md` + skills | Tech conventions per package / per kind of task |
 
-If the user corrects you on the same thing twice, write it into the right file above (ask which if unclear).
+**Before touching a module, read its map; explore only code changed since the map's
+`last_verified_commit`.** Module-specific learnings go in the map, not in CLAUDE.md. If the user corrects
+you on the same thing twice, write it down at the narrowest layer that fits.
 
 ## Commands (repo-root `.claude/skills/`)
 You (with Claude): `/spec <module>` → SME answers → `/freeze <module>`  ← last step you must be present for
@@ -37,7 +40,8 @@ Autonomous (Opus coordinator = main session, `claude --model opus`):
 - `/feature <module>` — plan → branch/worktree → build → review+security+perf+spec audit → tests → fix loop → PR
 - `/epic <module>` — large feature: split into sub-features, epic branch, one `/feature` + PR per sub-feature
 - `/watch-prs` — run as `/loop 10m /watch-prs`; picks up your PR comments and merges, re-runs the loop
-Manual helpers: `/slice` (one slice, you in the loop), `/bug`, `/wrap`.
+Pick-up & knowledge: `/status` (where are we, next action), `/map <module>` / `/map --stale` (module maps),
+`/wrap` (end of session). Manual helpers: `/slice` (one slice, you in the loop), `/bug`.
 
 Pipeline agents (repo-root `.claude/agents/`, model pinned): explorer (haiku), backend-dev, frontend-dev,
 test-writer, code-reviewer, security-auditor, performance-auditor, spec-reviewer (sonnet), test-runner (haiku),

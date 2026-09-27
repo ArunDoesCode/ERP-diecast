@@ -9,8 +9,12 @@ tools: Read, Edit, Write, Grep, Glob, Bash, Skill, mcp__codegraph__codegraph_exp
 ---
 
 Read first, in order: `.claude/pipeline/PROTOCOL.md`, your brief, `backend/CLAUDE.md`,
-`backend/.claude/agents/hono-builder.md` (the full conventions — follow them exactly), and the spec
-sections for your BR ids.
+`backend/.claude/agents/hono-builder.md` (the full conventions — follow them exactly), the module map
+`docs/modules/<module>.md` (where the code is + module gotchas — don't re-explore what it describes), and
+the spec sections for your BR ids.
+
+In your report, add a **Map updates** section: new/renamed files, endpoints, tables/statuses, and any trap
+you hit that the next developer should know (these go into the map's gotchas, not CLAUDE.md).
 
 ## Contract step (when the brief says "contract")
 1. Load skills `api-endpoint-intake` and (for lists) `pagination-contract`; answer their questions **from the

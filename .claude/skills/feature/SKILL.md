@@ -26,11 +26,16 @@ limit hit, (c) the PR is ready. Everything else you decide and record.
 4. Worktree: `git worktree add -b feature/<id> .claude/worktrees/<id> <base>` then EnterWorktree with that
    path (on `--resume`: EnterWorktree the existing path; recreate from the remote branch if missing).
 5. Infra: `cd backend && docker compose up -d && bun run db:push`.
-6. Create `.pipeline/<id>/` (state.json, plan.md, findings.md, questions.md). On `--resume` read them.
+6. Create `.pipeline/<id>/` (state.json, plan.md, findings.md, questions.md). On `--resume` read them and
+   continue from `state.json.phase` — never re-plan or re-explore a resumed run.
 7. Baseline: spawn **test-runner** with `mode: baseline` → `reports/00-test-runner-baseline.md`.
+8. Update `docs/STATUS.md` → Active pipelines row (phase: plan).
 
 ## Phase 1 — Plan
-1. Spawn **explorer** (brief: which files/utilities exist for these BRs, patterns to copy).
+Context you load yourself (cheap, no exploring): `docs/STATUS.md`, the spec, `docs/modules/<module>.md`
+(+ maps of `depends_on` modules), backlog items for the module, `docs/decisions.md`.
+1. Spawn **explorer** with a **map-first, diff-only** brief: the map's `last_verified_commit` and paths,
+   plus the questions the map doesn't answer for these BRs. No map yet → run `/map <module>` first.
 2. Write `plan.md`: slices in order (each 2–6 BRs, demo-able), per slice the backend/frontend work, files
    likely touched, new tests. Any ambiguity → try spec + decisions → else ask the user (AskUserQuestion,
    ≤4 questions, options + recommendation). Record answers in `questions.md` **and** in the spec's
@@ -64,7 +69,17 @@ loop:
   If iteration > 3, or the same finding id survives 2 fixes → STOP, summarise to the user, needs input.
 ```
 
-## Phase 4 — PR
+## Phase 4 — Knowledge update, then PR
+0. Before pushing, update the docs **in this branch** so the PR carries code + knowledge together:
+   - `docs/modules/<module>.md` — apply the dev agents' "Map updates", add gotchas learned in the fix loop
+     (recurring findings are the best gotchas), History row, `last_verified_commit` = HEAD.
+   - `docs/specs/<module>.md` — Implementation status table (BR → done + test file).
+   - `docs/backlog.md` — new BL items for everything backlogged during triage (with ids).
+   - `docs/decisions.md` — any decision made while answering BLOCKED questions.
+   - Cross-cutting convention learned (applies to all backend/frontend code) → the package `CLAUDE.md` or
+     matching skill, one line — only if it would have prevented a finding. Respect budgets in `docs/KNOWLEDGE.md`.
+   - `docs/STATUS.md` — module row + Active pipelines (phase: pr).
+   Commit: `docs(<id>): module map, spec status, backlog`.
 1. `git push -u origin feature/<id>`.
 2. `gh pr create --base <base> --head feature/<id> --label agent-pipeline --title "<id>: <summary>"` with body:
    - Spec + version, BR coverage table (BR | enforced at | test)
@@ -94,6 +109,6 @@ loop:
    what changed. Update `lastProcessedCommentAt`.
 
 ## After merge (detected by /watch-prs)
-Mark `state.json` `phase: merged`, remove the worktree (`git worktree remove`), mark BRs done in the spec's
-Implementation status on the base branch (small follow-up commit/PR if base is main), and if part of an
-epic, hand back to `/epic` for the next sub-feature.
+Docs already merged with the PR (Phase 4 step 0). Remove the worktree (`git worktree remove`), note the merge
+in `docs/STATUS.md` "Recently done" (it rides along in the next PR — don't commit to `main`), and if part of
+an epic, hand back to `/epic` for the next sub-feature.
