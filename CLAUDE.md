@@ -31,16 +31,25 @@ current build. Don't "also add" things.
 
 If the user corrects you on the same thing twice, write it into the right file above (ask which if unclear).
 
-## Commands (workflow skills, repo-root `.claude/skills/`)
-- `/spec <module>` — interview + write/extend a spec (draft)
-- `/freeze <module>` — completeness check, then freeze
-- `/slice <module> <BR ids>` — build one vertical slice test-first, backend → contract → frontend → review
-- `/bug <description>` — reproduce → regression test → fix → log
-- `/wrap` — end of session: capture learnings
+## Commands (repo-root `.claude/skills/`)
+You (with Claude): `/spec <module>` → SME answers → `/freeze <module>`  ← last step you must be present for
+Autonomous (Opus coordinator = main session, `claude --model opus`):
+- `/feature <module>` — plan → branch/worktree → build → review+security+perf+spec audit → tests → fix loop → PR
+- `/epic <module>` — large feature: split into sub-features, epic branch, one `/feature` + PR per sub-feature
+- `/watch-prs` — run as `/loop 10m /watch-prs`; picks up your PR comments and merges, re-runs the loop
+Manual helpers: `/slice` (one slice, you in the loop), `/bug`, `/wrap`.
 
-Workflow agents (repo-root `.claude/agents/`): `spec-analyst`, `test-writer`, `spec-reviewer`.
-Implementation agents live per package: `backend/.claude/agents/` (hono-builder, hono-reviewer, ponytail,
-cavecrew-*) and `frontend/.claude/agents/` (nextjs-builder, nextjs-reviewer, ponytail, cavecrew-*).
+Pipeline agents (repo-root `.claude/agents/`, model pinned): explorer (haiku), backend-dev, frontend-dev,
+test-writer, code-reviewer, security-auditor, performance-auditor, spec-reviewer (sonnet), test-runner (haiku),
+spec-analyst (opus). Agents communicate only via the coordinator and `.pipeline/<feature>/` —
+protocol: `.claude/pipeline/PROTOCOL.md`. Package agents (hono-*, nextjs-*) hold the detailed conventions
+the dev/review agents read.
+
+## Git
+- One branch per feature `feature/<id>` (epics: `epic/<name>` + `feature/<name>--<sub>` PRs into it), each
+  in its own worktree under `.claude/worktrees/`. Never commit to `main`; the user merges PRs.
+- Pipeline PRs carry label `agent-pipeline`. Pipeline replies on GitHub start with `🤖`.
+- CI (`.github/workflows/ci.yml`) must be green before a PR is handed to the user.
 
 ## Checks (run before calling anything done)
 - Backend: `cd backend && bun run typecheck && bun run lint && bun test` (needs `docker compose up -d` + `bun run db:push`)

@@ -38,3 +38,15 @@ If a decision is reversed, add a new entry that references the old one — don't
 - **Decision:** order is PR → Approval → PO → GRN → Subcontracting → UAT-1 → BOM spec → Sale Order + BOM
   explosion. BOM explosion reuses the procurement APIs to raise PRs/subcontract orders.
 - **Why:** if procurement isn't validated at the factory, BOM bugs and procurement bugs are indistinguishable.
+
+### D-008 — Autonomous agent pipeline after spec freeze (2026-09-27)
+- **Decision:** after `/freeze`, the main session (Opus) coordinates `/feature` / `/epic`: Sonnet dev,
+  test-writer and 4 reviewer agents, Haiku explorer + test-runner. Hub-and-spoke via
+  `.pipeline/<feature>/` files (`.claude/pipeline/PROTOCOL.md`). One branch + worktree + PR per feature;
+  large features as `epic/<name>` with sub-feature PRs into it. User involved only for questions, manual UI
+  test, merge/comments. PR comments picked up by a local watcher (`/loop 10m /watch-prs`). CI on every PR.
+- **Why:** user wants to be involved only at spec and PR; subagents can't spawn subagents, so the coordinator
+  must be the main session.
+- **Rejected:** GitHub Action (`@claude`) for comments — needs API secret + CI database, costs per run;
+  revisit if the laptop-must-be-on constraint becomes a problem. Package `ponytail` orchestrators — as
+  subagents they can't spawn the agents they route to; kept only as reference.

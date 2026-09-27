@@ -7,66 +7,105 @@ first and a coder second. Rules get written once (in specs, CLAUDE.md, decisions
 have to be re-explained.
 
 ```
- /spec ──► SME answers ──► /freeze ──► /slice … /slice ──► scenario test ──► SME walkthrough ──► DONE
-   ▲                                     │   │                                                   │
-   └──────── spec gap found ◄─── /bug ◄──┘   └── ideas → docs/backlog.md                /wrap ◄──┘
+ YOU ──────────────────────────────┐ AGENTS (autonomous) ───────────────────────┐ YOU ───────────────┐
+ /spec ─► SME answers ─► /freeze ──►│ /feature: plan → build → audit → test → fix │─► PR: UI test ─► merge
+   ▲                                │           ▲______________ loop ___________│      │
+   │                                └─────────────────────────────────────────────┘      ▼
+   └──────── spec gap found ◄── coordinator question ◄── /watch-prs ◄──────────── PR comment
 ```
 
-## Toolkit
-| Command / agent | Use it for |
-|---|---|
-| `/spec <module>` → `spec-analyst` | Benchmark ERPNext/Odoo/SAP B1, interview you, write `docs/specs/<module>.md` |
-| `/freeze <module>` | Completeness check → `status: frozen`; routes change requests to backlog or re-freeze |
-| `/slice <module> <BRs>` | One vertical slice: contract → `test-writer` (red) → `hono-builder` (green) → contract regen → `nextjs-builder` → `spec-reviewer` + code reviewers |
-| `/bug <desc>` | Repro → map to BR → regression test → fix → log |
-| `/wrap` | End of session: corrections/decisions/gotchas/backlog written to the right file |
-| `hono-reviewer`, `nextjs-reviewer` | Code/architecture review per package |
-| `cavecrew-*` | Cheap locate / 1–2 file edits / quick review |
+## Who does what
+| Stage | Who | Command |
+|---|---|---|
+| Spec: interview, rules, SME questions | **you** + spec-analyst (Opus) | `/spec <module>` |
+| Freeze = hand-off | **you** | `/freeze <module>` |
+| Plan, branch, build, audit, test, fix loop, PR | Opus coordinator + Sonnet/Haiku agents | `/feature <module>` or `/epic <module>` |
+| Questions the spec can't answer | coordinator asks **you** | (AskUserQuestion / PR comment) |
+| Manual UI test, review, merge or comment | **you** on GitHub | — |
+| Pick up comments/merges, re-run loop | coordinator | `/loop 10m /watch-prs` |
 
-Launch `claude` from the **repo root** so root `CLAUDE.md`, the workflow agents and skills load. Package
-skills load automatically when you work on files under `backend/` or `frontend/`. If a package agent
-(e.g. `hono-builder`) isn't listed in a root session, `/slice` falls back to a general agent that follows
-the agent file.
+## The autonomous pipeline
+```
+ /freeze ─► /feature <module>        (main session = Opus coordinator)
+   0 preflight: spec frozen? worktree feature/<id> off base, docker up, baseline test-runner
+   1 plan:      explorer(haiku) → plan.md (slices) → questions to you only if spec can't answer
+   2 build:     per slice: test-writer (red) → backend-dev contract → backend-dev ∥ frontend-dev (sonnet)
+   3 verify:  ┌► code-reviewer ∥ security-auditor ∥ performance-auditor ∥ spec-reviewer   (sonnet)
+              │  coordinator triages → fixes routed to backend-dev / frontend-dev / test-writer
+              │  test-runner (haiku): typecheck, lint, tests, contract check vs baseline
+              └─ any blocker/new failure → loop (max 3, then asks you)
+   4 PR:        push → gh pr create (BR coverage, audit summary, manual UI test script) → CI green
+ you: manual UI test ─► merge  ─► /watch-prs: cleanup, next epic sub-feature
+                    └─► comment ─► /watch-prs → /feature --resume --from-pr → phase 3 again → reply 🤖 on PR
+```
+
+### How the agents communicate
+- **Hub and spoke.** Subagents can't spawn subagents or message each other, so the coordinator (your main
+  session) spawns every agent, gives it a **brief** file, and gets back a short status block + a **report**
+  file. Full rules: `.claude/pipeline/PROTOCOL.md`.
+- **Shared state** lives in `.pipeline/<feature>/` on the feature branch: `state.json`, `plan.md`,
+  `contract.md`, `briefs/`, `reports/`, `findings.md`, `questions.md`. It's committed, so a new session (or
+  `/watch-prs` tomorrow) resumes exactly where it left off, and you can read the whole history in the PR.
+- **Backend → frontend** hand-off is the API contract only (`contract.md` + generated manifest). That's
+  what lets backend-dev and frontend-dev run in parallel without drift.
+- **Questions:** an agent that needs a decision returns `BLOCKED` with options; the coordinator answers from
+  the spec/decisions if it can, otherwise asks you, then records the answer in the spec changelog.
+- **File ownership** (backend-dev → `backend/**`, frontend-dev → `frontend/**`, test-writer → tests)
+  prevents parallel agents from editing the same files.
+
+### Models
+| Agent | Model | Why |
+|---|---|---|
+| coordinator (main session), spec-analyst | Opus | judgement: triage, routing, domain reasoning |
+| backend-dev, frontend-dev, test-writer, code-reviewer, security-auditor, performance-auditor, spec-reviewer | Sonnet | strong coding/review at lower cost |
+| explorer, test-runner | Haiku | search and command running — cheap and fast |
+
+Change a model by editing `model:` in `.claude/agents/<name>.md`.
+
+### Really large features (`/epic`)
+Spec → coordinator splits it into ordered sub-features (5–15 BRs each, e.g. `bom-master` →
+`bom-explosion-engine` → `sale-order` → `so-explosion-to-pr`), you approve the split once, then:
+`epic/<name>` branch ← one `feature/<name>--<sub>` branch + PR per sub-feature (full pipeline each). The
+end-to-end scenario test is written first and turns green as sub-features land. Final epic PR into `main`
+gets a full re-audit.
+
+### One-time setup
+1. `brew install gh && gh auth login` (the pipeline creates PRs and reads comments with `gh`).
+2. GitHub → Settings → Branches → protect `main`: require PR + CI (`backend`, `frontend` jobs) to pass.
+3. Permissions so the pipeline doesn't stop for every command: allow `git`, `gh`, `bun`, `bunx`,
+   `docker compose` in `.claude/settings.json` (or run `/fewer-permission-prompts` after a first run).
+4. Fix the known defects in `docs/backlog.md` first (a good first `/feature` run), otherwise CI starts red.
 
 ---
 
 ## Day-to-day routine
 
-### Start of day (10 min)
-1. `git pull`; start infra: `cd backend && docker compose up -d`.
-2. Open `docs/backlog.md` + current spec's "Implementation status" → pick **one** slice for the session.
-3. `claude` at repo root → "Read CLAUDE.md and docs/specs/<module>.md. Next slice: BR-… Use /slice."
+### Morning (10 min)
+1. Check GitHub: PRs labelled `agent-pipeline` waiting for you → manual UI test (script is in the PR body).
+   Merge, or leave review comments.
+2. `claude --model opus` at repo root → `/loop 10m /watch-prs` in one session (it picks up your comments).
+3. In another session: `/spec` the **next** module (your thinking time with spec-analyst), or `/freeze`
+   one whose SME answers came back → then `/feature <module>` and let it run.
 
-### Build block (per slice, 1–3 h)
-1. `/slice <module> <BRs>` — approve the plan it shows (plan mode). Read the plan; it's the cheapest place
-   to catch a misunderstanding.
-2. Let it run tests red → green. Read FAIL-BUG results carefully — those are real bugs in existing code.
-3. Manual click-through it proposes: golden path + one negative path, logged in as the right role.
-4. Commit (one slice = one commit/branch). `/clear` before the next slice — fresh context beats long context.
-
-### Thinking block (while things run, or 30 min/day)
-- Work on the *next* module's spec with `/spec` — this is where you gain functional knowledge.
-  Ask it: "What will a stores clerk / purchase manager / accountant expect from this that I haven't thought of?"
-- Collect SME questions; send them to the factory in one batch (WhatsApp/printed), not one by one.
+### During the day
+- Answer coordinator questions when they come (it only asks what the spec can't answer).
+- Manual test ready PRs: `cd .claude/worktrees/<id>` → run backend + frontend → follow the checklist.
+  Comment precisely: "Step 4: expected X, got Y" — the watcher turns each comment into a finding.
+- Anything new you think of → `docs/backlog.md`, not a PR comment (comments = bugs/spec mismatches).
 
 ### End of day (5 min)
-- `/wrap` — accept what should be remembered. This is what stops you repeating preferences.
-- Anything you thought of mid-build that isn't in the spec → `docs/backlog.md`.
+- `/wrap` in the sessions you interacted with (captures preferences so you stop repeating them).
+- Stop the watcher loop.
 
-### Weekly (30–45 min, e.g. Friday)
-- Triage backlog: promote, defer or delete.
-- Review root/package `CLAUDE.md` size and correctness (fix drift, e.g. `backend/CLAUDE.md` route list).
-- Run the full scenario tests + full manual golden path on a fresh DB.
-- Two numbers to track: *times you corrected Claude on the same thing* and *bugs found by the factory vs by
-  tests*. Both should go down.
+### Weekly (30–45 min)
+- Backlog triage; check `findings.md` of merged features for recurring issues → add rules to CLAUDE.md
+  or reviewer agents so they're caught earlier next time.
+- Track: repeated corrections, pipeline loops that hit the limit, bugs found by you vs by agents.
 
 ### Rules of thumb
-- **Two-strikes rule**: corrected the agent twice on the same thing → say "add this to CLAUDE.md" (or `/wrap`).
-- One module in build at a time; the next one in spec at the same time is fine.
-- Backend and frontend of the same slice in the **same session** (after the contract) — never split them
-  across days, that's where drift comes from.
-- Use worktrees if you run two agents in parallel; merge only green branches.
-- Don't let an agent "also improve" things. Out-of-slice findings → backlog.
+- **Two-strikes rule**: corrected the same thing twice → it goes into CLAUDE.md or an agent file.
+- The better the spec, the less the pipeline asks you. Spend time on `/spec`, not on reviewing code.
+- If the coordinator stops at the loop limit, the cause is almost always a spec gap — fix the spec.
 
 ---
 
@@ -131,10 +170,11 @@ QA accept/reject lines → check inventory movements + item stock. Note anything
 ### Starting any new module (checklist)
 1. `/spec <module>` — include dependencies (`depends_on`) and what existing APIs it reuses.
 2. SME questions answered → `/freeze <module>`.
-3. Break the spec into slices (ask: "propose slices in build order, each 2–6 BRs, each demo-able").
-4. `/slice` each one; `/clear` between slices; `/wrap` at the end of the day.
-5. Scenario test for the module's full flow.
-6. SME walkthrough → fix → spec "Implementation status" all done → module DONE.
+3. ≤15 BRs → `/feature <module>`; bigger → `/epic <module>` (approve the split once).
+4. Keep `/loop 10m /watch-prs` running; answer questions; manual-test each PR; merge or comment.
+5. Epic: the scenario test for the full flow must be green before the epic PR into `main`.
+6. SME walkthrough → fix via PR comments → spec "Implementation status" all done → module DONE.
+Prefer `/slice` (manual, you in the loop) only for small experiments or when you want to learn the code.
 
 ### Scope discipline
 - The frozen spec is the scope. New ideas → backlog, reviewed weekly, never mid-slice.

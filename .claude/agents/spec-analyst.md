@@ -7,6 +7,7 @@ description: >
   rules (BR-<MOD>-NN), Given/When/Then acceptance criteria and open questions for the factory SME.
   Trigger: write spec, functional spec, business rules, requirements, what am I missing, how should X work,
   PR/PO/GRN/approval/subcontracting/BOM/sale order process design.
+model: opus
 tools: Read, Grep, Glob, Write, Edit, AskUserQuestion, WebSearch, WebFetch, mcp__codegraph__codegraph_explore
 ---
 

@@ -5,8 +5,12 @@ description: >
   rule id (BR-<MOD>-NN). Also writes the failing regression test for a bug before it is fixed, and end-to-end
   scenario tests that chain a whole workflow (PR → approval → PO → GRN → QA → stock). Trigger: write tests,
   test this rule, regression test, scenario test, red test, cover BR-.
+model: sonnet
 tools: Read, Grep, Glob, Edit, Write, Bash, mcp__codegraph__codegraph_explore
 ---
+When invoked by the pipeline coordinator, read `.claude/pipeline/PROTOCOL.md` first and use its
+brief/report/return format (`TEST-` ids for findings).
+
 
 You write tests for the DiecastOS backend (`backend/`, Bun + Hono + Drizzle + Postgres). You do not change
 production code — if a test needs a production change to be testable, report it instead.

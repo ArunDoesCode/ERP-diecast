@@ -18,7 +18,9 @@ a spec via `/spec` and frozen. Format: `- [ ] <module>: <idea> — why — raise
 - [ ] backend: export `createApp()` from `src/index.ts` so HTTP tests get the real error handler
 - [ ] repo: commit `backend/.contracts/api-manifest.json` (currently gitignored) and a test that every
       frontend `API_ROUTES` path exists in it
-- [ ] repo: GitHub Actions CI — typecheck + lint + backend tests
+- [x] repo: GitHub Actions CI — typecheck + lint + backend tests (`.github/workflows/ci.yml`, 2026-09-27)
+- [ ] repo: protect `main` on GitHub — require PR + CI jobs `backend` and `frontend`
+- [ ] repo: `.claude/settings.json` allowlist (git, gh, bun, bunx, docker compose) so the pipeline runs unattended
 - [ ] repo: Claude Code hooks — biome on edited file, typecheck on stop
 - [ ] frontend: Playwright for 5–8 golden paths
 
