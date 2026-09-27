@@ -24,7 +24,6 @@ Type: defect · infra · feature · debt · idea.
 | BL-017 | P3 | feature | auth-setup | Operator QR login has no route — QR token issuance exists (`qr-token.ts`, `employeeService.regenerateQr`) but `/auth/login` is email+password only. Needed for floor PWA (later milestone) | module mapping (verified) | 2026-09-27 |
 | BL-018 | P2 | defect | auth-setup | Token refresh reuses old JWT `role`/`allowedPages` instead of re-reading DB — permission changes apply only after re-login | module mapping | 2026-09-27 |
 | BL-019 | P2 | defect | purchase-requisition | `pr_item_status` values `ordered`/`closed`/`cancelled` are never written (only `pending`, `po_draft`) — PR lines never advance after PO receipt/close; header status is right via `recomputeHeaderStatusFromItems` (verify in PR spec) | module mapping | 2026-09-27 |
-| BL-020 | P3 | debt | purchase-order | Frontend PO detail route named `purchase-orders/[prId]` but param is a PO id — rename | module mapping | 2026-09-27 |
 | BL-021 | P3 | debt | docs | `backend/docs/backend-audit-remediation-2026-07-21.md` partly stale (numbering + delete fixed backend-side) — mark resolved items | module mapping | 2026-09-27 |
 | BL-022 | P2 | defect | approval | Backend `updateApprovalPolicySchema` gives `subDocType` `.default("any")` → a PATCH without `subDocType` likely resets it to `any` (UI now always sends it). Needs a test | CI fix | 2026-09-27 |
 | BL-023 | P3 | debt | approval | `ApprovalPoliciesView` edit-form effect: review deps/reset flow in approval spec (lint fixed by adding `policyForm.reset`) | CI fix | 2026-09-27 |
@@ -39,5 +38,6 @@ Type: defect · infra · feature · debt · idea.
 | BL-008 | `backend/.contracts/api-manifest.json` committed (deterministic, no timestamp) + CI `contract:check`; `frontend-routes-contract.test.ts` fails on any `API_ROUTES` path without a backend route (`KNOWN_GAPS` allowlist, BL-001 only); removed dead frontend `files.presign` (no backend route, unused) | feature/bl-006-test-db | 2026-09-27 |
 | BL-009 | Project hooks in `.claude/settings.json`: PostToolUse `biome-format.sh` (biome --write on edited backend/frontend file, unfixable errors fed back), Stop `typecheck-on-stop.sh` (tsc only for packages with changed .ts/.tsx, blocks on errors, loop-safe) | feature/bl-006-test-db | 2026-09-27 |
 | BL-013 | `backend/CLAUDE.md` route/lib/schema/test sections match the code; Supabase leftovers removed from `drizzle.config.ts`, `db/client.ts`, `.env.example` | feature/bl-006-test-db | 2026-09-27 |
+| BL-020 | No change — premise was wrong: `purchase-orders/[prId]` receives a PR id (queue card pushes `pr.id`, view loads PR detail). Module map corrected | feature/bl-006-test-db | 2026-09-27 |
 
 Next free id: **BL-024**
