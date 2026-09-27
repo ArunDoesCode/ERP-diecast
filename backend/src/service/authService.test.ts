@@ -1,8 +1,16 @@
 /**
- * BL-018 regression: POST /auth/refresh must re-read the employee's role and
- * allowed pages from the DB, not copy them from the old token — otherwise a
- * role change or deactivation only takes effect after the next full login.
- * Real-DB test (test database, see bunfig.toml preload).
+ * docs/specs/auth-setup.md
+ * BR-AUTH-01 — Refreshing a session issues an access token whose `role` and
+ *   `allowedPages` are the employee's current role and that role's current
+ *   page grants in the database — never values copied from the previous
+ *   token.
+ * BR-AUTH-02 — An employee who is inactive (isActive = false) at refresh
+ *   time cannot refresh: the request is rejected as unauthorised (401) and
+ *   no new tokens are issued.
+ *
+ * Real-DB test (test database, see bunfig.toml preload). Written by
+ * test-writer from the spec only (redo of PR #4's coordinator-authored
+ * version per .pipeline/bl018-bl022-tests/findings.md#F-01).
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
@@ -41,6 +49,7 @@ beforeAll(async () => {
       email: EMAIL,
       passwordHash: await Bun.password.hash(PASSWORD),
       roleId: backOfficeRoleId,
+      isActive: true,
     })
     .returning({ id: employees.id });
   if (!row) throw new Error("Fixture setup: employee insert returned no row");
@@ -52,8 +61,8 @@ afterAll(async () => {
   await db.delete(employees).where(eq(employees.id, employeeId));
 });
 
-describe("authService.refresh re-reads role and pages (BL-018)", () => {
-  test("a role change applies on the next refresh", async () => {
+describe("authService.refresh — BR-AUTH-01: role/pages come from the DB, not the old token", () => {
+  test("a role change made after login is reflected in the next refreshed access token", async () => {
     const login = await authService.login(EMAIL, PASSWORD);
     expect(login.user.role).toBe("back_office");
 
@@ -69,9 +78,13 @@ describe("authService.refresh re-reads role and pages (BL-018)", () => {
     expect(payload.allowedPages).toEqual(
       await authRepository.getPagesByRoleId(ownerRoleId),
     );
+    // Never the previous token's role.
+    expect(payload.role).not.toBe("back_office");
   });
+});
 
-  test("a deactivated employee cannot refresh", async () => {
+describe("authService.refresh — BR-AUTH-02: an inactive employee cannot refresh", () => {
+  test("a deactivated employee's refresh is rejected as unauthorised and issues no tokens", async () => {
     await db
       .update(employees)
       .set({ roleId: backOfficeRoleId, isActive: true })
