@@ -65,6 +65,8 @@ NEXT: <one line — what you'd do next / who should act>
 - `BLOCKED` = you need a decision. Put the question under QUESTIONS with options + your recommendation.
   Never guess a business rule; never ask the user yourself.
 - `FAILED` = you couldn't complete for a technical reason (explain in report).
+- Nothing after the block — no summary, no recap. Report files follow "How to write" in root `CLAUDE.md`:
+  findings one line each (where · what · fix), no prose intros.
 
 ## Findings format (reviewers, test-runner)
 In the report, one row per finding:
