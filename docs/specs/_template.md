@@ -7,58 +7,38 @@ owner: Arun
 depends_on: []           # e.g. [approval, purchase-requisition]
 ---
 
-# <Module name> — functional spec
+# <Module name>
 
-## 1. Purpose
-One paragraph: what problem this solves at the plant, who uses it, what "done" looks like on the floor.
+> Keep it to one screen per section and ≤ 150 lines total (≤ 25 rules). Plain words, short sentences.
+> Bigger module → split into sub-specs. Code locations, gaps and history go in `docs/modules/<module>.md`.
 
-## 2. Actors & permissions
-| Role (from `roles` table) | Can view | Can create | Can edit | Can approve / change status |
-|---|---|---|---|---|
+## Summary
+3–5 lines: what it is, who uses it, what "done" looks like on the floor.
 
-## 3. Documents & key fields
-Which records exist (header/lines), the fields that drive rules (qty, uom, rate, tolerance, dates),
-units and precision (money = paise).
+## Who can do what
+| Action | Allowed |
+|---|---|
+| create | back_office, owner |
 
-## 4. State machine
-| From | Action | To | Who | Preconditions (BR ids) | Side effects |
-|---|---|---|---|---|---|
-| — | create | draft | … | BR-XXX-01 | number assigned |
+## Flow
+| From | Action | To | Rule |
+|---|---|---|---|
+| — | create | draft | BR-XXX-01 |
 
-Terminal states: …
+## Rules
+One sentence per rule, plus one example. IDs are permanent (strike out, never renumber).
+| ID | Rule | Example (given → then) |
+|---|---|---|
+| BR-XXX-01 | … must … | PO qty 100, receive 120 → rejected |
 
-## 5. Business rules
-Atomic, testable, never renumbered. Deprecated rules are ~~struck through~~ with a note.
-
-- **BR-XXX-01** — When …, the system must … (otherwise error `…`).
-- **BR-XXX-02** — …
-
-## 6. Cross-module effects
-Stock ledger postings, approval requests, costing/avg cost, document numbering, notifications.
-
-## 7. Acceptance criteria
-- **AC-01** (BR-XXX-01) — Given … When … Then …
-- **AC-02** (BR-XXX-02, BR-XXX-03) — Given … When … Then …
-
-Include negative paths: rejection, cancellation, reversal, partial, over/under qty, permission denied,
-edit after approval, concurrent edits.
-
-## 8. Screens (frontend)
-List/queue, detail, create/edit form, actions per status. Which fields are visible/editable per status/role.
-
-## 9. Reports / queries needed
-…
-
-## 10. Out of scope / later
+## Not now
 - …
 
-## 11. Open questions for factory SME
-Phrase so a stores/purchase clerk can answer in one line.
-1. …
-
-## 12. Implementation status
-| BR | Status (todo / done) | Test |
-|---|---|---|
+## Questions for you
+Max 7. Each answerable with a letter. Recommended option first.
+| # | Question | Options | Answer |
+|---|---|---|---|
+| Q1 | … | **A** … (recommended) / B … | |
 
 ## Changelog
-- <date> v0 — draft created
+- <date> v0 — draft

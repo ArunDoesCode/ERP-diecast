@@ -11,13 +11,13 @@ description: >
 
 ## Completeness check (all must pass)
 Read `docs/specs/<module>.md` and report a checklist:
-- [ ] Every `BR-<MOD>-NN` has ≥1 acceptance criterion citing it.
-- [ ] State machine lists every status that exists in the schema enum for this module (compare with
+- [ ] Every `BR-<MOD>-NN` row has an example (given → then). (Older specs: ≥1 acceptance criterion citing it.)
+- [ ] "Flow" lists every status that exists in the schema enum for this module (compare with
       `backend/src/db/schemas/`). Extra/missing statuses are listed.
-- [ ] "Open questions for factory SME" is empty, or each remaining item is explicitly marked
-      `deferred → backlog` by the user.
-- [ ] Roles/permissions table filled in.
-- [ ] "Out of scope / later" section present (even if short).
+- [ ] "Questions for you" all answered, or each remaining one explicitly marked `deferred → backlog`.
+- [ ] "Who can do what" filled in.
+- [ ] "Not now" section present (even if short).
+- [ ] ≤ 150 lines / ≤ 25 rules, or the user agreed to the size.
 - [ ] Specs this one depends on (listed under Dependencies) are `frozen`.
 
 If anything fails: list the gaps and stop. Offer `/spec <module>` to fix.

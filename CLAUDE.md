@@ -24,6 +24,15 @@ context with a pointers-only brief (never a fork, never your summary). Developer
 never create or edit tests; tests and code go in separate `test(…)` / `feat(…)`/`fix(…)` commits.
 Details: `.claude/pipeline/PROTOCOL.md` → Test independence.
 
+## How to write (every agent, every reply, report and doc)
+The user reads everything; keep it light.
+- Answer or result first, in 1–2 lines. Then only what the user needs to decide or act.
+- Plain words, short sentences. No jargon if a normal word works.
+- Small list or table over paragraphs. A normal reply fits on one screen (~15 lines).
+- One recommendation, not a survey of options. Don't restate the question or narrate what you did.
+- Questions to the user: max 3 at a time, each answerable with a letter or one word.
+- Detail belongs in files (spec, map, report) — link to it instead of pasting it.
+
 ## Where knowledge lives (layered — details and budgets in `docs/KNOWLEDGE.md`)
 | File | Contains |
 |---|---|
