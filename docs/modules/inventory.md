@@ -84,6 +84,18 @@ Full shapes: `cd backend && bun run contract:query "<METHOD /path>"`.
 - `inventory_ref_type` enum values `pro`, `sco_issue`, `sco_receipt`, `job_order_issue`, `scrap_dispatch` are declared but never written by any current code path.
 - No automated tests for any part of this module.
 
+## Known gaps (from spec draft 2026-09-27)
+Rule ids refer to `docs/specs/grn-stock.md`.
+- BR-GRN-24: `totalValueChangePaise` uses `Math.round`, which is asymmetric for negatives; needs round half away from zero.
+- BR-GRN-37: `itemMaster.currentStock` is never updated from ledger postings.
+- BR-GRN-38/39: `itemMaster.averageCostPaise` is never recomputed; PR estimates and `getLastRate` fallback read a stale value.
+- BR-GRN-40: `assetItemCreateSchema`/`assetItemUpdateSchema` accept `currentStock` and `averageCostPaise`; enum value `opening_stock` missing.
+- BR-GRN-41: no reconciliation query exists.
+- BR-GRN-42: `createInventoryMovement` locks only the last ledger row for item+location, so the first posting for a new pair is unprotected; should lock the `item_master` row.
+- BR-GRN-43: `POST /asset/inventory/movements` accepts any `referenceType` (incl. `grn`, `grn_bypass`) with no document check and no mandatory reason (BL-015).
+- BR-GRN-44: manual adjustments have no negative-balance check, no cost > 0 check on stock-in, and take the client's cost on stock-out.
+- BR-GRN-43 roles: movements route allows super-admin, back_office only; spec adds owner.
+
 ## History
 | Date | PR / commit | Change |
 |---|---|---|

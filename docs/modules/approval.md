@@ -195,6 +195,36 @@ API-boundary types disagree with the form:
 - No frontend tests found for the approval module (policy form, `ApprovalView`, or the
   PR/PO submit-for-approval integration).
 
+## Known gaps (from spec draft 2026-09-27)
+- Spec now split: `docs/specs/approval.md` (requests) + `docs/specs/approval-policies.md` (policies); ref doc `backend/docs/approval_policy_engine.md`.
+- Tested today: BR 01–04, 07, 11–14, 16–20, 23, 25–27, 30–32, 35–36, 40, 51–52, 55 partly covered by 19 cases + submit scenario 1 in `backend/src/repository/approvalRepository.test.ts`; rest untested.
+- BR-APR-05: create schema chain `.min(1)` rejects autoApprove + empty chain (UI sends `[]`), so BR-APR-62 UI path is blocked too.
+- BR-APR-06: PATCH checks max > min on the patch only, not stored + patch.
+- BR-APR-08 / BL-022: `updateApprovalPolicySchema` has `subDocType .default("any")` → omitted category resets to any.
+- BR-APR-09: null accepted for amounts; null on non-nullable fields not verified.
+- BR-APR-10: `hasAnyField` ignores min/max, and is always true because of the subDocType default.
+- BR-APR-15 / BL-002: `isSaleOrderLinked` still in schema, contract and `findMatchingActivePolicy`.
+- BR-APR-21: `findDocumentContext` uses category `any` for PO and SCO; SCO amount = 0 → every SCO goes to fallback, seeded tooling/maintenance PO policies never match.
+- BR-APR-22: fallback exists (inactive) but priority 9999 in code vs 99 in ref doc.
+- BR-APR-28: auto-approve sets `approvedBy` = requester; spec says leave empty.
+- BR-APR-33/34/53: self-approval and same-person-two-levels not blocked; inbox shows own requests.
+- BR-APR-37/38/64: reject and send-back notes optional; `ApprovalView` sends none.
+- BR-APR-39/42: withdraw sets PR/PO `cancelled` instead of `draft`.
+- BR-APR-41: row lock exists but losing action returns 400, not 409.
+- BR-APR-43: PO reject bypasses `poRepository.setStatusCancelled` → PR lines stay stuck, header not recomputed.
+- BR-APR-44: SCO send back leaves SCO at `require_more_info`.
+- BR-APR-46: `PATCH /pr/updatepr` accepts `pending_approval`/`cancelled` in its status field.
+- BR-APR-47: `prService.update` has no status check (PO update is draft-only — ok).
+- BR-APR-48: document cancel and request cancel run in separate transactions; trail actor = requester, not canceller.
+- BR-APR-54/65: only "current open request" lookup exists; per-document history query and detail-page history are new.
+- BR-APR-59: form reset effect depends on the `policy` object → background refetch wipes unsaved edits.
+- BR-APR-61: amount label says ₹ but the raw number is sent as paise.
+- BR-APR-63: fixed by the prType→subDocType rename; BR-APR-56–58, 60 done but untested.
+- Untested but done: BR-APR-24, 29, 45, 49, 50.
+- PR amount uses `averageCostPaise`, which is stale (BL-014) → a PR can route to a lower amount band.
+- BL-018: token refresh keeps the old role, so the approver role check must read roles from the DB (it does).
+- Benchmark: ERPNext workflow conditions can test any field and have "Allow Self Approval" per transition (default off); Odoo/SAP B1 approval templates key on doc type + amount; SAP B1 approves automatically when no template applies and asks remarks on reject; Odoo uses "reset to draft" for changes.
+
 ## History
 | Date | PR / commit | Change |
 |---|---|---|

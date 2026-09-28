@@ -12,10 +12,10 @@
 | Module | Spec | Map | Code | Tests | Open PR | Next step |
 |---|---|---|---|---|---|---|
 | auth-setup | stub draft v0 | [map](modules/auth-setup.md) | full | route-registry, app.test, authService.test | — | stub spec (BR-AUTH-01/02) → `/spec auth-setup` |
-| approval | draft v0 (10 Qs) | [map](modules/approval.md) | full (₹/paise form bug BL-025) | approvalRepository.test, approval.types.test, approvalService.test | — | answer Qs → `/freeze approval` |
-| purchase-requisition | draft v0 (13 Qs) + known-defects draft | [map](modules/purchase-requisition.md) | full (BL-001, BL-026) | none | — | answer Qs → `/freeze purchase-requisition` |
+| approval | draft v0 (+ approval-policies, 7 Qs) | [map](modules/approval.md) | full (₹/paise form bug BL-025) | approvalRepository.test, approval.types.test, approvalService.test | — | answer Qs → `/freeze approval` |
+| purchase-requisition | draft v0 (7 Qs) + known-defects draft (7 Qs) | [map](modules/purchase-requisition.md) | full (BL-001, BL-026) | none | — | answer Qs → `/freeze purchase-requisition` |
 | purchase-order | none | [map](modules/purchase-order.md) | full | none | — | spec in M1 |
-| grn | draft v0 (13 Qs) | [map](modules/grn.md) | full (double-post race BL-027) | none | — | answer Qs → `/freeze grn` |
+| grn | draft v0 (+ grn-stock, 7 Qs) | [map](modules/grn.md) | full (double-post race BL-027) | none | — | answer Qs → `/freeze grn` |
 | inventory | in grn spec | [map](modules/inventory.md) | full (stock/avg cost stale BL-014) | none | — | covered by grn spec |
 | suppliers | none | [map](modules/suppliers.md) | full | none | — | spec in M1 |
 | subcontracting | none | — | schema only | none | — | M2 |
@@ -32,8 +32,8 @@ Legend — Spec: none / draft / frozen vN · Code: none / schema only / partial 
 ## Waiting on you
 - [ ] One-time local setup from PR #4:
   add `DATABASE_URL_TEST` to `backend/.env` (see `.env.example`), `docker compose up -d`, `bun run db:test:prepare`
-- [ ] Answer open questions inline in the three draft specs (grn, purchase-requisition, approval)
-- [ ] Answer `known-defects` spec: SME Q1–Q4, assumptions A1–A15, decisions D1–D2 → `/freeze known-defects`
+- [ ] Answer the "Questions for you" tables (7 each) in grn(+grn-stock), purchase-requisition, approval(+approval-policies)
+- [ ] Answer `known-defects` spec: 7 questions → `/freeze known-defects`
 - [ ] BL-012 blocked: branch protection needs GitHub Pro or a public repo (API 403) — decide: upgrade / keep private + discipline
 - [ ] Remaining infra/debt needing a call: BL-010 Playwright (after specs freeze), BL-011 migrations (after
   known-defects' `db:reset` merges), BL-031 supplier batch limits
