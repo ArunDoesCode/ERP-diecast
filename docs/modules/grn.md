@@ -84,6 +84,29 @@ Full shapes: `cd backend && bun run contract:query "<METHOD /path>"`.
 - `challanPhotoUrl` column exists on `grnItems` with no upload endpoint or frontend wiring found.
 - No automated tests for any part of this module.
 
+## Known gaps (from spec draft 2026-09-27)
+Rule ids refer to `docs/specs/grn.md` / `docs/specs/grn-stock.md`.
+- Done as-built, untested: BR-GRN-01 (create check), 02 (PO-line check), 04, 06, 08, 12 (QA row), 18, 21 (main_store 404 part), 25, 27, 29 (status + role part).
+- BR-GRN-01: accept/bypass writes the ledger row first; the PO transition then throws on a cancelled/closed PO (no pre-check).
+- BR-GRN-02: duplicate `poItemId` within one GRN is not rejected.
+- BR-GRN-05: `challanNo` optional; no (supplier, challan) uniqueness check.
+- BR-GRN-09: "already finalized" check runs outside the posting tx with no row lock.
+- BR-GRN-10: accept and reject are mutually exclusive; accepted + rejected = arrived is not checked; bypass with smaller qty does not record the remainder as rejected.
+- BR-GRN-10/11: `acceptedQty ≤ arrivedQty` not enforced on accept or bypass.
+- BR-GRN-15: `overReceiptGuard` override roles are owner/back_office only (super-admin missing); no `overrideReason`, nothing stored; `poItem.receivedQty` read without lock.
+- BR-GRN-19: bypass route allows `super-admin, owner, back_office, floor_supervisor`; spec drops floor_supervisor (Q3).
+- BR-GRN-21: GRN line id only lands in ledger `notes`; needs column `inventory_ledger.referenceLineId`; `batchNumber` not captured on GRN lines.
+- BR-GRN-22: `createInventoryMovement` runs in its own tx (BL-016); correction's ledger + PO roll-back not in one tx either.
+- BR-GRN-29: each correction is checked alone against `acceptedQty`, so repeated corrections can exceed it.
+- BR-GRN-32: correction posts `referenceType = stock_adjustment`; needs enum value `grn_correction`.
+- BR-GRN-33: correction does not check for negative balance.
+- BR-GRN-34: correction does not touch `poItem.receivedQty` or PO status; PO module needs the edge `fully_received → partial_received`.
+- BR-GRN-35: no `netAcceptedQty` exposed; optional `grn_items.correctedQty` column.
+- `grn_items.qaStatus` should become a pg enum.
+- Draft §8 UI intent: create modal lists only dispatched/partial_received POs, shows ordered/previously received/arrived, warns (does not block) over tolerance; detail row actions by line status and role.
+- Benchmark notes: ERPNext Purchase Receipt (received = accepted + rejected, rejected warehouse, over-delivery %, reverse entries only); Odoo (backorders, AVCO/FIFO, returns at original cost); SAP B1 (manual stock changes need their own documents); India: stock valued excl. recoverable GST, challan + vehicle/e-way bill recorded at gate.
+- Old draft Q-13 (short-close of short-supplied PO line) moved to the PO spec.
+
 ## History
 | Date | PR / commit | Change |
 |---|---|---|

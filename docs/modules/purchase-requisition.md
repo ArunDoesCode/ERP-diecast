@@ -86,6 +86,33 @@ Full shapes: `cd backend && bun run contract:query "<METHOD /path>"`.
 - No automated tests for any layer of this module (repository/service/controller/route).
 - `saleOrderId` has no FK/existence check anywhere in `prService` — a nonexistent sale order id is accepted silently (there's no sale-order module yet per `backend/CLAUDE.md`, so this is presumably a forward-compatible placeholder, not a bug in isolation).
 
+## Known gaps (from spec draft 2026-09-27)
+- Benchmark: ERPNext Material Request (Draft → Submitted → Ordered/Partially Ordered/Received/Stopped/Cancelled, per-line ordered/received qty, no edit after submit).
+- Benchmark: Odoo Purchase Requisition (draft → confirmed → done/cancel; cancelling the PO doesn't cancel the requisition).
+- Benchmark: SAP B1 Purchase Request (Open/Closed per line, copy-to-PO full or part qty, can't cancel once copied).
+- Benchmark adaptation: one approval chain, no RFQ step, full remaining qty per PO line, no GST on PR, estimate from average cost.
+- Schema: add `updatedBy`, `cancelledBy`, `cancelledAt`, `cancelReason` to `purchase_requests` (BR-PR-41, BR-PR-46).
+- Done in code: BR-PR-01 (`prRepository.createWithItems`, `allocateDocumentSequence`); BR-PR-02 (`prService.create/update`); uom from item master; saleOrderId stored.
+- BR-PR-06: `isActive` not checked; duplicate-item check runs on update only, not create.
+- BR-PR-08: Zod `requestedQty` is `.int()` in `backend/src/types/pr.types.ts`; `expectedDate` not in create/update schema.
+- BR-PR-11: recompute done (`recalculateEstimatedAmountByPrId`); recompute at submit not done; cost source per grn spec / BL-014.
+- BR-PR-14: `noCostHistory` flag and warning not built.
+- BR-PR-15/17: `prService.update` has no status guard, no own-PR check; PATCH accepts `pending_approval`/`cancelled`; zero-line edit not blocked.
+- BR-PR-19/21: submit, approve, send back done (`approvalService.submitRequest/actOnRequest`); approval tests partial.
+- BR-PR-21: approval `cancel` (withdraw) maps PR to `cancelled`, should map to `draft`.
+- BR-PR-25/28: done in `poRepository.createWithItems/updateWithItems`.
+- BR-PR-30/32/33: `ordered`/`closed` line states never written; line-cancel action doesn't exist (BL-019).
+- BR-PR-31: PO line delete / PO cancel revert done; PO approval reject/cancel via mirror does not revert PR lines.
+- BR-PR-36: `recomputeHeaderStatusFromItems` doesn't ignore `cancelled` lines and doesn't skip draft/pending/rejected/cancelled headers.
+- BR-PR-36/39: `PR_STATUS_TRANSITIONS` treats `fully_ordered` as terminal; must allow the moves back to `partial_ordered`/`approved`.
+- BR-PR-39/41/42: cancel doesn't check line states, doesn't cancel pending lines, needs no reason; approval cancel not in the same transaction.
+- BR-PR-43: backend DELETE = cancel done; frontend sends id in body (BL-001).
+- BR-PR-45: done (`backend/src/routes/pr.ts`).
+- BR-PR-46/47: audit fields and row-lock status re-check inside transactions not built.
+- Screens: no PR detail route `purchase-requisitions/[id]`; detail should show line status, issued qty, linked PO, `noCostHistory` warning, approval trail, and PR line → PO → GRN trace.
+- Screens: list hides cancelled/rejected by default (UI filter); actions per status: draft = edit/submit/cancel; pending = withdraw/cancel; approved/partial = create PO, cancel line, cancel PR.
+- Reports: open PR lines queue (pending lines on approved/partial PRs, by default supplier) exists as the `/purchase-orders` queue.
+
 ## History
 | Date | PR / commit | Change |
 |---|---|---|
