@@ -9,6 +9,7 @@ import {
 import { toast } from "sonner";
 
 import { ApiClientError } from "@/lib/api/client";
+import { prErrorMessage } from "@/lib/api/purchase-requisitions/error-messages";
 import type {
 	ApprovalActionInput,
 	ApprovalDocType,
@@ -49,7 +50,9 @@ export const approvalKeys = {
 };
 
 function errorMessage(error: unknown, fallback: string) {
-	return error instanceof ApiClientError ? error.message : fallback;
+	return error instanceof ApiClientError
+		? prErrorMessage(error, fallback)
+		: fallback;
 }
 
 export function useApprovalPoliciesQuery(params?: ApprovalPolicyListParams) {
@@ -129,6 +132,7 @@ export function useSubmitApprovalRequestMutation() {
 						variables.docId,
 					),
 				}),
+				queryClient.invalidateQueries({ queryKey: ["purchase-requisitions"] }),
 			]);
 			toast.success(result.message || "Submitted for approval");
 		},
@@ -169,6 +173,10 @@ export function useActOnApprovalRequestMutation() {
 					queryKey: approvalKeys.requestTrail(variables.id),
 				}),
 				queryClient.invalidateQueries({ queryKey: approvalKeys.myPending() }),
+				queryClient.invalidateQueries({
+					queryKey: ["approval", "current-by-doc"],
+				}),
+				queryClient.invalidateQueries({ queryKey: ["purchase-requisitions"] }),
 			]);
 			if (result.success) {
 				const messageByAction: Record<ApprovalActionInput["action"], string> = {
@@ -176,6 +184,7 @@ export function useActOnApprovalRequestMutation() {
 					reject: "Approval rejected",
 					sent_back: "Approval sent back",
 					cancel: "Approval cancelled",
+					withdraw: "Withdrawn - PR is back in draft",
 				};
 				toast.success(
 					result.message || messageByAction[variables.input.action],

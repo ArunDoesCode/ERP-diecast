@@ -91,7 +91,10 @@ export function PurchaseRequisitionsCards({
 							<p>Notes: {pr.notes?.trim() ? pr.notes : "N/A"}</p>
 							<div className="flex  justify-between">
 								<p>Created: {new Date(pr.createdAt).toLocaleDateString()}</p>
-								<p>Est Amt: ₹ {pr.estimatedAmountPaise / 100}</p>
+								<p>
+									Est Amt: ₹{" "}
+									{(pr.estimatedAmountPaise / 100).toLocaleString("en-IN")}
+								</p>
 							</div>
 						</CardContent>
 					</Card>

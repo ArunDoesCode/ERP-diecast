@@ -27,6 +27,7 @@ import {
 import {
 	createDefaults,
 	type FormStep,
+	ItemDateCell,
 	ItemRowsTable,
 	type ItemsFormShape,
 	ItemUomCell,
@@ -58,7 +59,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { TableCell } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { useSubmitApprovalRequestMutation } from "@/lib/api/approval/queries";
+import {
+	useActOnApprovalRequestMutation,
+	useCurrentApprovalByDocQuery,
+	useSubmitApprovalRequestMutation,
+} from "@/lib/api/approval/queries";
 import { useMachinesQuery } from "@/lib/api/asset/queries";
 import {
 	purchaseRequisitionKeys,
@@ -73,6 +78,7 @@ import {
 	getPRStatusBadgeStyle,
 	humanizeStatusLabel,
 } from "@/lib/pr-status-badge";
+import { useAuthSessionStore } from "@/lib/store/auth-session-store";
 import {
 	type PRCreateFormInput,
 	type PREditFormInput,
@@ -156,6 +162,7 @@ export function CreatePurchaseRequisitionModal({
 					itemId: item.itemId,
 					requestedQty: item.requestedQty,
 					uom: item.uom,
+					expectedDate: item.expectedDate,
 				})),
 			}),
 			{
@@ -289,6 +296,7 @@ export function CreatePurchaseRequisitionModal({
 												itemId: undefined as unknown as number,
 												requestedQty: 1,
 												uom: "",
+												expectedDate: "",
 											})
 										}
 										renderFields={(index) => (
@@ -357,6 +365,8 @@ export function CreatePurchaseRequisitionModal({
 																		id={`create-item-qty-${index}`}
 																		label="Qty"
 																		type="number"
+																		step="0.001"
+																		min="0"
 																		name={field.name}
 																		value={
 																			typeof field.value === "number" &&
@@ -384,6 +394,13 @@ export function CreatePurchaseRequisitionModal({
 														form.control as unknown as Control<ItemsFormShape>
 													}
 													index={index}
+												/>
+												<ItemDateCell
+													control={
+														form.control as unknown as Control<ItemsFormShape>
+													}
+													index={index}
+													id={`create-item-date-${index}`}
 												/>
 
 												<TableCell className="text-right">
@@ -453,9 +470,26 @@ export function EditPurchaseRequisitionModal({
 
 	const detail = detailQuery.data?.success ? detailQuery.data.data : null;
 	const pr = detail?.pr;
-	const canEdit = pr?.status === "draft";
+	const currentUserId = useAuthSessionStore((state) => state.userId);
+	const isRequester =
+		pr != null &&
+		currentUserId != null &&
+		String(pr.requestedBy) === currentUserId;
+	// BR-PR-17: edit/submit only while draft and only by the requester.
+	const canEdit = pr?.status === "draft" && isRequester;
+	const canWithdraw = pr?.status === "pending_approval" && isRequester;
+	const currentApprovalQuery = useCurrentApprovalByDocQuery(
+		canWithdraw ? "pr" : undefined,
+		canWithdraw ? pr?.id : undefined,
+	);
+	const openRequestId = currentApprovalQuery.data?.success
+		? (currentApprovalQuery.data.data?.id ?? null)
+		: null;
+	const actMutation = useActOnApprovalRequestMutation();
 	const isMutating =
-		updateMutation.isPending || submitApprovalMutation.isPending;
+		updateMutation.isPending ||
+		submitApprovalMutation.isPending ||
+		actMutation.isPending;
 	const statusBadgeStyle = getPRStatusBadgeStyle(pr?.status);
 	const cancelBlockedReason = pr
 		? getCancelBlockedReason(pr.status, detail?.items ?? [])
@@ -537,6 +571,18 @@ export function EditPurchaseRequisitionModal({
 		}
 	}
 
+	function onWithdraw() {
+		if (openRequestId == null) return;
+		actMutation.mutate(
+			{ id: openRequestId, input: { action: "withdraw" } },
+			{
+				onSuccess: (result) => {
+					if (result.success) onOpenChange(false);
+				},
+			},
+		);
+	}
+
 	function getSubmitAction(event?: BaseSyntheticEvent): "save" | "submit" {
 		const submitter =
 			event?.nativeEvent instanceof SubmitEvent
@@ -567,11 +613,13 @@ export function EditPurchaseRequisitionModal({
 						id: item.id,
 						itemId: item.itemId,
 						requestedQty: item.requestedQty,
+						expectedDate: item.expectedDate ?? undefined,
 					})) ?? [],
 				items: values.items.map((item) => ({
 					id: item.id,
 					itemId: item.itemId,
 					requestedQty: item.requestedQty,
+					expectedDate: item.expectedDate,
 				})),
 			}),
 			{
@@ -615,7 +663,9 @@ export function EditPurchaseRequisitionModal({
 							<DialogDescription>
 								{canEdit
 									? "Draft PR can be edited or submitted for approval."
-									: "PR is not in draft. Fields are read-only."}
+									: pr && !isRequester
+										? "Only the requester can edit this PR. Fields are read-only."
+										: "PR is not in draft. Fields are read-only."}
 							</DialogDescription>
 						</DialogHeader>
 
@@ -636,9 +686,16 @@ export function EditPurchaseRequisitionModal({
 							{detail && pr ? (
 								<>
 									<div className="flex items-center justify-between">
-										<p className="text-sm text-muted-foreground">
-											PR: {pr.prNumber}
-										</p>
+										<div className="text-sm text-muted-foreground">
+											<p>PR: {pr.prNumber}</p>
+											<p>
+												Estimate: ₹
+												{(pr.estimatedAmountPaise / 100).toLocaleString(
+													"en-IN",
+													{ minimumFractionDigits: 2 },
+												)}
+											</p>
+										</div>
 										<Badge
 											variant={statusBadgeStyle.variant}
 											className={statusBadgeStyle.className}
@@ -811,6 +868,8 @@ export function EditPurchaseRequisitionModal({
 																				id={`edit-item-qty-${index}`}
 																				label="Qty"
 																				type="number"
+																				step="0.001"
+																				min="0"
 																				name={field.name}
 																				value={
 																					typeof field.value === "number" &&
@@ -842,6 +901,14 @@ export function EditPurchaseRequisitionModal({
 																form.control as unknown as Control<ItemsFormShape>
 															}
 															index={index}
+														/>
+														<ItemDateCell
+															control={
+																form.control as unknown as Control<ItemsFormShape>
+															}
+															index={index}
+															id={`edit-item-date-${index}`}
+															disabled={!canEdit}
 														/>
 
 														<TableCell className="text-right">
@@ -888,6 +955,17 @@ export function EditPurchaseRequisitionModal({
 							</div>
 
 							<div className="flex items-center gap-2">
+								{canWithdraw ? (
+									<Button
+										type="button"
+										variant="outline"
+										disabled={isMutating || openRequestId == null}
+										onClick={onWithdraw}
+									>
+										{actMutation.isPending ? "Withdrawing..." : "Withdraw"}
+									</Button>
+								) : null}
+
 								{detail && activeStep !== "items" ? (
 									<Button type="button" onClick={goNext}>
 										Next

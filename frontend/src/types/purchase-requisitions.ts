@@ -140,15 +140,43 @@ export type PurchaseRequisitionListParams = {
 	q?: string;
 };
 
+/** Local calendar date as YYYY-MM-DD (matches <input type="date">). */
+export function todayIso() {
+	const now = new Date();
+	const month = String(now.getMonth() + 1).padStart(2, "0");
+	const day = String(now.getDate()).padStart(2, "0");
+	return `${now.getFullYear()}-${month}-${day}`;
+}
+
 export const prItemInputSchema = z.object({
 	id: z.coerce.number().int().positive().optional(),
 	itemId: z.coerce.number().int().positive("Item id is required"),
 	requestedQty: z.coerce
 		.number()
-		.positive("Requested qty must be greater than 0"),
+		.positive("Requested qty must be greater than 0")
+		.refine(
+			(value) => Math.abs(value * 1000 - Math.round(value * 1000)) < 1e-6,
+			"Qty can have at most 3 decimals",
+		),
 	uom: z.string().trim().min(1, "UOM is required"),
-	expectedDate: z.string().trim().optional().or(z.literal("")),
+	expectedDate: z
+		.string()
+		.trim()
+		.optional()
+		.or(z.literal(""))
+		.refine(
+			(value) => !value || value >= todayIso(),
+			"Required-by date cannot be in the past",
+		),
 });
+
+const itemsArraySchema = z
+	.array(prItemInputSchema)
+	.min(1, "At least one item is required")
+	.refine(
+		(items) => new Set(items.map((item) => item.itemId)).size === items.length,
+		"The same item is on the PR twice. Keep one line.",
+	);
 
 export const prCreateFormSchema = z.object({
 	type: z.enum(prTypeValues, {
@@ -156,14 +184,14 @@ export const prCreateFormSchema = z.object({
 	}),
 	assetId: z.coerce.number().int().positive().optional(),
 	notes: z.string().trim().optional().or(z.literal("")),
-	items: z.array(prItemInputSchema).min(1, "At least one item is required"),
+	items: itemsArraySchema,
 });
 
 export const prEditFormSchema = z.object({
 	prId: z.coerce.number().int().positive(),
 	status: z.enum(prStatusValues),
 	notes: z.string().trim().optional().or(z.literal("")),
-	items: z.array(prItemInputSchema).min(1, "At least one item is required"),
+	items: itemsArraySchema,
 });
 
 export type PRItemInput = z.infer<typeof prItemInputSchema>;
@@ -192,11 +220,13 @@ export type PRUpdatePayload = {
 	inserts: Array<{
 		itemId: number;
 		requestedQty: number;
+		expectedDate?: string;
 	}>;
 	updates: Array<{
 		id: number;
 		itemId?: number;
 		requestedQty?: number;
+		expectedDate?: string;
 	}>;
 	deletes: Array<{
 		id: number;

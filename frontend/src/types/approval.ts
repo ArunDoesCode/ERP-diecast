@@ -8,7 +8,8 @@ export type ApprovalRequestAction =
 	| "approve"
 	| "reject"
 	| "sent_back"
-	| "cancel";
+	| "cancel"
+	| "withdraw";
 
 export type ApprovalRequestStatus =
 	| "pending_approval"

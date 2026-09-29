@@ -8,7 +8,7 @@ import {
 } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { ApiClientError } from "@/lib/api/client";
+import { prErrorMessage } from "@/lib/api/purchase-requisitions/error-messages";
 import type {
 	PRCreatePayload,
 	PRDeletePayload,
@@ -32,9 +32,7 @@ export const purchaseRequisitionKeys = {
 	detail: (prId: number) => ["purchase-requisitions", "detail", prId] as const,
 };
 
-function errorMessage(error: unknown, fallback: string) {
-	return error instanceof ApiClientError ? error.message : fallback;
-}
+const errorMessage = prErrorMessage;
 
 function normalize(value?: string | null) {
 	const trimmed = value?.trim();
@@ -171,11 +169,13 @@ export function toPRUpdatePayload(input: {
 		id: number;
 		itemId: number;
 		requestedQty: number;
+		expectedDate?: string;
 	}>;
 	items: Array<{
 		id?: number;
 		itemId?: number;
 		requestedQty?: number;
+		expectedDate?: string;
 	}>;
 }): PRUpdatePayload {
 	const originalById = new Map(
@@ -192,6 +192,7 @@ export function toPRUpdatePayload(input: {
 				inserts.push({
 					itemId: item.itemId,
 					requestedQty: item.requestedQty,
+					expectedDate: normalize(item.expectedDate),
 				});
 			}
 			continue;
@@ -216,7 +217,17 @@ export function toPRUpdatePayload(input: {
 			update.requestedQty = item.requestedQty;
 		}
 
-		if (update.itemId != null || update.requestedQty != null) {
+		const newDate = normalize(item.expectedDate);
+		const oldDate = normalize(original.expectedDate?.slice(0, 10));
+		if (newDate && newDate !== oldDate) {
+			update.expectedDate = newDate;
+		}
+
+		if (
+			update.itemId != null ||
+			update.requestedQty != null ||
+			update.expectedDate != null
+		) {
 			updates.push(update);
 		}
 	}
