@@ -1,6 +1,6 @@
 ---
 module: inventory
-spec: none yet
+spec: docs/specs/inventory.md (draft v0) + docs/specs/grn-stock.md
 last_verified_commit: 0a406f4
 last_verified_on: 2026-09-27
 depends_on: [suppliers]
@@ -95,6 +95,33 @@ Rule ids refer to `docs/specs/grn-stock.md`.
 - BR-GRN-43: `POST /asset/inventory/movements` accepts any `referenceType` (incl. `grn`, `grn_bypass`) with no document check and no mandatory reason (BL-015).
 - BR-GRN-44: manual adjustments have no negative-balance check, no cost > 0 check on stock-in, and take the client's cost on stock-out.
 - BR-GRN-43 roles: movements route allows super-admin, back_office only; spec adds owner.
+
+## Known gaps (from inventory spec draft 2026-09-29)
+Rule ids refer to `docs/specs/inventory.md`.
+- BR-INV-01/09/11/16: SKU and service code unique only case-sensitively (`item_master_sku`, `service_master_code`); location and machine names have no uniqueness at all.
+- BR-INV-02: `category`, `uom` free text (`assetItemCreateSchema`).
+- BR-INV-03: `InventoryItemsManager` form has editable `currentStock` / `averageCostPaise` fields (see also BR-GRN-40).
+- BR-INV-04/14: `updateItem` / `updateLocation` allow changing SKU, UOM, location type and `linkedVendorId` after postings.
+- BR-INV-05/10: PO and supplier-item paths — verify they reject inactive items/services (PR does, BR-PR-06).
+- BR-INV-12/13: no check that `vendor_premise` has a supplier (or others don't); no limit on `main_store` count.
+- BR-INV-15: `locations` and `machines` have no `isActive` column; `locations` and `itemMaster` have no `lastUpdatedBy/At` (BR-INV-25).
+- BR-INV-16: `machines` has no `code` column (BR-AUTH-26 expects one).
+- BR-INV-17: `lastMaintenanceAt` accepts future dates.
+- BR-INV-19: no stock-by-location endpoint; item list is the only stock view.
+- BR-INV-21: `InventoryMovementsManager` default form value is `referenceType: "grn"`.
+- BR-INV-22/23: movement create takes a signed change, not a counted qty; no opening-stock-once check.
+- BR-INV-24: `getLastRate` takes the newest PO line regardless of PO status (draft/cancelled count) and returns average cost 0 as a rate.
+- `createInventoryMovement` does not check item active or location exists before insert (FK error → 500).
+
+## ERP benchmark (with links)
+- ERPNext: default stock UOM cannot change once any stock transaction exists — make a new item instead ([Frappe forum](https://discuss.frappe.io/t/forced-item-stock-uom-via-db-set-value-what-should-i-verify-afterward/163769), [ERPNext Item](https://manualpt.angolaerp.co.ao/docs/user/manual/en/stock/item)). Adopted as BR-INV-04.
+- ERPNext: disabled items can't be picked in any new transaction; history stays ([ERPNext Item](https://manualpt.angolaerp.co.ao/docs/user/manual/en/stock/item)). Adopted as BR-INV-05.
+- ERPNext: Stock Reconciliation takes the counted qty (and rate) and posts the difference; purpose "Opening Stock" is a separate mode ([docs](https://docs.frappe.io/erpnext/user/manual/en/stock-reconciliation)). Adopted as BR-INV-22/23.
+- ERPNext: a warehouse with stock ledger entries can't be deleted; ledger entries are never deleted ([issue #10083](https://github.com/frappe/erpnext/issues/10083), [forum](https://discuss.frappe.io/t/unable-to-delete-stock-ledger-entry/69901)). Adopted as BR-INV-14/20.
+- Odoo: Physical Inventory — enter counted qty per product+location, Apply posts a stock move with an "Inventory Reason" (default "Physical Inventory") visible in Moves History ([Odoo 17 docs](https://www.odoo.com/documentation/17.0/applications/inventory_and_mrp/inventory/warehouses_storage/inventory_management/count_products.html)). Adopted: reason required (BR-GRN-43) + counted-qty entry.
+- SAP B1: inventory UoM can't change once the item has been booked; items in transactions can't be deleted, only set inactive ([SAP Community](https://community.sap.com/t5/enterprise-resource-planning-q-a/inventory-counting-after-changing-uom/qaq-p/12761058), [SAP Learning](https://learning.sap.com/courses/managing-logistics-in-sap-business-one/creating-item-master-data-and-item-groups-in-sap-business-one)).
+- SAP B1: counting (Inventory Counting) and posting (Inventory Posting) are two documents ([SAP how-to PDF](https://help.sap.com/doc/011000358700000063402014e/9.0/en-US/HowtoConductInventory.pdf)). Parked: single-step stock-take for a small plant; two-step with approval in "Not now".
+- Not adopted for M1: bins/multi-warehouse, UoM groups/conversion, batch balances, auto material request from reorder level — too heavy for one store; revisit with SCO (M2) and production.
 
 ## History
 | Date | PR / commit | Change |

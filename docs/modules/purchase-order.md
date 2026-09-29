@@ -1,6 +1,6 @@
 ---
 module: purchase-order
-spec: none yet
+spec: docs/specs/purchase-order.md (draft v0)
 last_verified_commit: 0a406f4
 last_verified_on: 2026-09-27
 depends_on: [purchase-requisition, approval, suppliers, grn]
@@ -100,6 +100,26 @@ Full shapes: `cd backend && bun run contract:query "<METHOD /path>"`.
 - `supplierInvoices` created by `markInvoiced` never advances past `matchStatus: "pending"` / `paymentStatus: "unpaid"` — the 3-way-match and payment-tracking workflow referenced in schema comments (`supplierPayments` table exists) isn't wired to this module yet.
 - GRN → PO coupling (`recomputeReceiptStatus`, `incrementPoItemReceivedQty`) is called from `grnService`, which lives outside this map's read scope — the in-code "known non-atomicity note" on the GRN side should be checked when the GRN module map is written, since it directly affects PO status correctness.
 - No PO "reject" status — an approval rejection is indistinguishable from a manual cancellation in `purchase_orders.status` (both land on `cancelled`); if the UI needs to show "rejected by approver" vs. "cancelled by user" it currently can't from PO status alone (would need the approval trail).
+
+### Gaps vs spec draft v0 (found 2026-09-29)
+- **BR-PO-10 / BR-GRN-34**: `PO_STATUS_TRANSITIONS` has `fully_received: ["invoiced","closed"]` and `partial_received` has no way back to `dispatched`, so a GRN correction on a fully received PO makes `recomputeReceiptStatus` throw `BadRequestError` (whole correction fails). A correction to zero leaves it `partial_received` (the "else no-op" branch).
+- **BR-PO-07 / BL-028**: approval reject writes `cancelled` via `updatePoApprovalMirror` without `setStatusCancelled` → PR lines stay `po_draft`, PR header stuck. Approve never moves PR lines to `ordered` (BL-019).
+- **BR-PO-11 / BR-PO-22**: `cancel` runs `hasGrnForPo`, the status check and `approvalRepository.cancelOpenRequestForDocument` outside the `setStatusCancelled` transaction, with no PO row lock → GRN created in between, or approval cancelled but PO not. No `cancelledBy/cancelledAt/cancelReason` columns: reason only lands in the approval trail (and nowhere if no open request). `recomputeHeaderStatusFromItems` has no status guard → can revive a cancelled PR (BL-029).
+- **BR-PO-08, 14, 15**: `markSent`, `markInvoiced`, `close` write two rows in two separate statements, no transaction, no lock → double send logs two rows; failed status write leaves a stray log/invoice row.
+- **BR-PO-04 / BR-APR-21**: tax hardcoded 0 → policies match on subtotal, not total incl. GST.
+- **BR-PO-03**: `unitPricePaise` is `.nonnegative()` → rate 0 accepted.
+- **BR-PO-05**: `updateWithItems` can delete every line → zero-line PO.
+- **BR-PO-13**: no short-close; `partial_received → closed` illegal.
+- **BR-PO-15**: invoice-number uniqueness per supplier not checked in service (check `supplier_invoices` constraints).
+- **BR-PO-16, 17**: `updateDelay`, `confirmSupplier`, `logReminder`, `escalate` accept any status (incl. cancelled/closed); delay fields optional.
+- **BR-PO-18**: `expectedDeliveryDate` optional everywhere; overdue filter ignores `revisedDeliveryDate` (BR-PO-19).
+- **BR-PO-21**: no `lastUpdatedBy/At` on `purchase_orders`.
+
+## ERP benchmark (with links)
+- **ERPNext**: after submit a PO is "To Receive and Bill"; actions Hold, Close, and close single items; "Update Items" lets you change only undelivered/unbilled lines after submit; taxes come from a tax template per PO. Over-receipt is a % allowance (global, overridable per item), default 0. [PO docs](https://docs.frappe.io/erpnext/user/manual/en/purchase-order), [Stock Settings](https://docs.erpnext.com/docs/user/manual/en/stock-settings), [status bug #27514](https://github.com/frappe/erpnext/issues/27514)
+- **Odoo**: RFQ → RFQ Sent → Purchase Order on Confirm, then optional Lock; Cancel after part receipt leaves backorders; order deadline / expected arrival drive "late". Bill control policy "received quantities" blocks a vendor bill before receipt (3-way match). [RFQ docs](https://www.odoo.com/documentation/19.0/applications/inventory_and_mrp/purchase/manage_deals/rfq.html), [Control policies](https://www.odoo.com/documentation/19.0/applications/inventory_and_mrp/purchase/manage_deals/control_bills.html)
+- **SAP Business One**: a PO is auto-closed when all rows are fully copied to GRPO/invoice; a partly delivered PO can be closed manually, or single rows closed; cancel is only possible while nothing is based on it (cancelling a GRPO reopens the PO). [Cancel PO](https://help.sap.com/docs/SAP_BUSINESS_ONE/68a2e87fb29941b5bf959a184d9c6727/44fc22591d3c6c30e10000000a114a6b.html), [Close row (community)](https://community.sap.com/t5/enterprise-resource-planning-q-a/purchase-order-close-row/qaq-p/6110606), [Solving issues in purchasing](https://learning.sap.com/courses/managing-logistics-in-sap-business-one/solving-issues-in-purchasing)
+- **Adapted here**: one plant-wide 5% over-receipt (BR-GRN-15, not per item); whole-PO short-close only (Q1) rather than row close; no amendments in M1 (cancel + new PO, like B1 "cancel only if nothing based on it"); GST per line in paise (Q2) because approval matches incl. GST; invoice recorded only after full receipt, no matching yet.
 
 ## History
 | Date | PR / commit | Change |

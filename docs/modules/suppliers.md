@@ -1,6 +1,6 @@
 ---
 module: suppliers
-spec: none yet
+spec: docs/specs/suppliers.md (draft v0)
 last_verified_commit: 0a406f4
 last_verified_on: 2026-09-27
 depends_on: [inventory]
@@ -86,7 +86,35 @@ Note: `PATCH .../editItem` and `PATCH .../editService` return `{success, data, s
 - Batch-edit endpoints' non-transactional, per-entry-partial-failure design is a real footgun for any caller assuming atomicity across the array.
 - No automated tests for any part of this module.
 
+### Gaps against spec draft v0 (2026-09-29)
+| Rule | Code today |
+|---|---|
+| BR-SUP-01 | No duplicate-name check. |
+| BR-SUP-02/03 | `gstNumber` is free text: no format check, not upper-cased → "27aaa…" and "27AAA…" both pass the unique index. |
+| BR-SUP-04 | No PAN format check, no PAN = GSTIN[3..12] check. |
+| BR-SUP-06 | `defaultPaymentTermsDays` has no max. `poService.create` uses `input.paymentTermsDays ?? 0`, ignores the supplier default (Q6). |
+| BR-SUP-10 | `supplierMaster` has no `lastUpdatedBy/At`; `updateMaster` takes no actor. Catalog rows only keep last-updated-by, no old/new values. |
+| BR-SUP-12/13 | Price `nonnegative()` allows 0; `taxPercentage` any number ≥ 0 (no slab list, no max). PO tax is hard-coded 0 (`poRepository` totals) — catalog GST % is not used anywhere. |
+| BR-SUP-14 | Item row `uom` is free text, not checked against `itemMaster.uom`. |
+| BR-SUP-15/16 | `assetRepository.getLastRate` reads the catalog row without checking `supplierItems.isActive` (or supplier `isActive`). |
+| BR-SUP-19 | Batch Zod arrays have no `.max()`; unbounded `Promise.all` (BL-031). |
+| BR-SUP-21 | Batch edit is per-row, not transactional (Q1). |
+| BR-SUP-22 | Catch blocks return raw `error.message` in row results (BL-035); single-item paths also rethrow non-unique DB errors. |
+| BR-SUP-23 | `supplierRepository.list` does not search `gstNumber`. |
+| BR-SUP-24 | List has no `isActive` filter; PO detail view (`PurchaseOrderDetailView` → `useSuppliersQuery`) shows inactive suppliers in its picker. |
+| Q4 | PO detail view calls `/supplier/listSuppliers` (router: `requireRole("super-admin","back_office")`) → owner with `po.manage` gets 403. |
+| BL-032 / BL-033 | Search performance (no `pg_trgm`) and item/service duplication — debt only, no behaviour rule. |
+
+## ERP benchmark (with links)
+- ERPNext: disabled suppliers are hidden from new transactions but stay in history; "Hold" blocks invoices, payments or both until a date. Tax ID + India Compliance GSTIN/PAN fields; default payment terms template flows into purchase docs. [Supplier](https://docs.frappe.io/erpnext/user/manual/en/supplier)
+- ERPNext Item Price: rate per price list + supplier + UOM, with valid from/upto, minimum qty, lead time; several prices per item allowed. [Item Price](https://docs.frappe.io/erpnext/v13/user/manual/en/stock/item-price), [Price Lists](https://docs.erpnext.com/docs/user/manual/en/price-lists)
+- Odoo: vendor pricelist line per product = vendor, price, min qty, lead time, sequence, validity; lead time drives PO expected date; bulk import via XLSX/CSV. [Import vendor pricelist](https://www.odoo.com/documentation/19.0/applications/inventory_and_mrp/purchase/products/pricelist.html), [Lead times](https://www.odoo.com/documentation/19.0/applications/inventory_and_mrp/inventory/warehouses_storage/replenishment/lead_times.html)
+- SAP B1: business partner "Active/Inactive" (frozen) by date range; inactive BPs cannot be used on new documents. [Frozen field](https://biuan.com/BusinessPartners/Frozen/), [SAP Community](https://community.sap.com/t5/enterprise-resource-planning-q-a/validfor-at-business-partner-master-data/qaq-p/10971448)
+- SAP B1 India: GSTIN held on BP master (per address, so a multi-state vendor has several GSTINs); required on GST documents. [GST how-to (PDF)](https://help.sap.com/doc/e0d2da20184b4d969c6d3748f92077d5/10.0/en-US/How_to_Work_with_GST_in_the_India_Localization_of_SAP_Business_One.pdf)
+- Adapted for us: one GSTIN per supplier, deactivate not delete, one current price per supplier+item with change history, no validity dates or qty breaks yet (all in spec "Not now").
+
 ## History
 | Date | PR / commit | Change |
 |---|---|---|
 | 2026-09-27 | 0a406f4 | Initial as-built map written |
+| 2026-09-29 | — | Spec draft v0 linked; gaps-vs-spec table and ERP benchmark added |
