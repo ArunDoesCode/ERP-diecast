@@ -1,7 +1,7 @@
 ---
 module: inventory
 spec: docs/specs/inventory.md (v1 frozen) + docs/specs/grn-stock.md (v1 frozen)
-last_verified_commit: 6257268
+last_verified_commit: eea4fb1
 last_verified_on: 2026-09-29
 depends_on: [suppliers, grn]
 ---
@@ -10,7 +10,7 @@ depends_on: [suppliers, grn]
 
 > What the code **is** (the spec says what it **should be**). Agents read this before touching the module
 > and only explore code changed since `last_verified_commit`
-> (`git diff 6257268..HEAD --stat -- backend/src/db/schemas/02_procurement-catalog.ts backend/src/service/assetService.ts backend/src/repository/assetRepository.ts backend/src/repository/stockPostingRepository.ts backend/src/routes/asset.ts backend/src/types/asset.types.ts frontend/src/lib/api/asset frontend/src/components/pages/inventory frontend/src/components/views/inventory`).
+> (`git diff eea4fb1..HEAD --stat -- backend/src/db/schemas/02_procurement-catalog.ts backend/src/service/assetService.ts backend/src/repository/assetRepository.ts backend/src/repository/stockPostingRepository.ts backend/src/routes/asset.ts backend/src/types/asset.types.ts frontend/src/lib/api/asset frontend/src/components/pages/inventory frontend/src/components/views/inventory`).
 > Use symbol names, not line numbers — lines rot.
 
 ## Summary
@@ -27,21 +27,21 @@ screen for stock-take and opening stock. All BR-INV-01..25 are built and tested
 | repository | `backend/src/repository/assetRepository.ts` | `listItems`, `createItem`, `updateItemLocked`, `isItemInUse`, `getLastRate`, `listStock`, `listInventoryMovements`, `manualMovement`, `inventoryReconciliation`, location/service/machine CRUD, `likePattern` |
 | posting | `backend/src/repository/stockPostingRepository.ts` | `postStock` (locks item, refuses unknown 404 / inactive 400 location, `blockNegative`) |
 | service | `backend/src/service/assetService.ts` | validation not expressible in Zod: unit-dependent whole numbers (`assertReorderLevelFitsUnit`), in-use locks, main-store rules, `getConflictError` (unwraps drizzle `cause`) |
-| routes | `backend/src/routes/asset.ts` + `END_POINTS.asset` | guards `requireRole` + `// perm:` (auth session converts) |
-| frontend | `frontend/src/lib/api/asset/{fetchers,queries}.ts`, `frontend/src/components/{pages,views}/inventory/*` (incl. `InventoryStockManager`, `InventoryStockView`, `inventory-format.ts`), `frontend/src/app/(protected)/inventory/stock/page.tsx`, `frontend/src/types/asset.ts` | |
+| routes | `backend/src/routes/asset.ts` + `END_POINTS.asset` | guards `requirePermission(key)`; `GET /machines` is any signed-in user, service allows `asset.manage` or `pr.link_machine` (BR-AUTH-26) |
+| frontend | `frontend/src/lib/api/asset/{fetchers,queries}.ts`, `frontend/src/components/{pages,views}/inventory/*` (incl. `InventoryStockManager`, `InventoryStockView`, `inventory-format.ts`), `frontend/src/app/(protected)/inventory/stock/page.tsx`, `frontend/src/types/asset.ts` | UI gated by `useCan(key)` |
 
 ## API
-| Method | Path | Roles (perm key) | Purpose |
+| Method | Path | Key (seed roles holding it) | Purpose |
 |---|---|---|---|
-| GET | `/api/asset/items` | sa, ow, bo, fs (`inventory.view`) | Items list |
-| POST / PATCH | `/api/asset/items`, `/items/:id` | sa, bo (`asset.manage`) | Create / edit / (de)activate item |
-| GET | `/api/asset/items/:itemId/last-rate` | sa, bo (`asset.manage`) | BR-INV-24 chain, returns `source` |
-| GET / POST / PATCH | `/api/asset/services`, `/machines` | sa, bo (`asset.manage`) | Masters (machine read for PR form = auth session, BR-AUTH-26) |
-| GET | `/api/asset/locations` | sa, ow, bo, fs (`inventory.view`) | Read (needed by the manual form) |
-| POST / PATCH | `/api/asset/locations`, `/locations/:id` | sa, bo (`asset.manage`) | Create / edit / (de)activate |
+| GET | `/api/asset/items` | `inventory.view` (ow, bo, fs) | Items list |
+| POST / PATCH | `/api/asset/items`, `/items/:id` | `asset.manage` (bo) | Create / edit / (de)activate item |
+| GET | `/api/asset/items/:itemId/last-rate` | `inventory.view` | BR-INV-24 chain, returns `source` |
+| GET / POST / PATCH | `/api/asset/services`, `/machines` | `asset.manage` (bo) | Masters. `GET /machines`: any login, service check `asset.manage` or `pr.link_machine` |
+| GET | `/api/asset/locations` | `asset.manage` (bo) | Read (the manual form needs it — see Known gaps) |
+| POST / PATCH | `/api/asset/locations`, `/locations/:id` | `asset.manage` (bo) | Create / edit / (de)activate |
 | GET | `/api/asset/inventory/stock` | `inventory.view` | Stock view: unit, stock, average, value, per-location balances, reorder flag, inactive tag |
 | GET | `/api/asset/inventory/movements` | `inventory.view` | Read-only ledger list, names the source document |
-| POST | `/api/asset/inventory/movements` | sa, ow, bo (`inventory.adjust`) | Stock-take (counted qty → posts difference; 0 → 400) or opening stock (no rows yet, else 409) |
+| POST | `/api/asset/inventory/movements` | `inventory.adjust` (ow, bo) | Stock-take (counted qty → posts difference; 0 → 400) or opening stock (no rows yet, else 409) |
 | GET | `/api/asset/inventory/reconciliation` | `inventory.view` | Mismatch rows only |
 
 ## Invariants & gotchas
@@ -53,8 +53,8 @@ screen for stock-take and opening stock. All BR-INV-01..25 are built and tested
 - `standard_rate_paise` defaults to 0 in the DB for old rows; the API requires > 0 on create.
 - Search uses `likePattern` (escapes `\ % _`); `ilike` on an enum column needs a `::text` cast.
 - drizzle wraps Postgres errors in `cause` — read the code/constraint from there for 23505 → 409.
-- Temporary: PR lines and new supplier-item links refuse inactive items on this branch — take the work/m1 version on merge.
 - Reconciliation aggregates the whole ledger per call — don't poll it.
+- Super-admin passes every key. Test fixtures must be real employees with seed roles (keys come from the DB).
 
 ## Tests
 | File | Covers |
@@ -67,6 +67,7 @@ screen for stock-take and opening stock. All BR-INV-01..25 are built and tested
 - BR-INV-05 PO half (PR line approved before deactivation) → BL-046 (PO code, auth session). SCO part → subcontracting build.
 - `inventory_ref_type` values `pro`, `job_order_issue`, `scrap_dispatch` still unwritten.
 - Stock list search not indexable (BL-050). No reconciliation screen (BL-045).
+- `GET /asset/locations` needs `asset.manage` (contract S7), but the stock-take / opening form is for `inventory.adjust` holders (owner has no `asset.manage`) — check whether owner can load locations (BL-066).
 
 ## ERP benchmark (with links)
 - ERPNext: default stock UOM cannot change once any stock transaction exists — make a new item instead ([Frappe forum](https://discuss.frappe.io/t/forced-item-stock-uom-via-db-set-value-what-should-i-verify-afterward/163769), [ERPNext Item](https://manualpt.angolaerp.co.ao/docs/user/manual/en/stock/item)). Adopted as BR-INV-04.
@@ -85,3 +86,4 @@ screen for stock-take and opening stock. All BR-INV-01..25 are built and tested
 | 2026-09-27 | 0a406f4 | Initial as-built map written |
 | 2026-09-29 | work/m1-stock 8cab134..1fe3cfd | grn-stock parts: posting engine, manual movements, reconciliation, item API |
 | 2026-09-29 | work/m1-stock e8f395c..6257268 | inventory v1 built: masters rules, stock view, stock-take/opening, last rate, indexes, tests |
+| 2026-09-29 | work/m1 da516f2..eea4fb1 | Merged into work/m1; routes on permission keys, `GET /machines` shared with `pr.link_machine`; inactive-item check for PR lines now from work/m1 |

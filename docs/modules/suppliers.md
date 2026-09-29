@@ -1,7 +1,7 @@
 ---
 module: suppliers
 spec: docs/specs/suppliers.md (v1 frozen)
-last_verified_commit: e27b301
+last_verified_commit: eea4fb1
 last_verified_on: 2026-09-29
 depends_on: [inventory]
 ---
@@ -10,14 +10,14 @@ depends_on: [inventory]
 
 > What the code **is** (the spec says what it **should be**). Agents read this before touching the module
 > and only explore code changed since `last_verified_commit`
-> (`git diff e27b301..HEAD --stat -- backend/src/db/schemas/02_procurement-suppliers.ts backend/src/service/supplierService.ts backend/src/repository/supplierRepository.ts backend/src/routes/supplier.ts backend/src/types/supplier.types.ts backend/src/controller/supplierController.ts frontend/src/lib/api/suppliers frontend/src/components/pages/suppliers frontend/src/components/views/suppliers`).
+> (`git diff eea4fb1..HEAD --stat -- backend/src/db/schemas/02_procurement-suppliers.ts backend/src/service/supplierService.ts backend/src/repository/supplierRepository.ts backend/src/routes/supplier.ts backend/src/types/supplier.types.ts backend/src/controller/supplierController.ts frontend/src/lib/api/suppliers frontend/src/components/pages/suppliers frontend/src/components/views/suppliers`).
 > Use symbol names, not line numbers — lines rot.
 
 ## Summary
 Supplier master (tax ids, contact, payment terms, active flag), price lists for items and services, a change
 history, search, and an all-or-nothing batch price edit. BR-SUP-01..24 are built and tested
-(`supplierService.test.ts`). BR-SUP-25 (403 naming the key) comes from the auth layer on work/m1. The PO side of
-BR-SUP-06/07 (copy terms, block inactive supplier) is PO code on work/m1; the SCO side is the subcontracting build.
+(`supplierService.test.ts`). BR-SUP-25 (403 naming the key) comes from the auth layer. The PO side of BR-SUP-06/07 (copy terms, block
+inactive supplier) is in `poService`; the SCO side is the subcontracting build (next batch).
 
 ## Code locations
 | Layer | Path | Key symbols |
@@ -27,8 +27,8 @@ BR-SUP-06/07 (copy terms, block inactive supplier) is PO code on work/m1; the SC
 | repository | `backend/src/repository/supplierRepository.ts` | `list` (escapeLike; name/contact/email/phone/GSTIN/SKU), `create`, `findItemRow`/`findServiceRow` (scoped by supplier), `updateItemRow`/`updateServiceRow`, `lockItemRowsOrdered`/`lockServiceRowsOrdered`, `insertHistory`, `listHistory` |
 | service | `backend/src/service/supplierService.ts` | GSTIN/PAN normalise + match (also against stored values under row lock), name/GSTIN clash → 409 via `getConflictError` (reads `error.cause`), `editSupplierItems`/`editSupplierServices` (one tx, `BatchRollback`), history writes in the same tx |
 | controller | `backend/src/controller/supplierController.ts` | batch 400 `BATCH_FAILED` body `{data, summary}` built here (global onError only emits message + code) |
-| routes | `backend/src/routes/supplier.ts` + `END_POINTS.supplier` | per-route guards: reads `supplier.view` (sa, ow, bo, fs), writes `supplier.manage` (sa, bo); `requireRole` + `// perm:` |
-| frontend | `frontend/src/lib/api/suppliers/{fetchers,queries,permissions}.ts`, `frontend/src/components/pages/suppliers/*` (incl. `SupplierHistoryCard`, `SupplierBatchEditDialog`), `frontend/src/components/views/suppliers/*`, `frontend/src/types/suppliers.ts` | `canManageSuppliers` = role list with `// perm:` (auth session converts) |
+| routes | `backend/src/routes/supplier.ts` + `END_POINTS.supplier` | per-route guards: reads `supplier.view` (sa, ow, bo, fs), writes `supplier.manage` (bo); `requirePermission(key)`, super-admin passes |
+| frontend | `frontend/src/lib/api/suppliers/{fetchers,queries}.ts`, `frontend/src/components/pages/suppliers/*` (incl. `SupplierHistoryCard`, `SupplierBatchEditDialog`), `frontend/src/components/views/suppliers/*`, `frontend/src/types/suppliers.ts` | manage buttons gated by `useCan("supplier.manage")` (old `permissions.ts` role list removed, MRG-F1) |
 
 ## API
 | Method | Path | Key | Purpose |
@@ -48,6 +48,7 @@ BR-SUP-06/07 (copy terms, block inactive supplier) is PO code on work/m1; the SC
 - Changing GSTIN with a stale stored PAN → 400; the form refills PAN from GSTIN chars 3–12.
 - History also records SKU, qty, unit and lead-time changes (more than BR-SUP-10 lists; BL-055).
 - Error text is a fixed sentence per case (BR-SUP-22); an unmapped 23505 → "Already exists".
+- Test fixtures must be real employees with seed roles (keys come from the DB, not the token).
 - Name unique index can fail `db:push` on a dev DB that already has names clashing by case/spaces.
 
 ## Tests
@@ -56,7 +57,7 @@ BR-SUP-06/07 (copy terms, block inactive supplier) is PO code on work/m1; the SC
 | `backend/src/service/supplierService.test.ts` | BR-SUP-01..24 (HTTP, real DB) |
 
 ## Known gaps / debt
-- PO supplier picker should request `status=active` (BR-SUP-24) — PO screen, auth session (BL-053).
+- PO supplier picker should request `status=active` (BR-SUP-24) — PO screen (BL-053).
 - Item vs service batch code near-duplicate (BL-033). Search not trigram-indexed (BL-032).
 - Bank details schema only (spec "Not now").
 
@@ -75,3 +76,4 @@ BR-SUP-06/07 (copy terms, block inactive supplier) is PO code on work/m1; the SC
 | 2026-09-27 | 0a406f4 | Initial as-built map written |
 | 2026-09-29 | — | Spec draft v0 linked; gaps-vs-spec table and ERP benchmark added |
 | 2026-09-29 | work/m1-stock f3e6607..e27b301 | suppliers v1 built: master rules, price lists, history, all-or-nothing batch edit, tests |
+| 2026-09-29 | work/m1 da516f2..eea4fb1 | Merged into work/m1; routes on permission keys, UI via `useCan`, test fixtures = real employees (MRG-T1) |

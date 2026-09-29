@@ -1,7 +1,7 @@
 ---
 module: grn
 spec: docs/specs/grn.md (v1 frozen) + docs/specs/grn-stock.md (v1 frozen)
-last_verified_commit: 1fe3cfd
+last_verified_commit: eea4fb1
 last_verified_on: 2026-09-29
 depends_on: [purchase-order, inventory, suppliers]
 ---
@@ -10,7 +10,7 @@ depends_on: [purchase-order, inventory, suppliers]
 
 > What the code **is** (the spec says what it **should be**). Agents read this before touching the module
 > and only explore code changed since `last_verified_commit`
-> (`git diff 1fe3cfd..HEAD --stat -- backend/src/service/grnService.ts backend/src/repository/grnRepository.ts backend/src/repository/stockPostingRepository.ts backend/src/routes/grn.ts backend/src/types/grn.types.ts frontend/src/lib/api/grn frontend/src/lib/grn-units.ts frontend/src/components/pages/grn frontend/src/components/views/grn`).
+> (`git diff eea4fb1..HEAD --stat -- backend/src/service/grnService.ts backend/src/repository/grnRepository.ts backend/src/repository/stockPostingRepository.ts backend/src/routes/grn.ts backend/src/types/grn.types.ts frontend/src/lib/api/grn frontend/src/lib/grn-units.ts frontend/src/components/pages/grn frontend/src/components/views/grn`).
 > Use symbol names, not line numbers — lines rot.
 
 ## Summary
@@ -27,10 +27,10 @@ ledger. All grn + grn-stock BRs are implemented and tested (`grnService.test.ts`
 | types | `backend/src/types/grn.types.ts` | `createGrnSchema`, `updateGrnSchema`, `updateGrnLineSchema`, `grnQaActionBodySchema` (registered in manifest) / `grnQaActionSchema`, `grnBypassSchema`, `grnCorrectionSchema`, `grnDetailsSchema`, `qty3` (≤ 3 decimals, ≤ 1e9) |
 | repository | `backend/src/repository/grnRepository.ts` | `createWithItems`, `findByChallan`, `lockGrnAndPo`, `lockDraftGrn`, `findGrnItemForUpdate`, `updateLineArrivedQty`, `insertQaTest`, `sumCorrections`, `findPostedRow`, `findLineUoms`, `getDetails`, `withTransaction` |
 | posting | `backend/src/repository/stockPostingRepository.ts` | `postStock` (only stock-posting path), `rowValuePaise` |
-| service | `backend/src/service/grnService.ts` | `create`, `update` (`applyDraftUpdate`), `remove`, `qaAction`, `bypass`, `correction`, `recomputeGrnHeaderStatus`, `mapChallanClash`, `WHOLE_NUMBER_UNITS` |
+| service | `backend/src/service/grnService.ts` | `create`, `update` (`applyDraftUpdate`), `remove`, `qaAction`, `bypass`, `correction`, `recomputeGrnHeaderStatus`, `mapChallanClash`, `WHOLE_NUMBER_UNITS`; takes an `Actor`, over-receipt via `can(actor, "grn.over_receipt_override")` |
 | PO hook | `backend/src/service/poService.ts` | `recomputeReceiptStatus` (both directions, BR-PO-10) |
-| routes | `backend/src/routes/grn.ts` + `END_POINTS.grn` | guards = `requireRole(...)` with `// perm: grn.*` comments (auth session converts them) |
-| frontend | `frontend/src/lib/api/grn/{fetchers,queries}.ts` (`invalidateGrnAndPO`, `usePoItemUoms`), `frontend/src/lib/grn-units.ts`, `frontend/src/lib/grn-permissions.ts`, `frontend/src/components/pages/grn/*`, `frontend/src/components/views/grn/*` | |
+| routes | `backend/src/routes/grn.ts` + `END_POINTS.grn` | guards = `requirePermission("grn.*")`, registry `auth: {type:"permission"}` |
+| frontend | `frontend/src/lib/api/grn/{fetchers,queries}.ts` (`invalidateGrnAndPO`, `usePoItemUoms`), `frontend/src/lib/grn-units.ts`, `frontend/src/components/pages/grn/*`, `frontend/src/components/views/grn/*` | buttons gated by `useCan("grn.*")` (old `grn-permissions.ts` role list removed) |
 
 ## Data model
 - `grns`: `grnNumber` `GRN-<YYYY-MM>-<seq>` (`allocateDocumentSequence`, never reused), `poId`, `supplierId` (copied from PO), `status`, `receivedDate` (server time only), `challanNo` (required; unique per supplier), vehicle/driver fields.
@@ -39,18 +39,18 @@ ledger. All grn + grn-stock BRs are implemented and tested (`grnService.test.ts`
 - Ledger rows from GRN: accept → `grn`, bypass → `grn_bypass`, correction → `grn_correction` (type `adjustment`, −qty at the cost + location of the line's original posting). `referenceId` = GRN id, `referenceLineId` = GRN line id.
 
 ## API
-| Method | Path | Roles (perm key) | Purpose |
+| Method | Path | Key (seed roles holding it) | Purpose |
 |---|---|---|---|
-| GET | `/api/grn/getgrns` | sa, ow, bo, fs, qa, dd (`grn.view`) | List, paginated |
-| GET | `/api/grn/getgrndetails/:id` | same | Header + lines + corrected/net qty |
-| POST | `/api/grn/creategrn` | sa, ow, bo, fs (`grn.edit_draft`) | Create draft |
-| PATCH | `/api/grn/updategrn` | same | Edit draft (header, arrived qty, batch no.) |
-| DELETE | `/api/grn/deletegrn/:id` | same | Delete draft |
-| POST | `/api/grn/:id/lines/:lineId/qa` | sa, ow, bo, qa (`grn.qa_decide`) | Accept/reject (accepted + rejected qty) |
-| POST | `/api/grn/:id/lines/:lineId/bypass` | sa, ow, bo (`grn.qa_bypass`) | Bypass with reason; optional smaller accepted qty |
-| POST | `/api/grn/:id/lines/:lineId/correction` | sa, ow, bo (`grn.correct`) | Correction with reason |
+| GET | `/api/grn/getgrns` | `grn.view` (ow, bo, fs, qa, dd) | List, paginated |
+| GET | `/api/grn/getgrndetails/:id` | `grn.view` | Header + lines + corrected/net qty |
+| POST | `/api/grn/creategrn` | `grn.edit_draft` (ow, bo, fs) | Create draft |
+| PATCH | `/api/grn/updategrn` | `grn.edit_draft` | Edit draft (header, arrived qty, batch no.) |
+| DELETE | `/api/grn/deletegrn/:id` | `grn.edit_draft` | Delete draft |
+| POST | `/api/grn/:id/lines/:lineId/qa` | `grn.qa_decide` (ow, bo, qa) | Accept/reject (accepted + rejected qty) |
+| POST | `/api/grn/:id/lines/:lineId/bypass` | `grn.qa_bypass` (ow, bo) | Bypass with reason; optional smaller accepted qty |
+| POST | `/api/grn/:id/lines/:lineId/correction` | `grn.correct` (ow, bo) | Correction with reason |
 
-Over-receipt override inside qa/bypass: sa, ow, bo (`grn.over_receipt_override`) + `overrideReason`.
+Super-admin passes every key. Over-receipt override inside qa/bypass: service check `grn.over_receipt_override` (ow, bo) + `overrideReason`.
 Full shapes: `cd backend && bun --env-file=… run contract:query "<METHOD /path>"`.
 
 ## Key flows
@@ -67,6 +67,7 @@ Full shapes: `cd backend && bun --env-file=… run contract:query "<METHOD /path
 - A body schema with `.transform()` shows as `body: unknown` in the manifest — register the pre-transform schema (`grnQaActionBodySchema`).
 - Zod strips unknown keys; use `.strict()` where an extra key must be a 400.
 - The frontend whole-number unit list (`grn-units.ts`) duplicates backend `WHOLE_NUMBER_UNITS` — change both (BL-043).
+- Test fixtures must be real employees with seed roles (the permission layer reads role + keys from the DB, not the token); a role-in-token user gets 403.
 - Schema changes reach DBs only via `db:push` (no migrations yet, BL-011). Dev DB needs `db:push` after this batch (bigint column + 2 ledger indexes).
 
 ## Tests
@@ -74,12 +75,14 @@ Full shapes: `cd backend && bun --env-file=… run contract:query "<METHOD /path
 |---|---|
 | `backend/src/service/grnService.test.ts` | BR-GRN-01, 02, 04, 05, 06, 08, 09, 10, 12, 13, 15, 18, 19, 25, 27, 29, 34, 35 (HTTP via `createApp()`, `TEST_grn_` fixtures) |
 | `backend/src/service/stockPosting.test.ts` | BR-GRN-21, 22, 24, 32, 33, 37, 38, 39, 40, 41, 42, 43, 44 |
+| `backend/src/service/poReceiptStatus.test.ts` | BR-PO-10 receipt status from GRN postings (both directions) |
 
 ## Known gaps / debt
 - Schema-only, no code: purchase returns, supplier invoices, supplier payments, supplier bank details, subcontracting orders/GRNs.
 - `grnItems.qaStatus` is free text, not a pg enum.
 - `challanPhotoUrl` column unused (upload is "Not now").
 - Frontend over-receipt warning ignores earlier receipts (BL-042); server enforces.
+- GRN list search is a leading-wildcard `ilike` on `grn_number` (no index; PERF-M2).
 - Race tests for concurrent draft edit vs QA are not automated (non-deterministic); covered by locks + review.
 
 ## History
@@ -87,3 +90,4 @@ Full shapes: `cd backend && bun --env-file=… run contract:query "<METHOD /path
 |---|---|---|
 | 2026-09-27 | 0a406f4 | Initial as-built map written |
 | 2026-09-29 | work/m1-stock 8cab134..1fe3cfd | grn + grn-stock v1 built: one-tx posting engine, challan rules, QA/bypass/over-receipt rules, corrections with PO roll-back, lock order, tests |
+| 2026-09-29 | work/m1 da516f2..eea4fb1 | Merged into work/m1; routes on permission keys (`requirePermission`), service takes `Actor`, UI via `useCan`; test fixtures = real employees (MRG-T1) |
