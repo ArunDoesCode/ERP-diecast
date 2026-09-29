@@ -155,3 +155,42 @@ Create/update/submit/cancel responses are unchanged (still `{ sco, items }`, ite
 - Schema: `subcontracting_grns` + `_items` rebuilt (tables were empty/unused): vendor challan no. unique per vendor, `processedQty`, `unprocessedQty`, nullable `acceptedQty/rejectedQty`, `qaStatus` enum, `qaDecidedBy/At`, `qaNotes`, `heatNumber`. New `sco_receipt_settlements`. New SCO line counter `pending_qa_qty`. Others (issued/accepted/rejected/unprocessed/loss) already existed.
 - Route order: `/receipts/:receiptId` and `/receipts/:receiptId/lines/:lineId/qa` do not clash with `/:id/receipts`.
 - Assumption (question in report): ratio = send / return; raw pcs consumed by accepted/rejected/pending processed = processed x ratio, rounding for non-integer ratios to be confirmed.
+
+---
+
+# Contract — subcontracting S4 (close, loss, reports)
+
+Status: CONTRACT ONLY. New handlers return 501 `NOT_IMPLEMENTED` until S4 backend lands. Qty whole pcs, money paise, dates ISO.
+No schema change: close fields (`closedBy`, `closedAt`, `closeReason`) and line `lossQty` exist. Loss log = `inventory_ledger` rows with reference `sco_loss` joined to the SCO (referenceId = SCO id, referenceLineId = SCO line id).
+
+## Endpoints (all under `/api/sco`)
+| Method | Path | Key | Notes |
+|---|---|---|---|
+| POST | /sco/:id/close | `sco.close` (+ `sco.loss_override` when qty is left at the vendor, checked in service) | 200 |
+| GET | /sco/reports/vendor-stock | `sco.view` | paginated |
+| GET | /sco/reports/loss-log | `sco.view` | paginated |
+| GET | /sco/getscos | `sco.view` | CHANGED: register date filter added |
+| GET | /sco/challans/open | `sco.view` | existing S2, reused as the "open challans with days left" report (no change) |
+
+## POST /sco/:id/close -> `data: { sco, items }` (same shape as cancel)
+Body: `{ reason?: string (3-500 chars) }`. Body may be empty.
+Allowed from `material_issued` / `material_received`. Result `closed`; sets closedBy/closedAt/closeReason. Un-issued qty is dropped.
+If any raw qty is still at the vendor (qtyAtVendor > 0 on any line): needs `sco.loss_override` (else 403, nothing changes) AND `reason` (else 400 `SCO_CLOSE_REASON_REQUIRED`); the qty is written off from the vendor location at issue cost (ledger `sco_loss`, line `lossQty` += qty). If nothing is left, reason is optional and no loss is posted.
+Errors: 400, 403 (no `sco.close`, or loss without `sco.loss_override`), 404, 409 (not material_issued/material_received; lost the SCO lock race, BR-SCO-24).
+
+## GET /sco/getscos (changed)
+Two new optional query params: `createdFrom`, `createdTo` (ISO dates, inclusive, filter SCO createdAt). Response unchanged.
+
+## GET /sco/reports/vendor-stock
+Query: `page`(1) `pageSize`(10, max 100) `sortBy` in `vendorName|itemSku|qty|valuePaise` (vendorName), `sortDir` asc|desc (asc), `vendorId`.
+Response `data: Row[]`, `meta {page,pageSize,total,totalPages}`.
+Row = `{ vendorId, vendorName, itemId, itemSku, itemName, qty, valuePaise }` (qty = raw pcs at the vendor location, valuePaise = value at issue cost). Rows with qty 0 are not listed.
+
+## GET /sco/reports/loss-log
+Query: `page`(1) `pageSize`(10, max 100) `sortBy` in `id|createdAt|qty|costPaise` (createdAt), `sortDir` asc|desc (desc), `vendorId`, `scoId`, `createdFrom`, `createdTo` (ISO dates, inclusive).
+Response `data: Row[]`, `meta` as above.
+Row = `{ ledgerId, scoId, scoNumber, vendorId, vendorName, itemId, itemSku, itemName, qty, costPaise, batchNumber|null, reason, createdBy, createdByName|null, createdAt }` (qty and costPaise positive; reason = SCO closeReason).
+
+## Notes
+- Route order: `/reports/*` does not clash with `/:id/*` (different second segment).
+- Assumption: register "date" filter = SCO created date; vendor-stock has no search box.

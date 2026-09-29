@@ -1,6 +1,11 @@
 import { db } from "../db/client";
 import type { Actor } from "../lib/auth-middleware";
-import { BadRequestError, ConflictError, NotFoundError } from "../lib/errors";
+import {
+  BadRequestError,
+  ConflictError,
+  NotFoundError,
+  NotImplementedError,
+} from "../lib/errors";
 import { qtyAtVendor } from "../lib/sco-math";
 import { approvalRepository } from "../repository/approvalRepository";
 import { scoReceiptRepository } from "../repository/scoReceiptRepository";
@@ -13,6 +18,7 @@ import {
 } from "../repository/scoRepository";
 import type {
   cancelScoSchemaType,
+  closeScoSchemaType,
   createScoSchemaType,
   scoDetailsSchemaType,
   scoLineInputSchemaType,
@@ -319,6 +325,16 @@ export const scoService = {
 
   // BR-SCO-20: draft / pending_approval / approved with nothing issued; reason
   // always; the open approval request is cancelled in the same transaction.
+  // BR-SCO-19, 24: contract stub, logic lands in S4 implement.
+  async close(
+    _id: number,
+    _input: closeScoSchemaType,
+    _actorId: number,
+    _actor: Actor,
+  ): Promise<scoDetailsSchemaType> {
+    throw new NotImplementedError("SCO close is not implemented yet");
+  },
+
   async cancel(
     id: number,
     input: cancelScoSchemaType,

@@ -2711,7 +2711,9 @@
           "sortDir": "enum:asc,desc.required",
           "status": "array<enum:draft,pending_approval,approved,rejected,require_more_info,material_issued,material_received,closed,cancelled>.optional",
           "vendorId": "integer.positive.optional",
-          "q": "string.nonempty.optional"
+          "q": "string.nonempty.optional",
+          "createdFrom": "unrepresentable.optional",
+          "createdTo": "unrepresentable.optional"
         }
       },
       "responses": {
@@ -3319,6 +3321,148 @@
             "settlements": "array<object>.required"
           }
         }
+      }
+    },
+    {
+      "id": "POST /api/sco/:id/close",
+      "method": "POST",
+      "path": "/api/sco/:id/close",
+      "tags": [
+        "sco"
+      ],
+      "summary": "Close a material_issued/material_received SCO (BR-SCO-19). Anything left at the vendor is written off as `sco_loss` and also needs `sco.loss_override` (403 otherwise) plus a reason 3-500 chars (400). Un-issued qty is dropped.",
+      "auth": {
+        "type": "permission",
+        "key": "sco.close"
+      },
+      "request": {
+        "body": {
+          "reason": "string.nonempty.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "sco": {
+              "id": "unrepresentable.required",
+              "scoNumber": "string.required",
+              "vendorId": "unrepresentable.required",
+              "status": "enum:draft,pending_approval,approved,rejected,require_more_info,material_issued,material_received,closed,cancelled.required",
+              "projectRef": "string.nullable.required",
+              "notes": "string.nullable.required",
+              "expectedReturnDate": "unrepresentable.required",
+              "subtotalPaise": "unrepresentable.required",
+              "taxAmountPaise": "unrepresentable.required",
+              "totalAmountPaise": "unrepresentable.required",
+              "approvedBy": "unrepresentable.nullable.required",
+              "currentApprovalLevel": "unrepresentable.required",
+              "totalApprovalLevels": "unrepresentable.required",
+              "createdBy": "unrepresentable.nullable.required",
+              "createdAt": "unrepresentable.required",
+              "lastUpdatedBy": "unrepresentable.nullable.required",
+              "lastUpdatedAt": "unrepresentable.required",
+              "cancelledBy": "unrepresentable.nullable.required",
+              "cancelledAt": "unrepresentable.nullable.required",
+              "cancelReason": "string.nullable.required",
+              "closedBy": "unrepresentable.nullable.required",
+              "closedAt": "unrepresentable.nullable.required",
+              "closeReason": "string.nullable.required",
+              "vendorName": "string.required",
+              "cancelledByName": "string.nullable.required"
+            },
+            "items": "array<object>.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "GET /api/sco/reports/vendor-stock",
+      "method": "GET",
+      "path": "/api/sco/reports/vendor-stock",
+      "tags": [
+        "sco"
+      ],
+      "summary": "Stock at each vendor: per vendor and raw item, qty at the vendor location and value at issue cost. Filter: vendorId.",
+      "auth": {
+        "type": "permission",
+        "key": "sco.view"
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "sortBy": "enum:vendorName,itemSku,qty,valuePaise.required",
+          "sortDir": "enum:asc,desc.required",
+          "vendorId": "integer.positive.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "vendorName",
+          "itemSku",
+          "qty",
+          "valuePaise"
+        ],
+        "searchable": false
+      }
+    },
+    {
+      "id": "GET /api/sco/reports/loss-log",
+      "method": "GET",
+      "path": "/api/sco/reports/loss-log",
+      "tags": [
+        "sco"
+      ],
+      "summary": "Loss log: one row per `sco_loss` write-off (SCO, item, qty, cost, close reason, who, when). Filters: vendorId, scoId, createdFrom, createdTo.",
+      "auth": {
+        "type": "permission",
+        "key": "sco.view"
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "sortBy": "enum:id,createdAt,qty,costPaise.required",
+          "sortDir": "enum:asc,desc.required",
+          "vendorId": "integer.positive.optional",
+          "scoId": "integer.positive.optional",
+          "createdFrom": "unrepresentable.optional",
+          "createdTo": "unrepresentable.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "id",
+          "createdAt",
+          "qty",
+          "costPaise"
+        ],
+        "searchable": false
       }
     },
     {

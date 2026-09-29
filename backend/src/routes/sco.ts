@@ -4,6 +4,7 @@ import { z } from "zod";
 import { scoChallanController } from "../controller/scoChallanController";
 import { scoController } from "../controller/scoController";
 import { scoReceiptController } from "../controller/scoReceiptController";
+import { scoReportController } from "../controller/scoReportController";
 import { asyncHandler } from "../lib/async-handler";
 import { requirePermission } from "../lib/auth-middleware";
 import { paginatedResponse, successResponse } from "../lib/response-schemas";
@@ -11,6 +12,7 @@ import { register } from "../lib/route-registry";
 import type { AppEnv } from "../lib/types";
 import {
   cancelScoSchema,
+  closeScoSchema,
   createScoSchema,
   scoDetailsSchema,
   scoListQuerySchema,
@@ -31,6 +33,12 @@ import {
   receiptResponseSchema,
   scoFullDetailsSchema,
 } from "../types/scoReceipt.types";
+import {
+  lossLogQuerySchema,
+  lossLogRowSchema,
+  vendorStockQuerySchema,
+  vendorStockRowSchema,
+} from "../types/scoReport.types";
 import { END_POINTS } from "./end-points";
 
 const SCO_ROUTES = END_POINTS.sco;
@@ -272,6 +280,64 @@ register({
   auth: { type: "permission", key: "sco.qa_decide" },
   request: { body: qaDecisionSchema },
   responses: { "200": successResponse(receiptDetailsSchema) },
+});
+
+// --- S4: close, loss, reports (BR-SCO-19, 22..25) ---
+
+scoRouter.post(
+  SCO_ROUTES.close,
+  requirePermission("sco.close"),
+  asyncHandler(scoController.close),
+);
+register({
+  method: "POST",
+  path: `${SCO_BASE_PATH}${SCO_ROUTES.close}`,
+  tags: ["sco"],
+  summary:
+    "Close a material_issued/material_received SCO (BR-SCO-19). Anything left at the vendor is written off as `sco_loss` and also needs `sco.loss_override` (403 otherwise) plus a reason 3-500 chars (400). Un-issued qty is dropped.",
+  auth: { type: "permission", key: "sco.close" },
+  request: { body: closeScoSchema },
+  responses: { "200": successResponse(scoDetailsSchema) },
+});
+
+scoRouter.get(
+  SCO_ROUTES.vendorStock,
+  requirePermission("sco.view"),
+  asyncHandler(scoReportController.vendorStock),
+);
+register({
+  method: "GET",
+  path: `${SCO_BASE_PATH}${SCO_ROUTES.vendorStock}`,
+  tags: ["sco"],
+  summary:
+    "Stock at each vendor: per vendor and raw item, qty at the vendor location and value at issue cost. Filter: vendorId.",
+  auth: { type: "permission", key: "sco.view" },
+  request: { query: vendorStockQuerySchema },
+  responses: { "200": paginatedResponse(vendorStockRowSchema) },
+  pagination: {
+    sortableFields: ["vendorName", "itemSku", "qty", "valuePaise"],
+    searchable: false,
+  },
+});
+
+scoRouter.get(
+  SCO_ROUTES.lossLog,
+  requirePermission("sco.view"),
+  asyncHandler(scoReportController.lossLog),
+);
+register({
+  method: "GET",
+  path: `${SCO_BASE_PATH}${SCO_ROUTES.lossLog}`,
+  tags: ["sco"],
+  summary:
+    "Loss log: one row per `sco_loss` write-off (SCO, item, qty, cost, close reason, who, when). Filters: vendorId, scoId, createdFrom, createdTo.",
+  auth: { type: "permission", key: "sco.view" },
+  request: { query: lossLogQuerySchema },
+  responses: { "200": paginatedResponse(lossLogRowSchema) },
+  pagination: {
+    sortableFields: ["id", "createdAt", "qty", "costPaise"],
+    searchable: false,
+  },
 });
 
 export { scoRouter as scoRoutes };

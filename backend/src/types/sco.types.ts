@@ -99,6 +99,13 @@ export const cancelScoSchema = z.object({
 });
 export type cancelScoSchemaType = z.infer<typeof cancelScoSchema>;
 
+// BR-SCO-19: reason 3-500 chars. Required when qty is left at the vendor
+// (checked in the service, 400); optional otherwise.
+export const closeScoSchema = z.object({
+  reason: z.string().trim().min(3).max(500).optional(),
+});
+export type closeScoSchemaType = z.infer<typeof closeScoSchema>;
+
 export const scoListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(10),
@@ -122,6 +129,9 @@ export const scoListQuerySchema = z.object({
   vendorId: z.coerce.number().int().positive().optional(),
   // Matches SCO number or vendor name (case-insensitive contains).
   q: z.string().trim().min(1).optional(),
+  // Register date filter (S4): SCO createdAt, inclusive, ISO dates.
+  createdFrom: z.coerce.date().optional(),
+  createdTo: z.coerce.date().optional(),
 });
 export type scoListQuerySchemaType = z.infer<typeof scoListQuerySchema>;
 

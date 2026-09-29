@@ -124,6 +124,9 @@ export const END_POINTS = {
     listReceipts: "/:id/receipts",
     receiptDetails: "/receipts/:receiptId",
     qaDecide: "/receipts/:receiptId/lines/:lineId/qa",
+    close: "/:id/close",
+    vendorStock: "/reports/vendor-stock",
+    lossLog: "/reports/loss-log",
   },
   company: {
     settings: "/settings",

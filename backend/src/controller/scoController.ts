@@ -5,6 +5,7 @@ import { parseCancelReason } from "../lib/http";
 import type { AppEnv } from "../lib/types";
 import { scoService } from "../service/scoService";
 import {
+  closeScoSchema,
   createScoSchema,
   scoListQuerySchema,
   updateScoSchema,
@@ -55,6 +56,20 @@ export const scoController = {
   async submit(c: Context<AppEnv>) {
     const data = await scoService.submit(
       parseId(c),
+      parseActorId(c),
+      c.get("actor"),
+    );
+    return c.json({ success: true, data });
+  },
+
+  async close(c: Context<AppEnv>) {
+    const id = parseId(c);
+    // Body is optional: reason is only needed when qty is left at the vendor.
+    const raw = await c.req.json().catch(() => ({}));
+    const body = closeScoSchema.parse(raw);
+    const data = await scoService.close(
+      id,
+      body,
       parseActorId(c),
       c.get("actor"),
     );
