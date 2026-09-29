@@ -61,16 +61,6 @@ export const END_POINTS = {
     accessLog: {
       list: "/access-log",
     },
-    pages: {
-      list: "/pages",
-      create: "/pages",
-      update: "/pages/:id",
-      remove: "/pages/:id",
-    },
-    permissions: {
-      list: "/permissions",
-      updateForRole: "/roles/:roleId/permissions",
-    },
   },
   supplier: {
     createSupplier: "/createSupplier",

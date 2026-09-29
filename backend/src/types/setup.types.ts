@@ -111,76 +111,8 @@ export const roleListQuerySchema = z.object({
 });
 export type roleListQuerySchemaType = z.infer<typeof roleListQuerySchema>;
 
-export const pageSchema = z.object({
-  id: z.number(),
-  key: z.string(),
-  label: z.string(),
-  path: z.string(),
-  sortOrder: z.number(),
-  moduleId: z.number().nullable(),
-});
-export type pageSchemaType = z.infer<typeof pageSchema>;
-
-export const pageInputSchema = z.object({
-  key: z.string().min(1),
-  label: z.string().min(1),
-  path: z.string().min(1),
-  sortOrder: z.number().optional(),
-  moduleId: z.number().nullable(),
-});
-export type pageInputSchemaType = z.infer<typeof pageInputSchema>;
-
-// key is immutable on update — omitted here rather than silently ignored
-// downstream.
-export const pageUpdateSchema = pageInputSchema
-  .omit({ key: true })
-  .partial()
-  .superRefine((data, ctx) => {
-    const hasUpdateField =
-      data.label !== undefined ||
-      data.path !== undefined ||
-      data.sortOrder !== undefined ||
-      data.moduleId !== undefined;
-
-    if (!hasUpdateField) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "At least one page field must be provided",
-      });
-    }
-  });
-export type pageUpdateSchemaType = z.infer<typeof pageUpdateSchema>;
-
-export const pageListQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(10),
-  sortBy: z.enum(["label", "path", "moduleId", "sortOrder"]).optional(),
-  sortDir: z.enum(["asc", "desc"]).default("asc"),
-});
-export type pageListQuerySchemaType = z.infer<typeof pageListQuerySchema>;
-
-export const rolePageSchema = z.object({
-  id: z.number(),
-  roleId: z.number(),
-  pageId: z.number(),
-});
-export type rolePageSchemaType = z.infer<typeof rolePageSchema>;
-
-export const rolePermissionDiffSchema = z.record(
-  z.string(),
-  z.object({
-    added: z.array(z.number()),
-    deleted: z.array(z.number()),
-  }),
-);
-export type rolePermissionDiffSchemaType = z.infer<
-  typeof rolePermissionDiffSchema
->;
-
 // ---------------------------------------------------------------------------
 // S6 (auth-setup v7): role editor, screens admin, guardrails, access log.
-// Old role_pages endpoints (/pages*, /permissions, /roles/:roleId/permissions)
-// stay unchanged until S7.
 // ---------------------------------------------------------------------------
 
 /** GET /roles row (BR-AUTH-07, 19): role + key and active-employee counts. */

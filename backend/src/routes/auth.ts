@@ -20,6 +20,7 @@ const sessionUserSchema = z.object({
   name: z.string(),
   email: z.string().nullable(),
   role: z.string(),
+  isSuperAdmin: z.boolean(),
   permissions: z.array(z.string()),
   screens: z.array(
     z.object({

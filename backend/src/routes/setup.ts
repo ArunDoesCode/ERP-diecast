@@ -27,18 +27,12 @@ import {
   employeeSearchQuerySchema,
   employeeUpdateSchema,
   moduleSchema,
-  pageInputSchema,
-  pageListQuerySchema,
-  pageSchema,
-  pageUpdateSchema,
   roleCopyInputSchema,
   roleGrantsDiffSchema,
   roleGrantsSchema,
   roleInputSchema,
   roleListItemSchema,
   roleListQuerySchema,
-  rolePageSchema,
-  rolePermissionDiffSchema,
   roleSchema,
   roleUpdateSchema,
   screenRolesDiffSchema,
@@ -237,106 +231,6 @@ register({
   notes: [
     "403 SYSTEM_ROLE_PROTECTED; 409 ROLE_HAS_EMPLOYEES (any active employee); 409 ROLE_HAS_INACTIVE_EMPLOYEES (only inactive employees hold it: move them to another role first); 409 ROLE_IN_APPROVAL_CHAIN (BR-AUTH-19). Logged.",
   ],
-});
-
-setupRouter.get(
-  SETUP_ROUTES.pages.list,
-  requirePermission("setup.roles.manage"),
-  asyncHandler(pageController.list),
-);
-register({
-  method: "GET",
-  path: `${SETUP_BASE_PATH}${SETUP_ROUTES.pages.list}`,
-  tags: ["setup", "pages"],
-  summary:
-    "List pages, paginated. Legacy: replaced by GET /screens; removed in S7.",
-  auth: { type: "permission", key: "setup.roles.manage" },
-  request: { query: pageListQuerySchema },
-  responses: { "200": paginatedResponse(pageSchema) },
-  pagination: {
-    sortableFields: ["label", "path", "moduleId", "sortOrder"],
-    searchable: false,
-  },
-});
-
-setupRouter.post(
-  SETUP_ROUTES.pages.create,
-  requirePermission("setup.roles.manage"),
-  asyncHandler(pageController.create),
-);
-register({
-  method: "POST",
-  path: `${SETUP_BASE_PATH}${SETUP_ROUTES.pages.create}`,
-  tags: ["setup", "pages"],
-  summary:
-    "Create a page. Legacy: BR-AUTH-06 forbids creating screens; removed in S7.",
-  auth: { type: "permission", key: "setup.roles.manage" },
-  request: { body: pageInputSchema },
-  responses: { "201": successResponse(pageSchema) },
-});
-
-setupRouter.patch(
-  SETUP_ROUTES.pages.update,
-  requirePermission("setup.roles.manage"),
-  asyncHandler(pageController.update),
-);
-register({
-  method: "PATCH",
-  path: `${SETUP_BASE_PATH}${SETUP_ROUTES.pages.update}`,
-  tags: ["setup", "pages"],
-  summary:
-    "Update a page (key is immutable). Legacy: replaced by PATCH /screens/:key; removed in S7.",
-  auth: { type: "permission", key: "setup.roles.manage" },
-  request: { body: pageUpdateSchema },
-  responses: { "200": successResponse(pageSchema) },
-});
-
-setupRouter.delete(
-  SETUP_ROUTES.pages.remove,
-  requirePermission("setup.roles.manage"),
-  asyncHandler(pageController.remove),
-);
-register({
-  method: "DELETE",
-  path: `${SETUP_BASE_PATH}${SETUP_ROUTES.pages.remove}`,
-  tags: ["setup", "pages"],
-  summary: "Delete a page. Legacy: removed in S7.",
-  auth: { type: "permission", key: "setup.roles.manage" },
-  responses: { "200": deleteResponse() },
-});
-
-setupRouter.get(
-  SETUP_ROUTES.permissions.list,
-  requirePermission("setup.roles.manage"),
-  asyncHandler(permissionController.list),
-);
-register({
-  method: "GET",
-  path: `${SETUP_BASE_PATH}${SETUP_ROUTES.permissions.list}`,
-  tags: ["setup", "permissions"],
-  summary:
-    "List all role-page permission assignments. Legacy (role_pages): removed in S7.",
-  auth: { type: "permission", key: "setup.roles.manage" },
-  responses: { "200": successResponse(z.array(rolePageSchema)) },
-  notes: [
-    "Bounded reference data (all role-page pairs) — pagination intentionally omitted",
-  ],
-});
-
-setupRouter.post(
-  SETUP_ROUTES.permissions.updateForRole,
-  requirePermission("setup.roles.manage"),
-  asyncHandler(permissionController.updateForRole),
-);
-register({
-  method: "POST",
-  path: `${SETUP_BASE_PATH}${SETUP_ROUTES.permissions.updateForRole}`,
-  tags: ["setup", "permissions"],
-  summary:
-    "Apply an added/deleted page-permission diff for a role. Legacy (role_pages): replaced by POST /roles/:id/grants; removed in S7.",
-  auth: { type: "permission", key: "setup.roles.manage" },
-  request: { body: rolePermissionDiffSchema },
-  responses: { "200": successResponse(z.array(rolePageSchema)) },
 });
 
 setupRouter.post(

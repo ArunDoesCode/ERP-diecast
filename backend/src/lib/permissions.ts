@@ -179,7 +179,7 @@ const s = (
   defaultMenuGroup,
 });
 
-/** Built pages only (frontend/src/app/(protected)); keys/paths/labels/order from seed_page_access.sql. */
+/** Built pages only (frontend/src/app/(protected)); keys/paths/labels/order from permissions-sync.ts. */
 export const SCREENS = {
   landing: s("/landing", null, "Landing", 10, "General"),
   setup: s("/setup", "setup.roles.manage", "Setup", 15, "Admin"),

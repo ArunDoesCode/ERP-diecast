@@ -2,15 +2,10 @@ import { db } from "../db/client";
 import { invalidateRole, isSuperAdminRoleName } from "../lib/auth-middleware";
 import { BadRequestError, ForbiddenError, NotFoundError } from "../lib/errors";
 import { authAuditRepository } from "../repository/authAuditRepository";
-import { moduleRepository } from "../repository/moduleRepository";
-import { pageRepository } from "../repository/pageRepository";
 import { permissionRepository } from "../repository/permissionRepository";
 import { roleRepository } from "../repository/roleRepository";
 import { screenRepository } from "../repository/screenRepository";
 import type {
-  pageInputSchemaType,
-  pageListQuerySchemaType,
-  pageUpdateSchemaType,
   screenRolesDiffSchemaType,
   screenSchemaType,
   screenUpdateSchemaType,
@@ -20,16 +15,6 @@ import { applyRoleKeyDiff, assertKeysGrantable } from "./permissionService";
 type ScreenRow = NonNullable<
   Awaited<ReturnType<typeof screenRepository.findByKey>>
 >;
-
-async function assertValidModuleId(moduleId: number | null) {
-  if (moduleId === null) {
-    return;
-  }
-  const module = await moduleRepository.findById(moduleId);
-  if (!module) {
-    throw new BadRequestError("Invalid moduleId");
-  }
-}
 
 /** Roles holding each screen's key, super-admin never listed (it always sees every screen). */
 async function roleIdsByKey(rows: ScreenRow[]) {
@@ -79,50 +64,6 @@ const screenSnapshot = (row: ScreenRow) => ({
 });
 
 export const pageService = {
-  // --- legacy pages (removed in S7) ---
-  async list(params: pageListQuerySchemaType) {
-    const { rows, total } = await pageRepository.list(params);
-    const page = params.page ?? 1;
-    const pageSize = params.pageSize ?? Math.max(total, 1);
-    const totalPages = Math.max(1, Math.ceil(total / pageSize));
-    return {
-      data: rows,
-      meta: { page, pageSize, total, totalPages },
-    };
-  },
-
-  async create(input: pageInputSchemaType, actorId: number) {
-    await assertValidModuleId(input.moduleId);
-    return pageRepository.create({ ...input, createdBy: actorId });
-  },
-
-  async update(id: number, input: pageUpdateSchemaType) {
-    if (input.moduleId !== undefined) {
-      await assertValidModuleId(input.moduleId);
-    }
-
-    const { label, path, sortOrder, moduleId } = input;
-
-    const updated = await pageRepository.update(id, {
-      label,
-      path,
-      sortOrder,
-      moduleId,
-    });
-    if (!updated) {
-      throw new NotFoundError("Page not found");
-    }
-    return updated;
-  },
-
-  async remove(id: number) {
-    const existing = await pageRepository.findById(id);
-    if (!existing) {
-      throw new NotFoundError("Page not found");
-    }
-    await pageRepository.remove(id);
-  },
-
   // --- screens (S6, BR-AUTH-15) ---
   async listScreens() {
     const rows = await screenRepository.list();

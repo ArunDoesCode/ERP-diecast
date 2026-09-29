@@ -2,7 +2,7 @@ import type { MiddlewareHandler } from "hono";
 import { authRepository } from "../repository/authRepository";
 import { ForbiddenError, UnauthorizedError } from "./errors";
 import { PERMISSION_KEYS, type PermissionKey } from "./permissions";
-import { type Role, verifyAccessToken } from "./token";
+import { verifyAccessToken } from "./token";
 import type { AppEnv } from "./types";
 
 /**
@@ -155,18 +155,6 @@ export function requireAnyPermission(
         key: keys[0],
       });
     }
-    await next();
-  };
-}
-
-/** Legacy role-name guard, kept until the other branch stops using it. */
-export function requireRole(...allowed: Role[]): MiddlewareHandler<AppEnv> {
-  return async (c, next) => {
-    const role = c.get("actor")?.roleName as Role | undefined;
-    if (!role || !allowed.includes(role)) {
-      throw new ForbiddenError("Forbidden");
-    }
-
     await next();
   };
 }

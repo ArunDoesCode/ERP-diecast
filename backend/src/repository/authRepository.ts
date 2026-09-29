@@ -2,9 +2,7 @@ import { and, eq, gt } from "drizzle-orm";
 
 import { db } from "../db/client";
 import {
-  pages,
   refreshTokens,
-  rolePages,
   rolePermissions,
   roles,
   screens,
@@ -84,16 +82,6 @@ export const authRepository = {
       })
       .from(screens)
       .orderBy(screens.sortOrder, screens.key);
-  },
-
-  async getPagesByRoleId(roleId: number) {
-    const pageRows = await db
-      .select({ key: pages.key })
-      .from(pages)
-      .innerJoin(rolePages, eq(rolePages.pageId, pages.id))
-      .where(eq(rolePages.roleId, roleId))
-      .orderBy(pages.sortOrder);
-    return pageRows.map((p) => p.key);
   },
 
   async storeRefreshToken(data: {

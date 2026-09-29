@@ -32,6 +32,7 @@ export const authService = {
       name: actor.name,
       email,
       role: actor.roleName,
+      isSuperAdmin: actor.isSuperAdmin,
       permissions: [...actor.permissions],
       screens,
     };

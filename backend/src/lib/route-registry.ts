@@ -1,11 +1,9 @@
 import type { ZodType } from "zod";
 import type { PermissionKey } from "./permissions";
-import type { Role } from "./token";
 
 export type AuthRequirement =
   | { type: "public" }
   | { type: "any-authenticated" }
-  | { type: "roles"; roles: Role[] } // legacy; removed once every router uses "permission"
   /** BR-AUTH-09/10: exactly one key; super-admin bypasses (BR-AUTH-18). */
   | {
       type: "permission";

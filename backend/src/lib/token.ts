@@ -2,15 +2,6 @@ import { jwtVerify, SignJWT } from "jose";
 
 import { env } from "./env";
 
-export type Role =
-  | "owner"
-  | "back_office"
-  | "floor_supervisor"
-  | "qa_inspector"
-  | "die_designer"
-  | "operator"
-  | "super-admin";
-
 export type TokenPayload = {
   userId: number | string;
   userName: string;

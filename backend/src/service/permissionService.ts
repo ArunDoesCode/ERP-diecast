@@ -3,13 +3,11 @@ import { invalidateRole, isSuperAdminRoleName } from "../lib/auth-middleware";
 import { BadRequestError, ForbiddenError, NotFoundError } from "../lib/errors";
 import { authAuditRepository } from "../repository/authAuditRepository";
 import type { DbExecutor } from "../repository/executor";
-import { pageRepository } from "../repository/pageRepository";
 import { permissionRepository } from "../repository/permissionRepository";
 import { roleRepository } from "../repository/roleRepository";
 import type {
   roleGrantsDiffSchemaType,
   roleGrantsSchemaType,
-  rolePermissionDiffSchemaType,
 } from "../types/setup.types";
 
 type RoleRow = NonNullable<Awaited<ReturnType<typeof roleRepository.findById>>>;
@@ -82,38 +80,6 @@ async function buildGrants(role: RoleRow): Promise<roleGrantsSchemaType> {
 }
 
 export const permissionService = {
-  // --- legacy role_pages (removed in S7) ---
-  async list() {
-    return permissionRepository.listAll();
-  },
-
-  async updateForRole(roleId: number, diff: rolePermissionDiffSchemaType) {
-    const role = await roleRepository.findById(roleId);
-    if (!role) {
-      throw new NotFoundError("Role not found");
-    }
-
-    const added: number[] = [];
-    const deleted: number[] = [];
-    for (const moduleDiff of Object.values(diff)) {
-      added.push(...moduleDiff.added);
-      deleted.push(...moduleDiff.deleted);
-    }
-
-    if (added.length > 0) {
-      const existingIds = await pageRepository.findExistingIds(added);
-      const missing = added.filter((pageId) => !existingIds.has(pageId));
-      if (missing.length > 0) {
-        throw new BadRequestError(`Invalid pageId(s): ${missing.join(", ")}`);
-      }
-    }
-
-    await permissionRepository.applyDiff(roleId, added, deleted);
-    invalidateRole(roleId);
-
-    return permissionRepository.listByRoleId(roleId);
-  },
-
   // --- key grants (S6) ---
   async getGrants(roleId: number) {
     const role = await roleRepository.findById(roleId);

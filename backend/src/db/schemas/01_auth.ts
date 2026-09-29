@@ -29,33 +29,6 @@ export const modules = pgTable("modules", {
   name: text("name").notNull().unique(),
 });
 
-export const pages = pgTable("pages", {
-  id: serial("id").primaryKey(),
-  key: text("key").notNull().unique(),
-  label: text("label").notNull(),
-  path: text("path").notNull(),
-  sortOrder: integer("sort_order").notNull().default(0),
-  moduleId: integer("module_id").references(() => modules.id),
-  createdBy: integer("created_by").references((): any => employees.id),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
-export const rolePages = pgTable(
-  "role_pages",
-  {
-    id: serial("id").primaryKey(),
-    roleId: integer("role_id")
-      .notNull()
-      .references(() => roles.id, { onDelete: "cascade" }),
-    pageId: integer("page_id")
-      .notNull()
-      .references(() => pages.id, { onDelete: "cascade" }),
-  },
-  (table) => [
-    unique("role_pages_role_id_page_id_unique").on(table.roleId, table.pageId),
-  ],
-);
-
 // Permission keys are defined in code (lib/permissions.ts) and synced here.
 export const permissions = pgTable("permissions", {
   key: text("key").primaryKey(),
