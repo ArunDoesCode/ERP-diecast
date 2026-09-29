@@ -1,6 +1,6 @@
 ---
 module: auth-setup
-spec: none yet
+spec: docs/specs/auth-setup.md (draft v1)
 last_verified_commit: 0a406f4
 last_verified_on: 2026-09-27
 depends_on: []
@@ -151,6 +151,43 @@ Full shapes: `cd backend && bun run contract:query "<METHOD /path>"`.
   re-verified line-by-line here.
 - Auth tests: `backend/src/service/authService.test.ts` (refresh re-reads RBAC, BL-018) and
   `backend/src/app.test.ts` (401/403 mapping). Setup module still has none.
+
+## Known gaps (from spec draft 2026-09-29)
+Spec: `docs/specs/auth-setup.md` v1 (permission keys, roles as data). Gaps against it:
+- **Role lists in routes, twice.** 18 `requireRole(...)` calls in `backend/src/routes/{asset,setup,auth,grn,pr,po,approval,supplier}.ts`,
+  and the same lists again in the `register()` descriptors (`auth: {type:"roles"}`, e.g. `GRN_READ_AUTH` in `routes/grn.ts`).
+  Breaks BR-AUTH-09/10/11. The `AuthRequirement` type in `lib/route-registry.ts` is the natural place for a `permission` key.
+- **Role names in services.** `grnService` `OVER_RECEIPT_OVERRIDE_ROLES`; `approvalService` `isPrivilegedApprovalReader`
+  and the `actorRole !== "super-admin"` check for another employee's pending list; `employeeService`
+  `assertNotLastActiveSuperAdmin` (name `"super-admin"`). Breaks BR-AUTH-11; the last one is BR-AUTH-17 keyed on a name.
+- **Role names in the frontend.** `frontend/src/lib/grn-permissions.ts` (hand copy of backend lists);
+  `role !== "floor_supervisor"` in `PurchaseOrdersView`, `PurchaseOrderDetailView`, `PurchaseOrderTrackingCards`;
+  `isFloorSupervisor` in `PurchaseRequisitionsView`. Breaks BR-AUTH-13. A new role gets wrong buttons silently.
+- **Two unlinked grant systems.** `role_pages` drives only menu + `proxy.ts`; the API uses code lists. A page can be
+  granted while its API returns 403, or the reverse. Likely live case (not run): the PR modal
+  (`PurchaseRequisitionModals.tsx`) calls `useMachinesQuery` (asset router = super-admin/back_office only) for
+  floor_supervisor, who may create PRs. BR-AUTH-15.
+- **`Role` TS union** in `backend/src/lib/token.ts` + `employee.roleName as Role` casts in `authService` — a role created
+  in Setup is unknown to the type system and can never pass any `requireRole`. BR-AUTH-07.
+- **Escalation (BL-024).** `/auth/register` lets owner assign super-admin; register also skips `createdBy`. BR-AUTH-16.
+  Two user-creation paths (`/auth/register`, `/setup/employees`) with different guards — spec Q6.
+- **No audit of grant changes.** `role_pages` has no `createdBy`/timestamps; `roleService`/`permissionService` log nothing. BR-AUTH-20.
+- **Approval chains store role names as text** (`approvalChain[].role`, `approval_requests.current_approver_role` in
+  `02_procurement-approval.ts`). Renaming a role breaks open requests. BR-AUTH-22 blocks rename for now; the real fix
+  (store role id) is an approval-module change.
+- **Grants live in the token for ≤15 min.** Revoking access or deactivating does not stop the current access token. BR-AUTH-12 / Q1.
+
+### Benchmark notes (how other ERPs do it)
+- **ERPNext:** Role is a record; Role Permission Manager grants per DocType × role a set of rights (read, write, create,
+  submit, cancel, amend, delete, report, export). Role Profiles bundle roles; User Permissions restrict to records.
+- **Odoo:** Groups (`res.groups`) hold users; `ir.model.access` gives CRUD per model per group; record rules add row
+  filters; groups can imply other groups. Menus and views are shown by group, same groups as the API.
+- **SAP B1:** per-user authorization tree (Full / Read-only / None) per form and function; data-ownership
+  authorizations for records; super user flag bypasses all.
+- **Common pattern:** code defines the list of checkable rights; admins only map them to roles. UI and API read
+  the same grants. Checks are deny-by-default.
+- **Adapted here:** fixed `<module>.<action>` keys from code (not per-table CRUD — our routes are actions like
+  `qa_decide`, `bypass`, `correct`), one role per user, no record rules yet, keys seeded to match today exactly.
 
 ## History
 | Date | PR / commit | Change |
