@@ -40,11 +40,13 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run typecheck
       - run: bun run lint
-      - name: Test DB schema + seed
-        run: |
-          bun run db:test:prepare
-          # Approval-policy seed needs a super-admin employee; add it back with the
-          # bootstrap-admin / db:reset scripts (BL-004, BL-005). Tests don't need it.
+      - name: Test DB schema + seed (db:reset --no-fixtures)
+        # Wipes and rebuilds the CI test DB: schema, roles, permissions, approval policies, admin.
+        # The target is DATABASE_URL as given here (the test DB); tests then run on DATABASE_URL_TEST.
+        run: bun run db:reset --no-fixtures
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/diecast_test
+          SEED_USER_PASSWORD: ci-seed-password-1
       - run: bun test
       - name: Contract manifest is committed and current
         run: bun run contract:check
