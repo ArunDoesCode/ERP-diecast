@@ -27,11 +27,9 @@ Type: defect · infra · feature · debt · idea.
 | BL-028 | P2 | defect | approval | PO approval reject skips `setStatusCancelled` → PR lines stuck `po_draft`; PO/SCO always match category `any`, SCO amount 0 → seeded tooling/maintenance/SCO policies never match (approval.md §12, verify) | approval spec draft | 2026-09-27 |
 | BL-029 | P2 | defect | purchase-order | Cancelling a PO recomputes PR header without checking PR status → can resurrect a cancelled PR (purchase-requisition.md §12, verify) | PR spec draft | 2026-09-27 |
 | BL-030 | P2 | debt | purchase-requisition | `prService.update` writes lines one row at a time (`updatePrItemById`/`createPrItem` in loops) and is one ~200-line function — batch + split (audit P1.2, §4) | BL-021 audit | 2026-09-27 |
-| BL-031 | P2 | debt | suppliers | `editSupplierItems`/`editSupplierServices` run unbounded `Promise.all` (one query per row); batch-edit Zod schemas have no `.max()` (audit S1) | BL-021 audit | 2026-09-27 |
 | BL-032 | P3 | debt | suppliers | `supplierRepository.list` search = OR + ILIKE + EXISTS, no `pg_trgm` indexes (audit S2) | BL-021 audit | 2026-09-27 |
 | BL-033 | P3 | debt | suppliers | Item vs service create/batch-edit in `supplierService.ts` are near-duplicates (audit S4) | BL-021 audit | 2026-09-27 |
 | BL-034 | P2 | defect | purchase-requisition | `prRepository.list` `q` still matches `type::text`/`status::text`; frontend sends status/type through `q` instead of the `status`/`type` params (audit B1) | BL-021 audit | 2026-09-27 |
-| BL-035 | P2 | defect | suppliers | Batch-edit catch blocks put raw `error.message` into per-row results → DB error text reaches the UI in a 200 (audit B2) | BL-021 audit | 2026-09-27 |
 | BL-036 | P3 | debt | auth-setup | Access token returned in JSON and stored in localStorage + JS-readable cookie + persisted Zustand (`frontend/src/lib/auth/token.ts`, `auth-session-store.ts`) — XSS exposure (audit B3, deferred) | BL-021 audit | 2026-09-27 |
 | BL-037 | P3 | debt | frontend | `frontend/proxy.ts` fetches `/auth/me` on every navigation although `allowedPages` is in the JWT (audit B4) | BL-021 audit | 2026-09-27 |
 | BL-038 | P2 | infra | repo | Worktree bootstrap: new `.claude/worktrees/*` have no `backend/.env` or `node_modules`, so agents must export env by hand to run `bun test` — add a `scripts/worktree-setup.sh` (copy/symlink `.env`, `bun install` both packages, `db:test:prepare`) and call it from `/feature` | test-writer report (PR #6) | 2026-09-27 |
@@ -49,10 +47,15 @@ Type: defect · infra · feature · debt · idea.
 | BL-050 | P3 | debt | inventory | Stock list search `ilike %q%` can't use an index; add pg_trgm if items pass ~50k | m1-stock review PERF-23 | 2026-09-29 |
 | BL-051 | P3 | debt | backend | Move `likePattern` (escapes `\ % _`) to lib and use it in supplier/po/pr/grn/approval/employee searches | m1-stock review SEC-21 | 2026-09-29 |
 | BL-052 | P3 | defect | inventory | PATCH location with only `isVirtual` returns 200 and changes nothing but the audit stamp; return 400 on empty payload | m1-stock review CR-27 | 2026-09-29 |
+| BL-053 | P2 | defect | purchase-order | PO supplier picker should list only active suppliers (`status=active`, suppliers BR-SUP-24) — PO screen, auth session | m1-stock suppliers review | 2026-09-29 |
+| BL-054 | P3 | debt | suppliers | Batch edit runs ~3 queries per row (≤ 300 in one tx); `supplier_services.service_id` unindexed; GSTIN change to an invalid value keeps the old PAN in the form | m1-stock review PERF-41/42, CR-43 | 2026-09-29 |
+| BL-055 | P3 | debt | suppliers | Spec touch-up at next change: field caps (name 200, contact 200, phone 30, email 254, address 500, SKU 100, qty ≤ 1e9); history also tracks SKU/qty/unit/lead time (BR-SUP-10); single-row edit of unknown row → 404; BR-SUP-04 PAN refilled on GSTIN change | m1-stock review SPEC-41..45 | 2026-09-29 |
 
 ## Done
 | ID | Item | PR / commit | Closed |
 |---|---|---|---|
+| BL-031 | Fixed: batch edit ≤ 100 rows, one tx, ordered row locks (BR-SUP-19..21) | work/m1-stock | 2026-09-29 |
+| BL-035 | Fixed: fixed plain error sentences per case, no DB text (BR-SUP-22) | work/m1-stock | 2026-09-29 |
 | BL-014 | Fixed: `postStock` updates item stock + moving average in the same tx as every ledger row (grn-stock BR-GRN-37/38/39) | work/m1-stock | 2026-09-29 |
 | BL-015 | Fixed: manual movements only `stock_adjustment`/`opening_stock` with reason + `inventory.adjust` roles; document types → 400 (BR-GRN-43) | work/m1-stock | 2026-09-29 |
 | BL-016 | Fixed: accept/bypass/correction post ledger, item, line, QA row, PO in one tx (BR-GRN-22) | work/m1-stock | 2026-09-29 |
@@ -69,4 +72,4 @@ Type: defect · infra · feature · debt · idea.
 | BL-018 | Confirmed + fixed: `authService.refresh` re-reads active employee + role + pages (401 if deactivated — was also refreshing forever). Regression test `src/service/authService.test.ts`. Also fixed test isolation: per-file `disconnectDb()` moved to a global afterAll in the test preload | PR #4 (fix), PR #6 (tests by test-writer) | 2026-09-27 |
 | BL-021 | Audit doc statuses verified against code: 13 resolved, 4 partial, 7 open, 1 frontend-only; status block at top. Open items not already tracked → BL-030..BL-037 | PR #4 | 2026-09-27 |
 
-Next free id: **BL-053**
+Next free id: **BL-056**

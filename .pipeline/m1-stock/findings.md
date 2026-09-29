@@ -60,3 +60,6 @@
 | SPEC-41 / CR-44, SPEC-42 | minor | spec | supplierService | history tracks extra fields; single edit unknown row → 404 | backlog BL-055 (spec touch-up) |
 | SPEC-43 | minor | frontend | SupplierMasterModal.tsx:196 | stale PAN after GSTIN change → 400 | fix now (cheap): refill PAN from new GSTIN |
 | SPEC-44 | minor | contract | contract.md | PAN mismatch message text | fixed by coordinator |
+| SPEC-44b | major→minor | spec | supplier.types.ts limits | field length caps + qty ≤ 1e9 unspecced | accept as input guards (same as BL-040 for GRN); spec line via BL-055 |
+| SPEC-45 | minor | spec | SupplierMasterModal | GSTIN change overwrites typed PAN (consistent with BR-SUP-04 match rule) | accept; wording via BL-055 |
+| TEST-5 | (blocker per runner) | test | 632f8d3 | same as TEST-1/2/4 | reject: rule 5 (a)+(b) hold per the runner's own summary; D-010 |
