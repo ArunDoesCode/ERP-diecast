@@ -1,6 +1,7 @@
 import {
   type AnyPgColumn,
   boolean,
+  index,
   integer,
   jsonb,
   pgTable,
@@ -95,15 +96,22 @@ export const screens = pgTable("screens", {
 });
 
 // Insert-only access log (BR-AUTH-20). No update/delete code paths may exist.
-export const authAuditLog = pgTable("auth_audit_log", {
-  id: serial("id").primaryKey(),
-  actorId: integer("actor_id").references((): AnyPgColumn => employees.id),
-  action: text("action").notNull(),
-  target: text("target").notNull(),
-  before: jsonb("before"),
-  after: jsonb("after"),
-  at: timestamp("at").defaultNow().notNull(),
-});
+export const authAuditLog = pgTable(
+  "auth_audit_log",
+  {
+    id: serial("id").primaryKey(),
+    actorId: integer("actor_id").references((): AnyPgColumn => employees.id),
+    action: text("action").notNull(),
+    target: text("target").notNull(),
+    before: jsonb("before"),
+    after: jsonb("after"),
+    at: timestamp("at").defaultNow().notNull(),
+  },
+  (t) => [
+    index("auth_audit_log_at_id_idx").on(t.at.desc(), t.id.desc()),
+    index("auth_audit_log_actor_id_idx").on(t.actorId),
+  ],
+);
 
 export const refreshTokens = pgTable("refresh_tokens", {
   id: serial("id").primaryKey(),

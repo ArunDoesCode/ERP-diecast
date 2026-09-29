@@ -59,7 +59,7 @@ export const employeeController = {
 
   async generateQr(c: Context<AppEnv>) {
     const id = parseIdParam(c);
-    const data = await employeeService.regenerateQr(id);
+    const data = await employeeService.regenerateQr(id, c.get("actor"));
     return c.json({ success: true, data });
   },
 

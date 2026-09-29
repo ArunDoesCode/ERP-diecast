@@ -10,6 +10,7 @@ import {
   screens,
 } from "../db/schemas/01_auth";
 import { employees } from "../db/schemas/03_hcm";
+import type { DbExecutor } from "./executor";
 
 export const authRepository = {
   async getEmployeeWithRoleByEmail(email: string) {
@@ -103,22 +104,31 @@ export const authRepository = {
     await db.insert(refreshTokens).values(data);
   },
 
-  async getRefreshTokenByHash(tokenHash: string) {
-    const [token] = await db
-      .select()
-      .from(refreshTokens)
+  /**
+   * Atomic single-use gate for rotation (BR-AUTH-05): returns the row only to
+   * the one caller whose DELETE actually removed it.
+   */
+  async consumeRefreshToken(tokenHash: string) {
+    const [row] = await db
+      .delete(refreshTokens)
       .where(
         and(
           eq(refreshTokens.tokenHash, tokenHash),
           gt(refreshTokens.expiresAt, new Date()),
         ),
       )
-      .limit(1);
-    return token;
+      .returning({ id: refreshTokens.id });
+    return row;
   },
 
-  async deleteRefreshToken(tokenId: number) {
-    await db.delete(refreshTokens).where(eq(refreshTokens.id, tokenId));
+  /** Revokes every session of one employee (password / method change, deactivation). */
+  async deleteRefreshTokensByEmployee(
+    employeeId: number,
+    exec: DbExecutor = db,
+  ) {
+    await exec
+      .delete(refreshTokens)
+      .where(eq(refreshTokens.employeeId, employeeId));
   },
 
   async deleteRefreshTokenByHash(tokenHash: string) {

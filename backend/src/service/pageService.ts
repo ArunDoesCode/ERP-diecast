@@ -166,14 +166,11 @@ export const pageService = {
     const screen = await loadScreen(key);
 
     const roleIds = [...new Set([...diff.added, ...diff.removed])];
-    const rolesById = new Map<
-      number,
-      NonNullable<Awaited<ReturnType<typeof roleRepository.findById>>>
-    >();
+    const rolesById = new Map(
+      (await roleRepository.findByIds(roleIds)).map((role) => [role.id, role]),
+    );
     for (const id of roleIds) {
-      const role = await roleRepository.findById(id);
-      if (!role) throw new NotFoundError(`Role ${id} not found`);
-      rolesById.set(id, role);
+      if (!rolesById.has(id)) throw new NotFoundError(`Role ${id} not found`);
     }
     for (const role of rolesById.values()) {
       if (isSuperAdminRoleName(role.name)) {
@@ -193,15 +190,16 @@ export const pageService = {
     await assertKeysGrantable([permissionKey], []);
 
     await db.transaction(async (tx) => {
-      for (const id of diff.added) {
+      // Ascending role id so concurrent edits lock roles in the same order (no deadlock).
+      const added = new Set(diff.added);
+      const removed = new Set(diff.removed);
+      for (const id of [...roleIds].sort((a, b) => a - b)) {
         const role = rolesById.get(id);
-        if (role) {
+        if (!role) continue;
+        if (added.has(id)) {
           await applyRoleKeyDiff(tx, role, [permissionKey], [], actorId);
         }
-      }
-      for (const id of diff.removed) {
-        const role = rolesById.get(id);
-        if (role) {
+        if (removed.has(id)) {
           await applyRoleKeyDiff(tx, role, [], [permissionKey], actorId);
         }
       }

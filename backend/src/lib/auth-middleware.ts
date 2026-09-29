@@ -13,6 +13,7 @@ import type { AppEnv } from "./types";
 export type Actor = {
   id: number;
   name: string;
+  email: string | null;
   roleId: number;
   roleName: string;
   /** true when the role is the system super-admin role (BR-AUTH-18). */
@@ -56,6 +57,7 @@ export const loadActor: LoadActorFn = async (employeeId) => {
   const actor: Actor = {
     id: row.id,
     name: row.name,
+    email: row.email,
     roleId: row.roleId,
     roleName: row.roleName,
     isSuperAdmin,

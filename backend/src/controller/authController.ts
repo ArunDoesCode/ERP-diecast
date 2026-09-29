@@ -60,7 +60,8 @@ export const authController = {
   },
 
   async me(c: Context<AppEnv>) {
-    const data = await authService.getSessionUser(c.get("actor"));
+    const actor = c.get("actor");
+    const data = await authService.getSessionUser(actor, actor.email);
     return c.json(
       { success: true, data, message: "User fetched successfully" },
       200,

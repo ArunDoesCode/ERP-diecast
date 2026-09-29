@@ -235,7 +235,7 @@ register({
   auth: { type: "permission", key: "setup.roles.manage" },
   responses: { "200": deleteResponse() },
   notes: [
-    "403 SYSTEM_ROLE_PROTECTED; 409 ROLE_HAS_EMPLOYEES (any active employee); 409 ROLE_IN_APPROVAL_CHAIN (BR-AUTH-19). Logged.",
+    "403 SYSTEM_ROLE_PROTECTED; 409 ROLE_HAS_EMPLOYEES (any active employee); 409 ROLE_HAS_INACTIVE_EMPLOYEES (only inactive employees hold it: move them to another role first); 409 ROLE_IN_APPROVAL_CHAIN (BR-AUTH-19). Logged.",
   ],
 });
 

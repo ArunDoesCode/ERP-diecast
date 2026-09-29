@@ -86,21 +86,21 @@ export const roleService = {
   },
 
   async update(id: number, input: roleUpdateSchemaType, actor: Actor) {
-    const role = await roleRepository.findById(id);
-    if (!role) throw new NotFoundError("Role not found");
-    if (role.isSystem) throw systemRoleProtected("rename");
-
-    const name = input.name as string;
-    if (name === role.name) return role;
-
-    if (await roleRepository.isUsedInApprovalChain(role.name)) {
-      throw new ConflictError(
-        "Cannot rename a role that an approval chain uses",
-        "ROLE_IN_APPROVAL_CHAIN",
-      );
-    }
-
     const updated = await db.transaction(async (tx) => {
+      // Guards run under the role's row lock so a racing delete/rename cannot slip past (CR-4).
+      const role = await roleRepository.findByIdForUpdate(id, tx);
+      if (!role) throw new NotFoundError("Role not found");
+      if (role.isSystem) throw systemRoleProtected("rename");
+
+      const { name } = input;
+      if (name === role.name) return role;
+
+      if (await roleRepository.isUsedInApprovalChain(role.name, tx)) {
+        throw new ConflictError(
+          "Cannot rename a role that an approval chain uses",
+          "ROLE_IN_APPROVAL_CHAIN",
+        );
+      }
       await assertNameFree(name, tx);
       const row = await roleRepository.update(id, { name }, tx);
       if (!row) throw new NotFoundError("Role not found");
@@ -118,32 +118,34 @@ export const roleService = {
   },
 
   async remove(id: number, actor: Actor) {
-    const role = await roleRepository.findById(id);
-    if (!role) throw new NotFoundError("Role not found");
-    if (role.isSystem) throw systemRoleProtected("delete");
-
-    const activeCount = await roleRepository.countActiveEmployees(id);
-    if (activeCount > 0) {
-      throw new ConflictError(
-        `Cannot delete role. ${activeCount} active employees are assigned to it.`,
-        "ROLE_HAS_EMPLOYEES",
-      );
-    }
-    const inactiveCount = await roleRepository.countInactiveEmployees(id);
-    if (inactiveCount > 0) {
-      throw new ConflictError(
-        `Cannot delete role. ${inactiveCount} inactive employees still have it; move them to another role first.`,
-        "ROLE_HAS_INACTIVE_EMPLOYEES",
-      );
-    }
-    if (await roleRepository.isUsedInApprovalChain(role.name)) {
-      throw new ConflictError(
-        "Cannot delete a role that an approval chain uses",
-        "ROLE_IN_APPROVAL_CHAIN",
-      );
-    }
-
     await db.transaction(async (tx) => {
+      // Guards run under the role's row lock; an employee being given this role
+      // holds a key-share lock on it, so the two serialise (CR-4).
+      const role = await roleRepository.findByIdForUpdate(id, tx);
+      if (!role) throw new NotFoundError("Role not found");
+      if (role.isSystem) throw systemRoleProtected("delete");
+
+      const activeCount = await roleRepository.countActiveEmployees(id, tx);
+      if (activeCount > 0) {
+        throw new ConflictError(
+          `Cannot delete role. ${activeCount} active employees are assigned to it.`,
+          "ROLE_HAS_EMPLOYEES",
+        );
+      }
+      const inactiveCount = await roleRepository.countInactiveEmployees(id, tx);
+      if (inactiveCount > 0) {
+        throw new ConflictError(
+          `Cannot delete role. ${inactiveCount} inactive employees still have it; move them to another role first.`,
+          "ROLE_HAS_INACTIVE_EMPLOYEES",
+        );
+      }
+      if (await roleRepository.isUsedInApprovalChain(role.name, tx)) {
+        throw new ConflictError(
+          "Cannot delete a role that an approval chain uses",
+          "ROLE_IN_APPROVAL_CHAIN",
+        );
+      }
+
       const keys = await permissionRepository.listKeysByRoleId(id, tx);
       await roleRepository.remove(id, tx);
       await authAuditRepository.insert(tx, {

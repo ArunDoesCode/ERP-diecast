@@ -1,7 +1,8 @@
 /**
  * Permission + screen catalog (auth-setup BR-AUTH-06, 21, 24).
  * Code owns the keys and screens; the DB copy is synced from here (see SyncCatalogFn).
- * Nothing reads this yet (contract step) — do not wire into middleware here.
+ * `PERMISSION_KEYS` feeds the actor load in `auth-middleware.ts` (super-admin holds every key);
+ * route guards read keys through `requirePermission` / `can`, not this file.
  */
 
 export type PermissionDef = {

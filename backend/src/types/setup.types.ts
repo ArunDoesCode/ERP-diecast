@@ -99,16 +99,8 @@ export const roleInputSchema = z.object({
 });
 export type roleInputSchemaType = z.infer<typeof roleInputSchema>;
 
-export const roleUpdateSchema = roleInputSchema
-  .partial()
-  .superRefine((data, ctx) => {
-    if (data.name === undefined) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "At least one role field must be provided",
-      });
-    }
-  });
+// Rename is the only role edit, so name is required (CR-5).
+export const roleUpdateSchema = roleInputSchema;
 export type roleUpdateSchemaType = z.infer<typeof roleUpdateSchema>;
 
 export const roleListQuerySchema = z.object({

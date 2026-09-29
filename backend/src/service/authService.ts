@@ -11,13 +11,8 @@ import { authRepository } from "../repository/authRepository";
 
 export const authService = {
   /** BR-AUTH-13: the shape returned by `/auth/me` and login `user`. */
-  async getSessionUser(actor: Actor, email?: string | null) {
-    const [rows, emailRow] = await Promise.all([
-      authRepository.listScreens(),
-      email === undefined
-        ? authRepository.getEmployeeRoleById(actor.id)
-        : Promise.resolve(undefined),
-    ]);
+  async getSessionUser(actor: Actor, email: string | null) {
+    const rows = await authRepository.listScreens();
     const screens = rows
       .filter(
         (r) =>
@@ -35,7 +30,7 @@ export const authService = {
     return {
       id: actor.id,
       name: actor.name,
-      email: email === undefined ? (emailRow?.email ?? null) : email,
+      email,
       role: actor.roleName,
       permissions: [...actor.permissions],
       screens,
@@ -88,14 +83,12 @@ export const authService = {
     });
     const refreshHash = await sha256(refreshToken);
 
-    // Get stored refresh token
-    const token = await authRepository.getRefreshTokenByHash(refreshHash);
-    if (!token) {
+    // Atomic single-use gate (BR-AUTH-05): only the caller whose DELETE removes
+    // the row may continue; a concurrent or repeated use gets 401.
+    const consumed = await authRepository.consumeRefreshToken(refreshHash);
+    if (!consumed) {
       throw new UnauthorizedError("Refresh token invalid");
     }
-
-    // Delete old refresh token
-    await authRepository.deleteRefreshToken(token.id);
 
     // Re-read the employee (BR-AUTH-01/02): deactivation blocks refresh, and the
     // new tokens carry the current name.

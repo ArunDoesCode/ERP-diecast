@@ -36,6 +36,8 @@ export async function applyRoleKeyDiff(
   removed: string[],
   actorId: number,
 ) {
+  // Row lock: two admins editing one role take turns, so before/after in the log is right (PERF-5).
+  await roleRepository.findByIdForUpdate(role.id, exec);
   const before = await permissionRepository.listKeysByRoleId(role.id, exec);
   const held = new Set(before);
   const toAdd = [...new Set(added)].filter((key) => !held.has(key));

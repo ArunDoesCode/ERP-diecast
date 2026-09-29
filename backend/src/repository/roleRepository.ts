@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
 
 import { db } from "../db/client";
 import { roles } from "../db/schemas/01_auth";
@@ -70,6 +70,22 @@ export const roleRepository = {
       .where(eq(roles.id, id))
       .limit(1);
     return row;
+  },
+
+  /** Same as `findById` but takes a row lock; call inside a transaction. */
+  async findByIdForUpdate(id: number, exec: DbExecutor) {
+    const [row] = await exec
+      .select(roleColumns)
+      .from(roles)
+      .where(eq(roles.id, id))
+      .limit(1)
+      .for("update");
+    return row;
+  },
+
+  async findByIds(ids: number[], exec: DbExecutor = db) {
+    if (ids.length === 0) return [];
+    return exec.select(roleColumns).from(roles).where(inArray(roles.id, ids));
   },
 
   async findByName(name: string, exec: DbExecutor = db) {

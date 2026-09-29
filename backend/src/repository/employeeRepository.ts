@@ -1,4 +1,4 @@
-import { asc, count, desc, eq, ilike } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike } from "drizzle-orm";
 
 import { db } from "../db/client";
 import { employees } from "../db/schemas/03_hcm";
@@ -96,8 +96,8 @@ export const employeeRepository = {
     return { rows: rows.map(toEmployee), total: totalRow?.value ?? 0 };
   },
 
-  async findById(id: number) {
-    const [row] = await db
+  async findById(id: number, exec: DbExecutor = db) {
+    const [row] = await exec
       .select(employeeColumns)
       .from(employees)
       .where(eq(employees.id, id))
@@ -105,9 +105,34 @@ export const employeeRepository = {
     return row ? toEmployee(row) : undefined;
   },
 
+  /** Same as `findById` but takes a row lock; call inside a transaction. */
+  async findByIdForUpdate(id: number, exec: DbExecutor) {
+    const [row] = await exec
+      .select(employeeColumns)
+      .from(employees)
+      .where(eq(employees.id, id))
+      .limit(1)
+      .for("update");
+    return row ? toEmployee(row) : undefined;
+  },
+
+  /**
+   * Locks every ACTIVE employee holding the role, in id order (a fixed order so
+   * two callers cannot deadlock). Used before the last-admin check (BR-AUTH-17).
+   */
+  async lockActiveByRole(roleId: number, exec: DbExecutor) {
+    const rows = await exec
+      .select({ id: employees.id })
+      .from(employees)
+      .where(and(eq(employees.roleId, roleId), eq(employees.isActive, true)))
+      .orderBy(asc(employees.id))
+      .for("update");
+    return rows.map((r) => r.id);
+  },
+
   /** Internal lookup used only to determine current login method (password vs qr). */
-  async findAuthStateById(id: number) {
-    const [row] = await db
+  async findAuthStateById(id: number, exec: DbExecutor = db) {
+    const [row] = await exec
       .select({ id: employees.id, passwordHash: employees.passwordHash })
       .from(employees)
       .where(eq(employees.id, id))
@@ -115,8 +140,8 @@ export const employeeRepository = {
     return row;
   },
 
-  async create(data: EmployeeWriteData) {
-    const [row] = await db
+  async create(data: EmployeeWriteData, exec: DbExecutor = db) {
+    const [row] = await exec
       .insert(employees)
       .values(data)
       .returning(employeeColumns);
