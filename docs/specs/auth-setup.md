@@ -1,7 +1,7 @@
 ---
 module: auth-setup
 status: frozen           # draft | frozen | changed-after-freeze
-version: 8
+version: 9
 frozen_on: 2026-09-29
 owner: Arun
 depends_on: []           # every other module depends on this one
@@ -131,3 +131,4 @@ None open.
 - 2026-09-29 — v6 clarified during build: key `employees.directory.view` (ow) for the existing Employee Directory screen (owner sees it today); `landing` and `approvals` screens need no key (any signed-in user); unbuilt seed pages get no screen (BR-AUTH-06). Read routes: item list, stock movements and item last-rate need `inventory.view`; posting a movement needs `inventory.adjust`; supplier list/detail/items/services reads need `supplier.view`.
 - 2026-09-29 — v7 clarified during build: `pr.link_machine` seeded to ow, bo, fs (was fs). Today owner and back office can save a maintenance PR with a machine, so BR-AUTH-21 (keep today's API access) requires it; they now also see the Machine field. The PR "Machine" field is `purchase_requests.assetId`.
 - 2026-09-29 — v8 clarified during build (BR-AUTH-19): a role held only by inactive employees can't be deleted either — 409 `ROLE_HAS_INACTIVE_EMPLOYEES` ("move them to another role first"); employees always keep a role.
+- 2026-09-29 — v9 clarified during build (security review): BR-AUTH-16 covers every change to an employee (edit, deactivate, QR regenerate), not only role assignment — a non-super-admin may act only on employees whose current role they could assign, never on a super-admin (403 `ROLE_NOT_ASSIGNABLE`). BR-AUTH-17's check runs inside the write transaction. BR-AUTH-20 also logs employee create, edit (email, password change — without the value — login method) and QR regenerate. BR-AUTH-05: a password or login-method change, or deactivation, revokes that employee's refresh tokens; rotation is atomic (a token can be used once even under concurrent calls). Error codes used: `ROLE_NOT_ASSIGNABLE` (BR-16), `SCREEN_HAS_NO_KEY` (BR-15, screen without a key can't be ticked), `UNKNOWN_KEY` (key not in the catalog).

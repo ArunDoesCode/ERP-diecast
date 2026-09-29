@@ -13,3 +13,21 @@
 | F-PR-1 | backend-dev 13 | backend/src/types/pr.types.ts updatePrSchema | saleOrderId/assetId/notes were wrongly required on PATCH → made optional | accepted (bug fix) | fixed |
 | TEST-8 | test-writer 16 | DELETE /setup/roles/:id | 500 FK violation when only inactive employees hold the role → 409 ROLE_HAS_INACTIVE_EMPLOYEES (spec v8) | fix now (backend-dev S6) | open |
 | F-TEST-9 | stop hook | backend/src/routes/role-admin.test.ts:171 | typecheck: string | null not assignable to string (screen menuGroup is nullable: "" = no group, questions.md #14) | fix after S6 build (test-writer) | resolved (menuGroup stays NOT NULL, "" = no group) |
+| SEC-1 | security 28 | backend/src/service/employeeService.ts update | non-super-admin with setup.employees.manage can edit a super-admin (password) → takeover; BR-AUTH-16 (spec v9) | fix now (test first) | open |
+| SEC-2 | security 28 | employeeService.ts remove | can deactivate super-admin / higher-role employees; BR-AUTH-16 v9 | fix now (test first) | open |
+| SEC-3 | security 28 | employeeService.ts regenerateQr | no target check, no audit, raw token; BR-AUTH-16/20 v9 | fix now (test first) | open |
+| SEC-4 | security 28 | employeeService.ts create/update/regenerateQr | employee changes not audited; BR-AUTH-20 v9 | fix now (test first) | open |
+| SEC-5 | security 28 | employeeService.ts update; authService.ts | password/method change + deactivation don't revoke refresh tokens; BR-AUTH-05 v9 | fix now (test first) | open |
+| SEC-6/CR-1 | security 28 + code 27 | employeeService.ts assertNotLastActiveAdmin | last-admin check outside write tx → zero super-admins under race; BR-AUTH-17 v9 | fix now (test first) | open |
+| CR-2 | code 27 | authService.ts:92-98 | refresh rotation not atomic → concurrent reuse; BR-AUTH-05 v9 | fix now (test first) | open |
+| SPEC-1 | spec 30 | backend tests | BR-AUTH-13 untested | fix now (test-writer) | open |
+| SPEC-4 | spec 30 | backend tests | ROLE_HAS_INACTIVE_EMPLOYEES untested (BR-AUTH-19 v8) | fix now (test-writer) | open |
+| SPEC-3 | spec 30 | spec | undocumented codes | fixed in spec v9 | fixed |
+| CR-3 | code 27 | frontend setup/auth queries | own permissions stale after grant/role change | fix now (frontend) | open |
+| CR-9..11, CR-13..15, PERF-10 | code 27, perf 29 | frontend | grants editor key, invalidations, dead code/types, tab gating, empty group header, missing error message, /auth/me staleTime | fix now (frontend) | open |
+| CR-4, CR-5, CR-7, CR-8, CR-12, CR-15 | code 27 | backend role/auth/approval services | guards inside tx, required name, explicit email, required actor, stale comment, inactive-employees doc | fix now (backend) | open |
+| PERF-1, PERF-2, PERF-4, PERF-5 | perf 29 | backend schema/services | index employees.role_id, auth_audit_log(at,id)+actor_id; batch setScreenRoles; row lock in grant tx | fix now (backend) | open |
+| CR-6, PERF-3, PERF-6..9, PERF-11, PERF-12, SEC-8 | code 27, perf 29, security 28 | various | minor structure/perf; multi-instance cache note | backlog | backlog |
+| SPEC-2 | spec 30 | approvalRepository.ts:394 | = F-APR-1 | approval module | open |
+| SPEC-5, SEC-9 | spec 30, security 28 | legacy role_pages routes | S7 | S7 | open |
+| SPEC-6 | spec 30 | authService.refresh | harmless | reject (no spec rule, no risk) | rejected |
