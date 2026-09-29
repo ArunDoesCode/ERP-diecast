@@ -86,7 +86,7 @@ ChallanLine = id, challanId, scoItemId, itemId, qty, unitIssueCostPaise, heatNum
 
 ## POST /sco/:id/challans -> 201 `data: { challan, lines }`
 Body: `{ challanDate?: ISO date (default now; decides FY), ewayBillNo?: string (1-50), lines: [ { scoItemId, qty (int >=1), heatNumber? (default = SCO line rawItemBatch) } ] }` (lines >= 1).
-Errors: 400 (validation; qty > send qty - issued; plant settings or raw item HSN missing; EWB missing when inter-state / vendor unregistered / value >= 50,000 paise*100 i.e. Rs 50,000 = 5,000,000 paise), 403, 404 (SCO / scoItemId not on this SCO),
+Errors: 400 (validation; challanDate after today UTC, BR-SCO-09; qty > send qty - issued; plant settings or raw item HSN missing; EWB missing when inter-state / vendor unregistered / value >= 50,000 paise*100 i.e. Rs 50,000 = 5,000,000 paise), 403, 404 (SCO / scoItemId not on this SCO),
 409 (SCO not approved/material_issued; store stock short; concurrent challan lost the SCO lock, BR-SCO-24).
 Effect: two `sco_issue` ledger rows per line (store -qty, vendor location +qty, average cost, heat), `issuedQty` += qty, SCO -> `material_issued`.
 

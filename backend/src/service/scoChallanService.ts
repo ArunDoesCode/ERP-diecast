@@ -39,6 +39,20 @@ function addOneYear(date: Date) {
   return due;
 }
 
+// BR-SCO-09: challan date may be today or earlier (whole days, UTC).
+function assertChallanDateNotFuture(date: Date) {
+  const now = new Date();
+  const startOfTomorrow =
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) +
+    24 * 60 * 60 * 1000;
+  if (date.getTime() >= startOfTomorrow) {
+    throw new BadRequestError(
+      "Challan date cannot be in the future",
+      "SCO_CHALLAN_DATE_FUTURE",
+    );
+  }
+}
+
 function dueStatusOf(daysLeft: number) {
   if (daysLeft < 0) return "overdue" as const;
   if (daysLeft <= WARNING_DAYS) return "warning" as const;
@@ -98,6 +112,7 @@ export const scoChallanService = {
     _actor: Actor,
   ): Promise<challanDetailsSchemaType> {
     const challanDate = input.challanDate ?? new Date();
+    assertChallanDateNotFuture(challanDate);
     const wanted = totalsByItem(input.lines);
 
     return db.transaction(async (tx) => {
