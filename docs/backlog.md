@@ -53,7 +53,6 @@ Type: defect · infra · feature · debt · idea.
 | BL-067 | P3 | debt | backend | List `q` search uses leading-wildcard `ilike` (PR, PO, GRN number) — no index; add pg_trgm when lists grow. See BL-032, BL-050 | m1 PERF-09, PERF-M2 | 2026-09-29 |
 | BL-068 | P3 | debt | approval | `assertChainHasEligibleApprovers` runs one count per chain step; group into one query if touched | m1 PERF-11 (procurement review) | 2026-09-29 |
 | BL-071 | P1 | defect | known-defects | `db:reset` guard lets a local DB named `diecast` through with no confirm, so a script run with the dev `DATABASE_URL` wiped the dev DB (2026-09-29). Also local `db:test:prepare` builds a different DB than CI's `db:reset --no-fixtures` (no baseline policies) → tests pass locally, fail in CI. Needs a known-defects spec change: confirm for any DB that isn't a test DB; one test-DB build path for local + CI | — | 2026-09-29 |
-| BL-072 | P2 | change | subcontracting | Challan date bounds: reject future dates (maybe allow ≤7 days back). Needs spec decision — date sets FY bucket and due date | subcontracting CR-6 | 2026-09-29 |
 | BL-073 | P3 | debt | subcontracting | `create` checks vendor + prepares lines outside the tx (update does it inside after the lock) | CR-8 | 2026-09-29 |
 | BL-074 | P3 | feature | company-settings | Keep change history (old/new) for company settings (GSTIN prints on legal challans) | SEC-1 | 2026-09-29 |
 | BL-075 | P3 | debt | subcontracting | BR-SCO-21 test only proves SCO DELETE ≥ 400; add challan/receipt delete cases; spec example says 400 but there is no route (404) | SPEC-1 | 2026-09-29 |
@@ -64,6 +63,7 @@ Type: defect · infra · feature · debt · idea.
 ## Done
 | ID | Item | PR / commit | Closed |
 |---|---|---|---|
+| BL-072 | Decided + fixed: challan date can't be in the future (subcontracting v3, BR-SCO-09) | PR #14 | 2026-09-29 |
 | BL-065 | Fixed: SCO submit locks and re-checks the row (subcontracting BR-SCO-06) | feature/subcontracting | 2026-09-29 |
 | BL-070 | Built subcontracting to spec v2 (S1–S4); SCO parts of BR-INV-05/10, BR-SUP-07 included | feature/subcontracting | 2026-09-29 |
 | BL-069 | Fixed: `GET /asset/locations` readable with `asset.manage` or `inventory.view`, so owner can fill the stock-take location picker (auth-setup v10) | work/m1 cc28d80 | 2026-09-29 |

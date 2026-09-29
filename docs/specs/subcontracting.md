@@ -1,7 +1,7 @@
 ---
 module: subcontracting
 status: frozen           # draft | frozen | changed-after-freeze
-version: 2
+version: 3
 frozen_on: 2026-09-29
 owner: Arun
 depends_on: [auth-setup, approval, approval-policies, grn, grn-stock, suppliers, inventory]
@@ -66,7 +66,7 @@ Seed: ow owner, bo back_office.
 | BR-SCO-06 | Submit, approve, reject, send back and withdraw follow `approval.md`; only its creator submits. Rejected is final: raise a new SCO. | SCO sent back → draft, editable |
 | BR-SCO-07 | An SCO may go out in several lots: a challan can be made on an `approved` or `material_issued` SCO, for qty > 0 per line and at most send qty − already issued. Main store must hold the qty (BR-GRN-33). | L1 issued 600, challan for 400 → ok; challan for 500 → 400; store has 300 → 409 |
 | BR-SCO-08 | Each challan line posts two ledger rows (`sco_issue`): main store −qty and the vendor's location +qty, at the item's current average cost, heat number copied. Item total stock and average do not change. The vendor's location is created on first use. | 600 pcs out → store −600, "Sai CNC (job work)" +600, both @ 12,000; item stock unchanged |
-| BR-SCO-09 | Challan number `JWC/<FY>/<seq>`: consecutive per financial year, max 16 characters, never reused. The printed challan carries the Rule 55 fields: date, number, our and vendor's name, address and GSTIN ("unregistered" if the vendor has none), item, HSN, qty, value at issue cost, "sent for job work u/s 143, no tax charged". Our name, address, GSTIN and state come from company settings (one row, owner edits it); HSN comes from the raw item's `hsn_code`. If either is missing the challan is refused (400) and nothing posts. | 1 Apr 2027 → JWC/27-28/1; vendor without GSTIN → prints "GSTIN: unregistered" |
+| BR-SCO-09 | Challan number `JWC/<FY>/<seq>`: consecutive per financial year, max 16 characters, never reused. The printed challan carries the Rule 55 fields: date, number, our and vendor's name, address and GSTIN ("unregistered" if the vendor has none), item, HSN, qty, value at issue cost, "sent for job work u/s 143, no tax charged". Our name, address, GSTIN and state come from company settings (one row, owner edits it); HSN comes from the raw item's `hsn_code`. If either is missing the challan is refused (400) and nothing posts. Challan date can't be in the future (400); it defaults to today. | 1 Apr 2027 → JWC/27-28/1; vendor without GSTIN → prints "GSTIN: unregistered" |
 | BR-SCO-10 | We always produce the e-way bill; its number must be entered before the challan is saved when the vendor is in another state (GSTIN state code differs from ours), the vendor has no GSTIN, or the challan value is ≥ ₹50,000. | inter-state, value ₹8,000, no EWB → 400; unregistered vendor, ₹5,000, no EWB → 400 |
 | BR-SCO-11 | Each challan's return due date = challan date + 1 year. Open challans show days left; ≤ 60 days = warning, past due = "overdue: deemed supply, tell accounts". Nothing is blocked, new challans to that vendor included. | challan 1 Oct 2026, today 15 Aug 2027 → 47 days left, warning; overdue challan, new challan to same vendor → ok |
 | BR-SCO-12 | A receipt can be made only on a `material_issued` SCO and needs the vendor's challan/invoice number, unique per vendor (409 if repeated). Per line: processed qty and unprocessed qty; (processed × ratio) + unprocessed ≤ qty still at the vendor for that line. | 600 at vendor, return 700 processed → 400 |
@@ -120,3 +120,4 @@ None open.
 - 2026-09-29 — clarified during build (S3, Arun: "do what other ERPs do"): when send ÷ return is not whole, raw pieces used are proportional to the cumulative processed qty, rounded half up to whole pieces, minus what was already used (ERPNext/Odoo/SAP backflush style; no drift, fully returned = fully used). BR-SCO-12 and 14 use this for "processed × ratio".
 - 2026-09-29 — clarified during build (S4): close while any receipt line is still pending QA → 409 "decide QA first"; nothing is written off until every processed line has a QA decision (BR-SCO-19).
 - 2026-09-29 — clarified during build (S4, supersedes the S3 note): BR-SCO-18 — status becomes `material_received` once every line is fully issued and every issued piece is covered by a receipt (unprocessed or processed), even if QA on it is still pending; close still waits for QA (409, BR-SCO-19).
+- 2026-09-29 — v3 (Arun, BL-072): challan date can't be in the future → 400 (BR-SCO-09); back-dating stays open. No other rule changed.
