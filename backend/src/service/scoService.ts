@@ -1,7 +1,9 @@
 import { db } from "../db/client";
 import type { Actor } from "../lib/auth-middleware";
 import { BadRequestError, ConflictError, NotFoundError } from "../lib/errors";
+import { qtyAtVendor } from "../lib/sco-math";
 import { approvalRepository } from "../repository/approvalRepository";
+import { scoReceiptRepository } from "../repository/scoReceiptRepository";
 import {
   computeScoLinePaise,
   computeScoTotalsPaise,
@@ -18,6 +20,7 @@ import type {
   scoResponseSchemaType,
   updateScoSchemaType,
 } from "../types/sco.types";
+import type { scoFullDetailsSchemaType } from "../types/scoReceipt.types";
 import { approvalService } from "./approvalService";
 
 type Paginated<T> = {
@@ -177,8 +180,38 @@ export const scoService = {
     };
   },
 
-  async getDetails(id: number): Promise<scoDetailsSchemaType> {
-    return loadDetails(id);
+  // BR-SCO-12, 17, 22: details plus qty at vendor, charge due and challan settlement.
+  async getDetails(id: number): Promise<scoFullDetailsSchemaType> {
+    const { sco, items } = await loadDetails(id);
+    const items2 = items.map((line) => {
+      const charge = computeScoLinePaise(
+        line.acceptedQty,
+        line.serviceUnitPricePaise,
+        line.serviceTaxPercentage,
+      );
+      return {
+        ...line,
+        qtyAtVendor: qtyAtVendor(line),
+        chargeDuePaise: charge.lineValuePaise,
+        chargeDueGstPaise: charge.lineTaxPaise,
+      };
+    });
+    const subtotalPaise = items2.reduce((s, l) => s + l.chargeDuePaise, 0);
+    const gstPaise = items2.reduce((s, l) => s + l.chargeDueGstPaise, 0);
+    const challanLines = await scoReceiptRepository.listChallanLinesForSco(id);
+    return {
+      sco,
+      items: items2,
+      chargeDue: {
+        subtotalPaise,
+        gstPaise,
+        totalPaise: subtotalPaise + gstPaise,
+      },
+      challanSettlements: challanLines.map((c) => ({
+        ...c,
+        settled: c.settledQty >= c.qty,
+      })),
+    };
   },
 
   // BR-SCO-01..04: header and lines saved together as a draft.
