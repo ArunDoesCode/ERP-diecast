@@ -117,7 +117,8 @@ export const assetLastRateSourceSchema = z.enum([
 ]);
 
 export const assetLastRateSchema = z.object({
-  ratePaise: z.number().int().min(1),
+  // 0 only for a legacy item whose standard rate was never set
+  ratePaise: z.number().int().min(0),
   source: assetLastRateSourceSchema,
 });
 export type assetLastRateSchemaType = z.infer<typeof assetLastRateSchema>;

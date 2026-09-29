@@ -101,7 +101,8 @@ Errors use the usual envelope `{ success:false, error:{ code, message } }`; `409
 ## Roles (perm key = seed roles + super-admin)
 | Routes | Key | Roles |
 |---|---|---|
-| POST/PATCH `/items`, `/services`, `/locations`, `/machines`; GET `/services`, `/locations`, `/machines`, `/items/:itemId/last-rate` | `asset.manage` | super-admin, back_office |
+| POST/PATCH `/items`, `/services`, `/locations`, `/machines`; GET `/services`, `/machines`, `/items/:itemId/last-rate` | `asset.manage` | super-admin, back_office |
+| GET `/locations` (read only, questions.md row 3) | `inventory.view` | super-admin, owner, back_office, floor_supervisor |
 | GET `/items` (**widened**), GET `/inventory/stock`, GET `/inventory/movements`, GET `/inventory/reconciliation` | `inventory.view` | super-admin, owner, back_office, floor_supervisor |
 | POST `/inventory/movements` | `inventory.adjust` | super-admin, owner, back_office |
 No route edits or deletes a ledger row; no DELETE route exists for items/services/locations/machines (deactivate via PATCH `isActive:false`). PATCH/DELETE on `/inventory/movements/:id` -> 404.

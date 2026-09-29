@@ -80,6 +80,7 @@ export const purchaseRequestItems = pgTable(
   },
   (table) => ({
     prIdIdx: index("idx_pr_items_pr_id").on(table.prId),
+    itemIdIdx: index("idx_pr_items_item_id").on(table.itemId),
   }),
 );
 
@@ -152,6 +153,7 @@ export const purchaseOrderItems = pgTable(
   },
   (table) => ({
     poIdIdx: index("idx_po_items_po_id").on(table.poId),
+    itemIdIdx: index("idx_po_items_item_id").on(table.itemId),
   }),
 );
 

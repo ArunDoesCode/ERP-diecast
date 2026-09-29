@@ -4,6 +4,7 @@ import type { db } from "../db/client";
 import {
   inventoryLedger,
   itemMaster,
+  locations,
 } from "../db/schemas/02_procurement-catalog";
 import { BadRequestError, ConflictError, NotFoundError } from "../lib/errors";
 
@@ -64,6 +65,19 @@ export async function postStock(tx: Tx, input: PostStockInput) {
     .for("update");
   if (!item) {
     throw new NotFoundError("Item not found");
+  }
+
+  // BR-INV-15: an inactive location takes no new postings (any path)
+  const [location] = await tx
+    .select({ isActive: locations.isActive })
+    .from(locations)
+    .where(eq(locations.id, input.locationId))
+    .limit(1);
+  if (!location) {
+    throw new NotFoundError("Location not found");
+  }
+  if (!location.isActive) {
+    throw new BadRequestError("Location is inactive");
   }
 
   // id order, not createdAt: created_at is the transaction start time.

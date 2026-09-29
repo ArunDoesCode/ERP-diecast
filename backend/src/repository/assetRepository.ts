@@ -126,6 +126,11 @@ type MachineUpdateData = PartialUpdate<
   Omit<typeof machines.$inferInsert, "id" | "createdBy" | "createdAt">
 >;
 
+// SEC-20: escape LIKE wildcards in user search text (Postgres default escape is \).
+function likePattern(q: string) {
+  return `%${q.replace(/[\\%_]/g, "\\$&")}%`;
+}
+
 function toStartOfDay(date: Date) {
   const normalized = new Date(date);
   normalized.setHours(0, 0, 0, 0);
@@ -138,6 +143,20 @@ function toNextDayStart(date: Date) {
   return normalized;
 }
 
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+// BR-INV-04: any ledger row, PR line, PO line or supplier-item line.
+async function itemInUse(tx: Tx, itemId: number) {
+  const [row] = await tx.execute<{ used: boolean }>(sql`
+    select (
+      exists (select 1 from ${inventoryLedger} where ${inventoryLedger.itemId} = ${itemId})
+      or exists (select 1 from ${purchaseRequestItems} where ${purchaseRequestItems.itemId} = ${itemId})
+      or exists (select 1 from ${purchaseOrderItems} where ${purchaseOrderItems.itemId} = ${itemId})
+      or exists (select 1 from ${supplierItems} where ${supplierItems.itemId} = ${itemId})
+    ) as used`);
+  return row?.used === true;
+}
+
 export const assetRepository = {
   async listItems(params: assetItemListQuerySchemaType) {
     const sortColumn =
@@ -147,7 +166,7 @@ export const assetRepository = {
     const orderFn = params.sortDir === "desc" ? desc : asc;
 
     const q = params.q?.trim();
-    const pattern = q ? `%${q}%` : undefined;
+    const pattern = q ? likePattern(q) : undefined;
 
     const whereClause = and(
       pattern
@@ -199,16 +218,42 @@ export const assetRepository = {
     return row;
   },
 
-  // BR-INV-04: any ledger row, PR line, PO line or supplier-item line.
-  async isItemInUse(itemId: number) {
-    const [row] = await db.execute<{ used: boolean }>(sql`
-      select (
-        exists (select 1 from ${inventoryLedger} where ${inventoryLedger.itemId} = ${itemId})
-        or exists (select 1 from ${purchaseRequestItems} where ${purchaseRequestItems.itemId} = ${itemId})
-        or exists (select 1 from ${purchaseOrderItems} where ${purchaseOrderItems.itemId} = ${itemId})
-        or exists (select 1 from ${supplierItems} where ${supplierItems.itemId} = ${itemId})
-      ) as used`);
-    return row?.used === true;
+  // BR-INV-04 (CR-24): the in-use check and the update run in one transaction
+  // with the item row locked, so a first posting can't slip in between.
+  // `decide` gets the current row and returns the columns to write.
+  async updateItemLocked(
+    id: number,
+    decide: (
+      current: {
+        sku: string;
+        uom: string;
+        reorderLevel: number;
+      },
+      isInUse: () => Promise<boolean>,
+    ) => ItemUpdateData | Promise<ItemUpdateData>,
+  ) {
+    return db.transaction(async (tx) => {
+      const [current] = await tx
+        .select({
+          sku: itemMaster.sku,
+          uom: itemMaster.uom,
+          reorderLevel: itemMaster.reorderLevel,
+        })
+        .from(itemMaster)
+        .where(eq(itemMaster.id, id))
+        .limit(1)
+        .for("update");
+      if (!current) {
+        return undefined;
+      }
+      const data = await decide(current, () => itemInUse(tx, id));
+      const [updated] = await tx
+        .update(itemMaster)
+        .set(data)
+        .where(eq(itemMaster.id, id))
+        .returning(itemColumns);
+      return updated;
+    });
   },
 
   async updateItem(id: number, data: ItemUpdateData) {
@@ -233,6 +278,7 @@ export const assetRepository = {
         and(
           eq(purchaseOrders.supplierId, supplierId),
           eq(purchaseOrderItems.itemId, itemId),
+          sql`${purchaseOrderItems.unitPricePaise} > 0`,
           inArray(purchaseOrders.status, [
             "approved",
             "dispatched",
@@ -290,7 +336,8 @@ export const assetRepository = {
       };
     }
     return {
-      ratePaise: Math.max(itemRow.standardRatePaise, 1),
+      // legacy rows may still have 0 (API rejects 0 on write)
+      ratePaise: itemRow.standardRatePaise,
       source: "standard_rate" as const,
     };
   },
@@ -303,7 +350,7 @@ export const assetRepository = {
     const orderFn = params.sortDir === "desc" ? desc : asc;
 
     const q = params.q?.trim();
-    const pattern = q ? `%${q}%` : undefined;
+    const pattern = q ? likePattern(q) : undefined;
 
     const whereClause = and(
       pattern
@@ -431,7 +478,7 @@ export const assetRepository = {
     const orderFn = params.sortDir === "desc" ? desc : asc;
 
     const q = params.q?.trim();
-    const pattern = q ? `%${q}%` : undefined;
+    const pattern = q ? likePattern(q) : undefined;
 
     const whereClause = and(
       pattern
@@ -480,7 +527,11 @@ export const assetRepository = {
   // Other locations of a type (optionally linked to one supplier).
   async countLocations(
     type: (typeof locations.$inferSelect)["type"],
-    opts: { excludeId?: number; supplierId?: number } = {},
+    opts: {
+      excludeId?: number;
+      supplierId?: number;
+      activeOnly?: boolean;
+    } = {},
   ) {
     const [row] = await db
       .select({ value: count() })
@@ -494,6 +545,7 @@ export const assetRepository = {
           opts.supplierId !== undefined
             ? eq(locations.linkedVendorId, opts.supplierId)
             : undefined,
+          opts.activeOnly ? eq(locations.isActive, true) : undefined,
         ),
       );
     return row?.value ?? 0;
@@ -660,7 +712,7 @@ export const assetRepository = {
   // still hold stock; per-location balance = last ledger balance.
   async listStock(params: assetStockListQuerySchemaType) {
     const q = params.q?.trim();
-    const pattern = q ? `%${q}%` : undefined;
+    const pattern = q ? likePattern(q) : undefined;
     const valueExpr = sql`round(${itemMaster.currentStock} * ${itemMaster.averageCostPaise})`;
     const belowExpr = and(
       eq(itemMaster.isActive, true),
@@ -823,7 +875,7 @@ export const assetRepository = {
     const orderFn = params.sortDir === "desc" ? desc : asc;
 
     const q = params.q?.trim();
-    const pattern = q ? `%${q}%` : undefined;
+    const pattern = q ? likePattern(q) : undefined;
 
     const whereClause = and(
       pattern

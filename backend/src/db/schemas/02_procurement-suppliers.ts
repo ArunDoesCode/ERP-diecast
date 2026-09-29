@@ -1,6 +1,7 @@
 import {
   boolean,
   doublePrecision,
+  index,
   integer,
   pgEnum,
   pgTable,
@@ -106,6 +107,8 @@ export const supplierItems = pgTable(
         table.supplierId,
         table.itemId,
       ),
+      // BR-INV-04 in-use check and item lookups lead with item_id
+      itemIdIdx: index("idx_supplier_items_item_id").on(table.itemId),
     };
   },
 );

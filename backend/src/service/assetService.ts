@@ -125,6 +125,13 @@ async function checkLocationRules(
   }
 }
 
+// BR-INV-07/08: pcs and set take whole numbers only, reorder level included.
+function assertReorderLevelFitsUnit(reorderLevel: number, uom: string) {
+  if ((uom === "pcs" || uom === "set") && !Number.isInteger(reorderLevel)) {
+    throw new BadRequestError(`Items in ${uom} take whole numbers only`);
+  }
+}
+
 export const assetService = {
   async listItems(params: assetItemListQuerySchemaType) {
     const { rows, total } = await assetRepository.listItems(params);
@@ -135,6 +142,7 @@ export const assetService = {
   },
 
   async createItem(input: assetItemCreateSchemaType, actorId: number) {
+    assertReorderLevelFitsUnit(input.reorderLevel ?? 0, input.uom);
     try {
       const created = await assetRepository.createItem(input, actorId);
       if (!created) {
@@ -155,25 +163,34 @@ export const assetService = {
     input: assetItemUpdateSchemaType,
     actorId: number,
   ) {
-    const current = await assetRepository.findItemById(id);
-    if (!current) {
-      throw new NotFoundError("Item not found");
-    }
-    // BR-INV-04: SKU and unit are locked once the item is used anywhere.
-    const skuChanges = input.sku !== undefined && input.sku !== current.sku;
-    const uomChanges = input.uom !== undefined && input.uom !== current.uom;
-    if ((skuChanges || uomChanges) && (await assetRepository.isItemInUse(id))) {
-      throw new ConflictError(
-        "SKU and unit can't change once the item is in use",
-        "ITEM_IN_USE",
-      );
-    }
     try {
-      const updated = await assetRepository.updateItem(id, {
-        ...input,
-        lastUpdatedBy: actorId,
-        lastUpdatedAt: new Date(),
-      });
+      const updated = await assetRepository.updateItemLocked(
+        id,
+        async (current, isInUse) => {
+          // BR-INV-04: SKU and unit are locked once the item is used anywhere.
+          const skuChanges =
+            input.sku !== undefined && input.sku !== current.sku;
+          const uomChanges =
+            input.uom !== undefined && input.uom !== current.uom;
+          if ((skuChanges || uomChanges) && (await isInUse())) {
+            throw new ConflictError(
+              "SKU and unit can't change once the item is in use",
+              "ITEM_IN_USE",
+            );
+          }
+          if (input.reorderLevel !== undefined || uomChanges) {
+            assertReorderLevelFitsUnit(
+              input.reorderLevel ?? current.reorderLevel,
+              input.uom ?? current.uom,
+            );
+          }
+          return {
+            ...input,
+            lastUpdatedBy: actorId,
+            lastUpdatedAt: new Date(),
+          };
+        },
+      );
       if (!updated) {
         throw new NotFoundError("Item not found");
       }
@@ -274,7 +291,8 @@ export const assetService = {
         {
           ...input,
           linkedVendorId: input.linkedVendorId ?? null,
-          ...(input.type === "vendor_premise" ? { isVirtual: true } : {}),
+          // BR-INV-12: vendor_premise is always virtual; client value ignored
+          isVirtual: input.type === "vendor_premise",
         },
         actorId,
       );
@@ -326,11 +344,27 @@ export const assetService = {
         }
       }
     }
+    if (input.isActive === false && current.type === "main_store") {
+      // GRN posts to the main store (BR-INV-13): keep one active
+      const otherActive = await assetRepository.countLocations("main_store", {
+        excludeId: id,
+        activeOnly: true,
+      });
+      if (otherActive === 0) {
+        throw new ConflictError("The main store can't be deactivated");
+      }
+    }
+    const { isVirtual: _clientIsVirtual, ...rest } = input;
     try {
       const updated = await assetRepository.updateLocation(id, {
-        ...input,
+        ...rest,
         ...(typeChanges || linkChanges ? { linkedVendorId } : {}),
-        ...(type === "vendor_premise" ? { isVirtual: true } : {}),
+        // derived, never taken from the client (CR-23)
+        ...(type === "vendor_premise"
+          ? { isVirtual: true }
+          : typeChanges
+            ? { isVirtual: false }
+            : {}),
         lastUpdatedBy: actorId,
         lastUpdatedAt: new Date(),
       });

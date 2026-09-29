@@ -30,3 +30,17 @@
 | TEST-1, TEST-2 | (blocker per runner) | test | cd77a53, b78b070 | test( commits also carry .pipeline briefs/reports | reject: PROTOCOL rule 5 only requires test files in test( commits and none in feat(/fix( — both hold; runner confirmed no feat/fix commit touches a test file |
 | TEST-3 | major | test | backend/src/service/stockPosting.test.ts (manual-movement tests) | 28 grn-stock tests post the old signed-qty body; spec inventory.md BR-INV-22: "Stock-take: the clerk enters the counted qty; the system posts counted − current balance at that location" and BR-INV-23 (opening stock qty + rate). Contract changed to match. | test-writer: update those tests to the new shape (brief 22) |
 | COORD-2 | minor | backend | locations | one main_store / one vendor_premise per supplier only checked in service (race) | fixed: partial unique indexes (brief 26) |
+| PERF-20 | major | backend | po/pr/supplier items item_id | unindexed exists checks + getLastRate scan | fix now (inventory iter 1) |
+| PERF-21 | major | backend | ledger location_id | unindexed location-only filters | fix now: index (location_id, id desc) |
+| PERF-22 | major | backend | movements list | date / ref-type filters sort+count whole ledger | fix now: index created_at |
+| PERF-23..26 | minor | backend/frontend | stock list / reconciliation / invalidation | acceptable at plant scale | backlog (PERF-23 trgm) / none |
+| CR-20, CR-21 | major | frontend | asset + grn queries | stale stock/movements caches | fix now |
+| CR-22 | major | backend | postStock / updateLocation | BR-INV-15 inactive location not checked on GRN path | fix now: postStock refuses inactive location (400, BR-INV-15 example); deactivating the only main_store → 409 (derived from BR-INV-13 "exactly one main_store (GRN posts there)") |
+| CR-23..26 | minor | backend | locations / items / last rate | isVirtual reset; BR-INV-04 lock; reorder whole numbers; last-rate rate>0, no fake 1 paise | fix now (cheap) |
+| SEC-20 | minor | backend | list search | ilike wildcards not escaped | fix now (cheap) |
+| SPEC-20 | major | backend | poService | BR-INV-05 PO half (PR line approved before item deactivated → PO) | reject here: PO code belongs to the auth session (rewritten on work/m1) → handed off as BL-046; SCO part → subcontracting plan |
+| SPEC-21 | major | backend | GET /machines | pr.link_machine read | reject: BR-AUTH-26 is the auth session's and built there (questions.md row 1) |
+| SPEC-22 | major | backend | prRepository | inactive item on PR edit | reject: purchase-requisition BR-PR-06 covers create + edit and work/m1 prService enforces it; our temporary change is replaced on merge |
+| SPEC-23 | minor | contract | contract.md | GET /locations guard text stale | fixed by coordinator in contract.md |
+| SPEC-24 | minor | contract | getLastRate source | `pr_estimate` means item average | backlog: consumers are PO screens (auth session) → BL-047; name kept |
+| SPEC-25 | minor | contract | locations isVirtual | client-sendable flag, spec silent | backlog |
