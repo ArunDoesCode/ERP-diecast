@@ -287,7 +287,7 @@ register({
 
 assetRouter.get(
   ASSET_ROUTES.listLocations,
-  requirePermission("asset.manage"),
+  requireAnyPermission("asset.manage", "inventory.view"),
   asyncHandler(assetController.listLocations),
 );
 register({
@@ -295,7 +295,11 @@ register({
   path: `${ASSET_BASE_PATH}${ASSET_ROUTES.listLocations}`,
   tags: ["asset"],
   summary: "List inventory locations, paginated.",
-  auth: { type: "permission", key: "asset.manage" },
+  auth: {
+    type: "permission",
+    key: "asset.manage",
+    alsoKeys: ["inventory.view"],
+  },
   request: { query: assetLocationListQuerySchema },
   responses: { "200": paginatedResponse(assetLocationSchema) },
   pagination: {
