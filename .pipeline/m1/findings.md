@@ -65,4 +65,4 @@
 | SPEC-P8 | spec 59 | reports | contamination line missing in 3 reports | noted: briefs are pointer-only template calls, recorded in the coordinator transcript | rejected |
 | CRP-5, CRP-9, PERF-03, PERF-05, PERF-09, PERF-10, PERF-11, SPEC-P10 | code 56, perf 58, spec 59 | various | repo layering, SCO submit lock (M2), minor batching, trigram search, rate suggestion (after merge) | backlog / after merge | backlog |
 | FE-LABEL | frontend-dev 61 | PurchaseOrderTrackingCards | shows raw confirmation method (in_person) | fix in final UI pass | open |
-| F-TEST-17 | backend-dev 62 | backend/src/repository/approvalRepository.test.ts:187 | requestor fixture role has no pr.manage; approval v2 (BR-APR-24) submit needs the doc key → 403 | fix now (test-writer) | open |
+| F-TEST-17 | backend-dev 62 | backend/src/repository/approvalRepository.test.ts:187 | requestor fixture role has no pr.manage; approval v2 (BR-APR-24) submit needs the doc key → 403 | fix now (test-writer) | fixed |
