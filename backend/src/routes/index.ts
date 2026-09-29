@@ -3,9 +3,11 @@ import type { AppEnv } from "../lib/types";
 import { approvalRoutes } from "./approval";
 import { assetRoutes } from "./asset";
 import { authRoutes } from "./auth";
+import { companyRoutes } from "./company";
 import { grnRoutes } from "./grn";
 import { poRoutes } from "./po";
 import { prRoutes } from "./pr";
+import { scoRoutes } from "./sco";
 import { setupRoutes } from "./setup";
 import { supplierRoutes } from "./supplier";
 
@@ -18,6 +20,8 @@ const MAIN_ROUTES = {
   po: "/po",
   grn: "/grn",
   approval: "/approval",
+  sco: "/sco",
+  company: "/company",
 } as const;
 
 export { authRoutes } from "./auth";
@@ -32,3 +36,5 @@ mainRouter.route(MAIN_ROUTES.pr, prRoutes);
 mainRouter.route(MAIN_ROUTES.po, poRoutes);
 mainRouter.route(MAIN_ROUTES.grn, grnRoutes);
 mainRouter.route(MAIN_ROUTES.approval, approvalRoutes);
+mainRouter.route(MAIN_ROUTES.sco, scoRoutes);
+mainRouter.route(MAIN_ROUTES.company, companyRoutes);

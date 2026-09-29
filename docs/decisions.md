@@ -116,3 +116,8 @@ If a decision is reversed, add a new entry that references the old one — don't
   Fixtures still never write stock or average cost directly; stock comes only from GRN postings.
 - **Why:** BL-014 is fixed, so GRN accept posts real stock and average cost; the old "stays 0" check was
   written against the bug.
+
+### D-017 — Plant details, item HSN, company.manage (2026-09-29, subcontracting v2)
+- **Decision:** plant name/address/GSTIN/state live in a one-row `company_settings` table, edited by owner
+  through new key `company.manage`; `hsn_code` added to `item_master`; challan without either → 400.
+- **Why:** challan (BR-SCO-09) and the inter-state e-way check (BR-SCO-10) need them and nothing held them.

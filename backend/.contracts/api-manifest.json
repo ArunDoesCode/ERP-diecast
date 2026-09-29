@@ -644,6 +644,7 @@
             "currentStock": "unrepresentable.required",
             "averageCostPaise": "unrepresentable.required",
             "isActive": "boolean.required",
+            "hsnCode": "string.nullable.required",
             "standardRatePaise": "unrepresentable.required",
             "createdBy": "unrepresentable.nullable.required",
             "createdAt": "unrepresentable.required",
@@ -674,6 +675,7 @@
           "uom": "enum:kg,pcs,ltr,m,set.optional",
           "reorderLevel": "number.nonnegative.optional",
           "standardRatePaise": "integer.nonnegative.optional",
+          "hsnCode": "string.nonempty.nullable.optional",
           "isActive": "boolean.optional"
         }
       },
@@ -691,6 +693,7 @@
             "currentStock": "unrepresentable.required",
             "averageCostPaise": "unrepresentable.required",
             "isActive": "boolean.required",
+            "hsnCode": "string.nullable.required",
             "standardRatePaise": "unrepresentable.required",
             "createdBy": "unrepresentable.nullable.required",
             "createdAt": "unrepresentable.required",
@@ -1247,6 +1250,69 @@
             "screens": "array<object>.required"
           },
           "message": "string.required"
+        }
+      }
+    },
+    {
+      "id": "GET /api/company/settings",
+      "method": "GET",
+      "path": "/api/company/settings",
+      "tags": [
+        "company"
+      ],
+      "summary": "Get our company details for the job-work challan (BR-SCO-09). `data` is null until saved.",
+      "auth": {
+        "type": "permission",
+        "key": "sco.view"
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "unrepresentable.required",
+            "name": "string.required",
+            "address": "string.required",
+            "gstin": "string.required",
+            "stateCode": "string.required",
+            "updatedBy": "unrepresentable.nullable.required",
+            "updatedAt": "unrepresentable.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "PATCH /api/company/settings",
+      "method": "PATCH",
+      "path": "/api/company/settings",
+      "tags": [
+        "company"
+      ],
+      "summary": "Create or replace the single company-settings row (owner only, BR-SCO-09). All four fields required.",
+      "auth": {
+        "type": "permission",
+        "key": "sco.loss_override"
+      },
+      "request": {
+        "body": {
+          "name": "string.nonempty.required",
+          "address": "string.nonempty.required",
+          "gstin": "string.required",
+          "stateCode": "string.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "unrepresentable.required",
+            "name": "string.required",
+            "address": "string.required",
+            "gstin": "string.required",
+            "stateCode": "string.required",
+            "updatedBy": "unrepresentable.nullable.required",
+            "updatedAt": "unrepresentable.required"
+          }
         }
       }
     },
@@ -2621,6 +2687,317 @@
               "expectedDate": "unrepresentable.nullable.required",
               "status": "enum:pending,po_draft,ordered,closed,cancelled.required"
             }
+          }
+        }
+      }
+    },
+    {
+      "id": "GET /api/sco/getscos",
+      "method": "GET",
+      "path": "/api/sco/getscos",
+      "tags": [
+        "sco"
+      ],
+      "summary": "List subcontracting orders, paginated. Filters: `status` (comma list), `vendorId`, `q` (SCO number or vendor name).",
+      "auth": {
+        "type": "permission",
+        "key": "sco.view"
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "sortBy": "enum:id,scoNumber,status,createdAt,expectedReturnDate.optional",
+          "sortDir": "enum:asc,desc.required",
+          "status": "array<enum:draft,pending_approval,approved,rejected,require_more_info,material_issued,material_received,closed,cancelled>.optional",
+          "vendorId": "integer.positive.optional",
+          "q": "string.nonempty.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "id",
+          "scoNumber",
+          "status",
+          "createdAt",
+          "expectedReturnDate"
+        ],
+        "searchable": true
+      }
+    },
+    {
+      "id": "GET /api/sco/getscodetails/:id",
+      "method": "GET",
+      "path": "/api/sco/getscodetails/:id",
+      "tags": [
+        "sco"
+      ],
+      "summary": "Get a subcontracting order with its lines (item names, computed line value and GST, counters).",
+      "auth": {
+        "type": "permission",
+        "key": "sco.view"
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "sco": {
+              "id": "unrepresentable.required",
+              "scoNumber": "string.required",
+              "vendorId": "unrepresentable.required",
+              "status": "enum:draft,pending_approval,approved,rejected,require_more_info,material_issued,material_received,closed,cancelled.required",
+              "projectRef": "string.nullable.required",
+              "notes": "string.nullable.required",
+              "expectedReturnDate": "unrepresentable.required",
+              "subtotalPaise": "unrepresentable.required",
+              "taxAmountPaise": "unrepresentable.required",
+              "totalAmountPaise": "unrepresentable.required",
+              "approvedBy": "unrepresentable.nullable.required",
+              "currentApprovalLevel": "unrepresentable.required",
+              "totalApprovalLevels": "unrepresentable.required",
+              "createdBy": "unrepresentable.nullable.required",
+              "createdAt": "unrepresentable.required",
+              "lastUpdatedBy": "unrepresentable.nullable.required",
+              "lastUpdatedAt": "unrepresentable.required",
+              "cancelledBy": "unrepresentable.nullable.required",
+              "cancelledAt": "unrepresentable.nullable.required",
+              "cancelReason": "string.nullable.required",
+              "closedBy": "unrepresentable.nullable.required",
+              "closedAt": "unrepresentable.nullable.required",
+              "closeReason": "string.nullable.required",
+              "vendorName": "string.required",
+              "cancelledByName": "string.nullable.required"
+            },
+            "items": "array<object>.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/sco/createsco",
+      "method": "POST",
+      "path": "/api/sco/createsco",
+      "tags": [
+        "sco"
+      ],
+      "summary": "Create a draft subcontracting order with its lines in one call (BR-SCO-01..04). Line price/GST default to the vendor's service price list.",
+      "auth": {
+        "type": "permission",
+        "key": "sco.manage"
+      },
+      "request": {
+        "body": {
+          "vendorId": "integer.positive.required",
+          "expectedReturnDate": "unrepresentable.required",
+          "projectRef": "string.nonempty.optional",
+          "notes": "string.optional",
+          "lines": "array<object>.required"
+        }
+      },
+      "responses": {
+        "201": {
+          "success": "boolean.required",
+          "data": {
+            "sco": {
+              "id": "unrepresentable.required",
+              "scoNumber": "string.required",
+              "vendorId": "unrepresentable.required",
+              "status": "enum:draft,pending_approval,approved,rejected,require_more_info,material_issued,material_received,closed,cancelled.required",
+              "projectRef": "string.nullable.required",
+              "notes": "string.nullable.required",
+              "expectedReturnDate": "unrepresentable.required",
+              "subtotalPaise": "unrepresentable.required",
+              "taxAmountPaise": "unrepresentable.required",
+              "totalAmountPaise": "unrepresentable.required",
+              "approvedBy": "unrepresentable.nullable.required",
+              "currentApprovalLevel": "unrepresentable.required",
+              "totalApprovalLevels": "unrepresentable.required",
+              "createdBy": "unrepresentable.nullable.required",
+              "createdAt": "unrepresentable.required",
+              "lastUpdatedBy": "unrepresentable.nullable.required",
+              "lastUpdatedAt": "unrepresentable.required",
+              "cancelledBy": "unrepresentable.nullable.required",
+              "cancelledAt": "unrepresentable.nullable.required",
+              "cancelReason": "string.nullable.required",
+              "closedBy": "unrepresentable.nullable.required",
+              "closedAt": "unrepresentable.nullable.required",
+              "closeReason": "string.nullable.required",
+              "vendorName": "string.required",
+              "cancelledByName": "string.nullable.required"
+            },
+            "items": "array<object>.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "PATCH /api/sco/updatesco",
+      "method": "PATCH",
+      "path": "/api/sco/updatesco",
+      "tags": [
+        "sco"
+      ],
+      "summary": "Edit a draft SCO (BR-SCO-05): header fields and/or replace all lines. Non-draft = 409; `status` in body = 400.",
+      "auth": {
+        "type": "permission",
+        "key": "sco.manage"
+      },
+      "request": {
+        "body": {
+          "scoId": "integer.positive.required",
+          "expectedReturnDate": "unrepresentable.optional",
+          "projectRef": "string.nonempty.nullable.optional",
+          "notes": "string.nullable.optional",
+          "lines": "array<object>.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "sco": {
+              "id": "unrepresentable.required",
+              "scoNumber": "string.required",
+              "vendorId": "unrepresentable.required",
+              "status": "enum:draft,pending_approval,approved,rejected,require_more_info,material_issued,material_received,closed,cancelled.required",
+              "projectRef": "string.nullable.required",
+              "notes": "string.nullable.required",
+              "expectedReturnDate": "unrepresentable.required",
+              "subtotalPaise": "unrepresentable.required",
+              "taxAmountPaise": "unrepresentable.required",
+              "totalAmountPaise": "unrepresentable.required",
+              "approvedBy": "unrepresentable.nullable.required",
+              "currentApprovalLevel": "unrepresentable.required",
+              "totalApprovalLevels": "unrepresentable.required",
+              "createdBy": "unrepresentable.nullable.required",
+              "createdAt": "unrepresentable.required",
+              "lastUpdatedBy": "unrepresentable.nullable.required",
+              "lastUpdatedAt": "unrepresentable.required",
+              "cancelledBy": "unrepresentable.nullable.required",
+              "cancelledAt": "unrepresentable.nullable.required",
+              "cancelReason": "string.nullable.required",
+              "closedBy": "unrepresentable.nullable.required",
+              "closedAt": "unrepresentable.nullable.required",
+              "closeReason": "string.nullable.required",
+              "vendorName": "string.required",
+              "cancelledByName": "string.nullable.required"
+            },
+            "items": "array<object>.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/sco/:id/submit",
+      "method": "POST",
+      "path": "/api/sco/:id/submit",
+      "tags": [
+        "sco"
+      ],
+      "summary": "Submit a draft SCO for approval (BR-SCO-06); only its creator. Result is pending_approval, or approved when no chain applies.",
+      "auth": {
+        "type": "permission",
+        "key": "sco.manage"
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "sco": {
+              "id": "unrepresentable.required",
+              "scoNumber": "string.required",
+              "vendorId": "unrepresentable.required",
+              "status": "enum:draft,pending_approval,approved,rejected,require_more_info,material_issued,material_received,closed,cancelled.required",
+              "projectRef": "string.nullable.required",
+              "notes": "string.nullable.required",
+              "expectedReturnDate": "unrepresentable.required",
+              "subtotalPaise": "unrepresentable.required",
+              "taxAmountPaise": "unrepresentable.required",
+              "totalAmountPaise": "unrepresentable.required",
+              "approvedBy": "unrepresentable.nullable.required",
+              "currentApprovalLevel": "unrepresentable.required",
+              "totalApprovalLevels": "unrepresentable.required",
+              "createdBy": "unrepresentable.nullable.required",
+              "createdAt": "unrepresentable.required",
+              "lastUpdatedBy": "unrepresentable.nullable.required",
+              "lastUpdatedAt": "unrepresentable.required",
+              "cancelledBy": "unrepresentable.nullable.required",
+              "cancelledAt": "unrepresentable.nullable.required",
+              "cancelReason": "string.nullable.required",
+              "closedBy": "unrepresentable.nullable.required",
+              "closedAt": "unrepresentable.nullable.required",
+              "closeReason": "string.nullable.required",
+              "vendorName": "string.required",
+              "cancelledByName": "string.nullable.required"
+            },
+            "items": "array<object>.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/sco/:id/cancel",
+      "method": "POST",
+      "path": "/api/sco/:id/cancel",
+      "tags": [
+        "sco"
+      ],
+      "summary": "Cancel an SCO (BR-SCO-20): draft/pending_approval/approved with nothing issued, else 409. Reason 3-500 chars always; the open approval request is cancelled too.",
+      "auth": {
+        "type": "permission",
+        "key": "sco.manage"
+      },
+      "request": {
+        "body": {
+          "reason": "string.nonempty.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "sco": {
+              "id": "unrepresentable.required",
+              "scoNumber": "string.required",
+              "vendorId": "unrepresentable.required",
+              "status": "enum:draft,pending_approval,approved,rejected,require_more_info,material_issued,material_received,closed,cancelled.required",
+              "projectRef": "string.nullable.required",
+              "notes": "string.nullable.required",
+              "expectedReturnDate": "unrepresentable.required",
+              "subtotalPaise": "unrepresentable.required",
+              "taxAmountPaise": "unrepresentable.required",
+              "totalAmountPaise": "unrepresentable.required",
+              "approvedBy": "unrepresentable.nullable.required",
+              "currentApprovalLevel": "unrepresentable.required",
+              "totalApprovalLevels": "unrepresentable.required",
+              "createdBy": "unrepresentable.nullable.required",
+              "createdAt": "unrepresentable.required",
+              "lastUpdatedBy": "unrepresentable.nullable.required",
+              "lastUpdatedAt": "unrepresentable.required",
+              "cancelledBy": "unrepresentable.nullable.required",
+              "cancelledAt": "unrepresentable.nullable.required",
+              "cancelReason": "string.nullable.required",
+              "closedBy": "unrepresentable.nullable.required",
+              "closedAt": "unrepresentable.nullable.required",
+              "closeReason": "string.nullable.required",
+              "vendorName": "string.required",
+              "cancelledByName": "string.nullable.required"
+            },
+            "items": "array<object>.required"
           }
         }
       }

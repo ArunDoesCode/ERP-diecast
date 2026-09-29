@@ -10,7 +10,7 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { itemMaster } from "./02_procurement-catalog";
+import { itemMaster, serviceMaster } from "./02_procurement-catalog";
 import { supplierMaster } from "./02_procurement-suppliers";
 import { employees } from "./03_hcm";
 
@@ -286,8 +286,29 @@ export const subcontractingOrders = pgTable("subcontracting_orders", {
   projectRef: text("project_ref"),
 
   notes: text("notes"),
+  // BR-SCO-03: required, today .. today + 365 days (checked by the API).
+  expectedReturnDate: timestamp("expected_return_date").notNull(),
+  // BR-SCO-04: money in paise. subtotal = sum(service price x return qty), no GST.
+  subtotalPaise: integer("subtotal_paise").default(0).notNull(),
+  taxAmountPaise: integer("tax_amount_paise").default(0).notNull(),
+  totalAmountPaise: integer("total_amount_paise").default(0).notNull(),
+  // Approval mirror, same as PR/PO (BR-SCO-06).
+  approvedBy: integer("approved_by").references(() => employees.id),
+  currentApprovalLevel: integer("current_approval_level").default(0).notNull(),
+  totalApprovalLevels: integer("total_approval_levels").default(0).notNull(),
+  // Kept nullable (older rows); the API always sets it and checks it on submit (BR-SCO-06).
   createdBy: integer("created_by").references(() => employees.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  lastUpdatedBy: integer("last_updated_by").references(() => employees.id),
+  lastUpdatedAt: timestamp("last_updated_at").defaultNow().notNull(),
+  // BR-SCO-20: cancel who, when, why.
+  cancelledBy: integer("cancelled_by").references(() => employees.id),
+  cancelledAt: timestamp("cancelled_at"),
+  cancelReason: text("cancel_reason"),
+  // BR-SCO-19: close who, when, why (reason only when a loss is written off).
+  closedBy: integer("closed_by").references(() => employees.id),
+  closedAt: timestamp("closed_at"),
+  closeReason: text("close_reason"),
 });
 
 export const subcontractingOrderItems = pgTable("subcontracting_order_items", {
@@ -303,11 +324,16 @@ export const subcontractingOrderItems = pgTable("subcontracting_order_items", {
     .references(() => itemMaster.id)
     .notNull(),
   rawItemBatch: text("raw_item_batch"), // CRITICAL: Heat Number or Melt Number for traceability!
-  rawQtyToIssue: doublePrecision("raw_qty_to_issue").notNull(),
+  // BR-SCO-02: send qty, whole pieces > 0.
+  rawQtyToIssue: integer("raw_qty_to_issue").notNull(),
 
   // 2. THE SERVICE (Decoupled from the physical `itemMaster`!)
   // Services don't have stock, so they don't belong in the `itemMaster` table.
-  serviceDescription: text("service_description").notNull(), // e.g., "5-Axis CNC Machining"
+  // BR-SCO-02: the vendor's service (price + GST % below are copied from its price list).
+  serviceId: integer("service_id")
+    .references(() => serviceMaster.id)
+    .notNull(),
+  serviceDescription: text("service_description").notNull(), // service name copied at create
   serviceHsnSacCode: text("service_hsn_sac_code"), // GST SAC Code (e.g., 9988 for manufacturing services)
   serviceUnitPricePaise: integer("service_unit_price_paise").notNull(),
   serviceTaxPercentage: doublePrecision("service_tax_percentage")
@@ -318,7 +344,14 @@ export const subcontractingOrderItems = pgTable("subcontracting_order_items", {
   finishedItemId: integer("finished_item_id")
     .references(() => itemMaster.id)
     .notNull(),
-  expectedReturnQty: doublePrecision("expected_return_qty").notNull(),
+  // BR-SCO-02: return qty, whole pieces > 0. Ratio = send qty / return qty.
+  expectedReturnQty: integer("expected_return_qty").notNull(),
+  // Running counters, whole pieces (BR-SCO-07, 12-16, 18, 19); moved only by posting actions.
+  issuedQty: integer("issued_qty").default(0).notNull(),
+  acceptedQty: integer("accepted_qty").default(0).notNull(),
+  rejectedQty: integer("rejected_qty").default(0).notNull(),
+  unprocessedQty: integer("unprocessed_qty").default(0).notNull(),
+  lossQty: integer("loss_qty").default(0).notNull(),
 });
 
 export const grnStatusEnum = pgEnum("grn_status", [

@@ -63,3 +63,10 @@ export class InternalServerError extends AppError {
     super(message, 500, code);
   }
 }
+
+/** Contract-step stub marker: the route is registered but has no logic yet. */
+export class NotImplementedError extends AppError {
+  constructor(message = "Not implemented", code = "NOT_IMPLEMENTED") {
+    super(message, 501, code);
+  }
+}

@@ -109,6 +109,17 @@ export const END_POINTS = {
     bypass: "/:id/lines/:lineId/bypass",
     correction: "/:id/lines/:lineId/correction",
   },
+  sco: {
+    list: "/getscos",
+    details: "/getscodetails/:id",
+    create: "/createsco",
+    update: "/updatesco",
+    submit: "/:id/submit",
+    cancel: "/:id/cancel",
+  },
+  company: {
+    settings: "/settings",
+  },
   approval: {
     getPolicies: "/getPolicies",
     getPolicyDetails: "/getPolicyDetails/:id",
