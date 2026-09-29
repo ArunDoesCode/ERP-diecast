@@ -1,6 +1,6 @@
 import type { Context } from "hono";
 
-import { BadRequestError } from "../lib/errors";
+import { AppError, BadRequestError } from "../lib/errors";
 import type { AppEnv } from "../lib/types";
 import { assetService } from "../service/assetService";
 import {
@@ -15,7 +15,6 @@ import {
   assetMachineCreateSchema,
   assetMachineListQuerySchema,
   assetMachineUpdateSchema,
-  assetManualMovementCreateSchema,
   assetReconciliationQuerySchema,
   assetServiceCreateSchema,
   assetServiceListQuerySchema,
@@ -93,11 +92,14 @@ export const assetController = {
     return c.json({ success: true, data, meta });
   },
 
-  async createInventoryMovement(c: Context<AppEnv>) {
-    const body = assetManualMovementCreateSchema.parse(await c.req.json());
-    const actorId = Number(c.get("user").userId);
-    const data = await assetService.createInventoryMovement(body, actorId);
-    return c.json({ success: true, data }, 201);
+  // Contract step (m1-stock part 2): new body shape, logic lands in slice S9.
+  async createInventoryMovement(_c: Context<AppEnv>): Promise<never> {
+    throw new AppError("Not implemented", 501, "NOT_IMPLEMENTED");
+  },
+
+  // Slice S9 (BR-INV-19).
+  async inventoryStock(_c: Context<AppEnv>): Promise<never> {
+    throw new AppError("Not implemented", 501, "NOT_IMPLEMENTED");
   },
 
   async inventoryReconciliation(c: Context<AppEnv>) {

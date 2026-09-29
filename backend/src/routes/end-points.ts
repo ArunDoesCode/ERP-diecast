@@ -26,6 +26,7 @@ export const END_POINTS = {
     listInventoryMovements: "/inventory/movements",
     createInventoryMovements: "/inventory/movements",
     inventoryReconciliation: "/inventory/reconciliation",
+    inventoryStock: "/inventory/stock",
     listLocations: "/locations",
     createLocation: "/locations",
     updateLocation: "/locations/:id",

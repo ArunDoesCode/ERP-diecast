@@ -68,7 +68,7 @@ Effect: ledger `adjustment`, −qty, cost = posted cost, ref `grn_correction`; P
 Roles: masters (`/machines`, `/items`, `/services`, `/locations`) = `asset.manage`: super-admin, back_office (unchanged).
 
 ### POST `/api/asset/inventory/movements` — `inventory.adjust`: super-admin, owner, back_office — 201 `data = ledger row`
-Body **(changed; handler not yet updated)**:
+Body **(SUPERSEDED by section "Inventory (part 2)" below — ignore this shape)**:
 ```
 { itemId: int, locationId: int,
   referenceType: "stock_adjustment" | "opening_stock"   // any other ref type (grn, grn_bypass, grn_correction, pro, sco_issue, sco_receipt, sco_loss, job_order_issue, scrap_dispatch) -> 400 "post from its source document"
@@ -93,3 +93,86 @@ Body no longer accepts `currentStock` or `averageCostPaise`; sending either (or 
 - `grn_items`: `qa_bypassed_at`, `batch_number`, `over_receipt_excess_qty`, `over_receipt_reason`, `over_receipt_by`.
 - new table `grn_corrections` (id, grn_item_id, qty, reason, created_by, created_at).
 - unique index `uq_grns_supplier_challan (supplier_id, challan_no)`.
+
+
+# Inventory (part 2, BR-INV-01..25)
+Errors use the usual envelope `{ success:false, error:{ code, message } }`; `409 ITEM_IN_USE` / `409 LOCATION_IN_USE` carry that `code`. Handlers for new behaviour land in S6-S10; until then only the shapes exist. `POST /inventory/movements` and `GET /inventory/stock` return **501** for now.
+
+## Roles (perm key = seed roles + super-admin)
+| Routes | Key | Roles |
+|---|---|---|
+| POST/PATCH `/items`, `/services`, `/locations`, `/machines`; GET `/services`, `/locations`, `/machines`, `/items/:itemId/last-rate` | `asset.manage` | super-admin, back_office |
+| GET `/items` (**widened**), GET `/inventory/stock`, GET `/inventory/movements`, GET `/inventory/reconciliation` | `inventory.view` | super-admin, owner, back_office, floor_supervisor |
+| POST `/inventory/movements` | `inventory.adjust` | super-admin, owner, back_office |
+No route edits or deletes a ledger row; no DELETE route exists for items/services/locations/machines (deactivate via PATCH `isActive:false`). PATCH/DELETE on `/inventory/movements/:id` -> 404.
+
+## Lists (all paginated `{ success, data[], meta{page,pageSize,total,totalPages} }`, `page`=1, `pageSize`=10 max 100, `sortDir` asc|desc)
+Every list of items/services/locations/machines takes optional `isActive=true|false` (pickers send `true`).
+| Path | Extra query | sortBy |
+|---|---|---|
+| GET `/api/asset/items` | `q` (sku/name/category), `category` (fixed list) | sku, name, category, currentStock, createdAt |
+| GET `/api/asset/services` | `q` | code, name, createdAt |
+| GET `/api/asset/locations` | `q` | name, type, createdAt |
+| GET `/api/asset/machines` | `q`, `status` (idle\|running\|maintenance\|breakdown) | name, code, type, status, createdAt |
+
+## Fixed lists
+- Item `category`: `Raw Material`, `Consumable`, `Spare Part`, `Tooling`, `Packing`. Item `uom`: `kg`, `pcs`, `ltr`, `m`, `set`. Anything else -> 400.
+- Location `type`: `main_store`, `vendor_premise`, `finished_goods`, `scrap_yard`. Machine `status`: `idle`, `running`, `maintenance`, `breakdown`.
+
+## Items
+### POST `/api/asset/items` — 201 `data = item row`
+Body (strict — unknown keys incl. `currentStock`, `averageCostPaise`, `isActive` -> 400):
+`{ sku: string (trimmed, >=1), name: string, description?: string|null, category, uom, reorderLevel?: number >=0 (3 dp), standardRatePaise: int 1..2147483647 (REQUIRED) }`
+Errors: 400 validation (incl. missing/0 `standardRatePaise`, bad category/uom); 403; 409 "Item SKU already exists" (ignoring case and outer spaces, BR-INV-01).
+### PATCH `/api/asset/items/:id` — 200 `data = item row`
+Body (strict, >=1 field): `{ sku?, name?, description?: string|null, category?, uom?, reorderLevel?, standardRatePaise?, isActive?: boolean }` (`isActive` false = deactivate, true = reactivate; an item with stock can be deactivated, BR-INV-06).
+Errors: 400 (validation; `currentStock`/`averageCostPaise` sent); 403; 404; 409 SKU clash; **409 `ITEM_IN_USE`** when `sku` or `uom` changes and the item has any ledger row or PR/PO/supplier-item line.
+### Item row (response)
+`id, sku, name, description|null, category, uom, reorderLevel, currentStock, averageCostPaise, standardRatePaise, isActive, createdBy|null, createdAt, lastUpdatedBy|null, lastUpdatedAt`. `currentStock`, `averageCostPaise` read-only. Existing rows have `standardRatePaise` 0 until edited (API rejects 0 on write only).
+
+## Services
+### POST `/api/asset/services` — 201 `data = service row`
+Body: `{ code: string, name: string, defaultUom: string, description?: string|null, sacCode?: string|null (6 digits starting 99, else 400) }`. Errors: 400; 403; 409 code exists (ignoring case).
+### PATCH `/api/asset/services/:id` — 200. Body: same fields all optional + `isActive?: boolean` (>=1 field). Errors: 400, 403, 404, 409.
+Service row: `id, code, name, description|null, sacCode|null, defaultUom, isActive, createdBy|null, createdAt, lastUpdatedBy|null, lastUpdatedAt`. Services never appear in stock/movement paths: a service id sent as `itemId` -> 404/400.
+
+## Machines
+### POST `/api/asset/machines` — 201 `data = machine row`
+Body: `{ name: string, code: string, type?: string|null, status?: enum (default idle), lastMaintenanceAt?: ISO date|null (not in the future, else 400) }`. Errors: 400; 403; 409 name or code exists (ignoring case).
+### PATCH `/api/asset/machines/:id` — 200. Body: `{ name?, code?, type?, status?, isActive?: boolean, lastMaintenanceAt? }` (>=1 field). Any status change is allowed; saves `lastUpdatedBy`/`lastUpdatedAt`. Errors: 400, 403, 404, 409.
+Machine row: `id, name, code: string|null (null only on rows that predate the column), type|null, status, isActive, lastMaintenanceAt|null, createdBy|null, createdAt, lastUpdatedBy|null, lastUpdatedAt`.
+
+## Locations
+### POST `/api/asset/locations` — 201 `data = location row`
+Body: `{ name: string, type, isVirtual?: boolean, linkedVendorId?: int|null }`. Server rules: `vendor_premise` requires an existing **active** supplier, is stored `isVirtual = true`, one location per supplier; other types with `linkedVendorId` -> 400; second `main_store` -> 409.
+Errors: 400; 403; 409 name exists (ignoring case) / second main_store / supplier already has a location.
+### PATCH `/api/asset/locations/:id` — 200. Body: `{ name?, type?, isVirtual?, linkedVendorId?: int|null, isActive?: boolean }` (>=1 field).
+Errors: 400 (also posting into an inactive location is a 400 on the movement, not here); 403; 404; **409 `LOCATION_IN_USE`** when `type` or `linkedVendorId` changes and the location has ledger rows; 409 changing the only `main_store` to another type; 409 name clash.
+Location row: `id, name, type, isVirtual, linkedVendorId|null, isActive, createdBy|null, createdAt, lastUpdatedBy|null, lastUpdatedAt`.
+
+## GET `/api/asset/inventory/stock` — `inventory.view` — NEW (501 until S9)
+Query: `page`, `pageSize`, `q` (sku/name), `category`, `locationId` (only items with a ledger row there; `locations` still lists all), `belowReorder=true|false`, `sortBy` (sku|name|category|currentStock|valuePaise), `sortDir`.
+200 paginated rows:
+`{ itemId, sku, name, category, uom, currentStock, averageCostPaise, valuePaise: int (= round(currentStock x averageCostPaise)), reorderLevel, belowReorder: boolean (active item, reorderLevel > 0, currentStock <= reorderLevel), isActive, locations: [{ locationId, locationName, locationType, balance }] }`
+Listed: all active items + inactive items whose `currentStock != 0` (shown with `isActive:false`). `locations` = locations with at least one ledger row for the item.
+
+## GET `/api/asset/inventory/movements` — changed response row
+Same query as before (`itemId`, `locationId`, `referenceType` = source, `transactionType`, `fromDate`, `toDate`, `sortBy`, `sortDir`). Each row = ledger row + `itemSku`, `itemName`, `locationName`, `sourceDocument: { type: <referenceType>, id: int, number: string|null }` (`number` = document number e.g. GRN no.; `null` for manual rows where `id` = 0 — reason is in `notes`).
+
+## POST `/api/asset/inventory/movements` — body changed (discriminated on `referenceType`) — 201 `data = ledger row`
+Stock-take: `{ itemId, locationId, referenceType: "stock_adjustment", countedQty: number >=0 (3 dp), reason: string 1..1000, unitCostPaise?: int 1..2147483647, batchNumber?: string|null }`
+ - Server posts `countedQty - current balance at that location` as one `adjustment` row. Difference 0 -> 400 "no difference". Difference > 0 needs `unitCostPaise` (else 400); difference < 0 is valued at average (cost ignored).
+Opening stock: `{ itemId, locationId, referenceType: "opening_stock", qty: number >0 (3 dp), unitCostPaise: int >=1, reason, batchNumber? }`
+ - Only when the item+location has no ledger rows, else **409** "use stock-take".
+Any document `referenceType` (`grn`, `grn_bypass`, `grn_correction`, `pro`, `sco_issue`, `sco_receipt`, `sco_loss`, `job_order_issue`, `scrap_dispatch`) -> 400 "post from its source document". No `transactionType`, `referenceId`, `quantityChange` in the body.
+Also: `pcs`/`set` items take whole numbers only (400); item or location inactive -> 400 (inactive item may still be adjusted to zero, BR-INV-06 — only stock-out to zero is allowed for an inactive item); service id -> 400; unknown item/location -> 404; balance would go < 0 -> 409 "Insufficient stock". Roles: `inventory.adjust`.
+
+## GET `/api/asset/items/:itemId/last-rate` — response changed
+Query `supplierId` (unchanged). 200 `data = { ratePaise: int >= 1, source: "po_history" | "supplier_catalog" | "pr_estimate" | "standard_rate" }` — `po_history` = newest line of an approved-or-later PO, `supplier_catalog`, `pr_estimate` = item average cost (only when > 0), `standard_rate` = item standard rate. Always answers (no 404 for "no rate"); 404 only for unknown item.
+
+## Data model additions (part 2, schema only)
+- `item_master`: `standard_rate_paise` int not null default 0, `last_updated_by`, `last_updated_at`; unique index `uq_item_master_sku_norm` on `lower(btrim(sku))`.
+- `service_master`: unique index `uq_service_master_code_norm` on `lower(btrim(code))`.
+- `locations`: `is_active` bool default true, `created_by`, `last_updated_by`, `last_updated_at`; unique `uq_locations_name_norm`.
+- `machines`: `code` text NULL, `is_active` bool default true; unique `uq_machines_name_norm`, `uq_machines_code_norm` (Postgres unique ignores NULL codes).
+- Not indexed (service enforces, note race): one `main_store`; one `vendor_premise` per supplier.

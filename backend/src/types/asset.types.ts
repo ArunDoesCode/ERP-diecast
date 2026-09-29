@@ -12,6 +12,47 @@ import {
   serviceMaster,
 } from "../db/schemas/02_procurement-catalog";
 
+// Fixed lists (BR-INV-02), kept in code.
+export const ITEM_CATEGORIES = [
+  "Raw Material",
+  "Consumable",
+  "Spare Part",
+  "Tooling",
+  "Packing",
+] as const;
+export const ITEM_UNITS = ["kg", "pcs", "ltr", "m", "set"] as const;
+export const itemCategorySchema = z.enum(ITEM_CATEGORIES);
+export const itemUnitSchema = z.enum(ITEM_UNITS);
+
+// ?isActive=true|false on list endpoints (pickers ask for true).
+const isActiveQuery = z
+  .enum(["true", "false"])
+  .transform((v) => v === "true")
+  .optional();
+
+// Reorder level: >= 0, up to 3 decimals (BR-INV-07, 08).
+const reorderLevelSchema = z
+  .number()
+  .nonnegative()
+  .refine((v) => Math.abs(v * 1000 - Math.round(v * 1000)) < 1e-6, {
+    message: "Quantity can have at most 3 decimals",
+  });
+
+// Whole paise > 0 per unit (BR-INV-03); cost columns are int4.
+const standardRateSchema = z.number().int().min(1).max(2_147_483_647);
+
+// BR-INV-09: optional; if given, 6 digits starting with 99.
+const sacCodeSchema = z
+  .string()
+  .regex(/^99\d{4}$/, "SAC code must be 6 digits starting with 99");
+
+// BR-INV-17: not in the future.
+const maintenanceDateSchema = z.coerce
+  .date()
+  .refine((d) => d.getTime() <= Date.now(), {
+    message: "Last maintenance date cannot be in the future",
+  });
+
 // Response shapes for stored rows — distinct from the *CreateSchema /
 // *UpdateSchema write contracts below, which omit server-assigned columns
 // (id, createdAt, ...).
@@ -31,6 +72,8 @@ export const assetItemListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(10),
   q: z.string().optional(),
+  isActive: isActiveQuery,
+  category: itemCategorySchema.optional(),
   sortBy: z
     .enum(["sku", "name", "category", "currentStock", "createdAt"])
     .optional(),
@@ -40,29 +83,25 @@ export type assetItemListQuerySchemaType = z.infer<
   typeof assetItemListQuerySchema
 >;
 
-export const assetItemCreateSchema = createInsertSchema(itemMaster)
-  .omit({
-    id: true,
-    createdBy: true,
-    createdAt: true,
-    currentStock: true,
-    averageCostPaise: true,
+// currentStock / averageCostPaise / isActive are not accepted (BR-GRN-40,
+// BR-INV-03): strict makes sending them a 400 instead of silently dropping them.
+export const assetItemCreateSchema = z
+  .object({
+    sku: z.string().trim().min(1),
+    name: z.string().trim().min(1),
+    description: z.string().nullable().optional(),
+    category: itemCategorySchema,
+    uom: itemUnitSchema,
+    reorderLevel: reorderLevelSchema.optional(),
+    standardRatePaise: standardRateSchema,
   })
-  .extend({
-    sku: z.string().min(1),
-    name: z.string().min(1),
-    category: z.string().min(1),
-    uom: z.string().min(1),
-    reorderLevel: z.number().nonnegative().optional(),
-  })
-  // currentStock / averageCostPaise are not accepted (BR-GRN-40): strict makes
-  // sending them a 400 instead of silently dropping them.
   .strict();
 export type assetItemCreateSchemaType = z.infer<typeof assetItemCreateSchema>;
 
-// GET /asset/items/:itemId/last-rate query + response — fallback chain:
-// latest PO price for that supplier+item, then the supplier's catalog
-// price, then the item master's average cost (the PR estimate).
+// GET /asset/items/:itemId/last-rate query + response (BR-INV-24) — fallback
+// chain: newest line of an approved-or-later PO for that supplier+item, then
+// the supplier's catalog price, then item average cost if > 0, then the item
+// standard rate. Always answers (ratePaise >= 1).
 export const assetLastRateQuerySchema = z.object({
   supplierId: z.coerce.number().int().positive(),
 });
@@ -73,48 +112,31 @@ export type assetLastRateQuerySchemaType = z.infer<
 export const assetLastRateSourceSchema = z.enum([
   "po_history",
   "supplier_catalog",
-  "pr_estimate",
+  "pr_estimate", // item average cost (> 0)
+  "standard_rate", // item standard rate (BR-INV-24 last resort)
 ]);
 
 export const assetLastRateSchema = z.object({
-  ratePaise: z.number().int().nonnegative(),
+  ratePaise: z.number().int().min(1),
   source: assetLastRateSourceSchema,
 });
 export type assetLastRateSchemaType = z.infer<typeof assetLastRateSchema>;
 
-export const assetItemUpdateSchema = createUpdateSchema(itemMaster)
-  .omit({
-    id: true,
-    createdBy: true,
-    createdAt: true,
-    currentStock: true,
-    averageCostPaise: true,
-  })
-  .extend({
-    sku: z.string().min(1).optional(),
-    name: z.string().min(1).optional(),
-    category: z.string().min(1).optional(),
-    uom: z.string().min(1).optional(),
-    reorderLevel: z.number().nonnegative().optional(),
+export const assetItemUpdateSchema = z
+  .object({
+    sku: z.string().trim().min(1).optional(),
+    name: z.string().trim().min(1).optional(),
+    description: z.string().nullable().optional(),
+    category: itemCategorySchema.optional(),
+    uom: itemUnitSchema.optional(),
+    reorderLevel: reorderLevelSchema.optional(),
+    standardRatePaise: standardRateSchema.optional(),
+    // deactivate / reactivate (BR-INV-05); items are never deleted
     isActive: z.boolean().optional(),
   })
   .strict()
-  .superRefine((data, ctx) => {
-    const hasUpdateField =
-      data.sku !== undefined ||
-      data.name !== undefined ||
-      data.description !== undefined ||
-      data.category !== undefined ||
-      data.uom !== undefined ||
-      data.reorderLevel !== undefined ||
-      data.isActive !== undefined;
-
-    if (!hasUpdateField) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "At least one item field must be provided",
-      });
-    }
+  .refine((data) => Object.values(data).some((v) => v !== undefined), {
+    message: "At least one item field must be provided",
   });
 export type assetItemUpdateSchemaType = z.infer<typeof assetItemUpdateSchema>;
 
@@ -122,6 +144,7 @@ export const assetServiceListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(10),
   q: z.string().optional(),
+  isActive: isActiveQuery,
   sortBy: z.enum(["code", "name", "createdAt"]).optional(),
   sortDir: z.enum(["asc", "desc"]).default("asc"),
 });
@@ -136,11 +159,13 @@ export const assetServiceCreateSchema = createInsertSchema(serviceMaster)
     createdAt: true,
     lastUpdatedBy: true,
     lastUpdatedAt: true,
+    isActive: true,
   })
   .extend({
-    code: z.string().min(1),
-    name: z.string().min(1),
-    defaultUom: z.string().min(1),
+    code: z.string().trim().min(1),
+    name: z.string().trim().min(1),
+    defaultUom: z.string().trim().min(1),
+    sacCode: sacCodeSchema.nullable().optional(),
   });
 export type assetServiceCreateSchemaType = z.infer<
   typeof assetServiceCreateSchema
@@ -155,9 +180,10 @@ export const assetServiceUpdateSchema = createUpdateSchema(serviceMaster)
     lastUpdatedAt: true,
   })
   .extend({
-    code: z.string().min(1).optional(),
-    name: z.string().min(1).optional(),
-    defaultUom: z.string().min(1).optional(),
+    code: z.string().trim().min(1).optional(),
+    name: z.string().trim().min(1).optional(),
+    defaultUom: z.string().trim().min(1).optional(),
+    sacCode: sacCodeSchema.nullable().optional(),
   })
   .superRefine((data, ctx) => {
     const hasUpdateField =
@@ -205,6 +231,19 @@ export const inventoryTransactionTypeSchema = z.enum([
   "adjustment",
 ]);
 
+// Document types the manual screen must refuse (BR-GRN-43).
+export const documentMovementReferenceTypeSchema = z.enum([
+  "grn",
+  "grn_bypass",
+  "grn_correction",
+  "pro",
+  "sco_issue",
+  "sco_receipt",
+  "sco_loss",
+  "job_order_issue",
+  "scrap_dispatch",
+]);
+
 export const assetInventoryMovementListQuerySchema = z
   .object({
     page: z.coerce.number().int().min(1).default(1),
@@ -237,6 +276,7 @@ export const assetLocationListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(10),
   q: z.string().optional(),
+  isActive: isActiveQuery,
   sortBy: z.enum(["name", "type", "createdAt"]).optional(),
   sortDir: z.enum(["asc", "desc"]).default("asc"),
 });
@@ -244,10 +284,20 @@ export type assetLocationListQuerySchemaType = z.infer<
   typeof assetLocationListQuerySchema
 >;
 
+// BR-INV-11..14. Cross-field rules (vendor_premise needs an active supplier and
+// is forced virtual, other types must not link one, one main_store) and
+// LOCATION_IN_USE are checked by the service.
 export const assetLocationCreateSchema = createInsertSchema(locations)
-  .omit({ id: true, createdAt: true })
+  .omit({
+    id: true,
+    createdAt: true,
+    createdBy: true,
+    lastUpdatedBy: true,
+    lastUpdatedAt: true,
+    isActive: true,
+  })
   .extend({
-    name: z.string().min(1),
+    name: z.string().trim().min(1),
     linkedVendorId: z.number().int().positive().nullable().optional(),
   });
 export type assetLocationCreateSchemaType = z.infer<
@@ -255,9 +305,16 @@ export type assetLocationCreateSchemaType = z.infer<
 >;
 
 export const assetLocationUpdateSchema = createUpdateSchema(locations)
-  .omit({ id: true, createdAt: true })
+  .omit({
+    id: true,
+    createdAt: true,
+    createdBy: true,
+    lastUpdatedBy: true,
+    lastUpdatedAt: true,
+  })
   .extend({
-    name: z.string().min(1).optional(),
+    name: z.string().trim().min(1).optional(),
+    isActive: z.boolean().optional(),
     linkedVendorId: z.number().int().positive().nullable().optional(),
   })
   .superRefine((data, ctx) => {
@@ -265,6 +322,7 @@ export const assetLocationUpdateSchema = createUpdateSchema(locations)
       data.name !== undefined ||
       data.type !== undefined ||
       data.isVirtual !== undefined ||
+      data.isActive !== undefined ||
       data.linkedVendorId !== undefined;
 
     if (!hasUpdateField) {
@@ -296,28 +354,126 @@ export type assetInventoryMovementCreateSchemaType = z.infer<
 >;
 
 // POST /asset/inventory/movements body — manual stock-take / opening stock
-// (BR-GRN-43, 44). referenceType is the full enum on purpose: document types
-// get 400 "post from its source document" from the service. Server sets
-// transactionType = adjustment. unitCostPaise: required > 0 for stock-in
-// (quantityChange > 0); ignored for stock-out (valued at current average).
+// (BR-GRN-43, BR-INV-21..23). Discriminated by referenceType; server sets
+// transactionType = adjustment. A document referenceType parses (so the
+// service can answer 400 "post from its source document") but is never posted.
+const qty3dp = z
+  .number()
+  .refine((v) => Math.abs(v * 1000 - Math.round(v * 1000)) < 1e-6, {
+    message: "Quantity can have at most 3 decimals",
+  })
+  .refine((v) => Math.abs(v) <= 1e9, { message: "Quantity is too large" });
+const reasonSchema = z.string().trim().min(1).max(1000);
+const batchSchema = z.string().trim().min(1).max(100).nullish();
+const costSchema = z.number().int().min(1).max(2_147_483_647); // int4
+
+export const assetManualMovementSchema = z.discriminatedUnion("referenceType", [
+  // Stock-take: counted qty; server posts counted - balance at that location
+  // (0 difference -> 400 "no difference"). unitCostPaise is needed only when
+  // the difference is positive (BR-GRN-44); ignored when negative (valued at
+  // average).
+  z.object({
+    itemId: z.number().int().positive(),
+    locationId: z.number().int().positive(),
+    referenceType: z.literal("stock_adjustment"),
+    countedQty: qty3dp.refine((v) => v >= 0, {
+      message: "Counted quantity cannot be negative",
+    }),
+    unitCostPaise: costSchema.optional(),
+    reason: reasonSchema,
+    batchNumber: batchSchema,
+  }),
+  // Opening stock: qty + rate; only for an item+location with no ledger rows.
+  z.object({
+    itemId: z.number().int().positive(),
+    locationId: z.number().int().positive(),
+    referenceType: z.literal("opening_stock"),
+    qty: qty3dp.refine((v) => v > 0, {
+      message: "Quantity must be greater than 0",
+    }),
+    unitCostPaise: costSchema,
+    reason: reasonSchema,
+    batchNumber: batchSchema,
+  }),
+  z.object({
+    itemId: z.number().int().positive(),
+    locationId: z.number().int().positive(),
+    referenceType: documentMovementReferenceTypeSchema,
+    reason: z.string().optional(),
+  }),
+]);
+export type assetManualMovementSchemaType = z.infer<
+  typeof assetManualMovementSchema
+>;
+
+// LEGACY signed-quantity shape, still used by assetService/assetRepository
+// until slice S9 replaces it with assetManualMovementSchema above. Not routed.
 export const assetManualMovementCreateSchema = z.object({
   itemId: z.number().int().positive(),
   locationId: z.number().int().positive(),
   referenceType: inventoryReferenceTypeSchema,
-  quantityChange: z
-    .number()
-    .refine((v) => v !== 0, { message: "quantityChange must be non-zero" })
-    .refine((v) => Math.abs(v * 1000 - Math.round(v * 1000)) < 1e-6, {
-      message: "Quantity can have at most 3 decimals",
-    })
-    .refine((v) => Math.abs(v) <= 1e9, { message: "Quantity is too large" }),
-  // ledger cost columns are int4
+  quantityChange: z.number().refine((v) => v !== 0, {
+    message: "quantityChange must be non-zero",
+  }),
   unitCostPaise: z.number().int().min(0).max(2_147_483_647).optional(),
   reason: z.string().trim().min(1).max(1000),
   batchNumber: z.string().trim().min(1).max(100).nullish(),
 });
 export type assetManualMovementCreateSchemaType = z.infer<
   typeof assetManualMovementCreateSchema
+>;
+
+// GET /asset/inventory/stock (BR-INV-19, 07, 06): one row per item.
+export const assetStockLocationBalanceSchema = z.object({
+  locationId: z.number().int(),
+  locationName: z.string(),
+  locationType: z.enum([
+    "main_store",
+    "vendor_premise",
+    "finished_goods",
+    "scrap_yard",
+  ]),
+  // last ledger balanceAfter for that item+location
+  balance: z.number(),
+});
+
+export const assetStockRowSchema = z.object({
+  itemId: z.number().int(),
+  sku: z.string(),
+  name: z.string(),
+  category: z.string(),
+  uom: z.string(),
+  currentStock: z.number(),
+  averageCostPaise: z.number().int(),
+  // round(currentStock x averageCostPaise), paise
+  valuePaise: z.number().int(),
+  reorderLevel: z.number(),
+  // active item, reorderLevel > 0 and currentStock <= reorderLevel
+  belowReorder: z.boolean(),
+  // shown with an "inactive" mark (only items with stock != 0 are listed)
+  isActive: z.boolean(),
+  // locations with at least one ledger row for the item
+  locations: z.array(assetStockLocationBalanceSchema),
+});
+export type assetStockRowSchemaType = z.infer<typeof assetStockRowSchema>;
+
+export const assetStockListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(10),
+  q: z.string().optional(),
+  category: itemCategorySchema.optional(),
+  locationId: z.coerce.number().int().positive().optional(),
+  belowReorder: z
+    .enum(["true", "false"])
+    .transform((v) => v === "true")
+    .optional(),
+  sortBy: z
+    .enum(["sku", "name", "category", "currentStock", "valuePaise"])
+    .optional(),
+  sortDir: z.enum(["asc", "desc"]).default("asc"),
+});
+export type assetStockListQuerySchemaType = z.infer<
+  typeof assetStockListQuerySchema
 >;
 
 // GET /asset/inventory/reconciliation (BR-GRN-41). One row per mismatch;
@@ -353,6 +509,25 @@ export type assetInventoryMovementSchemaType = z.infer<
   typeof assetInventoryMovementSchema
 >;
 
+// Row of the movement list (BR-INV-20): the ledger row plus display names and
+// the source document. Read-only — no edit/delete routes exist.
+export const assetInventoryMovementListRowSchema =
+  assetInventoryMovementSchema.extend({
+    itemSku: z.string(),
+    itemName: z.string(),
+    locationName: z.string(),
+    sourceDocument: z.object({
+      type: inventoryReferenceTypeSchema,
+      id: z.number().int(),
+      // document number, e.g. "GRN-2026-0001"; null for manual movements
+      // (referenceId 0: the reason is in `notes`)
+      number: z.string().nullable(),
+    }),
+  });
+export type assetInventoryMovementListRowSchemaType = z.infer<
+  typeof assetInventoryMovementListRowSchema
+>;
+
 export const machineStatusSchema = z.enum([
   "idle",
   "running",
@@ -365,7 +540,8 @@ export const assetMachineListQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(10),
   q: z.string().optional(),
   status: machineStatusSchema.optional(),
-  sortBy: z.enum(["name", "type", "status", "createdAt"]).optional(),
+  isActive: isActiveQuery,
+  sortBy: z.enum(["name", "code", "type", "status", "createdAt"]).optional(),
   sortDir: z.enum(["asc", "desc"]).default("asc"),
 });
 export type assetMachineListQuerySchemaType = z.infer<
@@ -379,11 +555,13 @@ export const assetMachineCreateSchema = createInsertSchema(machines)
     createdAt: true,
     lastUpdatedBy: true,
     lastUpdatedAt: true,
+    isActive: true,
   })
   .extend({
-    name: z.string().min(1),
+    name: z.string().trim().min(1),
+    code: z.string().trim().min(1),
     status: machineStatusSchema.optional(),
-    lastMaintenanceAt: z.coerce.date().nullable().optional(),
+    lastMaintenanceAt: maintenanceDateSchema.nullable().optional(),
   });
 export type assetMachineCreateSchemaType = z.infer<
   typeof assetMachineCreateSchema
@@ -398,15 +576,19 @@ export const assetMachineUpdateSchema = createUpdateSchema(machines)
     lastUpdatedAt: true,
   })
   .extend({
-    name: z.string().min(1).optional(),
+    name: z.string().trim().min(1).optional(),
+    code: z.string().trim().min(1).optional(),
     status: machineStatusSchema.optional(),
-    lastMaintenanceAt: z.coerce.date().nullable().optional(),
+    isActive: z.boolean().optional(),
+    lastMaintenanceAt: maintenanceDateSchema.nullable().optional(),
   })
   .superRefine((data, ctx) => {
     const hasUpdateField =
       data.name !== undefined ||
+      data.code !== undefined ||
       data.type !== undefined ||
       data.status !== undefined ||
+      data.isActive !== undefined ||
       data.lastMaintenanceAt !== undefined;
 
     if (!hasUpdateField) {

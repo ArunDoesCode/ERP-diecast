@@ -443,7 +443,8 @@
           "pageSize": "integer.nonnegative.required",
           "q": "string.optional",
           "status": "enum:idle,running,maintenance,breakdown.optional",
-          "sortBy": "enum:name,type,status,createdAt.optional",
+          "isActive": "unrepresentable.optional",
+          "sortBy": "enum:name,code,type,status,createdAt.optional",
           "sortDir": "enum:asc,desc.required"
         }
       },
@@ -462,6 +463,7 @@
       "pagination": {
         "sortableFields": [
           "name",
+          "code",
           "type",
           "status",
           "createdAt"
@@ -487,6 +489,7 @@
       "request": {
         "body": {
           "name": "string.nonempty.required",
+          "code": "string.nonempty.required",
           "type": "string.nullable.optional",
           "status": "enum:idle,running,maintenance,breakdown.optional",
           "lastMaintenanceAt": "unrepresentable.nullable.optional"
@@ -498,6 +501,8 @@
           "data": {
             "id": "unrepresentable.required",
             "name": "string.required",
+            "code": "string.nullable.required",
+            "isActive": "boolean.required",
             "type": "string.nullable.required",
             "status": "enum:idle,running,maintenance,breakdown.required",
             "lastMaintenanceAt": "unrepresentable.nullable.required",
@@ -527,6 +532,8 @@
       "request": {
         "body": {
           "name": "string.nonempty.optional",
+          "code": "string.nonempty.optional",
+          "isActive": "boolean.optional",
           "type": "string.nullable.optional",
           "status": "enum:idle,running,maintenance,breakdown.optional",
           "lastMaintenanceAt": "unrepresentable.nullable.optional"
@@ -538,6 +545,8 @@
           "data": {
             "id": "unrepresentable.required",
             "name": "string.required",
+            "code": "string.nullable.required",
+            "isActive": "boolean.required",
             "type": "string.nullable.required",
             "status": "enum:idle,running,maintenance,breakdown.required",
             "lastMaintenanceAt": "unrepresentable.nullable.required",
@@ -561,7 +570,9 @@
         "type": "roles",
         "roles": [
           "super-admin",
-          "back_office"
+          "owner",
+          "back_office",
+          "floor_supervisor"
         ]
       },
       "request": {
@@ -569,6 +580,8 @@
           "page": "integer.nonnegative.required",
           "pageSize": "integer.nonnegative.required",
           "q": "string.optional",
+          "isActive": "unrepresentable.optional",
+          "category": "enum:Raw Material,Consumable,Spare Part,Tooling,Packing.optional",
           "sortBy": "enum:sku,name,category,currentStock,createdAt.optional",
           "sortDir": "enum:asc,desc.required"
         }
@@ -616,10 +629,10 @@
           "sku": "string.nonempty.required",
           "name": "string.nonempty.required",
           "description": "string.nullable.optional",
-          "category": "string.nonempty.required",
-          "uom": "string.nonempty.required",
+          "category": "enum:Raw Material,Consumable,Spare Part,Tooling,Packing.required",
+          "uom": "enum:kg,pcs,ltr,m,set.required",
           "reorderLevel": "number.nonnegative.optional",
-          "isActive": "boolean.optional"
+          "standardRatePaise": "integer.nonnegative.required"
         }
       },
       "responses": {
@@ -636,8 +649,11 @@
             "currentStock": "unrepresentable.required",
             "averageCostPaise": "unrepresentable.required",
             "isActive": "boolean.required",
+            "standardRatePaise": "unrepresentable.required",
             "createdBy": "unrepresentable.nullable.required",
-            "createdAt": "unrepresentable.required"
+            "createdAt": "unrepresentable.required",
+            "lastUpdatedBy": "unrepresentable.nullable.required",
+            "lastUpdatedAt": "unrepresentable.required"
           }
         }
       }
@@ -662,9 +678,10 @@
           "sku": "string.nonempty.optional",
           "name": "string.nonempty.optional",
           "description": "string.nullable.optional",
-          "category": "string.nonempty.optional",
-          "uom": "string.nonempty.optional",
+          "category": "enum:Raw Material,Consumable,Spare Part,Tooling,Packing.optional",
+          "uom": "enum:kg,pcs,ltr,m,set.optional",
           "reorderLevel": "number.nonnegative.optional",
+          "standardRatePaise": "integer.nonnegative.optional",
           "isActive": "boolean.optional"
         }
       },
@@ -682,8 +699,11 @@
             "currentStock": "unrepresentable.required",
             "averageCostPaise": "unrepresentable.required",
             "isActive": "boolean.required",
+            "standardRatePaise": "unrepresentable.required",
             "createdBy": "unrepresentable.nullable.required",
-            "createdAt": "unrepresentable.required"
+            "createdAt": "unrepresentable.required",
+            "lastUpdatedBy": "unrepresentable.nullable.required",
+            "lastUpdatedAt": "unrepresentable.required"
           }
         }
       }
@@ -695,7 +715,7 @@
       "tags": [
         "asset"
       ],
-      "summary": "Look up the rate to prefill for an item+supplier: latest PO price, falling back to the supplier's catalog price, falling back to the item master's average cost estimate.",
+      "summary": "Look up the rate to prefill for an item+supplier: newest approved-or-later PO line price, then supplier catalog price, then item average cost (> 0), then item standard rate. Returns the source.",
       "auth": {
         "type": "roles",
         "roles": [
@@ -713,7 +733,7 @@
           "success": "boolean.required",
           "data": {
             "ratePaise": "integer.nonnegative.required",
-            "source": "enum:po_history,supplier_catalog,pr_estimate.required"
+            "source": "enum:po_history,supplier_catalog,pr_estimate,standard_rate.required"
           }
         }
       }
@@ -738,6 +758,7 @@
           "page": "integer.nonnegative.required",
           "pageSize": "integer.nonnegative.required",
           "q": "string.optional",
+          "isActive": "unrepresentable.optional",
           "sortBy": "enum:code,name,createdAt.optional",
           "sortDir": "enum:asc,desc.required"
         }
@@ -784,8 +805,7 @@
           "name": "string.nonempty.required",
           "description": "string.nullable.optional",
           "sacCode": "string.nullable.optional",
-          "defaultUom": "string.nonempty.required",
-          "isActive": "boolean.optional"
+          "defaultUom": "string.nonempty.required"
         }
       },
       "responses": {
@@ -910,7 +930,7 @@
       "tags": [
         "asset"
       ],
-      "summary": "Manual stock movement: stock-take (stock_adjustment) or opening stock (opening_stock) only, reason required. Document reference types get 400.",
+      "summary": "Manual stock movement: stock-take (stock_adjustment, counted qty) or opening stock (opening_stock, qty + rate) only, reason required. Document reference types get 400.",
       "auth": {
         "type": "roles",
         "roles": [
@@ -920,15 +940,7 @@
         ]
       },
       "request": {
-        "body": {
-          "itemId": "integer.positive.required",
-          "locationId": "integer.positive.required",
-          "referenceType": "enum:grn,grn_bypass,pro,sco_issue,sco_receipt,job_order_issue,scrap_dispatch,stock_adjustment,grn_correction,opening_stock,sco_loss.required",
-          "quantityChange": "number.required",
-          "unitCostPaise": "integer.nonnegative.optional",
-          "reason": "string.nonempty.required",
-          "batchNumber": "string.nonempty.nullable.optional"
-        }
+        "body": "union<[object Object]|[object Object]|[object Object]>.required"
       },
       "responses": {
         "201": {
@@ -951,6 +963,58 @@
             "createdAt": "unrepresentable.required"
           }
         }
+      }
+    },
+    {
+      "id": "GET /api/asset/inventory/stock",
+      "method": "GET",
+      "path": "/api/asset/inventory/stock",
+      "tags": [
+        "asset"
+      ],
+      "summary": "Stock view: per item unit, stock, average cost, value, per-location balances, reorder flag, inactive mark.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "owner",
+          "back_office",
+          "floor_supervisor"
+        ]
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "q": "string.optional",
+          "category": "enum:Raw Material,Consumable,Spare Part,Tooling,Packing.optional",
+          "locationId": "integer.positive.optional",
+          "belowReorder": "unrepresentable.optional",
+          "sortBy": "enum:sku,name,category,currentStock,valuePaise.optional",
+          "sortDir": "enum:asc,desc.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "sku",
+          "name",
+          "category",
+          "currentStock",
+          "valuePaise"
+        ],
+        "searchable": true
       }
     },
     {
@@ -1017,6 +1081,7 @@
           "page": "integer.nonnegative.required",
           "pageSize": "integer.nonnegative.required",
           "q": "string.optional",
+          "isActive": "unrepresentable.optional",
           "sortBy": "enum:name,type,createdAt.optional",
           "sortDir": "enum:asc,desc.required"
         }
@@ -1074,7 +1139,11 @@
             "type": "enum:main_store,vendor_premise,finished_goods,scrap_yard.required",
             "isVirtual": "boolean.required",
             "linkedVendorId": "unrepresentable.nullable.required",
-            "createdAt": "unrepresentable.required"
+            "isActive": "boolean.required",
+            "createdBy": "unrepresentable.nullable.required",
+            "createdAt": "unrepresentable.required",
+            "lastUpdatedBy": "unrepresentable.nullable.required",
+            "lastUpdatedAt": "unrepresentable.required"
           }
         }
       }
@@ -1099,7 +1168,8 @@
           "name": "string.nonempty.optional",
           "type": "enum:main_store,vendor_premise,finished_goods,scrap_yard.optional",
           "isVirtual": "boolean.optional",
-          "linkedVendorId": "integer.positive.nullable.optional"
+          "linkedVendorId": "integer.positive.nullable.optional",
+          "isActive": "boolean.optional"
         }
       },
       "responses": {
@@ -1111,7 +1181,11 @@
             "type": "enum:main_store,vendor_premise,finished_goods,scrap_yard.required",
             "isVirtual": "boolean.required",
             "linkedVendorId": "unrepresentable.nullable.required",
-            "createdAt": "unrepresentable.required"
+            "isActive": "boolean.required",
+            "createdBy": "unrepresentable.nullable.required",
+            "createdAt": "unrepresentable.required",
+            "lastUpdatedBy": "unrepresentable.nullable.required",
+            "lastUpdatedAt": "unrepresentable.required"
           }
         }
       }

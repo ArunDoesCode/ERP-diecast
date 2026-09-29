@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   bigint,
   boolean,
@@ -9,39 +10,64 @@ import {
   serial,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { supplierMaster } from "./02_procurement-suppliers";
 import { employees } from "./03_hcm";
 
 // Catalog master data used by supplier, purchasing, and inventory modules.
-export const itemMaster = pgTable("item_master", {
-  id: serial("id").primaryKey(),
-  sku: text("sku").unique().notNull(), //internal SKU
-  name: text("name").notNull(),
-  description: text("description"),
-  category: text("category").notNull(), // 'Raw Material', 'Consumable', 'Spare Part'
-  uom: text("uom").notNull(), // 'kg', 'pcs', 'ltr'
-  reorderLevel: doublePrecision("reorder_level").default(0).notNull(),
-  currentStock: doublePrecision("current_stock").default(0).notNull(),
-  averageCostPaise: integer("average_cost_paise").default(0).notNull(),
-  isActive: boolean("is_active").notNull().default(true),
-  createdBy: integer("created_by").references(() => employees.id),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+export const itemMaster = pgTable(
+  "item_master",
+  {
+    id: serial("id").primaryKey(),
+    sku: text("sku").unique().notNull(), //internal SKU
+    name: text("name").notNull(),
+    description: text("description"),
+    category: text("category").notNull(), // 'Raw Material', 'Consumable', 'Spare Part'
+    uom: text("uom").notNull(), // 'kg', 'pcs', 'ltr'
+    reorderLevel: doublePrecision("reorder_level").default(0).notNull(),
+    currentStock: doublePrecision("current_stock").default(0).notNull(),
+    averageCostPaise: integer("average_cost_paise").default(0).notNull(),
+    isActive: boolean("is_active").notNull().default(true),
+    // BR-INV-03: PR estimate / last-rate fallback; > 0 enforced by the API.
+    // DB default 0 keeps db:push safe on rows that already exist.
+    standardRatePaise: integer("standard_rate_paise").default(0).notNull(),
+    createdBy: integer("created_by").references(() => employees.id),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    // BR-INV-25
+    lastUpdatedBy: integer("last_updated_by").references(() => employees.id),
+    lastUpdatedAt: timestamp("last_updated_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    // BR-INV-01: unique ignoring case and outer spaces
+    skuNormUq: uniqueIndex("uq_item_master_sku_norm").on(
+      sql`lower(btrim(${t.sku}))`,
+    ),
+  }),
+);
 
-export const serviceMaster = pgTable("service_master", {
-  id: serial("id").primaryKey(),
-  code: text("code").unique().notNull(),
-  name: text("name").notNull(),
-  description: text("description"),
-  sacCode: text("sac_code"),
-  defaultUom: text("default_uom").notNull(), // 'job', 'hour', 'lot'
-  isActive: boolean("is_active").notNull().default(true),
-  createdBy: integer("created_by").references(() => employees.id),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  lastUpdatedBy: integer("last_updated_by").references(() => employees.id),
-  lastUpdatedAt: timestamp("last_updated_at").defaultNow().notNull(),
-});
+export const serviceMaster = pgTable(
+  "service_master",
+  {
+    id: serial("id").primaryKey(),
+    code: text("code").unique().notNull(),
+    name: text("name").notNull(),
+    description: text("description"),
+    sacCode: text("sac_code"),
+    defaultUom: text("default_uom").notNull(), // 'job', 'hour', 'lot'
+    isActive: boolean("is_active").notNull().default(true),
+    createdBy: integer("created_by").references(() => employees.id),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    lastUpdatedBy: integer("last_updated_by").references(() => employees.id),
+    lastUpdatedAt: timestamp("last_updated_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    // BR-INV-09: code unique ignoring case
+    codeNormUq: uniqueIndex("uq_service_master_code_norm").on(
+      sql`lower(btrim(${t.code}))`,
+    ),
+  }),
+);
 
 // 1. Direction of movement
 export const inventoryTxTypeEnum = pgEnum("inventory_tx_type", [
@@ -72,16 +98,29 @@ export const locationTypeEnum = pgEnum("location_type", [
   "scrap_yard", // Where dross and rejected parts live before selling
 ]);
 
-export const locations = pgTable("locations", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  type: locationTypeEnum("type").notNull(),
-  isVirtual: boolean("is_virtual").default(false).notNull(),
-  linkedVendorId: integer("linked_vendor_id").references(
-    () => supplierMaster.id,
-  ),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+export const locations = pgTable(
+  "locations",
+  {
+    id: serial("id").primaryKey(),
+    name: text("name").notNull(),
+    type: locationTypeEnum("type").notNull(),
+    isVirtual: boolean("is_virtual").default(false).notNull(),
+    linkedVendorId: integer("linked_vendor_id").references(
+      () => supplierMaster.id,
+    ),
+    isActive: boolean("is_active").notNull().default(true),
+    createdBy: integer("created_by").references(() => employees.id),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    lastUpdatedBy: integer("last_updated_by").references(() => employees.id),
+    lastUpdatedAt: timestamp("last_updated_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    // BR-INV-11: name unique ignoring case
+    nameNormUq: uniqueIndex("uq_locations_name_norm").on(
+      sql`lower(btrim(${t.name}))`,
+    ),
+  }),
+);
 
 // 3. The Ledger Engine
 export const inventoryLedger = pgTable(
@@ -143,14 +182,29 @@ export const machineStatusEnum = pgEnum("machine_status", [
   "breakdown",
 ]);
 
-export const machines = pgTable("machines", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  type: text("type"),
-  status: machineStatusEnum("status").default("idle").notNull(),
-  lastMaintenanceAt: timestamp("last_maintenance_at"),
-  createdBy: integer("created_by").references(() => employees.id),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  lastUpdatedBy: integer("last_updated_by").references(() => employees.id),
-  lastUpdatedAt: timestamp("last_updated_at").defaultNow().notNull(),
-});
+export const machines = pgTable(
+  "machines",
+  {
+    id: serial("id").primaryKey(),
+    name: text("name").notNull(),
+    // BR-INV-16: required by the API; nullable in the DB so db:push is safe on
+    // rows that predate the column.
+    code: text("code"),
+    isActive: boolean("is_active").notNull().default(true),
+    type: text("type"),
+    status: machineStatusEnum("status").default("idle").notNull(),
+    lastMaintenanceAt: timestamp("last_maintenance_at"),
+    createdBy: integer("created_by").references(() => employees.id),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    lastUpdatedBy: integer("last_updated_by").references(() => employees.id),
+    lastUpdatedAt: timestamp("last_updated_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    nameNormUq: uniqueIndex("uq_machines_name_norm").on(
+      sql`lower(btrim(${t.name}))`,
+    ),
+    codeNormUq: uniqueIndex("uq_machines_code_norm").on(
+      sql`lower(btrim(${t.code}))`,
+    ),
+  }),
+);
