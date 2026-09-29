@@ -42,3 +42,4 @@
 | FE-SA | frontend-dev 40 | /auth/me + PR screens | no super-admin flag in UI → super-admin cannot edit PRs from the UI (backend allows, BR-PR-17) | S7: /auth/me returns isSuperAdmin; PR edit uses it | open |
 | FE-INACTIVE | frontend-dev 40 | PR item picker (useAssetItemsLookupQuery) | unverified that lookup excludes inactive items (backend rejects PR_INVALID_ITEM) | check after stock merge | open |
 | DBR-1 | backend-dev 44 | backend/scripts/db-reset*.ts fixtures | 13 "db:reset with fixtures" tests now fail (were green at 24c5dd9) — likely new rules (required approval comments, requester-only submit, PR create rules) broke fixture flows | fix with APR build (backend-dev), confirm with test-runner | open |
+| FE-HIST | frontend-dev 49 | frontend ApprovalHistoryPanel | trail action "cancelled" is written for both withdraw and document cancel; panel labels it "Withdrawn" → show "Cancelled" + notes | fix in next frontend pass | open |
