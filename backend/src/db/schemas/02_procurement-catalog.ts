@@ -1,4 +1,5 @@
 import {
+  bigint,
   boolean,
   doublePrecision,
   index,
@@ -112,7 +113,9 @@ export const inventoryLedger = pgTable(
 
     // FINANCIAL VALUATION (Costing at the exact moment of movement)
     unitCostPaise: integer("unit_cost_paise").notNull(),
-    totalValueChangePaise: integer("total_value_change_paise").notNull(),
+    totalValueChangePaise: bigint("total_value_change_paise", {
+      mode: "number",
+    }).notNull(),
 
     // METADATA
     notes: text("notes"),

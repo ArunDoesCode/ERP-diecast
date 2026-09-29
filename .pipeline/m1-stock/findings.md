@@ -20,3 +20,4 @@
 | SEC-2, SEC-3, SEC-4 | minor | backend | types / assetService | no qty/cost upper bound; bad locationId → 500; certificateUrl allows javascript: | fix now (cheap, iter 1) |
 | SPEC-4, SPEC-5 | minor | backend | grnService comments | stale comment; BR id comments missing | fix now (iter 1) |
 | SPEC-6 | minor | backend | assetRepository:451-468 | opening_stock accepted as stock-out; BR-GRN-40 "opening stock goes in" | backlog: spec is silent; spec edits are off-limits on this branch → BL item, ask at next spec change |
+| COORD-1 | major | backend | 02_procurement-catalog.ts:115 | ledger total_value_change_paise int4 → receipts > ₹2.1 cr refused | fix now (brief 15) |

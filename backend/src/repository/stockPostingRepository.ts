@@ -37,12 +37,12 @@ export type PostStockInput = {
 const toMilli = (qty: number) => Math.round(qty * 1000);
 const fromMilli = (milli: number) => milli / 1000;
 
-const INT4_MAX = 2_147_483_647; // ledger value columns are integer
+const MAX_ROW_VALUE = Number.MAX_SAFE_INTEGER; // total_value_change_paise is bigint (number mode)
 
 // qty x cost in paise, rounded half away from zero (BR-GRN-24).
 function rowValuePaise(qtyMilli: number, unitCostPaise: number) {
   const magnitude = Math.round(Math.abs(qtyMilli * unitCostPaise) / 1000);
-  if (magnitude > INT4_MAX) {
+  if (magnitude > MAX_ROW_VALUE) {
     throw new BadRequestError("Row value is too large");
   }
   return qtyMilli < 0 ? -magnitude : magnitude;
