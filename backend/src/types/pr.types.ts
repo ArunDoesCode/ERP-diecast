@@ -25,6 +25,15 @@ export type prItemStatusSchemaType = z.infer<typeof prItemStatusSchema>;
 export const prSchema = createSelectSchema(purchaseRequests);
 export type prSchemaType = z.infer<typeof prSchema>;
 
+// DELETE /pr/deletepr/:id body (BR-PR-41): reason trimmed, 3-500 characters.
+export const cancelPrSchema = z.object({
+  reason: z.string().trim().min(3).max(500),
+});
+export type cancelPrSchemaType = z.infer<typeof cancelPrSchema>;
+
+// DELETE /pr/deletepr/:id response payload (BR-PR-46).
+export const prCancelResultSchema = z.object({ pr: prSchema });
+
 // Response shape for a stored purchase request item row (write-side projection).
 export const prItemSchema = createSelectSchema(purchaseRequestItems).pick({
   id: true,
@@ -66,7 +75,10 @@ export type prLinkedPoSchemaType = z.infer<typeof prLinkedPoSchema>;
 
 // GET /pr/getprdetails/:id response payload.
 export const prDetailsSchema = z.object({
-  pr: prSchema.extend({ requestedByName: z.string() }),
+  pr: prSchema.extend({
+    requestedByName: z.string(),
+    cancelledByName: z.string().nullable(),
+  }),
   items: z.array(prItemDetailSchema),
   linkedPos: z.array(prLinkedPoSchema),
 });

@@ -807,8 +807,9 @@ export const approvalRepository = {
     docType: ApprovalDocType,
     docId: number,
     reason?: string,
+    options: { actorId?: number; notes?: string; tx?: Tx } = {},
   ) {
-    return db.transaction(async (tx) => {
+    const run = async (tx: Tx) => {
       const openRequest = await this.findPendingRequestByDoc(
         docType,
         docId,
@@ -821,7 +822,12 @@ export const approvalRepository = {
       const [updatedRequest] = await tx
         .update(approvalRequests)
         .set({ status: "cancelled", completedAt: new Date() })
-        .where(eq(approvalRequests.id, openRequest.id))
+        .where(
+          and(
+            eq(approvalRequests.id, openRequest.id),
+            eq(approvalRequests.status, "pending_approval"),
+          ),
+        )
         .returning(requestColumns);
 
       if (!updatedRequest) {
@@ -834,13 +840,16 @@ export const approvalRepository = {
         docId,
         level: updatedRequest.currentLevel,
         action: "cancelled",
-        actionBy: updatedRequest.requestedBy,
-        notes: reason
-          ? `Approval cancelled because source document was cancelled: ${reason}`
-          : "Approval cancelled because source document was cancelled",
+        actionBy: options.actorId ?? updatedRequest.requestedBy,
+        notes:
+          options.notes ??
+          (reason
+            ? `Approval cancelled because source document was cancelled: ${reason}`
+            : "Approval cancelled because source document was cancelled"),
       });
 
       return updatedRequest;
-    });
+    };
+    return options.tx ? run(options.tx) : db.transaction(run);
   },
 };

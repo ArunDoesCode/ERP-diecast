@@ -1,6 +1,12 @@
 import { db } from "../db/client";
 import { type Actor, can } from "../lib/auth-middleware";
-import { BadRequestError, ForbiddenError, NotFoundError } from "../lib/errors";
+import {
+  AppError,
+  BadRequestError,
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+} from "../lib/errors";
 import { approvalRepository } from "../repository/approvalRepository";
 import { prRepository } from "../repository/prRepository";
 import type {
@@ -9,18 +15,6 @@ import type {
   prStatusSchemaType,
   updatePrSchemaType,
 } from "../types/pr.types";
-
-// Allowed forward moves per status. Empty array = terminal state.
-const PR_STATUS_TRANSITIONS: Record<prStatusSchemaType, prStatusSchemaType[]> =
-  {
-    draft: ["pending_approval", "cancelled"],
-    pending_approval: ["approved", "rejected", "cancelled"],
-    approved: ["partial_ordered", "fully_ordered", "cancelled"],
-    partial_ordered: ["fully_ordered", "cancelled"],
-    fully_ordered: [],
-    rejected: [],
-    cancelled: [],
-  };
 
 // BR-AUTH-26: saving a PR with a machine needs pr.link_machine.
 function assertCanLinkMachine(
@@ -33,26 +27,6 @@ function assertCanLinkMachine(
     });
   }
 }
-
-function assertValidStatusTransition(
-  current: prStatusSchemaType,
-  next: prStatusSchemaType,
-) {
-  if (current === next) {
-    return;
-  }
-
-  if (!PR_STATUS_TRANSITIONS[current].includes(next)) {
-    throw new BadRequestError(`Cannot move PR from ${current} to ${next}`);
-  }
-}
-
-const APPROVAL_OWNED_STATUSES = new Set<prStatusSchemaType>([
-  "approved",
-  "rejected",
-  "partial_ordered",
-  "fully_ordered",
-]);
 
 function toPaginatedMeta(page: number, pageSize: number, total: number) {
   return {
@@ -133,28 +107,29 @@ export const prService = {
 
   async update(input: updatePrSchemaType, actor: Actor) {
     assertCanLinkMachine(actor, input.assetId);
-    if (
-      input.status !== undefined &&
-      APPROVAL_OWNED_STATUSES.has(input.status)
-    ) {
+    // BR-PR-15 / BR-KD-01: status is never set from the edit path.
+    if (input.status !== undefined) {
       throw new BadRequestError(
-        "Use the approval action endpoint to approve or reject a PR",
+        "Status cannot be changed here; use the cancel or approval action",
+        "PR_STATUS_VIA_ACTION",
       );
     }
 
     return db.transaction(async (tx) => {
-      const existingPr = await prRepository.findPrById(input.prId, tx);
+      const existingPr = await prRepository.findPrByIdForUpdate(input.prId, tx);
       if (!existingPr) {
         throw new NotFoundError("Purchase request not found");
+      }
+      if (existingPr.status === "cancelled") {
+        throw new ConflictError(
+          "A cancelled PR cannot be edited",
+          "PR_NOT_EDITABLE",
+        );
       }
 
       const targetType = input.type ?? existingPr.type;
       const targetAssetId =
         input.assetId !== undefined ? input.assetId : existingPr.assetId;
-
-      if (input.status !== undefined) {
-        assertValidStatusTransition(existingPr.status, input.status);
-      }
 
       if (targetType === "maintenance" && targetAssetId == null) {
         throw new BadRequestError(
@@ -177,7 +152,6 @@ export const prService = {
           : {}),
         ...(input.assetId !== undefined ? { assetId: input.assetId } : {}),
         ...(input.notes !== undefined ? { notes: input.notes } : {}),
-        ...(input.status !== undefined ? { status: input.status } : {}),
       };
 
       const pr = await prRepository.updatePrById(
@@ -344,21 +318,74 @@ export const prService = {
     });
   },
 
-  async cancel(prId: number) {
-    const existingPr = await prRepository.findPrById(prId);
-    if (!existingPr) {
-      throw new NotFoundError("Purchase request not found");
-    }
+  // BR-PR-39, 41, 42, 43, 46, 47: one transaction, row lock, status re-checked under the lock.
+  async cancel(prId: number, reason: string, actor: Actor) {
+    return db.transaction(async (tx) => {
+      const pre = await prRepository.findPrById(prId, tx);
+      if (!pre) {
+        throw new AppError("Purchase request not found", 404, "PR_NOT_FOUND");
+      }
 
-    assertValidStatusTransition(existingPr.status, "cancelled");
+      // Same lock order as approval actions (request, then PR) so they cannot deadlock.
+      if (pre.status === "pending_approval") {
+        const open = await approvalRepository.findPendingRequestByDoc(
+          "pr",
+          prId,
+          tx,
+        );
+        if (open) {
+          await approvalRepository.lockRequestById(open.id, tx);
+        }
+      }
 
-    const row = await prRepository.setStatusCancelled(prId);
-    if (!row) {
-      throw new NotFoundError("Purchase request not found");
-    }
+      const pr = await prRepository.findPrByIdForUpdate(prId, tx);
+      if (!pr) {
+        throw new AppError("Purchase request not found", 404, "PR_NOT_FOUND");
+      }
 
-    await approvalRepository.cancelOpenRequestForDocument("pr", prId);
+      if (pr.requestedBy !== actor.id && !actor.isSuperAdmin) {
+        throw new ForbiddenError(
+          "Only the requester or a super-admin can cancel this PR",
+          "PR_NOT_REQUESTER",
+        );
+      }
 
-    return row;
+      const ordered = await prRepository.findOrderedLinesWithLivePos(prId, tx);
+      if (ordered.lineCount > 0) {
+        const names =
+          ordered.poNumbers.length > 0
+            ? ` (${ordered.poNumbers.join(", ")})`
+            : "";
+        throw new ConflictError(
+          `PR has lines on a purchase order${names}. Cancel the PO first, or cancel the pending lines one by one.`,
+          "PR_HAS_ORDERED_LINES",
+        );
+      }
+
+      if (!["draft", "pending_approval", "approved"].includes(pr.status)) {
+        throw new ConflictError(
+          `Cannot cancel a PR in status ${pr.status}`,
+          "PR_INVALID_TRANSITION",
+        );
+      }
+
+      const row = await prRepository.cancelPr(
+        prId,
+        { actorId: actor.id, reason },
+        tx,
+      );
+      if (!row) {
+        throw new AppError("Purchase request not found", 404, "PR_NOT_FOUND");
+      }
+
+      await approvalRepository.cancelOpenRequestForDocument(
+        "pr",
+        prId,
+        undefined,
+        { actorId: actor.id, notes: reason, tx },
+      );
+
+      return row;
+    });
   },
 };

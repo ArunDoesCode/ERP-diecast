@@ -10,6 +10,8 @@ import {
   sql,
 } from "drizzle-orm";
 
+import { alias } from "drizzle-orm/pg-core";
+
 import { db } from "../db/client";
 import {
   itemMaster,
@@ -39,9 +41,14 @@ const purchaseRequestColumns = {
   totalApprovalLevels: purchaseRequests.totalApprovalLevels,
   notes: purchaseRequests.notes,
   estimatedAmountPaise: purchaseRequests.estimatedAmountPaise,
+  cancelledBy: purchaseRequests.cancelledBy,
+  cancelledAt: purchaseRequests.cancelledAt,
+  cancelReason: purchaseRequests.cancelReason,
   createdAt: purchaseRequests.createdAt,
   updatedAt: purchaseRequests.updatedAt,
 };
+
+const cancellerEmployees = alias(employees, "canceller_employees");
 
 const purchaseRequestItemWriteColumns = {
   id: purchaseRequestItems.id,
@@ -243,9 +250,14 @@ export const prRepository = {
         .select({
           ...purchaseRequestColumns,
           requestedByName: employees.name,
+          cancelledByName: cancellerEmployees.name,
         })
         .from(purchaseRequests)
         .innerJoin(employees, eq(employees.id, purchaseRequests.requestedBy))
+        .leftJoin(
+          cancellerEmployees,
+          eq(cancellerEmployees.id, purchaseRequests.cancelledBy),
+        )
         .where(eq(purchaseRequests.id, prId))
         .limit(1),
       db
@@ -524,13 +536,80 @@ export const prRepository = {
     return row;
   },
 
-  async setStatusCancelled(prId: number) {
-    const [row] = await db
+  // Row lock for edit/submit/cancel (BR-PR-47): read the PR under FOR UPDATE.
+  async findPrByIdForUpdate(prId: number, tx: Tx) {
+    await tx.execute(
+      sql`select ${purchaseRequests.id} from ${purchaseRequests} where ${purchaseRequests.id} = ${prId} for update`,
+    );
+    return this.findPrById(prId, tx);
+  },
+
+  // Lines of the PR that sit on a PO (po_draft/ordered/closed) with the live PO numbers (BR-PR-39).
+  async findOrderedLinesWithLivePos(prId: number, tx: Tx) {
+    const lines = await tx
+      .select({ id: purchaseRequestItems.id })
+      .from(purchaseRequestItems)
+      .where(
+        and(
+          eq(purchaseRequestItems.prId, prId),
+          inArray(purchaseRequestItems.status, [
+            "po_draft",
+            "ordered",
+            "closed",
+          ]),
+        ),
+      );
+    if (lines.length === 0) return { lineCount: 0, poNumbers: [] as string[] };
+    const pos = await tx
+      .selectDistinct({ poNumber: purchaseOrders.poNumber })
+      .from(prPoItemLinks)
+      .innerJoin(
+        purchaseOrderItems,
+        eq(purchaseOrderItems.id, prPoItemLinks.poItemId),
+      )
+      .innerJoin(purchaseOrders, eq(purchaseOrders.id, purchaseOrderItems.poId))
+      .where(
+        and(
+          inArray(
+            prPoItemLinks.prItemId,
+            lines.map((l) => l.id),
+          ),
+          sql`${purchaseOrders.status} <> 'cancelled'`,
+        ),
+      );
+    return {
+      lineCount: lines.length,
+      poNumbers: pos.map((p) => p.poNumber),
+    };
+  },
+
+  // Soft cancel: header + pending lines -> cancelled, who/when/why saved (BR-PR-39, 41, 46).
+  async cancelPr(
+    prId: number,
+    input: { actorId: number; reason: string },
+    tx: Tx,
+  ) {
+    const now = new Date();
+    const [row] = await tx
       .update(purchaseRequests)
-      .set({ status: "cancelled", updatedAt: new Date() })
+      .set({
+        status: "cancelled",
+        cancelledBy: input.actorId,
+        cancelledAt: now,
+        cancelReason: input.reason,
+        updatedAt: now,
+      })
       .where(eq(purchaseRequests.id, prId))
       .returning(purchaseRequestColumns);
-
+    await tx
+      .update(purchaseRequestItems)
+      .set({ status: "cancelled" })
+      .where(
+        and(
+          eq(purchaseRequestItems.prId, prId),
+          eq(purchaseRequestItems.status, "pending"),
+        ),
+      );
     return row;
   },
 

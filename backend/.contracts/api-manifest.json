@@ -2116,9 +2116,13 @@
               "totalApprovalLevels": "unrepresentable.required",
               "notes": "string.nullable.required",
               "estimatedAmountPaise": "unrepresentable.required",
+              "cancelledBy": "unrepresentable.nullable.required",
+              "cancelledAt": "unrepresentable.nullable.required",
+              "cancelReason": "string.nullable.required",
               "createdAt": "unrepresentable.required",
               "updatedAt": "unrepresentable.required",
-              "requestedByName": "string.required"
+              "requestedByName": "string.required",
+              "cancelledByName": "string.nullable.required"
             },
             "items": "array<object>.required",
             "linkedPos": "array<object>.required"
@@ -2164,6 +2168,9 @@
               "totalApprovalLevels": "unrepresentable.required",
               "notes": "string.nullable.required",
               "estimatedAmountPaise": "unrepresentable.required",
+              "cancelledBy": "unrepresentable.nullable.required",
+              "cancelledAt": "unrepresentable.nullable.required",
+              "cancelReason": "string.nullable.required",
               "createdAt": "unrepresentable.required",
               "updatedAt": "unrepresentable.required"
             },
@@ -2214,6 +2221,9 @@
               "totalApprovalLevels": "unrepresentable.required",
               "notes": "string.nullable.required",
               "estimatedAmountPaise": "unrepresentable.required",
+              "cancelledBy": "unrepresentable.nullable.required",
+              "cancelledAt": "unrepresentable.nullable.required",
+              "cancelReason": "string.nullable.required",
               "createdAt": "unrepresentable.required",
               "updatedAt": "unrepresentable.required"
             },
@@ -2229,30 +2239,39 @@
       "tags": [
         "pr"
       ],
-      "summary": "Cancel a purchase requisition.",
+      "summary": "Cancel a purchase requisition (soft cancel; reason 3-500 chars required).",
       "auth": {
         "type": "permission",
         "key": "pr.manage"
       },
-      "request": {},
+      "request": {
+        "body": {
+          "reason": "string.nonempty.required"
+        }
+      },
       "responses": {
         "200": {
           "success": "boolean.required",
           "data": {
-            "id": "unrepresentable.required",
-            "prNumber": "string.required",
-            "type": "enum:sale_order,stock_reorder,maintenance,tooling,subcontracting,misc.required",
-            "saleOrderId": "unrepresentable.nullable.required",
-            "assetId": "unrepresentable.nullable.required",
-            "status": "enum:draft,pending_approval,approved,rejected,partial_ordered,fully_ordered,cancelled.required",
-            "requestedBy": "unrepresentable.required",
-            "approvedBy": "unrepresentable.nullable.required",
-            "currentApprovalLevel": "unrepresentable.required",
-            "totalApprovalLevels": "unrepresentable.required",
-            "notes": "string.nullable.required",
-            "estimatedAmountPaise": "unrepresentable.required",
-            "createdAt": "unrepresentable.required",
-            "updatedAt": "unrepresentable.required"
+            "pr": {
+              "id": "unrepresentable.required",
+              "prNumber": "string.required",
+              "type": "enum:sale_order,stock_reorder,maintenance,tooling,subcontracting,misc.required",
+              "saleOrderId": "unrepresentable.nullable.required",
+              "assetId": "unrepresentable.nullable.required",
+              "status": "enum:draft,pending_approval,approved,rejected,partial_ordered,fully_ordered,cancelled.required",
+              "requestedBy": "unrepresentable.required",
+              "approvedBy": "unrepresentable.nullable.required",
+              "currentApprovalLevel": "unrepresentable.required",
+              "totalApprovalLevels": "unrepresentable.required",
+              "notes": "string.nullable.required",
+              "estimatedAmountPaise": "unrepresentable.required",
+              "cancelledBy": "unrepresentable.nullable.required",
+              "cancelledAt": "unrepresentable.nullable.required",
+              "cancelReason": "string.nullable.required",
+              "createdAt": "unrepresentable.required",
+              "updatedAt": "unrepresentable.required"
+            }
           }
         }
       }

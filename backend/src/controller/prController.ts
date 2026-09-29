@@ -1,9 +1,10 @@
 import type { Context } from "hono";
 
-import { BadRequestError, UnauthorizedError } from "../lib/errors";
+import { AppError, BadRequestError, UnauthorizedError } from "../lib/errors";
 import type { AppEnv } from "../lib/types";
 import { prService } from "../service/prService";
 import {
+  cancelPrSchema,
   createPrSchema,
   prListQuerySchema,
   updatePrSchema,
@@ -52,10 +53,19 @@ export const prController = {
   async remove(c: Context<AppEnv>) {
     const id = Number(c.req.param("id"));
     if (!Number.isInteger(id) || id <= 0) {
-      throw new BadRequestError("Invalid PR id");
+      throw new AppError("Invalid PR id", 400, "INVALID_PR_ID");
     }
 
-    const data = await prService.cancel(id);
-    return c.json({ success: true, data });
+    const raw = await c.req.json().catch(() => ({}));
+    const parsed = cancelPrSchema.safeParse(raw);
+    if (!parsed.success) {
+      throw new BadRequestError(
+        "A cancel reason of 3 to 500 characters is required",
+        "PR_CANCEL_REASON_REQUIRED",
+      );
+    }
+
+    const data = await prService.cancel(id, parsed.data.reason, c.get("actor"));
+    return c.json({ success: true, data: { pr: data } });
   },
 };

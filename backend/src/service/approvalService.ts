@@ -7,6 +7,7 @@ import {
   NotFoundError,
 } from "../lib/errors";
 import { approvalRepository } from "../repository/approvalRepository";
+import { prRepository } from "../repository/prRepository";
 import type {
   approvalActionRequestSchemaType,
   approvalChainSchemaType,
@@ -364,6 +365,17 @@ export const approvalService = {
     await assertChainHasEligibleApprovers(chain);
 
     return db.transaction(async (tx) => {
+      // BR-PR-47: a PR is re-read under its row lock so a racing cancel wins cleanly.
+      if (input.docType === "pr") {
+        const locked = await prRepository.findPrByIdForUpdate(input.docId, tx);
+        if (!locked || !canSubmitForApproval(locked.status)) {
+          throw new ConflictError(
+            `Cannot submit PR for approval from status ${locked?.status ?? "missing"}`,
+            "APPROVAL_INVALID_SOURCE_STATUS",
+          );
+        }
+      }
+
       const existingPending = await approvalRepository.findPendingRequestByDoc(
         input.docType,
         input.docId,
@@ -532,7 +544,10 @@ export const approvalService = {
       }
 
       if (request.status !== "pending_approval") {
-        throw new BadRequestError("Approval request is not pending");
+        throw new ConflictError(
+          "Approval request is not pending",
+          "APPROVAL_NOT_PENDING",
+        );
       }
 
       const chain = request.chainSnapshot;

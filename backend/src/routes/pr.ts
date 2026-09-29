@@ -7,7 +7,9 @@ import { paginatedResponse, successResponse } from "../lib/response-schemas";
 import { register } from "../lib/route-registry";
 import type { AppEnv } from "../lib/types";
 import {
+  cancelPrSchema,
   createPrSchema,
+  prCancelResultSchema,
   prDetailsSchema,
   prListQuerySchema,
   prSchema,
@@ -95,9 +97,11 @@ register({
   method: "DELETE",
   path: `${PR_BASE_PATH}${PR_ROUTES.remove}`,
   tags: ["pr"],
-  summary: "Cancel a purchase requisition.",
+  summary:
+    "Cancel a purchase requisition (soft cancel; reason 3-500 chars required).",
   auth: { type: "permission", key: "pr.manage" },
-  responses: { "200": successResponse(prSchema) },
+  request: { body: cancelPrSchema },
+  responses: { "200": successResponse(prCancelResultSchema) },
 });
 
 export { prRouter as prRoutes };

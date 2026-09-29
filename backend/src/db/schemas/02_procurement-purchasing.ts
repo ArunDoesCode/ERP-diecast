@@ -49,6 +49,9 @@ export const purchaseRequests = pgTable("purchase_requests", {
   totalApprovalLevels: integer("total_approval_levels").default(0).notNull(),
   notes: text("notes"),
   estimatedAmountPaise: integer("estimated_amount_paise").default(0).notNull(),
+  cancelledBy: integer("cancelled_by").references(() => employees.id),
+  cancelledAt: timestamp("cancelled_at"),
+  cancelReason: text("cancel_reason"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
