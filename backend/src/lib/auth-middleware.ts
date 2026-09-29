@@ -28,6 +28,11 @@ export type InvalidateActorFn = (employeeId: number) => void;
 /** Drops every cached actor holding this role (grant change, role delete). */
 export type InvalidateRoleFn = (roleId: number) => void;
 
+/** The one system role that bypasses every permission check (BR-AUTH-18). */
+export const SUPER_ADMIN_ROLE_NAME = "super-admin";
+export const isSuperAdminRoleName = (roleName: string): boolean =>
+  roleName === SUPER_ADMIN_ROLE_NAME;
+
 const ACTOR_CACHE_TTL_MS = 2000;
 const actorCache = new Map<number, { actor: Actor; expiresAt: number }>();
 
@@ -40,7 +45,7 @@ export const loadActor: LoadActorFn = async (employeeId) => {
     actorCache.delete(employeeId);
     return null;
   }
-  const isSuperAdmin = row.roleName === "super-admin";
+  const isSuperAdmin = isSuperAdminRoleName(row.roleName);
   const permissions = new Set<PermissionKey>(
     isSuperAdmin
       ? PERMISSION_KEYS

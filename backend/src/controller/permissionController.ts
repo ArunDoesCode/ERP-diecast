@@ -3,7 +3,18 @@ import type { Context } from "hono";
 import { BadRequestError } from "../lib/errors";
 import type { AppEnv } from "../lib/types";
 import { permissionService } from "../service/permissionService";
-import { rolePermissionDiffSchema } from "../types/setup.types";
+import {
+  roleGrantsDiffSchema,
+  rolePermissionDiffSchema,
+} from "../types/setup.types";
+
+function parseRoleId(c: Context<AppEnv>) {
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id)) {
+    throw new BadRequestError("Invalid role id");
+  }
+  return id;
+}
 
 export const permissionController = {
   async list(c: Context<AppEnv>) {
@@ -22,19 +33,18 @@ export const permissionController = {
     return c.json({ success: true, data });
   },
 
-  // S6 contract stub: 501 until the build step.
   async getGrants(c: Context<AppEnv>) {
-    return c.json(
-      { success: false, message: "Not implemented", code: "NOT_IMPLEMENTED" },
-      501,
-    );
+    const data = await permissionService.getGrants(parseRoleId(c));
+    return c.json({ success: true, data });
   },
 
-  // S6 contract stub: 501 until the build step.
   async setGrants(c: Context<AppEnv>) {
-    return c.json(
-      { success: false, message: "Not implemented", code: "NOT_IMPLEMENTED" },
-      501,
+    const body = roleGrantsDiffSchema.parse(await c.req.json());
+    const data = await permissionService.setGrants(
+      parseRoleId(c),
+      body,
+      c.get("actor").id,
     );
+    return c.json({ success: true, data });
   },
 };

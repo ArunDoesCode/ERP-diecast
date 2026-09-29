@@ -2,10 +2,13 @@ import type { Context } from "hono";
 
 import { BadRequestError } from "../lib/errors";
 import type { AppEnv } from "../lib/types";
+import { authAuditService } from "../service/authAuditService";
 import { employeeService } from "../service/employeeService";
 import {
+  accessLogListQuerySchema,
   employeeInputSchema,
   employeeListQuerySchema,
+  employeeRoleAssignSchema,
   employeeSearchQuerySchema,
   employeeUpdateSchema,
 } from "../types/setup.types";
@@ -37,21 +40,20 @@ export const employeeController = {
 
   async create(c: Context<AppEnv>) {
     const body = employeeInputSchema.parse(await c.req.json());
-    const actorId = Number(c.get("user").userId);
-    const data = await employeeService.create(body, actorId);
+    const data = await employeeService.create(body, c.get("actor"));
     return c.json({ success: true, data }, 201);
   },
 
   async update(c: Context<AppEnv>) {
     const id = parseIdParam(c);
     const body = employeeUpdateSchema.parse(await c.req.json());
-    const data = await employeeService.update(id, body);
+    const data = await employeeService.update(id, body, c.get("actor"));
     return c.json({ success: true, data });
   },
 
   async remove(c: Context<AppEnv>) {
     const id = parseIdParam(c);
-    await employeeService.remove(id);
+    await employeeService.remove(id, c.get("actor"));
     return c.json({ success: true });
   },
 
@@ -61,27 +63,27 @@ export const employeeController = {
     return c.json({ success: true, data });
   },
 
-  // S6 contract stub: 501 until the build step.
   async assignableRoles(c: Context<AppEnv>) {
-    return c.json(
-      { success: false, message: "Not implemented", code: "NOT_IMPLEMENTED" },
-      501,
-    );
+    const data = await employeeService.assignableRoles(c.get("actor"));
+    return c.json({ success: true, data });
   },
 
-  // S6 contract stub: 501 until the build step.
   async assignRole(c: Context<AppEnv>) {
-    return c.json(
-      { success: false, message: "Not implemented", code: "NOT_IMPLEMENTED" },
-      501,
+    const id = parseIdParam(c);
+    const body = employeeRoleAssignSchema.parse(await c.req.json());
+    const data = await employeeService.assignRole(
+      id,
+      body.roleId,
+      c.get("actor"),
     );
+    return c.json({ success: true, data });
   },
 
-  // S6 contract stub: 501 until the build step.
   async accessLog(c: Context<AppEnv>) {
-    return c.json(
-      { success: false, message: "Not implemented", code: "NOT_IMPLEMENTED" },
-      501,
+    const query = accessLogListQuerySchema.parse(
+      Object.fromEntries(new URL(c.req.url).searchParams),
     );
+    const { data, meta } = await authAuditService.list(query);
+    return c.json({ success: true, data, meta });
   },
 };

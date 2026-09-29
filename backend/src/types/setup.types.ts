@@ -249,6 +249,7 @@ export const screenSchema = z.object({
   permissionKey: z.string().nullable(),
   label: z.string(),
   sortOrder: z.number().int(),
+  // "" = no menu group
   menuGroup: z.string(),
   // roles that hold the screen's key (super-admin excluded: always sees it)
   roleIds: z.array(z.number()),
@@ -260,7 +261,8 @@ export const screenUpdateSchema = z
   .object({
     label: z.string().trim().min(1).optional(),
     sortOrder: z.number().int().optional(),
-    menuGroup: z.string().trim().min(1).optional(),
+    // "" clears the group (stored as "")
+    menuGroup: z.string().trim().optional(),
   })
   .strict()
   .superRefine((data, ctx) => {

@@ -2953,7 +2953,7 @@
         "body": {
           "label": "string.nonempty.optional",
           "sortOrder": "integer.optional",
-          "menuGroup": "string.nonempty.optional"
+          "menuGroup": "string.optional"
         }
       },
       "responses": {

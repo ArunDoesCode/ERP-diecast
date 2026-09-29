@@ -3,6 +3,7 @@ import { asc, count, desc, eq, ilike } from "drizzle-orm";
 import { db } from "../db/client";
 import { employees } from "../db/schemas/03_hcm";
 import type { employeeSchemaType } from "../types/setup.types";
+import type { DbExecutor } from "./executor";
 
 const employeeColumns = {
   id: employees.id,
@@ -125,8 +126,12 @@ export const employeeRepository = {
     return toEmployee(row);
   },
 
-  async update(id: number, data: Partial<EmployeeWriteData>) {
-    const [row] = await db
+  async update(
+    id: number,
+    data: Partial<EmployeeWriteData>,
+    exec: DbExecutor = db,
+  ) {
+    const [row] = await exec
       .update(employees)
       .set({ ...data, lastUpdatedAt: new Date() })
       .where(eq(employees.id, id))
@@ -134,8 +139,8 @@ export const employeeRepository = {
     return row ? toEmployee(row) : undefined;
   },
 
-  async softDelete(id: number) {
-    const [row] = await db
+  async softDelete(id: number, exec: DbExecutor = db) {
+    const [row] = await exec
       .update(employees)
       .set({ isActive: false, lastUpdatedAt: new Date() })
       .where(eq(employees.id, id))

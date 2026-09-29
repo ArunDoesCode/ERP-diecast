@@ -16,7 +16,10 @@ export const roles = pgTable("roles", {
   id: serial("id").primaryKey(),
   name: text("name").notNull().unique(),
   isSystem: boolean("is_system").notNull().default(false), // seed Owner, BackOffice, super-admin as true
-  createdBy: integer("created_by").references((): any => employees.id),
+  // set null: removing an employee row must not be blocked by roles they created (the access log keeps who)
+  createdBy: integer("created_by").references((): AnyPgColumn => employees.id, {
+    onDelete: "set null",
+  }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -72,6 +75,7 @@ export const rolePermissions = pgTable(
       .references(() => permissions.key, { onDelete: "cascade" }),
     grantedBy: integer("granted_by").references(
       (): AnyPgColumn => employees.id,
+      { onDelete: "set null" },
     ),
     grantedAt: timestamp("granted_at").defaultNow().notNull(),
   },

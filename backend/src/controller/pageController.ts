@@ -7,6 +7,8 @@ import {
   pageInputSchema,
   pageListQuerySchema,
   pageUpdateSchema,
+  screenRolesDiffSchema,
+  screenUpdateSchema,
 } from "../types/setup.types";
 
 function parseIdParam(c: Context<AppEnv>) {
@@ -46,27 +48,28 @@ export const pageController = {
     return c.json({ success: true });
   },
 
-  // S6 contract stub: 501 until the build step.
   async listScreens(c: Context<AppEnv>) {
-    return c.json(
-      { success: false, message: "Not implemented", code: "NOT_IMPLEMENTED" },
-      501,
-    );
+    const data = await pageService.listScreens();
+    return c.json({ success: true, data });
   },
 
-  // S6 contract stub: 501 until the build step.
   async updateScreen(c: Context<AppEnv>) {
-    return c.json(
-      { success: false, message: "Not implemented", code: "NOT_IMPLEMENTED" },
-      501,
+    const body = screenUpdateSchema.parse(await c.req.json());
+    const data = await pageService.updateScreen(
+      c.req.param("key") ?? "",
+      body,
+      c.get("actor").id,
     );
+    return c.json({ success: true, data });
   },
 
-  // S6 contract stub: 501 until the build step.
   async setScreenRoles(c: Context<AppEnv>) {
-    return c.json(
-      { success: false, message: "Not implemented", code: "NOT_IMPLEMENTED" },
-      501,
+    const body = screenRolesDiffSchema.parse(await c.req.json());
+    const data = await pageService.setScreenRoles(
+      c.req.param("key") ?? "",
+      body,
+      c.get("actor").id,
     );
+    return c.json({ success: true, data });
   },
 };
