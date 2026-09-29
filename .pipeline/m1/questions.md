@@ -17,3 +17,4 @@
 | 13 | frontend-dev (17) | PATCH employee resends unchanged roleId | backend skips BR-16/17 when unchanged | backend S6 |
 | 14 | frontend-dev (17) | menuGroup "" | = no group (null), not 400 | backend S6 |
 | 15 | test-writer (21) | PR cancel: reason transport, cancel fields, test level | body {reason}; cancelledBy/cancelledByName/cancelledAt/cancelReason; HTTP tests | contract PR-S1 |
+| 16 | test-writer (24) | db:reset: failure hooks, fixture passwords, desk emails | uncovered (no prod hooks); SEED_USER_PASSWORD for all incl. admin; <role>@diecast.local | known-defects v2 |
