@@ -1,7 +1,10 @@
 import {
+  type AnyPgColumn,
   boolean,
   integer,
+  jsonb,
   pgTable,
+  primaryKey,
   serial,
   text,
   timestamp,
@@ -48,6 +51,55 @@ export const rolePages = pgTable(
     unique("role_pages_role_id_page_id_unique").on(table.roleId, table.pageId),
   ],
 );
+
+// Permission keys are defined in code (lib/permissions.ts) and synced here.
+export const permissions = pgTable("permissions", {
+  key: text("key").primaryKey(),
+  module: text("module").notNull(),
+  label: text("label").notNull(),
+  description: text("description").notNull(),
+  grantable: boolean("grantable").notNull().default(true),
+});
+
+export const rolePermissions = pgTable(
+  "role_permissions",
+  {
+    roleId: integer("role_id")
+      .notNull()
+      .references(() => roles.id, { onDelete: "cascade" }),
+    permissionKey: text("permission_key")
+      .notNull()
+      .references(() => permissions.key, { onDelete: "cascade" }),
+    grantedBy: integer("granted_by").references(
+      (): AnyPgColumn => employees.id,
+    ),
+    grantedAt: timestamp("granted_at").defaultNow().notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.roleId, table.permissionKey] })],
+);
+
+// Screens are defined in code: code owns key/path/permissionKey, the UI owns label/sortOrder/menuGroup.
+export const screens = pgTable("screens", {
+  key: text("key").primaryKey(),
+  path: text("path").notNull(),
+  permissionKey: text("permission_key").references(() => permissions.key, {
+    onDelete: "set null",
+  }), // null = any signed-in user
+  label: text("label").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  menuGroup: text("menu_group").notNull(),
+});
+
+// Insert-only access log (BR-AUTH-20). No update/delete code paths may exist.
+export const authAuditLog = pgTable("auth_audit_log", {
+  id: serial("id").primaryKey(),
+  actorId: integer("actor_id").references((): AnyPgColumn => employees.id),
+  action: text("action").notNull(),
+  target: text("target").notNull(),
+  before: jsonb("before"),
+  after: jsonb("after"),
+  at: timestamp("at").defaultNow().notNull(),
+});
 
 export const refreshTokens = pgTable("refresh_tokens", {
   id: serial("id").primaryKey(),

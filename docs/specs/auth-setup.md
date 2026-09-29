@@ -1,7 +1,7 @@
 ---
 module: auth-setup
 status: frozen           # draft | frozen | changed-after-freeze
-version: 5
+version: 6
 frozen_on: 2026-09-29
 owner: Arun
 depends_on: []           # every other module depends on this one
@@ -54,6 +54,7 @@ Super-admin needs no grants (bypass). ow = owner, bo = back_office, fs = floor_s
 | `approval.policy.view` | list / view approval policies | ow, bo |
 | `approval.policy.manage` | create / update approval policies | none (super-admin) |
 | `approval.view_all` | read any approval request (service check) | ow, bo |
+| `employees.directory.view` | Employee Directory screen (placeholder page today) | ow |
 | `approval.view_others_pending` | see another employee's pending list | none (super-admin) |
 | `approval.auto_approve_own` | own requests skip the chain (approval BR-APR-61; new behaviour) | ow |
 | `sco.view` | subcontracting screens, read (`subcontracting.md`) | ow, bo, fs, qa |
@@ -127,3 +128,4 @@ None open.
 - 2026-09-29 — consistency pass: fs removed from `grn.qa_bypass`; new keys `inventory.adjust`, `inventory.view` (inventory Q5=A), `supplier.view`, `approval.auto_approve_own`, `sco.*` (seed none until M2); BR-AUTH-21 differences extended; BR-AUTH-26 machine name and code (inventory Q3=A adds the code); bootstrap points to known-defects.
 - 2026-09-29 — pre-freeze touch-up: subcontracting is built now, so `sco.view/manage/issue_receive/qa_decide/close` seed ow + bo and `sco.loss_override` ow only. Confirmed rows for `inventory.adjust`, `inventory.view`, `supplier.view`, `approval.auto_approve_own`, `pr.link_machine`; BR-AUTH-21 now also lists owner `inventory.adjust` and the `sco.*` seed. BR-AUTH-24 example no longer uses `sco.manage`.
 - 2026-09-29 — frozen v5 (all questions answered by Arun)
+- 2026-09-29 — v6 clarified during build: key `employees.directory.view` (ow) for the existing Employee Directory screen (owner sees it today); `landing` and `approvals` screens need no key (any signed-in user); unbuilt seed pages get no screen (BR-AUTH-06).
