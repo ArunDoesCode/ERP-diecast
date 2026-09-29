@@ -91,7 +91,8 @@ If a decision is reversed, add a new entry that references the old one — don't
 - **Decision:** work happens on one local branch `work/<theme>` in one worktree; every item is its own
   commit; one PR per batch when the user asks. A second branch only for a truly parallel session or an epic.
   Adjusts D-008 ("one branch + PR per feature").
-- **Why:** many small branches and PRs cost the user more review time than they saved.
+- **Why:** fewer branches, worktrees and PRs to track for a solo developer (set in CLAUDE.md Git, 938ef40;
+  no longer reason was written down).
 
 ### D-014 — Parallel stock session merged into work/m1 (2026-09-29)
 - **Decision:** grn, grn-stock, inventory and suppliers were built in a parallel session on `work/m1-stock`
