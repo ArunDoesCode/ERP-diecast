@@ -1,7 +1,7 @@
 ---
 module: auth-setup
 status: frozen           # draft | frozen | changed-after-freeze
-version: 6
+version: 7
 frozen_on: 2026-09-29
 owner: Arun
 depends_on: []           # every other module depends on this one
@@ -43,7 +43,7 @@ Super-admin needs no grants (bypass). ow = owner, bo = back_office, fs = floor_s
 | `supplier.view` | supplier list, search, view (PO supplier picker) | ow, bo, fs |
 | `supplier.manage` | supplier create, edit, deactivate, price lists | bo |
 | `pr.manage` | all `/pr` routes | ow, bo, fs |
-| `pr.link_machine` | PR "Machine" field + machine list for it (BR-AUTH-26) | fs |
+| `pr.link_machine` | PR "Machine" field + machine list for it (BR-AUTH-26) | ow, bo, fs |
 | `po.manage` | all `/po` routes, PO tracking and PO action buttons | ow, bo |
 | `grn.view` | GRN list, details | ow, bo, fs, qa, dd |
 | `grn.edit_draft` | GRN create, update, delete | ow, bo, fs |
@@ -129,3 +129,4 @@ None open.
 - 2026-09-29 — pre-freeze touch-up: subcontracting is built now, so `sco.view/manage/issue_receive/qa_decide/close` seed ow + bo and `sco.loss_override` ow only. Confirmed rows for `inventory.adjust`, `inventory.view`, `supplier.view`, `approval.auto_approve_own`, `pr.link_machine`; BR-AUTH-21 now also lists owner `inventory.adjust` and the `sco.*` seed. BR-AUTH-24 example no longer uses `sco.manage`.
 - 2026-09-29 — frozen v5 (all questions answered by Arun)
 - 2026-09-29 — v6 clarified during build: key `employees.directory.view` (ow) for the existing Employee Directory screen (owner sees it today); `landing` and `approvals` screens need no key (any signed-in user); unbuilt seed pages get no screen (BR-AUTH-06). Read routes: item list, stock movements and item last-rate need `inventory.view`; posting a movement needs `inventory.adjust`; supplier list/detail/items/services reads need `supplier.view`.
+- 2026-09-29 — v7 clarified during build: `pr.link_machine` seeded to ow, bo, fs (was fs). Today owner and back office can save a maintenance PR with a machine, so BR-AUTH-21 (keep today's API access) requires it; they now also see the Machine field. The PR "Machine" field is `purchase_requests.assetId`.

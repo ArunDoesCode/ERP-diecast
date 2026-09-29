@@ -9,3 +9,5 @@
 | 5 | test-writer (02) | key for last-rate, supplier listItems/listServices? | inventory.view; supplier.view | spec v6 changelog, contract.md |
 | 6 | backend-dev (06) | GET /asset/machines for bo (asset.manage) + fs (pr.link_machine)? | A: route any-authenticated, service allows asset.manage OR pr.link_machine (BR-AUTH-26) | contract S3 |
 | 7 | backend-dev (06) | /setup/modules, /setup/pages* key? | setup.roles.manage (super-admin only, as today) | contract S3 |
+| 8 | test-writer (10) | can bo still create a maintenance PR (needs machine)? | yes — seed pr.link_machine to ow, bo, fs (BR-AUTH-21 parity) | spec v7 changelog, contract |
+| 9 | test-writer (10) | PR Machine field = purchase_requests.assetId? | yes | spec v7 changelog |

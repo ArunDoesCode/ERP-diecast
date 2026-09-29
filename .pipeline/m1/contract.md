@@ -25,11 +25,14 @@ Drizzle exports: `permissions`, `rolePermissions`, `screens`, `authAuditLog`.
 ## Seed map (matches spec table, BR-AUTH-21)
 - owner (21): employees.directory.view, inventory.adjust, inventory.view, supplier.view, pr.manage, po.manage, grn.view, grn.edit_draft, grn.qa_decide, grn.qa_bypass, grn.correct, grn.over_receipt_override, approval.policy.view, approval.view_all, approval.auto_approve_own, sco.view, sco.manage, sco.close, sco.issue_receive, sco.qa_decide, sco.loss_override
 - back_office (20): asset.manage, inventory.adjust, inventory.view, supplier.view, supplier.manage, pr.manage, po.manage, grn.view, grn.edit_draft, grn.qa_decide, grn.qa_bypass, grn.correct, grn.over_receipt_override, approval.policy.view, approval.view_all, sco.view, sco.manage, sco.close, sco.issue_receive, sco.qa_decide
-- floor_supervisor (8): inventory.view, supplier.view, pr.manage, pr.link_machine, grn.view, grn.edit_draft, sco.view, sco.issue_receive
+- owner and back_office also hold pr.link_machine (spec v7). floor_supervisor (8): inventory.view, supplier.view, pr.manage, pr.link_machine, grn.view, grn.edit_draft, sco.view, sco.issue_receive
 - qa_inspector: grn.view, grn.qa_decide, sco.view, sco.qa_decide
 - die_designer: grn.view
 - super-admin, operator: none
 - No role holds: setup.roles.manage, setup.employees.manage, approval.policy.manage, approval.view_others_pending.
+
+## S4 — service checks
+`can(actor: Actor, key: PermissionKey): boolean` exported from `backend/src/lib/auth-middleware.ts` (super-admin → true). Services receive the `Actor` (from `c.get("actor")`) instead of a role name. Replaces: `grnService` OVER_RECEIPT_OVERRIDE_ROLES → `grn.over_receipt_override`; `approvalService` privileged reader → `approval.view_all`, others-pending → `approval.view_others_pending`, own auto-approve → `approval.auto_approve_own`; `employeeService` super-admin check → `setup.employees.manage`. `GET /asset/machines`: allowed with `asset.manage` OR `pr.link_machine`; PR save with a machine requires `pr.link_machine` (BR-AUTH-26).
 
 ## `/auth/me` and login `user` (from S3)
 `{ id, name, email, role: string /* role name, display only */, permissions: string[] /* super-admin: every key */, screens: { key, path, label, menuGroup, sortOrder }[] }` (BR-AUTH-13). Token payload: `{ userId, userName }` only.
