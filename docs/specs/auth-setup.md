@@ -1,7 +1,7 @@
 ---
 module: auth-setup
 status: frozen           # draft | frozen | changed-after-freeze
-version: 9
+version: 10
 frozen_on: 2026-09-29
 owner: Arun
 depends_on: []           # every other module depends on this one
@@ -39,7 +39,7 @@ Super-admin needs no grants (bypass). ow = owner, bo = back_office, fs = floor_s
 | `setup.employees.manage` | employees + QR regenerate in `/setup` | none (super-admin) |
 | `asset.manage` | all `/asset` routes except those below | bo |
 | `inventory.adjust` | manual stock-take / opening stock (grn-stock BR-GRN-43) | ow, bo |
-| `inventory.view` | items, stock view, movement list (inventory Q5=A) | ow, bo, fs |
+| `inventory.view` | items, stock view, movement list, location list for pickers (inventory Q5=A) | ow, bo, fs |
 | `supplier.view` | supplier list, search, view (PO supplier picker) | ow, bo, fs |
 | `supplier.manage` | supplier create, edit, deactivate, price lists | bo |
 | `pr.manage` | all `/pr` routes | ow, bo, fs |
@@ -132,3 +132,4 @@ None open.
 - 2026-09-29 — v7 clarified during build: `pr.link_machine` seeded to ow, bo, fs (was fs). Today owner and back office can save a maintenance PR with a machine, so BR-AUTH-21 (keep today's API access) requires it; they now also see the Machine field. The PR "Machine" field is `purchase_requests.assetId`.
 - 2026-09-29 — v8 clarified during build (BR-AUTH-19): a role held only by inactive employees can't be deleted either — 409 `ROLE_HAS_INACTIVE_EMPLOYEES` ("move them to another role first"); employees always keep a role.
 - 2026-09-29 — v9 clarified during build (security review): BR-AUTH-16 covers every change to an employee (edit, deactivate, QR regenerate), not only role assignment — a non-super-admin may act only on employees whose current role they could assign, never on a super-admin (403 `ROLE_NOT_ASSIGNABLE`). BR-AUTH-17's check runs inside the write transaction. BR-AUTH-20 also logs employee create, edit (email, password change — without the value — login method) and QR regenerate. BR-AUTH-05: a password or login-method change, or deactivation, revokes that employee's refresh tokens; rotation is atomic (a token can be used once even under concurrent calls). Error codes used: `ROLE_NOT_ASSIGNABLE` (BR-16), `SCREEN_HAS_NO_KEY` (BR-15, screen without a key can't be ticked), `UNKNOWN_KEY` (key not in the catalog).
+- 2026-09-29 — v10 clarified during build: `GET /asset/locations` (read only) is allowed for `asset.manage` or `inventory.view`, so the stock view and the stock-take / opening-stock form (inventory BR-INV-21..23, owner holds `inventory.adjust`) can fill the location picker. Creating and editing locations stays `asset.manage`.
