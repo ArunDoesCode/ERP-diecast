@@ -1,21 +1,24 @@
 import { create } from "zustand";
 import { createJSONStorage, devtools, persist } from "zustand/middleware";
 
-import { decodeAccessToken } from "@/lib/auth/token";
+import type { AuthScreen } from "@/types/auth";
 
 type AuthProfile = {
 	userId?: string;
 	userName?: string;
 	role?: string;
-	allowedPages?: string[];
+	permissions?: string[];
+	screens?: AuthScreen[];
 };
 
 type AuthSessionState = {
 	token: string | null;
 	userId: string | null;
 	userName: string | null;
+	/** Display only — never gate UI on this; use `permissions` (useCan). */
 	role: string | null;
-	allowedPages: string[];
+	permissions: string[];
+	screens: AuthScreen[];
 	hasHydrated: boolean;
 	setToken: (token: string | null) => void;
 	setProfile: (profile: AuthProfile) => void;
@@ -28,7 +31,8 @@ const initialState = {
 	userId: null,
 	userName: null,
 	role: null,
-	allowedPages: [] as string[],
+	permissions: [] as string[],
+	screens: [] as AuthScreen[],
 };
 
 export const useAuthSessionStore = create<AuthSessionState>()(
@@ -50,16 +54,7 @@ export const useAuthSessionStore = create<AuthSessionState>()(
 						return;
 					}
 
-					const decoded = decodeAccessToken(token);
-					set(
-						(state) => ({
-							token,
-							role: decoded?.role ?? state.role,
-							allowedPages: decoded?.allowedPages ?? state.allowedPages,
-						}),
-						false,
-						"auth-session/setToken",
-					);
+					set({ token }, false, "auth-session/setToken");
 				},
 
 				setProfile: (profile) => {
@@ -68,7 +63,8 @@ export const useAuthSessionStore = create<AuthSessionState>()(
 							userId: profile.userId ?? state.userId,
 							userName: profile.userName ?? state.userName,
 							role: profile.role ?? state.role,
-							allowedPages: profile.allowedPages ?? state.allowedPages,
+							permissions: profile.permissions ?? state.permissions,
+							screens: profile.screens ?? state.screens,
 						}),
 						false,
 						"auth-session/setProfile",
@@ -98,7 +94,8 @@ export const useAuthSessionStore = create<AuthSessionState>()(
 					userId: state.userId,
 					userName: state.userName,
 					role: state.role,
-					allowedPages: state.allowedPages,
+					permissions: state.permissions,
+					screens: state.screens,
 				}),
 				onRehydrateStorage: () => (state) => {
 					state?.setHasHydrated(true);

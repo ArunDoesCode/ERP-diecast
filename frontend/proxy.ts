@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 const PUBLIC_PATHS = ["/", "/login"];
+// Screens with no permission key: open to every signed-in user (BR-AUTH-15).
+const ALWAYS_ALLOWED_PATHS = ["/landing", "/approvals"];
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
 
 function normalizePath(path: string) {
@@ -30,7 +32,7 @@ function isPathAllowed(pathname: string, allowedPages: string[]) {
 	});
 }
 
-async function fetchAllowedPages(accessToken: string) {
+async function fetchScreenPaths(accessToken: string) {
 	if (!apiBaseUrl) {
 		return null;
 	}
@@ -49,11 +51,11 @@ async function fetchAllowedPages(accessToken: string) {
 
 	const payload = (await response.json()) as {
 		success: true;
-		data: { allowedPages: string[] };
+		data: { screens: { path: string }[] };
 	};
 
-	return Array.isArray(payload.data.allowedPages)
-		? payload.data.allowedPages
+	return Array.isArray(payload.data.screens)
+		? payload.data.screens.map((screen) => screen.path)
 		: null;
 }
 
@@ -68,12 +70,12 @@ export async function proxy(request: NextRequest) {
 		return NextResponse.redirect(new URL("/login", request.url));
 	}
 
-	const allowedPages = await fetchAllowedPages(accessToken);
-	if (!allowedPages) {
+	const screenPaths = await fetchScreenPaths(accessToken);
+	if (!screenPaths) {
 		return NextResponse.redirect(new URL("/login", request.url));
 	}
 
-	if (!isPathAllowed(pathname, allowedPages)) {
+	if (!isPathAllowed(pathname, [...ALWAYS_ALLOWED_PATHS, ...screenPaths])) {
 		return NextResponse.redirect(new URL("/", request.url));
 	}
 

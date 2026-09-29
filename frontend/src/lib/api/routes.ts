@@ -14,7 +14,6 @@ export const API_ROUTES = {
 		refresh: `${API_Header.auth}/refresh`,
 		logout: `${API_Header.auth}/logout`,
 		me: `${API_Header.auth}/me`,
-		register: `${API_Header.auth}/register`,
 	},
 	// mirrors backend SETUP_ROUTES (list/create/update/remove per resource); :id/:roleId
 	// params become functions here since api.* needs concrete URLs, not placeholders.

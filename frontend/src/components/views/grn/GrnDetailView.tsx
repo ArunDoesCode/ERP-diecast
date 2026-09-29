@@ -21,11 +21,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useCan } from "@/hooks/use-can";
 import { useDeleteGrnMutation, useGrnDetailQuery } from "@/lib/api/grn/queries";
-import { canManageGrnDraft } from "@/lib/grn-permissions";
 import { getGrnStatusBadgeStyle } from "@/lib/grn-status-badge";
 import { humanizeStatusLabel } from "@/lib/pr-status-badge";
-import { useAuthSessionStore } from "@/lib/store/auth-session-store";
 import type { Grn } from "@/types/grn";
 
 function formatDate(value?: string | null) {
@@ -39,7 +38,7 @@ function formatDate(value?: string | null) {
 
 export function GrnDetailView({ grnId }: { grnId: number }) {
 	const router = useRouter();
-	const role = useAuthSessionStore((state) => state.role);
+	const canEditDraft = useCan("grn.edit_draft");
 	const [editOpen, setEditOpen] = useState(false);
 
 	const detailQuery = useGrnDetailQuery(grnId, grnId > 0);
@@ -47,7 +46,7 @@ export function GrnDetailView({ grnId }: { grnId: number }) {
 	const grn = detail?.grn;
 	const items = detail?.items ?? [];
 
-	const canManage = canManageGrnDraft(role) && grn?.status === "draft";
+	const canManage = canEditDraft && grn?.status === "draft";
 
 	return (
 		<div className="flex w-full flex-col gap-4 p-6">
@@ -87,7 +86,6 @@ export function GrnDetailView({ grnId }: { grnId: number }) {
 								grnId={grn.id}
 								poId={grn.poId ?? 0}
 								items={items}
-								role={role}
 							/>
 						</CardContent>
 					</Card>

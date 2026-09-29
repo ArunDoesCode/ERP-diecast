@@ -30,8 +30,7 @@ export function clearAccessToken() {
 
 export type AccessTokenPayload = {
 	userId: string;
-	role: string;
-	allowedPages: string[];
+	userName: string;
 	exp: number;
 };
 

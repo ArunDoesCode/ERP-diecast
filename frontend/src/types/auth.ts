@@ -6,3 +6,20 @@ export const loginSchema = z.object({
 });
 
 export type LoginInput = z.infer<typeof loginSchema>;
+
+export type AuthScreen = {
+	key: string | null;
+	path: string;
+	label: string;
+	menuGroup: string;
+	sortOrder: number;
+};
+
+export type AuthUser = {
+	id: string | number;
+	name: string;
+	email?: string;
+	role: string;
+	permissions: string[];
+	screens: AuthScreen[];
+};

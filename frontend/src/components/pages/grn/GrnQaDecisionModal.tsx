@@ -20,8 +20,8 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useCan } from "@/hooks/use-can";
 import { useGrnQaDecisionMutation } from "@/lib/api/grn/queries";
-import { isExemptFromOverReceiptGuard } from "@/lib/grn-permissions";
 import type { GrnItemDetail } from "@/types/grn";
 
 const OVER_RECEIPT_MULTIPLIER = 1.05;
@@ -30,14 +30,12 @@ export function GrnQaDecisionModal({
 	grnId,
 	poId,
 	line,
-	role,
 	open,
 	onOpenChange,
 }: {
 	grnId: number;
 	poId: number;
 	line: GrnItemDetail;
-	role?: string | null;
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 }) {
@@ -51,7 +49,7 @@ export function GrnQaDecisionModal({
 	const isOverReceipt =
 		decision === "accept" &&
 		Number(acceptedQty || 0) > line.orderedQty * OVER_RECEIPT_MULTIPLIER;
-	const isExempt = isExemptFromOverReceiptGuard(role);
+	const isExempt = useCan("grn.over_receipt_override");
 
 	function reset() {
 		setDecision("accept");

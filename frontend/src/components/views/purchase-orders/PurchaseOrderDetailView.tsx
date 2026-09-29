@@ -52,6 +52,7 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { useCan } from "@/hooks/use-can";
 import { useSubmitApprovalRequestMutation } from "@/lib/api/approval/queries";
 import {
 	toPOCreatePayload,
@@ -67,7 +68,6 @@ import {
 	useSupplierItemsQuery,
 	useSuppliersQuery,
 } from "@/lib/api/suppliers/queries";
-import { canManageGrnDraft } from "@/lib/grn-permissions";
 import {
 	canCancelPurchaseOrder,
 	canClosePurchaseOrder,
@@ -79,7 +79,6 @@ import {
 	getPRStatusBadgeStyle,
 	humanizeStatusLabel,
 } from "@/lib/pr-status-badge";
-import { useAuthSessionStore } from "@/lib/store/auth-session-store";
 import type { LastRateSource } from "@/types/purchase-orders";
 import type {
 	PRLinkedPo,
@@ -146,8 +145,7 @@ function statusBadgeClass(status: string) {
 
 export function PurchaseOrderDetailView({ prId }: { prId: number }) {
 	const router = useRouter();
-	const role = useAuthSessionStore((state) => state.role);
-	const canManagePO = role !== "floor_supervisor";
+	const canManagePO = useCan("po.manage");
 	const [selectedLineIds, setSelectedLineIds] = useState<Set<number>>(
 		() => new Set(),
 	);
@@ -398,8 +396,8 @@ function LinkedPOs({
 	prId: number;
 	pendingLines: PurchaseRequisitionItem[];
 }) {
-	const role = useAuthSessionStore((state) => state.role);
-	const canManagePO = role !== "floor_supervisor";
+	const canManagePO = useCan("po.manage");
+	const canEditGrnDraft = useCan("grn.edit_draft");
 	const [editingPoId, setEditingPoId] = useState<number | null>(null);
 	const [receivingPoId, setReceivingPoId] = useState<number | null>(null);
 	const [dialogState, setDialogState] = useState<LinkedPoDialogState | null>(
@@ -557,12 +555,11 @@ function LinkedPOs({
 											) : null}
 										</>
 									) : null}
-									{/* Independent of canManagePO: floor_supervisor is authorized by
+									{/* Independent of canManagePO: grn.edit_draft holders are authorized by
 									the backend to create/manage GRN drafts (creategrn, bypass) even
 									though they can't manage the PO itself — never nest this inside
 									the canManagePO-gated block above. */}
-									{PO_IN_TRANSIT_STATUSES.has(po.status) &&
-									canManageGrnDraft(role) ? (
+									{PO_IN_TRANSIT_STATUSES.has(po.status) && canEditGrnDraft ? (
 										<Button
 											type="button"
 											size="sm"

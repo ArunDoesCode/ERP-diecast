@@ -20,8 +20,8 @@ import {
 	type SearchField,
 	usePRListControls,
 } from "@/components/views/purchase-requisitions/use-pr-list-controls";
+import { useCan } from "@/hooks/use-can";
 import { usePurchaseRequisitionsQuery } from "@/lib/api/purchase-requisitions/queries";
-import { useAuthSessionStore } from "@/lib/store/auth-session-store";
 import {
 	type PRStatus,
 	type PRType,
@@ -63,8 +63,7 @@ export function PurchaseRequisitionsView() {
 	const [createOpen, setCreateOpen] = useState(false);
 	const [selectedPrId, setSelectedPrId] = useState<number | null>(null);
 	const [editOpen, setEditOpen] = useState(false);
-	const role = useAuthSessionStore((state) => state.role);
-	const isFloorSupervisor = role === "floor_supervisor";
+	const canLinkMachine = useCan("pr.link_machine");
 
 	const requisitionsQuery = usePurchaseRequisitionsQuery({
 		page,
@@ -190,7 +189,7 @@ export function PurchaseRequisitionsView() {
 				<CreatePurchaseRequisitionModal
 					open={createOpen}
 					onOpenChange={setCreateOpen}
-					isFloorSupervisor={isFloorSupervisor}
+					canLinkMachine={canLinkMachine}
 				/>
 			) : null}
 
@@ -204,7 +203,7 @@ export function PurchaseRequisitionsView() {
 							setSelectedPrId(null);
 						}
 					}}
-					isFloorSupervisor={isFloorSupervisor}
+					canLinkMachine={canLinkMachine}
 				/>
 			) : null}
 		</div>

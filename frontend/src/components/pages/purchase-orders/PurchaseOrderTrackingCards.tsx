@@ -27,12 +27,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { useCan } from "@/hooks/use-can";
 import { useSubmitApprovalRequestMutation } from "@/lib/api/approval/queries";
 import {
 	purchaseOrderKeys,
 	useCancelPurchaseOrderMutation,
 } from "@/lib/api/purchase-orders/queries";
-import { canManageGrnDraft } from "@/lib/grn-permissions";
 import {
 	canCancelPurchaseOrder,
 	canClosePurchaseOrder,
@@ -42,7 +42,6 @@ import {
 	PO_TERMINAL_STATUSES,
 } from "@/lib/po-status-badge";
 import { humanizeStatusLabel } from "@/lib/pr-status-badge";
-import { useAuthSessionStore } from "@/lib/store/auth-session-store";
 import type { PurchaseOrder } from "@/types/purchase-orders";
 
 type PoTrackingDialogState = {
@@ -146,8 +145,8 @@ export function PurchaseOrderTrackingCards({
 	purchaseOrders,
 	isLoading,
 }: PurchaseOrderTrackingCardsProps) {
-	const role = useAuthSessionStore((state) => state.role);
-	const canManagePO = role !== "floor_supervisor";
+	const canManagePO = useCan("po.manage");
+	const canEditGrnDraft = useCan("grn.edit_draft");
 	const [editingPoId, setEditingPoId] = useState<number | null>(null);
 	const [receivingPoId, setReceivingPoId] = useState<number | null>(null);
 	const [dialogState, setDialogState] = useState<PoTrackingDialogState | null>(
@@ -331,12 +330,11 @@ export function PurchaseOrderTrackingCards({
 										) : null}
 									</div>
 								) : null}
-								{/* Independent of canManagePO: floor_supervisor is authorized by
+								{/* Independent of canManagePO: grn.edit_draft holders are authorized by
 								the backend to create/manage GRN drafts (creategrn, bypass) even
 								though they can't manage the PO itself — never nest this inside
 								the canManagePO-gated block above. */}
-								{PO_IN_TRANSIT_STATUSES.has(po.status) &&
-								canManageGrnDraft(role) ? (
+								{PO_IN_TRANSIT_STATUSES.has(po.status) && canEditGrnDraft ? (
 									<div className="flex flex-wrap gap-2">
 										<Button
 											type="button"

@@ -80,11 +80,11 @@ import {
 export function CreatePurchaseRequisitionModal({
 	open,
 	onOpenChange,
-	isFloorSupervisor,
+	canLinkMachine,
 }: {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
-	isFloorSupervisor: boolean;
+	canLinkMachine: boolean;
 }) {
 	const createMutation = useCreatePurchaseRequisitionMutation();
 	const [activeStep, setActiveStep] = useState<FormStep>("details");
@@ -147,7 +147,7 @@ export function CreatePurchaseRequisitionModal({
 			toPRCreatePayload({
 				type: values.type,
 				notes: values.notes,
-				assetId: isFloorSupervisor ? values.assetId : undefined,
+				assetId: canLinkMachine ? values.assetId : undefined,
 				items: values.items.map((item) => ({
 					itemId: item.itemId,
 					requestedQty: item.requestedQty,
@@ -226,7 +226,7 @@ export function CreatePurchaseRequisitionModal({
 											)}
 										/>
 
-										{isFloorSupervisor ? (
+										{canLinkMachine ? (
 											<FormField
 												control={form.control}
 												name="assetId"
@@ -426,12 +426,12 @@ export function EditPurchaseRequisitionModal({
 	prId,
 	open,
 	onOpenChange,
-	isFloorSupervisor,
+	canLinkMachine,
 }: {
 	prId: number | null;
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
-	isFloorSupervisor: boolean;
+	canLinkMachine: boolean;
 }) {
 	const queryClient = useQueryClient();
 	const [activeStep, setActiveStep] = useState<FormStep>("details");
@@ -699,7 +699,7 @@ export function EditPurchaseRequisitionModal({
 													</FormControl>
 												</FormItem>
 
-												{isFloorSupervisor ? (
+												{canLinkMachine ? (
 													<FormItem className="min-h-19">
 														<FormLabel>Machine</FormLabel>
 														<FormControl>

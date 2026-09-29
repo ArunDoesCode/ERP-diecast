@@ -28,10 +28,11 @@ export function useMeQuery(enabled: boolean) {
 		const result = query.data;
 
 		useAuthSessionStore.getState().setProfile({
-			userId: result.data.userId,
-			userName: result.data.userName,
+			userId: String(result.data.id),
+			userName: result.data.name,
 			role: result.data.role,
-			allowedPages: result.data.allowedPages,
+			permissions: result.data.permissions,
+			screens: result.data.screens,
 		});
 	}, [query.data]);
 
@@ -52,10 +53,11 @@ export function useLoginMutation() {
 			setAccessToken(result.data.accessToken);
 			useAuthSessionStore.getState().setToken(result.data.accessToken);
 			useAuthSessionStore.getState().setProfile({
-				userId: result.data.user.id,
-				userName: result.data.user.email,
+				userId: String(result.data.user.id),
+				userName: result.data.user.name,
 				role: result.data.user.role,
-				allowedPages: result.data.user.allowedPages,
+				permissions: result.data.user.permissions,
+				screens: result.data.user.screens,
 			});
 			await queryClient.invalidateQueries({ queryKey: authKeys.me() });
 			toast.success(result.message || "Login successful");

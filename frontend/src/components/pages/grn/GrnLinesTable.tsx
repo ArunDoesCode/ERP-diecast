@@ -15,11 +15,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import {
-	canBypassGrnQa,
-	canCorrectGrnLine,
-	canDecideGrnQa,
-} from "@/lib/grn-permissions";
+import { useCan } from "@/hooks/use-can";
 import { getGrnQaStatusBadgeStyle } from "@/lib/grn-status-badge";
 import { humanizeStatusLabel } from "@/lib/pr-status-badge";
 import type { GrnItemDetail } from "@/types/grn";
@@ -28,13 +24,14 @@ export function GrnLinesTable({
 	grnId,
 	poId,
 	items,
-	role,
 }: {
 	grnId: number;
 	poId: number;
 	items: GrnItemDetail[];
-	role?: string | null;
 }) {
+	const canDecideQa = useCan("grn.qa_decide");
+	const canBypassQa = useCan("grn.qa_bypass");
+	const canCorrectLine = useCan("grn.correct");
 	const [qaDecisionLine, setQaDecisionLine] = useState<GrnItemDetail | null>(
 		null,
 	);
@@ -101,7 +98,7 @@ export function GrnLinesTable({
 										<div className="flex flex-wrap gap-2">
 											{isPendingQa ? (
 												<>
-													{canDecideGrnQa(role) ? (
+													{canDecideQa ? (
 														<Button
 															type="button"
 															size="sm"
@@ -111,7 +108,7 @@ export function GrnLinesTable({
 															Decide
 														</Button>
 													) : null}
-													{canBypassGrnQa(role) ? (
+													{canBypassQa ? (
 														<Button
 															type="button"
 															size="sm"
@@ -123,7 +120,7 @@ export function GrnLinesTable({
 													) : null}
 												</>
 											) : null}
-											{canCorrect && canCorrectGrnLine(role) ? (
+											{canCorrect && canCorrectLine ? (
 												<Button
 													type="button"
 													size="sm"
@@ -147,7 +144,6 @@ export function GrnLinesTable({
 					grnId={grnId}
 					poId={poId}
 					line={qaDecisionLine}
-					role={role}
 					open={qaDecisionLine !== null}
 					onOpenChange={(open) => {
 						if (!open) setQaDecisionLine(null);
@@ -160,7 +156,6 @@ export function GrnLinesTable({
 					grnId={grnId}
 					poId={poId}
 					line={bypassLine}
-					role={role}
 					open={bypassLine !== null}
 					onOpenChange={(open) => {
 						if (!open) setBypassLine(null);
