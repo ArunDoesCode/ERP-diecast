@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { SearchableSelect } from "@/components/common/SearchableSelect";
+import { ApprovalHistoryPanel } from "@/components/pages/approval/ApprovalHistoryPanel";
 import { CreateGrnModal } from "@/components/pages/grn/CreateGrnModal";
 import { ClosePoAlert } from "@/components/pages/purchase-orders/ClosePoAlert";
 import { ConfirmPoDialog } from "@/components/pages/purchase-orders/ConfirmPoDialog";
@@ -417,159 +418,160 @@ function LinkedPOs({
 				) : (
 					<div className="space-y-2">
 						{linkedPos.map((po) => (
-							<div
-								key={po.id}
-								className="flex flex-col gap-2 rounded-md border p-3 text-xs sm:flex-row sm:items-center sm:justify-between"
-							>
-								<div className="flex flex-wrap items-center gap-2">
-									<span className="font-medium">{po.poNumber}</span>
-									<span className="text-muted-foreground">
-										Supplier #{po.supplierId}
-									</span>
-									<Badge variant="outline">
-										{humanizeStatusLabel(po.status)}
-									</Badge>
-									<span>{formatMoney(po.totalAmountPaise)}</span>
-								</div>
+							<div key={po.id} className="space-y-2">
+								<div className="flex flex-col gap-2 rounded-md border p-3 text-xs sm:flex-row sm:items-center sm:justify-between">
+									<div className="flex flex-wrap items-center gap-2">
+										<span className="font-medium">{po.poNumber}</span>
+										<span className="text-muted-foreground">
+											Supplier #{po.supplierId}
+										</span>
+										<Badge variant="outline">
+											{humanizeStatusLabel(po.status)}
+										</Badge>
+										<span>{formatMoney(po.totalAmountPaise)}</span>
+									</div>
 
-								<div className="flex flex-wrap gap-2">
-									{!canManagePO ? null : po.status === "draft" ? (
-										<>
-											<SubmitPOForApprovalButton poId={po.id} prId={prId} />
-											<Button
-												type="button"
-												size="sm"
-												variant="outline"
-												onClick={() => setEditingPoId(po.id)}
-											>
-												Edit
-											</Button>
-											<DiscardPOAlert
-												poId={po.id}
-												prId={prId}
-												poNumber={po.poNumber}
-											/>
-										</>
-									) : !PO_TERMINAL_STATUSES.has(po.status) ? (
-										<>
-											{po.status === "approved" ? (
-												<Button
-													type="button"
-													size="sm"
-													onClick={() =>
-														setDialogState({
-															type: "send",
-															poId: po.id,
-															poNumber: po.poNumber,
-														})
-													}
-												>
-													Send to supplier
-												</Button>
-											) : null}
-											{PO_IN_TRANSIT_STATUSES.has(po.status) ? (
-												<>
-													<Button
-														type="button"
-														size="sm"
-														variant="outline"
-														onClick={() =>
-															setDialogState({
-																type: "reminder",
-																poId: po.id,
-																poNumber: po.poNumber,
-															})
-														}
-													>
-														Reminder
-													</Button>
-													<Button
-														type="button"
-														size="sm"
-														variant="outline"
-														onClick={() =>
-															setDialogState({
-																type: "escalate",
-																poId: po.id,
-																poNumber: po.poNumber,
-															})
-														}
-													>
-														Escalate
-													</Button>
-													<Button
-														type="button"
-														size="sm"
-														variant="outline"
-														onClick={() =>
-															setDialogState({
-																type: "delay",
-																poId: po.id,
-																poNumber: po.poNumber,
-															})
-														}
-													>
-														Delay
-													</Button>
-													<Button
-														type="button"
-														size="sm"
-														variant="outline"
-														onClick={() =>
-															setDialogState({
-																type: "confirm",
-																poId: po.id,
-																poNumber: po.poNumber,
-															})
-														}
-													>
-														Confirm
-													</Button>
-												</>
-											) : null}
-											{canMarkPurchaseOrderInvoiced(po.status) ? (
+									<div className="flex flex-wrap gap-2">
+										{!canManagePO ? null : po.status === "draft" ? (
+											<>
+												<SubmitPOForApprovalButton poId={po.id} prId={prId} />
 												<Button
 													type="button"
 													size="sm"
 													variant="outline"
-													onClick={() =>
-														setDialogState({
-															type: "invoice",
-															poId: po.id,
-															poNumber: po.poNumber,
-														})
-													}
+													onClick={() => setEditingPoId(po.id)}
 												>
-													Mark Invoiced
+													Edit
 												</Button>
-											) : null}
-											{canClosePurchaseOrder(po.status) ? (
-												<ClosePoAlert poId={po.id} poNumber={po.poNumber} />
-											) : null}
-											{canCancelPurchaseOrder(po.status) ? (
-												<CancelPOAlert
+												<DiscardPOAlert
 													poId={po.id}
 													prId={prId}
 													poNumber={po.poNumber}
 												/>
-											) : null}
-										</>
-									) : null}
-									{/* Independent of canManagePO: grn.edit_draft holders are authorized by
+											</>
+										) : !PO_TERMINAL_STATUSES.has(po.status) ? (
+											<>
+												{po.status === "approved" ? (
+													<Button
+														type="button"
+														size="sm"
+														onClick={() =>
+															setDialogState({
+																type: "send",
+																poId: po.id,
+																poNumber: po.poNumber,
+															})
+														}
+													>
+														Send to supplier
+													</Button>
+												) : null}
+												{PO_IN_TRANSIT_STATUSES.has(po.status) ? (
+													<>
+														<Button
+															type="button"
+															size="sm"
+															variant="outline"
+															onClick={() =>
+																setDialogState({
+																	type: "reminder",
+																	poId: po.id,
+																	poNumber: po.poNumber,
+																})
+															}
+														>
+															Reminder
+														</Button>
+														<Button
+															type="button"
+															size="sm"
+															variant="outline"
+															onClick={() =>
+																setDialogState({
+																	type: "escalate",
+																	poId: po.id,
+																	poNumber: po.poNumber,
+																})
+															}
+														>
+															Escalate
+														</Button>
+														<Button
+															type="button"
+															size="sm"
+															variant="outline"
+															onClick={() =>
+																setDialogState({
+																	type: "delay",
+																	poId: po.id,
+																	poNumber: po.poNumber,
+																})
+															}
+														>
+															Delay
+														</Button>
+														<Button
+															type="button"
+															size="sm"
+															variant="outline"
+															onClick={() =>
+																setDialogState({
+																	type: "confirm",
+																	poId: po.id,
+																	poNumber: po.poNumber,
+																})
+															}
+														>
+															Confirm
+														</Button>
+													</>
+												) : null}
+												{canMarkPurchaseOrderInvoiced(po.status) ? (
+													<Button
+														type="button"
+														size="sm"
+														variant="outline"
+														onClick={() =>
+															setDialogState({
+																type: "invoice",
+																poId: po.id,
+																poNumber: po.poNumber,
+															})
+														}
+													>
+														Mark Invoiced
+													</Button>
+												) : null}
+												{canClosePurchaseOrder(po.status) ? (
+													<ClosePoAlert poId={po.id} poNumber={po.poNumber} />
+												) : null}
+												{canCancelPurchaseOrder(po.status) ? (
+													<CancelPOAlert
+														poId={po.id}
+														prId={prId}
+														poNumber={po.poNumber}
+													/>
+												) : null}
+											</>
+										) : null}
+										{/* Independent of canManagePO: grn.edit_draft holders are authorized by
 									the backend to create/manage GRN drafts (creategrn, bypass) even
 									though they can't manage the PO itself — never nest this inside
 									the canManagePO-gated block above. */}
-									{PO_IN_TRANSIT_STATUSES.has(po.status) && canEditGrnDraft ? (
-										<Button
-											type="button"
-											size="sm"
-											variant="outline"
-											onClick={() => setReceivingPoId(po.id)}
-										>
-											Receive goods
-										</Button>
-									) : null}
+										{PO_IN_TRANSIT_STATUSES.has(po.status) &&
+										canEditGrnDraft ? (
+											<Button
+												type="button"
+												size="sm"
+												variant="outline"
+												onClick={() => setReceivingPoId(po.id)}
+											>
+												Receive goods
+											</Button>
+										) : null}
+									</div>
 								</div>
+								<PoApprovalHistory poId={po.id} />
 							</div>
 						))}
 					</div>
@@ -652,6 +654,24 @@ function LinkedPOs({
 				/>
 			) : null}
 		</Card>
+	);
+}
+
+function PoApprovalHistory({ poId }: { poId: number }) {
+	const [open, setOpen] = useState(false);
+
+	return (
+		<div className="space-y-2 px-1">
+			<Button
+				type="button"
+				size="sm"
+				variant="ghost"
+				onClick={() => setOpen((value) => !value)}
+			>
+				{open ? "Hide approval history" : "Approval history"}
+			</Button>
+			{open ? <ApprovalHistoryPanel docType="po" docId={poId} /> : null}
+		</div>
 	);
 }
 

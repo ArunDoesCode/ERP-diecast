@@ -9,11 +9,29 @@ import type {
 export type ActiveFilter = "all" | "active" | "inactive";
 export type PolicyFormMode = "create" | "edit";
 
+// BL-025: the form works in rupees, the API in integer paise.
+export function paiseToRupeesInput(paise: number | null): string {
+	return paise == null ? "" : String(paise / 100);
+}
+
+export function rupeesInputToPaise(value: string): number | null {
+	const trimmed = value.trim();
+	if (!trimmed) return null;
+	return Math.round(Number(trimmed) * 100);
+}
+
+function rupees(paise: number) {
+	return `₹${(paise / 100).toLocaleString("en-IN", {
+		maximumFractionDigits: 2,
+	})}`;
+}
+
 export function toAmountLabel(min: number | null, max: number | null) {
 	if (min == null && max == null) return "Any";
-	if (min != null && max != null) return `>= ${min} and < ${max}`;
-	if (min != null) return `>= ${min}`;
-	return `< ${max}`;
+	if (min != null && max != null)
+		return `>= ${rupees(min)} and < ${rupees(max)}`;
+	if (min != null) return `>= ${rupees(min)}`;
+	return `< ${rupees(max as number)}`;
 }
 
 export function createDefaultFormValues(): ApprovalPolicyFormInput {
@@ -48,10 +66,8 @@ export function mapPolicyToFormValues(
 		priority: policy.priority,
 		docType: policy.docType,
 		subDocType: policy.subDocType ?? "",
-		minAmountPaise:
-			policy.minAmountPaise == null ? "" : String(policy.minAmountPaise),
-		maxAmountPaise:
-			policy.maxAmountPaise == null ? "" : String(policy.maxAmountPaise),
+		minAmountPaise: paiseToRupeesInput(policy.minAmountPaise),
+		maxAmountPaise: paiseToRupeesInput(policy.maxAmountPaise),
 		autoApprove: policy.autoApprove,
 		approvalChain:
 			policy.approvalChain?.length > 0
@@ -91,8 +107,8 @@ export function toChainPayload(
 export function toCreatePayload(
 	form: ApprovalPolicyFormInput,
 ): ApprovalPolicyCreateInput {
-	const min = form.minAmountPaise.trim();
-	const max = form.maxAmountPaise.trim();
+	const min = rupeesInputToPaise(form.minAmountPaise);
+	const max = rupeesInputToPaise(form.maxAmountPaise);
 
 	return {
 		name: form.name,
@@ -100,13 +116,14 @@ export function toCreatePayload(
 		isActive: form.isActive,
 		priority: form.priority,
 		docType: form.docType,
-		// isSaleOrderLinked is intentionally not sent until the approval spec decides
-		// whether policies filter on it (BL-002); backend then stores null = any.
 		subDocType: form.subDocType || undefined,
-		minAmountPaise: min ? Number(min) : undefined,
-		maxAmountPaise: max ? Number(max) : undefined,
+		minAmountPaise: min ?? undefined,
+		maxAmountPaise: max ?? undefined,
 		autoApprove: form.autoApprove,
-		approvalChain: form.autoApprove ? [] : toChainPayload(form.approvalChain),
+		// Auto-approve: chain is optional, send none.
+		...(form.autoApprove
+			? {}
+			: { approvalChain: toChainPayload(form.approvalChain) }),
 	};
 }
 
@@ -119,12 +136,8 @@ export function toUpdatePayload(
 		isActive: form.isActive,
 		priority: form.priority,
 		subDocType: form.subDocType || "any",
-		minAmountPaise: form.minAmountPaise.trim()
-			? Number(form.minAmountPaise)
-			: null,
-		maxAmountPaise: form.maxAmountPaise.trim()
-			? Number(form.maxAmountPaise)
-			: null,
+		minAmountPaise: rupeesInputToPaise(form.minAmountPaise),
+		maxAmountPaise: rupeesInputToPaise(form.maxAmountPaise),
 		autoApprove: form.autoApprove,
 		approvalChain: form.autoApprove ? [] : toChainPayload(form.approvalChain),
 	};

@@ -20,6 +20,7 @@ import {
 	SearchableSelect,
 	type SearchableSelectOption,
 } from "@/components/common/SearchableSelect";
+import { ApprovalHistoryPanel } from "@/components/pages/approval/ApprovalHistoryPanel";
 import {
 	CancelPurchaseRequisitionDialog,
 	getCancelBlockedReason,
@@ -930,6 +931,11 @@ export function EditPurchaseRequisitionModal({
 										) : null}
 									</form>
 								</>
+							) : null}
+							{pr ? (
+								<div className="px-6 pb-4">
+									<ApprovalHistoryPanel docType="pr" docId={pr.id} />
+								</div>
 							) : null}
 						</div>
 

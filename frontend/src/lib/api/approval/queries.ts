@@ -23,6 +23,7 @@ import type {
 import {
 	actOnApprovalRequest,
 	createApprovalPolicy,
+	getApprovalHistory,
 	getApprovalPolicies,
 	getApprovalPolicyDetails,
 	getApprovalRequestDetails,
@@ -45,6 +46,8 @@ export const approvalKeys = {
 		params
 			? (["approval", "pending", params] as const)
 			: (["approval", "pending"] as const),
+	history: (docType: ApprovalDocType, docId: number) =>
+		["approval", "history", docType, docId] as const,
 	currentByDoc: (docType: ApprovalDocType, docId: number) =>
 		["approval", "current-by-doc", docType, docId] as const,
 };
@@ -132,6 +135,7 @@ export function useSubmitApprovalRequestMutation() {
 						variables.docId,
 					),
 				}),
+				queryClient.invalidateQueries({ queryKey: ["approval", "history"] }),
 				queryClient.invalidateQueries({ queryKey: ["purchase-requisitions"] }),
 			]);
 			toast.success(result.message || "Submitted for approval");
@@ -176,6 +180,7 @@ export function useActOnApprovalRequestMutation() {
 				queryClient.invalidateQueries({
 					queryKey: ["approval", "current-by-doc"],
 				}),
+				queryClient.invalidateQueries({ queryKey: ["approval", "history"] }),
 				queryClient.invalidateQueries({ queryKey: ["purchase-requisitions"] }),
 			]);
 			if (result.success) {
@@ -184,7 +189,7 @@ export function useActOnApprovalRequestMutation() {
 					reject: "Approval rejected",
 					sent_back: "Approval sent back",
 					cancel: "Approval cancelled",
-					withdraw: "Withdrawn - PR is back in draft",
+					withdraw: "Withdrawn - document is back in draft",
 				};
 				toast.success(
 					result.message || messageByAction[variables.input.action],
@@ -202,6 +207,18 @@ export function useMyPendingApprovalsQuery(params?: ApprovalMyPendingParams) {
 		queryKey: approvalKeys.myPending(params),
 		queryFn: () => getMyPendingApprovals(params),
 		placeholderData: params ? keepPreviousData : undefined,
+	});
+}
+
+export function useApprovalHistoryQuery(
+	docType?: ApprovalDocType,
+	docId?: number,
+	enabled = true,
+) {
+	return useQuery({
+		queryKey: approvalKeys.history(docType ?? "pr", docId ?? 0),
+		queryFn: () => getApprovalHistory(docType ?? "pr", docId ?? 0),
+		enabled: enabled && Boolean(docType && docId),
 	});
 }
 

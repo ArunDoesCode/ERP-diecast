@@ -23,6 +23,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { useCan } from "@/hooks/use-can";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useApprovalPoliciesQuery } from "@/lib/api/approval/queries";
 import type {
@@ -41,6 +42,7 @@ export function ApprovalPolicyTable({
 	onCreate,
 	onEdit,
 }: ApprovalPolicyTableProps) {
+	const canManage = useCan("approval.policy.manage");
 	const [pagination, setPagination] = useState<PaginationState>({
 		pageIndex: 0,
 		pageSize: 10,
@@ -76,15 +78,18 @@ export function ApprovalPolicyTable({
 				header: ({ column }) => (
 					<DataTableColumnHeader column={column} title="Policy" />
 				),
-				cell: ({ row }) => (
-					<button
-						type="button"
-						onClick={() => onEdit(row.original.id)}
-						className="text-left font-medium text-primary hover:underline"
-					>
-						{row.original.name}
-					</button>
-				),
+				cell: ({ row }) =>
+					canManage ? (
+						<button
+							type="button"
+							onClick={() => onEdit(row.original.id)}
+							className="text-left font-medium text-primary hover:underline"
+						>
+							{row.original.name}
+						</button>
+					) : (
+						<span className="font-medium">{row.original.name}</span>
+					),
 			},
 			{
 				accessorKey: "docType",
@@ -132,7 +137,7 @@ export function ApprovalPolicyTable({
 					),
 			},
 		],
-		[onEdit], // Fixed dependency array
+		[onEdit, canManage],
 	);
 
 	const table = useReactTable({
@@ -155,10 +160,12 @@ export function ApprovalPolicyTable({
 			<CardHeader className="gap-3">
 				<div className="flex items-center justify-between gap-3">
 					<CardTitle>Approval Policies</CardTitle>
-					<Button type="button" onClick={onCreate}>
-						<IconPlus className="size-3.5" />
-						Create Policy
-					</Button>
+					{canManage ? (
+						<Button type="button" onClick={onCreate}>
+							<IconPlus className="size-3.5" />
+							Create Policy
+						</Button>
+					) : null}
 				</div>
 				<p className="text-xs text-muted-foreground">
 					Server-side search, filter, sorting, and pagination.
