@@ -126,14 +126,12 @@ describe("BR-AUTH-06 syncCatalog", () => {
 
   test("BR-AUTH-06 a key removed from code is deleted with its grants (audit row written)", async () => {
     const [role] = await db.insert(roles).values({ name: ROLE }).returning();
-    await db
-      .insert(permissions)
-      .values({
-        key: GHOST_KEY,
-        module: "test_authsync",
-        label: "G",
-        description: "G",
-      });
+    await db.insert(permissions).values({
+      key: GHOST_KEY,
+      module: "test_authsync",
+      label: "G",
+      description: "G",
+    });
     await db
       .insert(rolePermissions)
       .values({ roleId: role?.id as number, permissionKey: GHOST_KEY });
@@ -232,14 +230,12 @@ describe("BR-AUTH-21 / BR-AUTH-24 seedGrants", () => {
   });
 
   test("BR-AUTH-24 a key added in a later release is held by no role after seed", async () => {
-    await db
-      .insert(permissions)
-      .values({
-        key: "test_authsync.later",
-        module: "test_authsync",
-        label: "L",
-        description: "L",
-      });
+    await db.insert(permissions).values({
+      key: "test_authsync.later",
+      module: "test_authsync",
+      label: "L",
+      description: "L",
+    });
     await seedGrants();
     expect(
       await db

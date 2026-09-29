@@ -203,16 +203,14 @@ describe("BR-AUTH-24 deny by default (storage level)", () => {
     await db
       .insert(rolePermissions)
       .values({ roleId: r!.id, permissionKey: key });
-    await db
-      .insert(screens)
-      .values({
-        key: "test_authcat_screen",
-        path: "/test-authcat",
-        permissionKey: key,
-        label: "T",
-        sortOrder: 1,
-        menuGroup: "T",
-      });
+    await db.insert(screens).values({
+      key: "test_authcat_screen",
+      path: "/test-authcat",
+      permissionKey: key,
+      label: "T",
+      sortOrder: 1,
+      menuGroup: "T",
+    });
     await db.delete(permissions).where(eq(permissions.key, key));
     expect(
       await db

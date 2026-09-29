@@ -31,6 +31,9 @@ Drizzle exports: `permissions`, `rolePermissions`, `screens`, `authAuditLog`.
 - super-admin, operator: none
 - No role holds: setup.roles.manage, setup.employees.manage, approval.policy.manage, approval.view_others_pending.
 
+## `/auth/me` and login `user` (from S3)
+`{ id, name, email, role: string /* role name, display only */, permissions: string[] /* super-admin: every key */, screens: { key, path, label, menuGroup, sortOrder }[] }` (BR-AUTH-13). Token payload: `{ userId, userName }` only.
+
 ## Route → key (coordinator decisions for routes the spec table doesn't name; used from S3)
 - `GET /asset/items`, `GET /asset/inventory/movements`, `GET /asset/items/:itemId/last-rate` → `inventory.view`
 - `POST /asset/inventory/movements` → `inventory.adjust`
