@@ -52,6 +52,7 @@ export function GrnLinesTable({
 						<TableHead>Ordered</TableHead>
 						<TableHead>Received</TableHead>
 						<TableHead>Accepted</TableHead>
+						<TableHead>Net accepted</TableHead>
 						<TableHead>Rejected</TableHead>
 						<TableHead>QA status</TableHead>
 						<TableHead className="w-48" />
@@ -61,7 +62,7 @@ export function GrnLinesTable({
 					{items.length === 0 ? (
 						<TableRow>
 							<TableCell
-								colSpan={7}
+								colSpan={8}
 								className="py-8 text-center text-muted-foreground"
 							>
 								No lines on this GRN.
@@ -83,11 +84,35 @@ export function GrnLinesTable({
 											<span className="text-muted-foreground">
 												{item.itemSku}
 											</span>
+											{item.batchNumber ? (
+												<span className="text-xs text-muted-foreground">
+													Batch/heat: {item.batchNumber}
+												</span>
+											) : null}
+											{item.isQaBypassed ? (
+												<span className="text-xs text-muted-foreground">
+													QA bypassed: {item.qaBypassReason ?? "-"}
+												</span>
+											) : null}
+											{item.overReceiptReason ? (
+												<span className="text-xs text-amber-700">
+													Over-receipt +{item.overReceiptExcessQty ?? 0}:{" "}
+													{item.overReceiptReason}
+												</span>
+											) : null}
 										</div>
 									</TableCell>
 									<TableCell>{item.orderedQty}</TableCell>
 									<TableCell>{item.receivedQty}</TableCell>
 									<TableCell>{item.acceptedQty}</TableCell>
+									<TableCell>
+										{item.netAcceptedQty}
+										{item.correctedQty > 0 ? (
+											<span className="block text-xs text-muted-foreground">
+												{item.correctedQty} corrected
+											</span>
+										) : null}
+									</TableCell>
 									<TableCell>{item.rejectedQty ?? 0}</TableCell>
 									<TableCell>
 										<Badge

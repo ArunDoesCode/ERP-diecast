@@ -39,6 +39,7 @@ export function EditGrnModal({
 	const [driverPhone, setDriverPhone] = useState("");
 	const [remarks, setRemarks] = useState("");
 	const [arrivedQty, setArrivedQty] = useState<Record<number, string>>({});
+	const [batchNumbers, setBatchNumbers] = useState<Record<number, string>>({});
 	const updateMutation = useUpdateGrnMutation();
 
 	// Seed form state from the fetched GRN exactly once per time the modal opens —
@@ -65,22 +66,32 @@ export function EditGrnModal({
 				items.map((item) => [item.id, String(item.receivedQty)]),
 			),
 		);
+		setBatchNumbers(
+			Object.fromEntries(
+				items.map((item) => [item.id, item.batchNumber ?? ""]),
+			),
+		);
 	}, [open, grn, items]);
 
 	function onSubmit() {
 		if (!grn) return;
 
 		const changedLines = items
-			.filter((item) => Number(arrivedQty[item.id] || 0) !== item.receivedQty)
+			.filter(
+				(item) =>
+					Number(arrivedQty[item.id] || 0) !== item.receivedQty ||
+					(batchNumbers[item.id] ?? "").trim() !== (item.batchNumber ?? ""),
+			)
 			.map((item) => ({
 				id: item.id,
 				arrivedQty: Number(arrivedQty[item.id] || 0),
+				batchNumber: (batchNumbers[item.id] ?? "").trim() || null,
 			}));
 
 		updateMutation.mutate(
 			{
 				grnId: grn.id,
-				challanNo: challanNo.trim() || null,
+				challanNo: challanNo.trim() || undefined,
 				challanDate: challanDate || null,
 				vehicleNo: vehicleNo.trim() || null,
 				driverName: driverName.trim() || null,
@@ -120,10 +131,11 @@ export function EditGrnModal({
 										htmlFor="grn-edit-challan-no"
 										className="mb-1 block text-xs font-medium"
 									>
-										Challan no
+										Challan no *
 									</label>
 									<Input
 										id="grn-edit-challan-no"
+										required
 										value={challanNo}
 										onChange={(event) => setChallanNo(event.target.value)}
 									/>
@@ -202,7 +214,7 @@ export function EditGrnModal({
 								{items.map((item) => (
 									<div
 										key={item.id}
-										className="grid gap-3 rounded-md border p-3 md:grid-cols-[1fr_8rem_8rem] md:items-center"
+										className="grid gap-3 rounded-md border p-3 md:grid-cols-[1fr_8rem_8rem_10rem] md:items-center"
 									>
 										<div className="min-w-0">
 											<span className="font-medium">{item.itemName}</span>
@@ -227,9 +239,28 @@ export function EditGrnModal({
 												id={`grn-edit-arrived-qty-${item.id}`}
 												type="number"
 												min={0}
+												step="any"
 												value={arrivedQty[item.id] ?? ""}
 												onChange={(event) =>
 													setArrivedQty((current) => ({
+														...current,
+														[item.id]: event.target.value,
+													}))
+												}
+											/>
+										</div>
+										<div>
+											<label
+												htmlFor={`grn-edit-batch-${item.id}`}
+												className="mb-1 block text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase"
+											>
+												Batch / heat no
+											</label>
+											<Input
+												id={`grn-edit-batch-${item.id}`}
+												value={batchNumbers[item.id] ?? ""}
+												onChange={(event) =>
+													setBatchNumbers((current) => ({
 														...current,
 														[item.id]: event.target.value,
 													}))
@@ -251,7 +282,7 @@ export function EditGrnModal({
 							</Button>
 							<Button
 								type="button"
-								disabled={updateMutation.isPending}
+								disabled={updateMutation.isPending || !challanNo.trim()}
 								onClick={onSubmit}
 							>
 								Save changes

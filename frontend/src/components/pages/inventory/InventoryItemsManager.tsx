@@ -68,8 +68,6 @@ function toItemPayload(values: AssetItemCreatePayload): AssetItemCreatePayload {
 		category: values.category.trim(),
 		uom: values.uom.trim(),
 		reorderLevel: values.reorderLevel,
-		currentStock: values.currentStock,
-		averageCostPaise: values.averageCostPaise,
 		isActive: values.isActive,
 	};
 }
@@ -100,8 +98,6 @@ function ItemEditorForm({ mode, item, onDone }: ItemEditorFormProps) {
 						category: item.category,
 						uom: item.uom,
 						reorderLevel: item.reorderLevel ?? undefined,
-						currentStock: item.currentStock ?? undefined,
-						averageCostPaise: item.averageCostPaise ?? undefined,
 						isActive: item.isActive,
 					}
 				: {
@@ -111,8 +107,6 @@ function ItemEditorForm({ mode, item, onDone }: ItemEditorFormProps) {
 						category: "",
 						uom: "",
 						reorderLevel: undefined,
-						currentStock: undefined,
-						averageCostPaise: undefined,
 						isActive: true,
 					},
 	});
@@ -239,59 +233,22 @@ function ItemEditorForm({ mode, item, onDone }: ItemEditorFormProps) {
 						)}
 					/>
 
-					<FormField
-						control={form.control}
-						name="currentStock"
-						render={({ field }) => (
-							<FormItem className="min-h-19">
-								<FormControl>
-									<FloatingLabelInput
-										id="item-current-stock"
-										label="Current stock (optional)"
-										type="number"
-										name={field.name}
-										value={field.value ?? ""}
-										onBlur={field.onBlur}
-										ref={field.ref}
-										onChange={(event) => {
-											const value = event.target.value;
-											field.onChange(
-												value === "" ? undefined : event.target.valueAsNumber,
-											);
-										}}
-									/>
-								</FormControl>
-								<FormMessage />
-							</FormItem>
-						)}
-					/>
-
-					<FormField
-						control={form.control}
-						name="averageCostPaise"
-						render={({ field }) => (
-							<FormItem className="min-h-19">
-								<FormControl>
-									<FloatingLabelInput
-										id="item-average-cost"
-										label="Average cost paise (optional)"
-										type="number"
-										name={field.name}
-										value={field.value ?? ""}
-										onBlur={field.onBlur}
-										ref={field.ref}
-										onChange={(event) => {
-											const value = event.target.value;
-											field.onChange(
-												value === "" ? undefined : event.target.valueAsNumber,
-											);
-										}}
-									/>
-								</FormControl>
-								<FormMessage />
-							</FormItem>
-						)}
-					/>
+					{mode === "edit" && item ? (
+						<div className="grid grid-cols-2 gap-3 text-sm">
+							<div>
+								<p className="text-xs font-medium text-muted-foreground">
+									Current stock (read-only)
+								</p>
+								<p>{item.currentStock ?? 0}</p>
+							</div>
+							<div>
+								<p className="text-xs font-medium text-muted-foreground">
+									Average cost, paise (read-only)
+								</p>
+								<p>{item.averageCostPaise ?? 0}</p>
+							</div>
+						</div>
+					) : null}
 
 					<FormField
 						control={form.control}

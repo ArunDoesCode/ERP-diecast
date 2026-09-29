@@ -49,7 +49,12 @@ export interface GrnItem {
 	isQaBypassed: boolean | null;
 	qaBypassReason: string | null;
 	qaBypassedBy: number | null;
+	qaBypassedAt: string | null;
 	challanPhotoUrl: string | null;
+	batchNumber: string | null;
+	overReceiptExcessQty: number | null;
+	overReceiptReason: string | null;
+	overReceiptBy: number | null;
 }
 
 export interface GrnItemDetail extends GrnItem {
@@ -57,6 +62,8 @@ export interface GrnItemDetail extends GrnItem {
 	itemSku: string;
 	itemName: string;
 	orderedQty: number;
+	correctedQty: number;
+	netAcceptedQty: number;
 }
 
 export interface GrnDetailPayload {
@@ -80,37 +87,47 @@ export type GrnDetailResult = ApiResult<GrnDetailPayload>;
 
 export type GrnCreatePayload = {
 	poId: number;
-	challanNo?: string;
+	challanNo: string;
 	challanDate?: string;
 	vehicleNo?: string;
 	driverName?: string;
 	driverPhone?: string;
 	remarks?: string;
-	lines: Array<{ poItemId: number; arrivedQty: number }>;
+	lines: Array<{ poItemId: number; arrivedQty: number; batchNumber?: string }>;
 };
 export type GrnCreateResult = ApiResult<GrnDetailPayload>;
 
 export type GrnUpdatePayload = {
 	grnId: number;
-	challanNo?: string | null;
+	challanNo?: string;
 	challanDate?: string | null;
 	vehicleNo?: string | null;
 	driverName?: string | null;
 	driverPhone?: string | null;
 	remarks?: string | null;
-	lines?: Array<{ id: number; arrivedQty: number }>;
+	lines?: Array<{
+		id: number;
+		arrivedQty: number;
+		batchNumber?: string | null;
+	}>;
 };
 export type GrnUpdateResult = ApiResult<GrnDetailPayload>;
 export type GrnDeleteResult = ApiResult<{ id: number }>;
 
 export type GrnQaDecisionPayload = {
-	decision: "accept" | "reject";
-	acceptedQty?: number;
-	rejectedQty?: number;
+	acceptedQty: number;
+	rejectedQty: number;
 	remarks?: string;
 	certificateUrl?: string;
+	batchNumber?: string;
+	overrideReason?: string;
 };
-export type GrnBypassPayload = { bypassReason: string; acceptedQty?: number };
+export type GrnBypassPayload = {
+	bypassReason: string;
+	acceptedQty?: number;
+	batchNumber?: string;
+	overrideReason?: string;
+};
 export type GrnCorrectionPayload = { qty: number; reason: string };
 
 export type GrnLineActionResult = ApiResult<GrnItem>;

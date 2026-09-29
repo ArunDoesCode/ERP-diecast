@@ -59,6 +59,7 @@ export interface AssetMovement {
 	transactionType: AssetTransactionType;
 	referenceType: AssetReferenceType;
 	referenceId: number;
+	referenceLineId: number | null;
 	quantityChange: number;
 	balanceAfter: number;
 	unitCostPaise: number;
@@ -116,6 +117,9 @@ export type AssetTransactionType = (typeof assetTransactionTypeValues)[number];
 export const assetReferenceTypeValues = [
 	"grn",
 	"grn_bypass",
+	"grn_correction",
+	"opening_stock",
+	"sco_loss",
 	"pro",
 	"sco_issue",
 	"sco_receipt",
@@ -125,6 +129,12 @@ export const assetReferenceTypeValues = [
 ] as const;
 
 export type AssetReferenceType = (typeof assetReferenceTypeValues)[number];
+
+// Only these two can be posted by hand; every other type comes from its source document.
+export const assetManualReferenceTypeValues = [
+	"stock_adjustment",
+	"opening_stock",
+] as const;
 
 export type AssetMachineListParams = {
 	page?: number;
@@ -192,19 +202,22 @@ export const assetLocationUpdateSchema = assetLocationCreateSchema
 		message: "At least one field is required",
 	});
 
-export const assetMovementCreateSchema = z.object({
-	itemId: z.number().int().positive("Item is required"),
-	locationId: z.number().int().positive("Location is required"),
-	batchNumber: z.string().trim().nullable().optional(),
-	transactionType: z.enum(assetTransactionTypeValues),
-	referenceType: z.enum(assetReferenceTypeValues),
-	referenceId: z.number().int().positive("Reference is required"),
-	quantityChange: z.number().refine((value) => value !== 0, {
-		message: "Quantity change cannot be zero",
-	}),
-	unitCostPaise: z.number().int().min(0),
-	notes: z.string().trim().nullable().optional(),
-});
+export const assetMovementCreateSchema = z
+	.object({
+		itemId: z.number().int().positive("Item is required"),
+		locationId: z.number().int().positive("Location is required"),
+		batchNumber: z.string().trim().nullable().optional(),
+		referenceType: z.enum(assetManualReferenceTypeValues),
+		quantityChange: z.number().refine((value) => value !== 0, {
+			message: "Quantity change cannot be zero",
+		}),
+		unitCostPaise: z.number().int().min(0).optional(),
+		reason: z.string().trim().min(1, "Reason is required").max(1000),
+	})
+	.refine(
+		(value) => value.quantityChange < 0 || (value.unitCostPaise ?? 0) > 0,
+		{ message: "Cost is required for stock-in", path: ["unitCostPaise"] },
+	);
 
 export type AssetMachineCreatePayload = z.infer<
 	typeof assetMachineCreateSchema
@@ -231,8 +244,6 @@ export const assetItemCreateSchema = z.object({
 	category: z.string().min(1),
 	uom: z.string().min(1),
 	reorderLevel: z.number().nonnegative().optional(),
-	currentStock: z.number().nonnegative().optional(),
-	averageCostPaise: z.number().int().nonnegative().optional(),
 	isActive: z.boolean().optional(),
 });
 

@@ -48,7 +48,8 @@ export function GrnCorrectionAlert({
 					<AlertDialogTitle>Correct · {line.itemName}</AlertDialogTitle>
 					<AlertDialogDescription>
 						Posts a negative stock adjustment against this line's original
-						posting. The original GRN line is not changed. A reason is required.
+						posting. The original GRN line is not changed. Max{" "}
+						{line.netAcceptedQty} can still be corrected. A reason is required.
 					</AlertDialogDescription>
 				</AlertDialogHeader>
 
@@ -69,7 +70,14 @@ export function GrnCorrectionAlert({
 							onChange={(event) => setQty(event.target.value)}
 						/>
 					</div>
+					<label
+						htmlFor="grn-correction-reason"
+						className="block text-xs font-medium"
+					>
+						Reason
+					</label>
 					<Textarea
+						id="grn-correction-reason"
 						value={reason}
 						onChange={(event) => setReason(event.target.value)}
 						placeholder="Reason for correction"

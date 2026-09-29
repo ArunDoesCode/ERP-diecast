@@ -52,21 +52,28 @@ import {
 	type AssetMovementCreatePayload,
 	type AssetReferenceType,
 	type AssetTransactionType,
+	assetManualReferenceTypeValues,
 	assetMovementCreateSchema,
-	assetReferenceTypeValues,
-	assetTransactionTypeValues,
 } from "@/types/asset";
 
 const REFERENCE_TYPE_LABEL: Record<AssetReferenceType, string> = {
 	grn: "GRN",
 	grn_bypass: "GRN bypass",
+	grn_correction: "GRN correction",
+	opening_stock: "Opening stock",
+	sco_loss: "SCO loss",
 	pro: "PRO",
 	sco_issue: "SCO issue",
 	sco_receipt: "SCO receipt",
 	job_order_issue: "Job order issue",
 	scrap_dispatch: "Scrap dispatch",
-	stock_adjustment: "Stock adjustment",
+	stock_adjustment: "Stock-take",
 };
+
+const MANUAL_REFERENCE_LABEL = {
+	stock_adjustment: "Stock-take",
+	opening_stock: "Opening stock",
+} as const;
 
 const TRANSACTION_TYPE_LABEL: Record<AssetTransactionType, string> = {
 	in: "In",
@@ -89,12 +96,11 @@ function toMovementPayload(
 		itemId: values.itemId,
 		locationId: values.locationId,
 		batchNumber: values.batchNumber?.trim() ? values.batchNumber.trim() : null,
-		transactionType: values.transactionType,
 		referenceType: values.referenceType,
-		referenceId: values.referenceId,
 		quantityChange: values.quantityChange,
-		unitCostPaise: values.unitCostPaise,
-		notes: values.notes?.trim() ? values.notes.trim() : null,
+		// Stock-out is valued at the current average; cost is not sent.
+		unitCostPaise: values.quantityChange > 0 ? values.unitCostPaise : undefined,
+		reason: values.reason.trim(),
 	};
 }
 
@@ -111,12 +117,10 @@ function MovementCreateForm({ onDone }: MovementCreateFormProps) {
 			itemId: 0,
 			locationId: 0,
 			batchNumber: null,
-			transactionType: "in",
-			referenceType: "grn",
-			referenceId: 0,
+			referenceType: "stock_adjustment",
 			quantityChange: 0,
-			unitCostPaise: 0,
-			notes: null,
+			unitCostPaise: undefined,
+			reason: "",
 		},
 	});
 
@@ -179,40 +183,10 @@ function MovementCreateForm({ onDone }: MovementCreateFormProps) {
 
 				<FormField
 					control={form.control}
-					name="transactionType"
-					render={({ field }) => (
-						<FormItem className="min-h-19">
-							<FormLabel>Transaction type</FormLabel>
-							<Select
-								value={field.value}
-								onValueChange={(value) =>
-									field.onChange(value as AssetTransactionType)
-								}
-							>
-								<FormControl>
-									<SelectTrigger className="w-full">
-										<SelectValue placeholder="Select transaction type" />
-									</SelectTrigger>
-								</FormControl>
-								<SelectContent>
-									{assetTransactionTypeValues.map((type) => (
-										<SelectItem key={type} value={type}>
-											{TRANSACTION_TYPE_LABEL[type]}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
-							<FormMessage />
-						</FormItem>
-					)}
-				/>
-
-				<FormField
-					control={form.control}
 					name="referenceType"
 					render={({ field }) => (
 						<FormItem className="min-h-19">
-							<FormLabel>Reference type</FormLabel>
+							<FormLabel>Movement type</FormLabel>
 							<Select
 								value={field.value}
 								onValueChange={(value) =>
@@ -221,41 +195,17 @@ function MovementCreateForm({ onDone }: MovementCreateFormProps) {
 							>
 								<FormControl>
 									<SelectTrigger className="w-full">
-										<SelectValue placeholder="Select reference type" />
+										<SelectValue placeholder="Select movement type" />
 									</SelectTrigger>
 								</FormControl>
 								<SelectContent>
-									{assetReferenceTypeValues.map((type) => (
+									{assetManualReferenceTypeValues.map((type) => (
 										<SelectItem key={type} value={type}>
-											{REFERENCE_TYPE_LABEL[type]}
+											{MANUAL_REFERENCE_LABEL[type]}
 										</SelectItem>
 									))}
 								</SelectContent>
 							</Select>
-							<FormMessage />
-						</FormItem>
-					)}
-				/>
-
-				<FormField
-					control={form.control}
-					name="referenceId"
-					render={({ field }) => (
-						<FormItem className="min-h-19">
-							<FormControl>
-								<FloatingLabelInput
-									id="movement-reference-id"
-									label="Reference ID"
-									type="number"
-									name={field.name}
-									value={field.value}
-									onBlur={field.onBlur}
-									ref={field.ref}
-									onChange={(event) =>
-										field.onChange(event.target.valueAsNumber)
-									}
-								/>
-							</FormControl>
 							<FormMessage />
 						</FormItem>
 					)}
@@ -269,7 +219,7 @@ function MovementCreateForm({ onDone }: MovementCreateFormProps) {
 							<FormControl>
 								<FloatingLabelInput
 									id="movement-quantity-change"
-									label="Quantity change"
+									label="Quantity change (+ in, - out)"
 									type="number"
 									name={field.name}
 									value={field.value}
@@ -293,14 +243,18 @@ function MovementCreateForm({ onDone }: MovementCreateFormProps) {
 							<FormControl>
 								<FloatingLabelInput
 									id="movement-unit-cost"
-									label="Unit cost (paise)"
+									label="Unit cost (paise) - required for stock-in"
 									type="number"
 									name={field.name}
-									value={field.value}
+									value={field.value ?? ""}
 									onBlur={field.onBlur}
 									ref={field.ref}
 									onChange={(event) =>
-										field.onChange(event.target.valueAsNumber)
+										field.onChange(
+											event.target.value === ""
+												? undefined
+												: event.target.valueAsNumber,
+										)
 									}
 								/>
 							</FormControl>
@@ -334,20 +288,18 @@ function MovementCreateForm({ onDone }: MovementCreateFormProps) {
 
 				<FormField
 					control={form.control}
-					name="notes"
+					name="reason"
 					render={({ field }) => (
 						<FormItem className="min-h-19">
 							<FormControl>
 								<FloatingLabelInput
-									id="movement-notes"
-									label="Notes (optional)"
+									id="movement-reason"
+									label="Reason"
 									name={field.name}
 									value={field.value ?? ""}
 									onBlur={field.onBlur}
 									ref={field.ref}
-									onChange={(event) =>
-										field.onChange(event.target.value || null)
-									}
+									onChange={(event) => field.onChange(event.target.value)}
 								/>
 							</FormControl>
 							<FormMessage />
