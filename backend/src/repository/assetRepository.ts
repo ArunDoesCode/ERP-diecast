@@ -306,6 +306,7 @@ export const assetRepository = {
         and(
           eq(supplierItems.supplierId, supplierId),
           eq(supplierItems.itemId, itemId),
+          eq(supplierItems.isActive, true), // BR-SUP-15: inactive row never suggested
         ),
       )
       .limit(1);

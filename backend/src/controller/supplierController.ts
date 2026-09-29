@@ -2,7 +2,10 @@ import type { Context } from "hono";
 
 import { BadRequestError } from "../lib/errors";
 import type { AppEnv } from "../lib/types";
-import { supplierService } from "../service/supplierService";
+import {
+  SUPPLIER_BATCH_FAILED_MESSAGE,
+  supplierService,
+} from "../service/supplierService";
 import {
   supplierCreateSchema,
   supplierHistoryQuerySchema,
@@ -22,6 +25,25 @@ function parseSupplierId(value: unknown) {
     throw new BadRequestError("Invalid supplier id");
   }
   return id;
+}
+
+// BR-SUP-21: any failed row -> 400 with the per-row reasons (global onError only emits message/code).
+function batchReply(
+  c: Context<AppEnv>,
+  result: { data: unknown[]; summary: { failed: number } },
+) {
+  if (result.summary.failed > 0) {
+    return c.json(
+      {
+        success: false,
+        message: SUPPLIER_BATCH_FAILED_MESSAGE,
+        code: "BATCH_FAILED",
+        ...result,
+      },
+      400,
+    );
+  }
+  return c.json({ success: true, ...result });
 }
 
 export const supplierController = {
@@ -54,13 +76,14 @@ export const supplierController = {
     return c.json({ success: true, data, meta });
   },
 
-  // BR-SUP-10 — contract only, 501 until S12
+  // BR-SUP-10
   async history(c: Context<AppEnv>) {
-    parseSupplierId(c.req.param("supplierId"));
-    supplierHistoryQuerySchema.parse(
+    const supplierId = parseSupplierId(c.req.param("supplierId"));
+    const query = supplierHistoryQuerySchema.parse(
       Object.fromEntries(new URL(c.req.url).searchParams),
     );
-    return c.json({ success: false, message: "Not implemented" }, 501);
+    const { data, meta } = await supplierService.listHistory(supplierId, query);
+    return c.json({ success: true, data, meta });
   },
 
   async getDetails(c: Context<AppEnv>) {
@@ -105,7 +128,7 @@ export const supplierController = {
       body,
       actorId,
     );
-    return c.json({ success: true, ...data });
+    return batchReply(c, data);
   },
 
   async createService(c: Context<AppEnv>) {
@@ -129,6 +152,6 @@ export const supplierController = {
       body,
       actorId,
     );
-    return c.json({ success: true, ...data });
+    return batchReply(c, data);
   },
 };
