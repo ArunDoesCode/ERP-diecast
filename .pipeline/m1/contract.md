@@ -173,3 +173,57 @@ GET `/access-log?page&pageSize&sortBy=at|action|actorId&sortDir` -> 200 paginate
 - Second submit while an approval request is open → 409 `APPROVAL_ALREADY_OPEN` (BR-PR-19, the specific case wins); any other non-draft source → `APPROVAL_INVALID_SOURCE_STATUS` (BR-APR-24).
 - Withdraw (BR-PR-21): `POST /api/approval/actOnRequest/:id` with `action: "withdraw"` — requester only; request → cancelled with a trail row; PR → `draft`. `action: "cancel"` is not the PR-withdraw path.
 - BR-PR-14 (standard rate required) tests wait for the inventory item `standard_rate` column (work/m1-stock merge).
+
+# APR / PO — S1/S2 contract (brief 44)
+Base `/api`. Envelope `{ success, data }`; lists add `meta`. New handlers return 501 `NOT_IMPLEMENTED` until the build. Exact shapes: `backend/.contracts/api-manifest.json`.
+**Two kinds of change.** (A) already in the manifest. (B) build-step changes the build must add together with the service/db; not in the manifest yet because the current service code depends on the old types. The frontend builds against A + B.
+
+## Approval (`/api/approval`)
+| Endpoint | Key | Change |
+|---|---|---|
+| GET `/getPolicies`, `/getPolicyDetails/:id` | `approval.policy.view` (or `.manage`, BR-APR-01) | none (B: holders of only `.manage` must pass too) |
+| POST `/createPolicy` | `approval.policy.manage` | see policy body |
+| PATCH `/updatePolicy/:id` | `approval.policy.manage` | see policy body |
+| POST `/submitRequest` `{ docType: pr\|po\|sco, docId }` | any login | none. 403 not creator, 409 `APPROVAL_INVALID_SOURCE_STATUS`, 409 `APPROVAL_ALREADY_OPEN`, 400 `APPROVAL_NO_ELIGIBLE_APPROVER` |
+| POST `/actOnRequest/:id` | any login (step match checked in service) | see action body |
+| GET `/getRequestDetails/:id`, `/getRequestTrail/:id`, `/getCurrentApprovalByDoc/:docType/:docId` | any login; read rule BR-APR-51 (403 otherwise) | none (A: `chainSnapshot` / policy `approvalChain` may now be `[]`) |
+| GET `/getMyPendingApprovals?employeeId` | any login; another's list needs `approval.view_others_pending` (403); inactive target 404 | none |
+| **GET `/getApprovalHistory/:docType/:docId` (NEW, A)** | any login; BR-APR-51 (403) | array, requests newest first, each = request list item + `trail[]` oldest first (`actorName` included). `[]` if never submitted. Live state ("level x of N", who acts now) = the first item when `status = pending_approval` (`currentLevel`, `chainSnapshot`). |
+
+**Policy body.** Amounts in **paise**. BL-025 is a frontend bug: the form must show stored paise / 100 as ₹ and send ₹ x 100 (up to 2 decimals).
+- create: `name, priority>=1, docType, subDocType (default "any"), description?, isActive?, autoApprove?, minAmountPaise?, maxAmountPaise?, approvalChain`. (A) chain may be `[]` when `autoApprove`; auto-approve off + no step = 400. Max > min else 400. Duplicate active (priority, docType, category) = 409 `POLICY_PRIORITY_TAKEN`.
+- (B) `approvalChain` becomes optional on create (auto-approve form sends none). `isSaleOrderLinked` is removed from create and update (BR-APR-15): do not send it. `docType` in a PATCH = 400 (BR-APR-11). `null` is allowed only on `description, minAmountPaise, maxAmountPaise` (BR-APR-09). `approvalLevels` in a body is ignored.
+- update is partial; omitted `subDocType` stays as stored (BL-022/023: the edit form loads details first, sends the shown category, keeps unsaved edits across refetch).
+
+**Action body** `{ action: approve|reject|sent_back|withdraw|cancel, notes? }`
+- `notes` (trimmed, non-empty) is **required** for approve, reject, sent_back: 400 `APPROVAL_NOTES_REQUIRED` from the service (BR-APR-37). Optional for withdraw (BR-APR-39, requester only, 403 otherwise; request → cancelled, doc → draft). `cancel` is not the withdraw path.
+- Send back = `action: "sent_back"` (no separate endpoint): request `require_more_info`, doc → `draft`.
+- Errors: 409 `APPROVAL_NOT_PENDING`; 403 not the current step's approver; 403 `APPROVAL_ALREADY_ACTED` (BR-APR-33). Reject of a PO cancels the PO and its PR lines (BR-APR-43).
+- 200 → the updated approval request.
+
+## PO (`/api/po`, all key `po.manage`; 401 no login, 403 `PERMISSION_DENIED`)
+(A) `po` now also carries `cancelledBy, cancelledByName, cancelledAt, cancelReason, shortClosed, invoicedBy, invoicedAt, dueDate` (dueDate = revised date else expected date). Items carry `gstPercent, lineValuePaise, lineTaxPaise`. (B) these do not exist in the DB/service yet, so they are absent at runtime until the build. Money is integer paise; `subtotalPaise, taxAmountPaise, totalAmountPaise` are recomputed on every line change (BR-PO-04).
+| Endpoint | Body / query | Notes |
+|---|---|---|
+| GET `/getpos?status=a,b&supplierId&q&overdue=true&page&pageSize&sortBy&sortDir` | | `overdue` = dispatched/partial_received, open qty, due date < today (BR-PO-19, revised date wins; B for the changed meaning) |
+| GET `/getpodetails/:id` | | `{ po, items }` |
+| POST `/createpo` | `{ supplierId, paymentTermsDays? (0-365), deliveryTerms?, expectedDeliveryDate?, notes?, lines: [{ prItemId, unitPricePaise (>=1), gstPercent? }] }` | 201 `{ po, items }`. Omitted `paymentTermsDays` = supplier default (B, BR-PO-23). Omitted `gstPercent` = supplier price-list % else 0 (B, BR-PO-04). GST % one of 0, 0.1, 0.25, 1.5, 3, 5, 12, 18, 28, 40. Inactive supplier 400; PR line already drafted 400 / 409 `PO_LINE_ALREADY_DRAFTED`. Qty is never sent. |
+| PATCH `/updatepo` | `{ poId, paymentTermsDays?, deliveryTerms?, notes?, expectedDeliveryDate?, inserts: [{ prItemId, unitPricePaise, gstPercent? }], updates: [{ id, unitPricePaise (>=1), gstPercent? }], deletes: [{ id }] }` | draft only, else 409 `PO_NOT_EDITABLE` (pending: 409 `DOC_LOCKED_IN_APPROVAL`). Removing all lines 400. Expected date before PO date 400 (BR-PO-18). |
+| DELETE `/deletepo/:id` | `{ reason }` **required for every status incl. draft**, trimmed 3-500 (A, changed) | only draft/pending_approval/approved/dispatched with no GRN (draft or posted), else 409. PR lines → cancelled (B); open approval cancelled. |
+| POST `/:id/send` | `{ channel: email\|whatsapp\|phone\|in_person, note?, toEmail? }` | `approved` → `dispatched`; email needs `toEmail` (400); expected date required (400, BR-PO-18) |
+| PATCH `/:id/delay` | `{ revisedDeliveryDate, delayReason }` both **required** (A, changed) | dispatched/partial_received only, else 400 |
+| POST `/:id/confirm` `{ confirmationMethod, note? }`; POST `/:id/reminder`, `/:id/escalate` `{ channel, note?, toEmail? }` | | log rows only; dispatched/partial_received else 400 |
+| POST `/:id/invoice` | `{ invoiceNumber, invoiceDate, billedAmountPaise, dueDate? }` | fully_received only, else 400; same invoice number + supplier = 409 |
+| POST `/:id/close` | `{ note? }` | fully_received/invoiced → closed, else 400 |
+| **POST `/:id/short-close` (NEW, A)** | `{ reason }` trimmed 3-500 | partial_received only, else 400; PO → closed, `shortClosed = true`, PR lines → closed. 200 `po`. |
+| **GET `/:id/communications` (NEW, A)** | | array of log rows newest first (`type po_sent\|reminder\|escalation`, `channel`, `note`, `toEmail`, `sentBy`, `sentByName`, `sentAt`) |
+- Submit / approve / reject / send back / withdraw of a PO use the approval endpoints (`docType: "po"`); the PO is matched on its total incl. GST.
+- Status changes re-read the PO under a row lock; the race loser gets 409 (BR-PO-22).
+
+## Questions for the coordinator
+1. Rate prefill (BR-SUP-16) and supplier default terms: which endpoint gives the frontend the price suggestion (last rate + source), default terms and GST %? Not in this brief; PO create currently requires `unitPricePaise` from the client.
+2. `GET /:id/communications` and `GET /getApprovalHistory/...` are inferred from BR-PO-21 / BR-APR-54 (the spec names the data, not the route).
+
+### APR / PO — coordinator decisions (2026-09-29)
+- PO defaults (BR-PO-03/04/23, BR-SUP-16): the frontend prefills rate, GST % and payment terms from `GET /api/supplier/:id/listItems` (active price rows) and supplier detail; on create/update the backend fills the same defaults when `unitPricePaise` / `gstPercent` / `paymentTermsDays` are omitted. Both stay editable.
+- Route names confirmed: `GET /api/approval/getApprovalHistory/:docType/:docId`, `POST /api/po/:id/short-close`, `GET /api/po/:id/communications`.

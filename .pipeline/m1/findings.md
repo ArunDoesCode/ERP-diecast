@@ -41,3 +41,4 @@
 | CR-8-L | coordinator | backend/src/service/approvalService.ts:415-417 | biome format error after CR-8 commit (lint fails) | fix now (backend-dev) | fixed |
 | FE-SA | frontend-dev 40 | /auth/me + PR screens | no super-admin flag in UI → super-admin cannot edit PRs from the UI (backend allows, BR-PR-17) | S7: /auth/me returns isSuperAdmin; PR edit uses it | open |
 | FE-INACTIVE | frontend-dev 40 | PR item picker (useAssetItemsLookupQuery) | unverified that lookup excludes inactive items (backend rejects PR_INVALID_ITEM) | check after stock merge | open |
+| DBR-1 | backend-dev 44 | backend/scripts/db-reset*.ts fixtures | 13 "db:reset with fixtures" tests now fail (were green at 24c5dd9) — likely new rules (required approval comments, requester-only submit, PR create rules) broke fixture flows | fix with APR build (backend-dev), confirm with test-runner | open |

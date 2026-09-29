@@ -20,3 +20,4 @@
 | 16 | test-writer (24) | db:reset: failure hooks, fixture passwords, desk emails | uncovered (no prod hooks); SEED_USER_PASSWORD for all incl. admin; <role>@diecast.local | known-defects v2 |
 | 17 | test-writer (36) | resubmit code / withdraw call / standard rate test | APPROVAL_ALREADY_OPEN; actOnRequest action "withdraw" → PR draft; after stock merge | contract PR-S2 |
 | 18 | backend-dev (38) | super-admin submit/withdraw? | no — spec: requester only (BR-APR-24/39, BR-PR-17); super-admin may edit | spec |
+| 19 | backend-dev (44) | PO rate/GST/terms prefill source; new route names | frontend prefill from supplier endpoints + backend fills omitted defaults; routes confirmed | contract APR/PO |
