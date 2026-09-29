@@ -8,8 +8,12 @@ import {
 } from "@tanstack/react-query";
 import { toast } from "sonner";
 
+import { assetKeys } from "@/lib/api/asset/queries";
 import { ApiClientError } from "@/lib/api/client";
-import { purchaseOrderKeys } from "@/lib/api/purchase-orders/queries";
+import {
+	purchaseOrderKeys,
+	usePurchaseOrderDetailQuery,
+} from "@/lib/api/purchase-orders/queries";
 import type {
 	GrnBypassPayload,
 	GrnCreatePayload,
@@ -137,6 +141,9 @@ function invalidateGrnAndPO(
 	return Promise.all([
 		queryClient.invalidateQueries({ queryKey: grnKeys.list() }),
 		queryClient.invalidateQueries({ queryKey: grnKeys.detail(grnId) }),
+		// Stock and moving average change on QA/bypass/correction postings.
+		queryClient.invalidateQueries({ queryKey: assetKeys.items() }),
+		queryClient.invalidateQueries({ queryKey: assetKeys.movements() }),
 		queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.cards() }),
 		queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.detail(poId) }),
 		// A QA accept/bypass rolls the PO's receipt status forward server-side,
@@ -206,6 +213,7 @@ export function useGrnCorrectionMutation() {
 		mutationFn: (variables: {
 			grnId: number;
 			lineId: number;
+			poId: number;
 			payload: { qty: number; reason: string };
 		}) => correctGrnLine(variables.grnId, variables.lineId, variables.payload),
 		onSuccess: async (result, variables) => {
@@ -214,13 +222,18 @@ export function useGrnCorrectionMutation() {
 				return;
 			}
 
-			await queryClient.invalidateQueries({
-				queryKey: grnKeys.detail(variables.grnId),
-			});
+			await invalidateGrnAndPO(queryClient, variables.grnId, variables.poId);
 			toast.success(result.message || "Correction recorded");
 		},
 		onError: (error) => {
 			toast.error(errorMessage(error, "Failed to correct GRN line"));
 		},
 	});
+}
+
+/** poItemId -> uom, from the PO detail (GRN lines carry no uom). */
+export function usePoItemUoms(poId: number, enabled: boolean) {
+	const query = usePurchaseOrderDetailQuery(poId, enabled);
+	const items = query.data?.success ? query.data.data.items : [];
+	return new Map(items.map((item) => [item.id, item.uom]));
 }

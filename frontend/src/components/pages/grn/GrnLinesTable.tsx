@@ -196,6 +196,7 @@ export function GrnLinesTable({
 			{correctionLine ? (
 				<GrnCorrectionAlert
 					grnId={grnId}
+					poId={poId}
 					line={correctionLine}
 					open={correctionLine !== null}
 					onOpenChange={(open) => {

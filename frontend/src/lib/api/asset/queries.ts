@@ -174,7 +174,10 @@ export function useCreateMovementMutation() {
 		mutationFn: (payload: AssetMovementCreatePayload) =>
 			createMovement(payload),
 		onSuccess: async () => {
-			await queryClient.invalidateQueries({ queryKey: assetKeys.movements() });
+			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: assetKeys.movements() }),
+				queryClient.invalidateQueries({ queryKey: assetKeys.items() }),
+			]);
 			toast.success("Movement created");
 		},
 		onError: (error) => {

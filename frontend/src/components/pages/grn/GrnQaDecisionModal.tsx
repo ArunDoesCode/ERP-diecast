@@ -13,8 +13,9 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { useGrnQaDecisionMutation } from "@/lib/api/grn/queries";
+import { useGrnQaDecisionMutation, usePoItemUoms } from "@/lib/api/grn/queries";
 import { canOverrideOverReceipt } from "@/lib/grn-permissions";
+import { qtyStep } from "@/lib/grn-units";
 import type { GrnItemDetail } from "@/types/grn";
 
 const OVER_RECEIPT_MULTIPLIER = 1.05;
@@ -40,6 +41,8 @@ export function GrnQaDecisionModal({
 	const [remarks, setRemarks] = useState("");
 	const [certificateUrl, setCertificateUrl] = useState("");
 	const [overrideReason, setOverrideReason] = useState("");
+	const uoms = usePoItemUoms(poId, open);
+	const uom = line.poItemId != null ? uoms.get(line.poItemId) : undefined;
 	const mutation = useGrnQaDecisionMutation();
 
 	const accepted = Number(acceptedQty || 0);
@@ -118,7 +121,7 @@ export function GrnQaDecisionModal({
 								id="grn-qa-accepted-qty"
 								type="number"
 								min={0}
-								step="any"
+								step={qtyStep(uom)}
 								value={acceptedQty}
 								onChange={(event) => setAcceptedQty(event.target.value)}
 							/>
@@ -134,7 +137,7 @@ export function GrnQaDecisionModal({
 								id="grn-qa-rejected-qty"
 								type="number"
 								min={0}
-								step="any"
+								step={qtyStep(uom)}
 								value={rejectedQty}
 								onChange={(event) => setRejectedQty(event.target.value)}
 							/>

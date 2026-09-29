@@ -14,7 +14,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { useGrnDetailQuery, useUpdateGrnMutation } from "@/lib/api/grn/queries";
+import {
+	useGrnDetailQuery,
+	usePoItemUoms,
+	useUpdateGrnMutation,
+} from "@/lib/api/grn/queries";
+import { qtyStep } from "@/lib/grn-units";
 
 export function EditGrnModal({
 	grnId,
@@ -31,6 +36,7 @@ export function EditGrnModal({
 	const detail = detailQuery.data?.success ? detailQuery.data.data : undefined;
 	const grn = detail?.grn;
 	const items = useMemo(() => detail?.items ?? [], [detail]);
+	const uoms = usePoItemUoms(grn?.poId ?? 0, open);
 
 	const [challanNo, setChallanNo] = useState("");
 	const [challanDate, setChallanDate] = useState("");
@@ -239,7 +245,7 @@ export function EditGrnModal({
 												id={`grn-edit-arrived-qty-${item.id}`}
 												type="number"
 												min={0}
-												step="any"
+												step={qtyStep(uoms.get(item.poItemId ?? -1))}
 												value={arrivedQty[item.id] ?? ""}
 												onChange={(event) =>
 													setArrivedQty((current) => ({

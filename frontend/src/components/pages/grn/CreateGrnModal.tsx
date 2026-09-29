@@ -16,13 +16,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useCreateGrnMutation } from "@/lib/api/grn/queries";
 import { usePurchaseOrderDetailQuery } from "@/lib/api/purchase-orders/queries";
+import { qtyStep } from "@/lib/grn-units";
 import type { PurchaseOrderItem } from "@/types/purchase-orders";
-
-const WHOLE_UOMS = ["pcs", "set"];
-
-function isWholeUom(uom?: string | null) {
-	return !!uom && WHOLE_UOMS.includes(uom.trim().toLowerCase());
-}
 
 function remainingQty(item: PurchaseOrderItem) {
 	return item.qty - item.receivedQty;
@@ -250,7 +245,7 @@ export function CreateGrnModal({
 												type="number"
 												min={0}
 												max={remainingQty(item)}
-												step={isWholeUom(item.uom) ? 1 : "any"}
+												step={qtyStep(item.uom)}
 												value={qtyFor(item)}
 												onChange={(event) =>
 													setArrivedQty((current) => ({

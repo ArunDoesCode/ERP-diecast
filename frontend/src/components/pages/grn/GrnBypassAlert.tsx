@@ -14,8 +14,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { useGrnBypassMutation } from "@/lib/api/grn/queries";
+import { useGrnBypassMutation, usePoItemUoms } from "@/lib/api/grn/queries";
 import { canOverrideOverReceipt } from "@/lib/grn-permissions";
+import { qtyStep } from "@/lib/grn-units";
 import type { GrnItemDetail } from "@/types/grn";
 
 const OVER_RECEIPT_MULTIPLIER = 1.05;
@@ -39,6 +40,8 @@ export function GrnBypassAlert({
 	const [acceptedQty, setAcceptedQty] = useState(String(line.receivedQty));
 	const [batchNumber, setBatchNumber] = useState(line.batchNumber ?? "");
 	const [overrideReason, setOverrideReason] = useState("");
+	const uoms = usePoItemUoms(poId, open);
+	const uom = line.poItemId != null ? uoms.get(line.poItemId) : undefined;
 	const mutation = useGrnBypassMutation();
 
 	const accepted = Number(acceptedQty || 0);
@@ -84,7 +87,7 @@ export function GrnBypassAlert({
 							id="grn-bypass-accepted-qty"
 							type="number"
 							min={0}
-							step="any"
+							step={qtyStep(uom)}
 							value={acceptedQty}
 							onChange={(event) => setAcceptedQty(event.target.value)}
 						/>
