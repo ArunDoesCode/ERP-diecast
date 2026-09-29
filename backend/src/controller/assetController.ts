@@ -48,7 +48,8 @@ export const assetController = {
   async updateItem(c: Context<AppEnv>) {
     const id = parseId(c.req.param("id"), "item id");
     const body = assetItemUpdateSchema.parse(await c.req.json());
-    const data = await assetService.updateItem(id, body);
+    const actorId = Number(c.get("user").userId);
+    const data = await assetService.updateItem(id, body, actorId);
     return c.json({ success: true, data });
   },
 

@@ -369,7 +369,10 @@ export const prRepository = {
         averageCostPaise: itemMaster.averageCostPaise,
       })
       .from(itemMaster)
-      .where(inArray(itemMaster.id, itemIds));
+      // BR-INV-05: inactive items can't go on a new PR line (take work/m1 version on merge)
+      .where(
+        and(inArray(itemMaster.id, itemIds), eq(itemMaster.isActive, true)),
+      );
 
     return new Map(rows.map((row) => [row.id, row]));
   },

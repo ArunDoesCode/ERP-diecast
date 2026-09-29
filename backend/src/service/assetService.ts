@@ -40,7 +40,11 @@ function toPaginatedMeta(page: number, pageSize: number, total: number) {
 }
 
 function getConflictError(error: unknown) {
-  const dbError = error as DbUniqueError;
+  // drizzle wraps the driver error: the Postgres error is on `cause`
+  const outer = error as { cause?: unknown };
+  const dbError = (
+    (outer?.cause as DbUniqueError | undefined)?.code ? outer.cause : error
+  ) as DbUniqueError;
 
   if (dbError?.code !== "23505") {
     return undefined;
@@ -54,6 +58,14 @@ function getConflictError(error: unknown) {
 
   if (constraint.includes("service_master_code")) {
     return new ConflictError("Service code already exists");
+  }
+
+  if (constraint.includes("machines_name")) {
+    return new ConflictError("Machine name already exists");
+  }
+
+  if (constraint.includes("machines_code")) {
+    return new ConflictError("Machine code already exists");
   }
 
   return new ConflictError("Duplicate value violates a unique constraint");
@@ -84,9 +96,30 @@ export const assetService = {
     }
   },
 
-  async updateItem(id: number, input: assetItemUpdateSchemaType) {
+  async updateItem(
+    id: number,
+    input: assetItemUpdateSchemaType,
+    actorId: number,
+  ) {
+    const current = await assetRepository.findItemById(id);
+    if (!current) {
+      throw new NotFoundError("Item not found");
+    }
+    // BR-INV-04: SKU and unit are locked once the item is used anywhere.
+    const skuChanges = input.sku !== undefined && input.sku !== current.sku;
+    const uomChanges = input.uom !== undefined && input.uom !== current.uom;
+    if ((skuChanges || uomChanges) && (await assetRepository.isItemInUse(id))) {
+      throw new ConflictError(
+        "SKU and unit can't change once the item is in use",
+        "ITEM_IN_USE",
+      );
+    }
     try {
-      const updated = await assetRepository.updateItem(id, input);
+      const updated = await assetRepository.updateItem(id, {
+        ...input,
+        lastUpdatedBy: actorId,
+        lastUpdatedAt: new Date(),
+      });
       if (!updated) {
         throw new NotFoundError("Item not found");
       }
@@ -249,11 +282,15 @@ export const assetService = {
   },
 
   async createMachine(input: assetMachineCreateSchemaType, actorId: number) {
-    const created = await assetRepository.createMachine(input, actorId);
-    if (!created) {
-      throw new InternalServerError("Failed to create machine");
+    try {
+      const created = await assetRepository.createMachine(input, actorId);
+      if (!created) {
+        throw new InternalServerError("Failed to create machine");
+      }
+      return created;
+    } catch (error) {
+      throw getConflictError(error) ?? error;
     }
-    return created;
   },
 
   async updateMachine(
@@ -261,16 +298,20 @@ export const assetService = {
     input: assetMachineUpdateSchemaType,
     actorId: number,
   ) {
-    const updated = await assetRepository.updateMachine(id, {
-      ...input,
-      lastUpdatedBy: actorId,
-      lastUpdatedAt: new Date(),
-    });
+    try {
+      const updated = await assetRepository.updateMachine(id, {
+        ...input,
+        lastUpdatedBy: actorId,
+        lastUpdatedAt: new Date(),
+      });
 
-    if (!updated) {
-      throw new NotFoundError("Machine not found");
+      if (!updated) {
+        throw new NotFoundError("Machine not found");
+      }
+
+      return updated;
+    } catch (error) {
+      throw getConflictError(error) ?? error;
     }
-
-    return updated;
   },
 };

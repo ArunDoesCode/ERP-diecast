@@ -19,6 +19,7 @@ import {
   machines,
   purchaseOrderItems,
   purchaseOrders,
+  purchaseRequestItems,
   serviceMaster,
   supplierItems,
 } from "../db/schemas/02_procurement";
@@ -97,6 +98,7 @@ const locationSortColumns = {
 
 const machineSortColumns = {
   name: machines.name,
+  code: machines.code,
   type: machines.type,
   status: machines.status,
   createdAt: machines.createdAt,
@@ -141,34 +143,30 @@ export const assetRepository = {
     const q = params.q?.trim();
     const pattern = q ? `%${q}%` : undefined;
 
-    const whereClause = pattern
-      ? or(
-          ilike(itemMaster.name, pattern),
-          ilike(itemMaster.sku, pattern),
-          ilike(itemMaster.category, pattern),
-        )
-      : undefined;
+    const whereClause = and(
+      pattern
+        ? or(
+            ilike(itemMaster.name, pattern),
+            ilike(itemMaster.sku, pattern),
+            ilike(itemMaster.category, pattern),
+          )
+        : undefined,
+      params.isActive !== undefined
+        ? eq(itemMaster.isActive, params.isActive)
+        : undefined,
+      params.category ? eq(itemMaster.category, params.category) : undefined,
+    );
 
-    const [rows, [totalRow]] = whereClause
-      ? await Promise.all([
-          db
-            .select(itemColumns)
-            .from(itemMaster)
-            .where(whereClause)
-            .orderBy(orderFn(sortColumn), asc(itemMaster.id))
-            .limit(params.pageSize)
-            .offset((params.page - 1) * params.pageSize),
-          db.select({ value: count() }).from(itemMaster).where(whereClause),
-        ])
-      : await Promise.all([
-          db
-            .select(itemColumns)
-            .from(itemMaster)
-            .orderBy(orderFn(sortColumn), asc(itemMaster.id))
-            .limit(params.pageSize)
-            .offset((params.page - 1) * params.pageSize),
-          db.select({ value: count() }).from(itemMaster),
-        ]);
+    const [rows, [totalRow]] = await Promise.all([
+      db
+        .select(itemColumns)
+        .from(itemMaster)
+        .where(whereClause)
+        .orderBy(orderFn(sortColumn), asc(itemMaster.id))
+        .limit(params.pageSize)
+        .offset((params.page - 1) * params.pageSize),
+      db.select({ value: count() }).from(itemMaster).where(whereClause),
+    ]);
 
     return { rows, total: totalRow?.value ?? 0 };
   },
@@ -179,10 +177,32 @@ export const assetRepository = {
       .values({
         ...input,
         createdBy: actorId,
+        lastUpdatedBy: actorId,
       })
       .returning(itemColumns);
 
     return created;
+  },
+
+  async findItemById(id: number) {
+    const [row] = await db
+      .select({ id: itemMaster.id, sku: itemMaster.sku, uom: itemMaster.uom })
+      .from(itemMaster)
+      .where(eq(itemMaster.id, id))
+      .limit(1);
+    return row;
+  },
+
+  // BR-INV-04: any ledger row, PR line, PO line or supplier-item line.
+  async isItemInUse(itemId: number) {
+    const [row] = await db.execute<{ used: boolean }>(sql`
+      select (
+        exists (select 1 from ${inventoryLedger} where ${inventoryLedger.itemId} = ${itemId})
+        or exists (select 1 from ${purchaseRequestItems} where ${purchaseRequestItems.itemId} = ${itemId})
+        or exists (select 1 from ${purchaseOrderItems} where ${purchaseOrderItems.itemId} = ${itemId})
+        or exists (select 1 from ${supplierItems} where ${supplierItems.itemId} = ${itemId})
+      ) as used`);
+    return row?.used === true;
   },
 
   async updateItem(id: number, data: ItemUpdateData) {
@@ -261,33 +281,28 @@ export const assetRepository = {
     const q = params.q?.trim();
     const pattern = q ? `%${q}%` : undefined;
 
-    const whereClause = pattern
-      ? or(
-          ilike(serviceMaster.name, pattern),
-          ilike(serviceMaster.code, pattern),
-        )
-      : undefined;
+    const whereClause = and(
+      pattern
+        ? or(
+            ilike(serviceMaster.name, pattern),
+            ilike(serviceMaster.code, pattern),
+          )
+        : undefined,
+      params.isActive !== undefined
+        ? eq(serviceMaster.isActive, params.isActive)
+        : undefined,
+    );
 
-    const [rows, [totalRow]] = whereClause
-      ? await Promise.all([
-          db
-            .select(serviceColumns)
-            .from(serviceMaster)
-            .where(whereClause)
-            .orderBy(orderFn(sortColumn), asc(serviceMaster.id))
-            .limit(params.pageSize)
-            .offset((params.page - 1) * params.pageSize),
-          db.select({ value: count() }).from(serviceMaster).where(whereClause),
-        ])
-      : await Promise.all([
-          db
-            .select(serviceColumns)
-            .from(serviceMaster)
-            .orderBy(orderFn(sortColumn), asc(serviceMaster.id))
-            .limit(params.pageSize)
-            .offset((params.page - 1) * params.pageSize),
-          db.select({ value: count() }).from(serviceMaster),
-        ]);
+    const [rows, [totalRow]] = await Promise.all([
+      db
+        .select(serviceColumns)
+        .from(serviceMaster)
+        .where(whereClause)
+        .orderBy(orderFn(sortColumn), asc(serviceMaster.id))
+        .limit(params.pageSize)
+        .offset((params.page - 1) * params.pageSize),
+      db.select({ value: count() }).from(serviceMaster).where(whereClause),
+    ]);
 
     return { rows, total: totalRow?.value ?? 0 };
   },
@@ -530,9 +545,16 @@ export const assetRepository = {
 
     const whereClause = and(
       pattern
-        ? or(ilike(machines.name, pattern), ilike(machines.type, pattern))
+        ? or(
+            ilike(machines.name, pattern),
+            ilike(machines.code, pattern),
+            ilike(machines.type, pattern),
+          )
         : undefined,
       params.status ? eq(machines.status, params.status) : undefined,
+      params.isActive !== undefined
+        ? eq(machines.isActive, params.isActive)
+        : undefined,
     );
 
     const [rows, [totalRow]] = await Promise.all([
@@ -554,6 +576,7 @@ export const assetRepository = {
       .insert(machines)
       .values({
         name: input.name,
+        code: input.code,
         type: input.type ?? null,
         status: input.status ?? "idle",
         lastMaintenanceAt: input.lastMaintenanceAt ?? null,

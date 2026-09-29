@@ -171,11 +171,15 @@ export const supplierRepository = {
     return { rows, total: totalRow?.value ?? 0 };
   },
 
-  async findExistingItemIds(itemIds: number[]) {
+  async findExistingItemIds(itemIds: number[], activeOnly = false) {
     const rows = await db
       .select({ id: itemMaster.id })
       .from(itemMaster)
-      .where(inArray(itemMaster.id, itemIds));
+      .where(
+        activeOnly
+          ? and(inArray(itemMaster.id, itemIds), eq(itemMaster.isActive, true))
+          : inArray(itemMaster.id, itemIds),
+      );
     return new Set(rows.map((row) => row.id));
   },
 

@@ -200,9 +200,10 @@ export const supplierService = {
       throw new NotFoundError("Supplier not found");
     }
 
-    const existingItemIds = await supplierRepository.findExistingItemIds([
-      input.itemId,
-    ]);
+    const existingItemIds = await supplierRepository.findExistingItemIds(
+      [input.itemId],
+      true, // BR-INV-05: no new link to an inactive item
+    );
     if (!existingItemIds.has(input.itemId)) {
       throw new BadRequestError(`Invalid itemId: ${input.itemId}`);
     }
@@ -278,8 +279,10 @@ export const supplierService = {
         );
       }
 
-      const existingItemIds =
-        await supplierRepository.findExistingItemIds(itemIds);
+      const existingItemIds = await supplierRepository.findExistingItemIds(
+        itemIds,
+        true,
+      );
       const missingItemIds = itemIds.filter(
         (itemId) => !existingItemIds.has(itemId),
       );
