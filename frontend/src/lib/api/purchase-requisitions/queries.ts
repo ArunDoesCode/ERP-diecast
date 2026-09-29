@@ -17,6 +17,7 @@ import type {
 } from "@/types/purchase-requisitions";
 
 import {
+	cancelPurchaseRequisitionLine,
 	createPurchaseRequisition,
 	deletePurchaseRequisition,
 	getPurchaseRequisitionById,
@@ -247,4 +248,31 @@ export function toPRUpdatePayload(input: {
 		updates,
 		deletes,
 	};
+}
+
+export function useCancelPurchaseRequisitionLineMutation() {
+	const queryClient = useQueryClient();
+
+	// No toast on error: the dialog stays open and shows the message inline.
+	return useMutation({
+		mutationFn: (variables: { prId: number; lineId: number; reason: string }) =>
+			cancelPurchaseRequisitionLine(
+				variables.prId,
+				variables.lineId,
+				variables.reason,
+			),
+		onSuccess: async (result, { prId }) => {
+			if (!result.success) return;
+
+			await Promise.all([
+				queryClient.invalidateQueries({
+					queryKey: purchaseRequisitionKeys.cards(),
+				}),
+				queryClient.invalidateQueries({
+					queryKey: purchaseRequisitionKeys.detail(prId),
+				}),
+			]);
+			toast.success("Line cancelled");
+		},
+	});
 }

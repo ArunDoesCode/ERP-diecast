@@ -57,3 +57,14 @@ export function deletePurchaseRequisition(payload: PRDeletePayload) {
 		{ reason: payload.reason },
 	);
 }
+
+export function cancelPurchaseRequisitionLine(
+	prId: number,
+	lineId: number,
+	reason: string,
+) {
+	return api.post<ApiResult<unknown>, { reason: string }>(
+		API_ROUTES.purchaseRequisitions.cancelLine(prId, lineId),
+		{ reason },
+	);
+}

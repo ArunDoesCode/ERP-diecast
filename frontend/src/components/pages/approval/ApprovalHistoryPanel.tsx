@@ -11,7 +11,8 @@ const ACTION_LABEL: Record<string, string> = {
 	rejected: "Rejected",
 	require_more_info: "Sent back",
 	auto_approved: "Auto-approved",
-	cancelled: "Withdrawn",
+	// Used for both withdraw and document cancel; the note says which.
+	cancelled: "Cancelled",
 	withdrawn: "Withdrawn",
 };
 
@@ -21,7 +22,7 @@ const STATUS_LABEL: Record<string, string> = {
 	rejected: "Rejected",
 	require_more_info: "Sent back",
 	auto_approved: "Auto-approved",
-	cancelled: "Withdrawn",
+	cancelled: "Cancelled",
 	partial_ordered: "Partly ordered",
 	fully_ordered: "Fully ordered",
 };

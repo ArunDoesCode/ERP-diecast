@@ -11,6 +11,8 @@ import { DelayPoDialog } from "@/components/pages/purchase-orders/DelayPoDialog"
 import { EditPOModal } from "@/components/pages/purchase-orders/EditPOModal";
 import { LogPoCommunicationDialog } from "@/components/pages/purchase-orders/LogPoCommunicationDialog";
 import { MarkPoInvoicedDialog } from "@/components/pages/purchase-orders/MarkPoInvoicedDialog";
+import { PoDetailPanel } from "@/components/pages/purchase-orders/PoDetailPanel";
+import { ShortClosePoAlert } from "@/components/pages/purchase-orders/ShortClosePoAlert";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -25,6 +27,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useCan } from "@/hooks/use-can";
@@ -37,12 +40,17 @@ import {
 	canCancelPurchaseOrder,
 	canClosePurchaseOrder,
 	canMarkPurchaseOrderInvoiced,
+	canShortClosePurchaseOrder,
 	getPOStatusBadgeStyle,
 	PO_IN_TRANSIT_STATUSES,
 	PO_TERMINAL_STATUSES,
 } from "@/lib/po-status-badge";
 import { humanizeStatusLabel } from "@/lib/pr-status-badge";
-import type { PurchaseOrder } from "@/types/purchase-orders";
+import {
+	PO_REASON_MAX,
+	PO_REASON_MIN,
+	type PurchaseOrder,
+} from "@/types/purchase-orders";
 
 type PoTrackingDialogState = {
 	type: "send" | "reminder" | "escalate" | "delay" | "confirm" | "invoice";
@@ -103,6 +111,7 @@ function SubmitForApprovalButton({ poId }: { poId: number }) {
 function CancelPOAlert({ poId, poNumber }: { poId: number; poNumber: string }) {
 	const [reason, setReason] = useState("");
 	const mutation = useCancelPurchaseOrderMutation();
+	const trimmed = reason.trim();
 
 	return (
 		<AlertDialog
@@ -122,16 +131,19 @@ function CancelPOAlert({ poId, poNumber }: { poId: number; poNumber: string }) {
 						Lines return to pending for re-order. A reason is required.
 					</AlertDialogDescription>
 				</AlertDialogHeader>
+				<Label htmlFor={`po-cancel-reason-${poId}`}>Reason</Label>
 				<Textarea
+					id={`po-cancel-reason-${poId}`}
 					value={reason}
+					maxLength={PO_REASON_MAX}
 					onChange={(event) => setReason(event.target.value)}
-					placeholder="Reason for cancellation"
+					placeholder={`Reason for cancellation (at least ${PO_REASON_MIN} characters)`}
 				/>
 				<AlertDialogFooter>
 					<AlertDialogCancel>Back</AlertDialogCancel>
 					<AlertDialogAction
-						disabled={!reason.trim() || mutation.isPending}
-						onClick={() => mutation.mutate({ poId, reason: reason.trim() })}
+						disabled={trimmed.length < PO_REASON_MIN || mutation.isPending}
+						onClick={() => mutation.mutate({ poId, reason: trimmed })}
 					>
 						Cancel PO
 					</AlertDialogAction>
@@ -149,6 +161,9 @@ export function PurchaseOrderTrackingCards({
 	const canEditGrnDraft = useCan("grn.edit_draft");
 	const [editingPoId, setEditingPoId] = useState<number | null>(null);
 	const [receivingPoId, setReceivingPoId] = useState<number | null>(null);
+	const [expandedPoIds, setExpandedPoIds] = useState<Set<number>>(
+		() => new Set(),
+	);
 	const [dialogState, setDialogState] = useState<PoTrackingDialogState | null>(
 		null,
 	);
@@ -189,10 +204,15 @@ export function PurchaseOrderTrackingCards({
 			<div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
 				{purchaseOrders.map((po) => {
 					const badgeStyle = getPOStatusBadgeStyle(po.status);
+					// BR-PO-19: due date = revised date if set, else expected date.
+					const dueDate =
+						po.dueDate ?? po.revisedDeliveryDate ?? po.expectedDeliveryDate;
 					const isOverdue =
 						PO_IN_TRANSIT_STATUSES.has(po.status) &&
-						Boolean(po.expectedDeliveryDate) &&
-						new Date(po.expectedDeliveryDate as string) < new Date();
+						Boolean(dueDate) &&
+						new Date(`${(dueDate as string).slice(0, 10)}T23:59:59`) <
+							new Date();
+					const expanded = expandedPoIds.has(po.id);
 
 					return (
 						<Card key={po.id}>
@@ -258,6 +278,7 @@ export function PurchaseOrderTrackingCards({
 										>
 											Edit
 										</Button>
+										<CancelPOAlert poId={po.id} poNumber={po.poNumber} />
 									</div>
 								) : !PO_TERMINAL_STATUSES.has(po.status) ? (
 									<div className="flex flex-wrap gap-2">
@@ -325,11 +346,32 @@ export function PurchaseOrderTrackingCards({
 										{canClosePurchaseOrder(po.status) ? (
 											<ClosePoAlert poId={po.id} poNumber={po.poNumber} />
 										) : null}
+										{canShortClosePurchaseOrder(po.status) ? (
+											<ShortClosePoAlert poId={po.id} poNumber={po.poNumber} />
+										) : null}
 										{canCancelPurchaseOrder(po.status) ? (
 											<CancelPOAlert poId={po.id} poNumber={po.poNumber} />
 										) : null}
 									</div>
 								) : null}
+								<Button
+									type="button"
+									size="sm"
+									variant="ghost"
+									className="w-fit"
+									aria-expanded={expanded}
+									onClick={() =>
+										setExpandedPoIds((current) => {
+											const next = new Set(current);
+											if (next.has(po.id)) next.delete(po.id);
+											else next.add(po.id);
+											return next;
+										})
+									}
+								>
+									{expanded ? "Hide details" : "Details, GST and log"}
+								</Button>
+								{expanded ? <PoDetailPanel poId={po.id} /> : null}
 								{/* Independent of canManagePO: grn.edit_draft holders are authorized by
 								the backend to create/manage GRN drafts (creategrn, bypass) even
 								though they can't manage the PO itself — never nest this inside

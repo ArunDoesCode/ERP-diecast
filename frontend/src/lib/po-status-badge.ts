@@ -58,15 +58,21 @@ export const PO_IN_TRANSIT_STATUSES = new Set<POStatus>([
 	"partial_received",
 ]);
 
-const PO_NOT_CANCELLABLE_STATUSES = new Set<POStatus>([
-	"fully_received",
-	"invoiced",
-	"closed",
-	"cancelled",
+// BR-PO-11: cancel only from these; the backend still refuses when a GRN exists.
+const PO_CANCELLABLE_STATUSES = new Set<POStatus>([
+	"draft",
+	"pending_approval",
+	"approved",
+	"dispatched",
 ]);
 
 export function canCancelPurchaseOrder(status: POStatus) {
-	return !PO_NOT_CANCELLABLE_STATUSES.has(status);
+	return PO_CANCELLABLE_STATUSES.has(status);
+}
+
+// BR-PO-13
+export function canShortClosePurchaseOrder(status: POStatus) {
+	return status === "partial_received";
 }
 
 export function canMarkPurchaseOrderInvoiced(status: POStatus) {

@@ -47,6 +47,16 @@ export interface PurchaseOrder {
 	closedAt: string | null;
 	closedBy: number | null;
 	closeNote: string | null;
+	// BR-PO-11/13/15/19 — absent at runtime until the backend build lands.
+	cancelledBy?: number | null;
+	cancelledByName?: string | null;
+	cancelledAt?: string | null;
+	cancelReason?: string | null;
+	shortClosed?: boolean;
+	invoicedBy?: number | null;
+	invoicedAt?: string | null;
+	/** Revised date if set, else expected date (BR-PO-19). */
+	dueDate?: string | null;
 }
 
 export interface PurchaseOrderItem {
@@ -56,6 +66,9 @@ export interface PurchaseOrderItem {
 	qty: number;
 	receivedQty: number;
 	unitPricePaise: number;
+	gstPercent?: number | null;
+	lineValuePaise?: number;
+	lineTaxPaise?: number;
 	uom: string | null;
 	itemSku?: string;
 	itemName?: string;
@@ -80,6 +93,14 @@ export type PurchaseOrderListParams = {
 	overdue?: boolean;
 };
 
+/** BR-SUP-13 allowed GST percentages. */
+export const GST_PERCENT_VALUES = [
+	0, 0.1, 0.25, 1.5, 3, 5, 12, 18, 28, 40,
+] as const;
+
+export const PO_REASON_MIN = 3;
+export const PO_REASON_MAX = 500;
+
 export type POCreatePayload = {
 	supplierId: number;
 	paymentTermsDays?: number;
@@ -89,6 +110,7 @@ export type POCreatePayload = {
 	lines: Array<{
 		prItemId: number;
 		unitPricePaise: number;
+		gstPercent?: number;
 	}>;
 };
 
@@ -101,8 +123,12 @@ export type POUpdatePayload = {
 	deliveryTerms?: string | null;
 	notes?: string | null;
 	expectedDeliveryDate?: string | null;
-	inserts?: Array<{ prItemId: number; unitPricePaise: number }>;
-	updates?: Array<{ id: number; unitPricePaise: number }>;
+	inserts?: Array<{
+		prItemId: number;
+		unitPricePaise: number;
+		gstPercent?: number;
+	}>;
+	updates?: Array<{ id: number; unitPricePaise: number; gstPercent?: number }>;
 	deletes?: Array<{ id: number }>;
 };
 
@@ -161,6 +187,7 @@ export type MarkPoInvoicedPayload = {
 	dueDate?: string;
 };
 export type ClosePoPayload = { note?: string };
+export type ShortClosePoPayload = { reason: string };
 
 // Bare responses — confirmed via backend source, do not wrap in { po: ... }:
 export type POSendResult = ApiResult<PurchaseOrder>;
@@ -168,6 +195,8 @@ export type PODelayResult = ApiResult<PurchaseOrder>;
 export type POConfirmResult = ApiResult<PurchaseOrder>;
 export type POInvoiceResult = ApiResult<PurchaseOrder>;
 export type POCloseResult = ApiResult<PurchaseOrder>;
+export type POShortCloseResult = ApiResult<PurchaseOrder>;
+export type POCommunicationsResult = ApiResult<PoCommunication[]>;
 export type POCommunicationResult = ApiResult<PoCommunication>;
 
 export const markPoInvoicedSchema = z.object({

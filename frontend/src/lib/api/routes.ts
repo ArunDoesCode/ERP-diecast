@@ -127,6 +127,8 @@ export const API_ROUTES = {
 		create: `${API_Header.pr}/createpr`,
 		update: `${API_Header.pr}/updatepr`,
 		remove: (prId: number) => `${API_Header.pr}/deletepr/${prId}`,
+		cancelLine: (prId: number, lineId: number) =>
+			`${API_Header.pr}/${prId}/lines/${lineId}/cancel`,
 	},
 	purchaseOrders: {
 		list: `${API_Header.po}/getpos`,
@@ -141,6 +143,8 @@ export const API_ROUTES = {
 		confirm: (poId: number) => `${API_Header.po}/${poId}/confirm`,
 		invoice: (poId: number) => `${API_Header.po}/${poId}/invoice`,
 		close: (poId: number) => `${API_Header.po}/${poId}/close`,
+		shortClose: (poId: number) => `${API_Header.po}/${poId}/short-close`,
+		communications: (poId: number) => `${API_Header.po}/${poId}/communications`,
 	},
 	grn: {
 		list: `${API_Header.grn}/getgrns`,

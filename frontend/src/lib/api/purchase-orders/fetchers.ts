@@ -9,6 +9,7 @@ import type {
 	POCancelResult,
 	POCloseResult,
 	POCommunicationResult,
+	POCommunicationsResult,
 	POConfirmResult,
 	POCreatePayload,
 	POCreateResult,
@@ -16,10 +17,12 @@ import type {
 	POInvoiceResult,
 	POListResult,
 	POSendResult,
+	POShortCloseResult,
 	POUpdatePayload,
 	POUpdateResult,
 	PurchaseOrderDetailPayload,
 	PurchaseOrderListParams,
+	ShortClosePoPayload,
 	UpdatePoDelayPayload,
 } from "@/types/purchase-orders";
 import type { ApiResult } from "@/types/purchase-requisitions";
@@ -136,5 +139,21 @@ export function closePurchaseOrder(poId: number, payload: ClosePoPayload) {
 	return api.post<POCloseResult, ClosePoPayload>(
 		API_ROUTES.purchaseOrders.close(poId),
 		payload,
+	);
+}
+
+export function shortClosePurchaseOrder(
+	poId: number,
+	payload: ShortClosePoPayload,
+) {
+	return api.post<POShortCloseResult, ShortClosePoPayload>(
+		API_ROUTES.purchaseOrders.shortClose(poId),
+		payload,
+	);
+}
+
+export function getPurchaseOrderCommunications(poId: number) {
+	return api.get<POCommunicationsResult>(
+		API_ROUTES.purchaseOrders.communications(poId),
 	);
 }
