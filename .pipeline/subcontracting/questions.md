@@ -9,3 +9,4 @@
 | 5 | BR-SCO-24 example (409) vs BR-SCO-07 (400) for the race loser | coordinator | 400 if over on arrival; 409 if lost the race after lock | spec changelog |
 | 6 | Ledger referenceId challan or SCO? | coordinator | challan id | spec changelog |
 | 7 | Uneven send:return ratio, fractional raw pcs | Arun | do what other ERPs do → proportional on cumulative processed, round half up | spec changelog |
+| 8 | Close while a receipt is pending QA? | coordinator | 409 decide QA first | spec changelog |
