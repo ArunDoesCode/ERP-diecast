@@ -85,11 +85,11 @@ gets a full re-audit.
 ### Documentation & picking up work
 - **Pick up:** `/status` (or open `docs/STATUS.md`) — what's waiting on you, active pipelines, next action.
 - **Specs** (`docs/specs/`) say what should happen; **module maps** (`docs/modules/`) say what the code does
-  and where; **backlog** (`docs/backlog.md`, `BL-NNN`) holds everything deferred. All three are updated in
+  and where; **GitHub Issues** hold everything deferred (labels `P1–P3`, type, `mod:<module>`). All three are updated in
   the same PR as the code, so `main` is always documented.
 - Agents read the map and only explore code changed since its `last_verified_commit` — no full re-exploration.
 - How knowledge is layered and how it scales as the codebase grows: `docs/KNOWLEDGE.md`.
-4. Fix the known defects in `docs/backlog.md` first (a good first `/feature` run), otherwise CI starts red.
+4. Fix the known defects (open issues labelled `defect`) first (a good first `/feature` run), otherwise CI starts red.
 
 ---
 
@@ -106,7 +106,7 @@ gets a full re-audit.
 - Answer coordinator questions when they come (it only asks what the spec can't answer).
 - Manual test ready PRs: `cd .claude/worktrees/<id>` → run backend + frontend → follow the checklist.
   Comment precisely: "Step 4: expected X, got Y" — the watcher turns each comment into a finding.
-- Anything new you think of → `docs/backlog.md`, not a PR comment (comments = bugs/spec mismatches).
+- Anything new you think of → a GitHub issue ("Change request or idea" form), not a PR comment (comments = bugs/spec mismatches).
 
 ### End of day (5 min)
 - `/wrap` in the sessions you interacted with (captures preferences so you stop repeating them).
@@ -178,7 +178,7 @@ QA accept/reject lines → check inventory movements + item stock. Note anything
 ### Milestones
 | # | Milestone | What you do | Exit gate |
 |---|---|---|---|
-| M0 | Workflow infra (~1 week) | Items under "Workflow infrastructure" in `docs/backlog.md`: bootstrap-admin, `db:reset` + realistic fixtures, test DB, `createApp()`, commit contract manifest + route check, CI, hooks. Fix the 3 known defects via `/bug`. | CI green; `db:reset && bun test` works from zero |
+| M0 | Workflow infra (~1 week) | Items under "Workflow infrastructure" (issues labelled `infra`): bootstrap-admin, `db:reset` + realistic fixtures, test DB, `createApp()`, commit contract manifest + route check, CI, hooks. Fix the 3 known defects via `/bug`. | CI green; `db:reset && bun test` works from zero |
 | M1 | Procurement hardening | Retroactive specs + BR tests for GRN, PR, Approval, PO (section C) | Scenario test green; SME walkthrough OK |
 | M2 | Subcontracting | `/spec subcontracting` (schema exists, no routes): SCO, issue material to vendor location, job-work challan, receive back, QA, loss/scrap | Scenario extended to SCO |
 | UAT-1 | Procurement at factory (2–3 weeks) | Real users, real data. Switch `db:push` → migrations first (D-004). Log via `/bug` into `docs/uat-log.md`; S1/S2 fixed immediately | Sign-off from purchase + stores |

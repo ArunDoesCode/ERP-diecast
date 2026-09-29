@@ -16,7 +16,7 @@ SPEC → FREEZE → CONTRACT → BACKEND + TESTS → FRONTEND → SCENARIO TEST 
 has `status: frozen`. If it doesn't, stop and say so — suggest `/spec <module>`. Bug fixes to existing
 behaviour are allowed via `/bug`, but a bug that reveals a missing rule becomes a spec change first.
 
-**Scope rule:** ideas that are not in the frozen spec go to `docs/backlog.md` (one line), never into the
+**Scope rule:** ideas that are not in the frozen spec become a GitHub issue (`gh issue create`, labels `P1–P3` + type + `mod:<module>`), never into the
 current build. Don't "also add" things.
 
 **Test independence rule:** tests are written only by the `test-writer` agent, from the spec, in a fresh
@@ -39,7 +39,7 @@ The user reads everything; keep it light.
 | `docs/STATUS.md` | **Start here.** Where every module stands, active pipelines, what's waiting, next action |
 | `docs/modules/<module>.md` | As-built map: code locations, data model, API, flows, module gotchas, history |
 | `docs/specs/<module>.md` | Should-be behaviour: states, rules `BR-<MOD>-NN`, acceptance criteria |
-| `docs/backlog.md` | Deferred ideas, defects, change requests (`BL-NNN`) |
+| GitHub Issues | Deferred ideas, defects, change requests, UAT bugs (old `BL-NNN` ids in titles; `docs/backlog.md` = closed archive) |
 | `docs/decisions.md` | Decisions with the why (append-only) |
 | `docs/uat-log.md` | Factory UAT bugs |
 | package `CLAUDE.md` + skills | Tech conventions per package / per kind of task |

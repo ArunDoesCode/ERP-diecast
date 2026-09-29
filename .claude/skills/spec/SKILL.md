@@ -13,7 +13,7 @@ description: >
 1. Normalise the module name to kebab-case (`purchase-requisition`, `grn`, `subcontracting`, `bom`, …).
 2. If `docs/specs/<module>.md` exists, read it. If `status: frozen`, warn the user that changing it moves it
    to `changed-after-freeze` and ask whether this is a real rule change or a backlog idea
-   (backlog → append to `docs/backlog.md` and stop).
+   (backlog → open a GitHub issue and stop).
 3. Delegate to the **spec-analyst** agent (Agent tool, `subagent_type: spec-analyst`) with:
    - module name, whether it's new or retroactive (code already exists),
    - path of the existing spec if any,

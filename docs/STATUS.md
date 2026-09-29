@@ -32,7 +32,7 @@ Legend — Code: none / schema only / partial / full. Tests per module: see each
 - [ ] Dev DB after the merges: `drop table subcontracting_grn_items, subcontracting_grns cascade` (old empty tables), drop `pages` and `role_pages` if still there, then `bun run db:push`.
 - [ ] Owner: fill **Company details** (plant name, address, GSTIN, state) and give each raw item an HSN code — a challan is refused (400) without them.
 - [ ] Run the subcontracting manual UI checklist (PR #14 body) before UAT-1.
-- [ ] Decide BL-079 (challan date: one day rule for server + picker, IST vs UTC) — small.
+- [ ] Open issues: <https://github.com/ArunDoesCode/ERP-diecast/issues> (P1: `gh issue list --label P1`). BL-079 challan date timezone is one of them.
 - [ ] BL-012 blocked: branch protection / auto-merge need GitHub Pro or a public repo — decide: upgrade / keep private.
 - [ ] BL-011 migrations before UAT-1 (also drops `pages`/`role_pages`, BL-056).
 

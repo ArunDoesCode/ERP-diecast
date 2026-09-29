@@ -120,7 +120,7 @@ Tests are the spec turned into code. They must not be shaped by the implementati
    `test(<id>):` commit, and every `feat(`/`fix(` commit touches no test file. A violation is a blocker.
 6. **Human checklist is independent too.** The manual UI test checklist in the PR is written by
    test-writer from the spec, not by the developer who built the screens.
-- coordinator: `.pipeline/**`, `docs/**` (spec changelog, decisions, backlog)
+- coordinator: `.pipeline/**`, `docs/**` (spec changelog, decisions) and GitHub issues (backlog)
 - reviewers, auditors, test-runner, explorer: read-only (write only their report file)
 
 ## Loop limits

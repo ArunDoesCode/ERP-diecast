@@ -26,4 +26,4 @@ model: sonnet
 4. If the map passes ~250 lines, propose splitting it into `docs/modules/<module>/<area>.md` + index.
 
 Never describe intended behaviour here (that's the spec); only what the code does. Contradictions between
-map and spec → add a line under **Known gaps / debt** and a backlog item.
+map and spec → add a line under **Known gaps / debt** and a GitHub issue.

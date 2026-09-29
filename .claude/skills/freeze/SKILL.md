@@ -28,7 +28,7 @@ If all pass, confirm with the user, then edit the header:
 
 ## Change requests after freeze
 When the user (or you) wants to change a frozen spec:
-- Is it needed for the **current milestone to work at the factory**? If no → append to `docs/backlog.md`
+- Is it needed for the **current milestone to work at the factory**? If no → open a GitHub issue (label `idea`/`change`)
   (`- [ ] <module>: <idea> — why — raised <date>`) and stop.
 - If yes → set `status: changed-after-freeze`, apply the change as new/edited BRs (never renumber;
   strike through deprecated rules), add a Changelog line, re-run the completeness check, re-freeze.

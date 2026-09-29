@@ -20,7 +20,7 @@ Route by **scope** — the narrower the scope, the deeper the layer (full table:
 | How to do one kind of task (lists, forms, endpoints) | the matching skill |
 | Rule that applies to every session everywhere (rare) | root `CLAUDE.md` — one line, imperative |
 | Product/architecture decision with a reason | `docs/decisions.md` (date, decision, why, alternatives rejected) |
-| Idea / defect not in current scope | `docs/backlog.md` with next free `BL-` id |
+| Idea / defect not in current scope | GitHub issue (`gh issue create`, labels priority + type + `mod:`) |
 | Personal working-style preference (tone, plan format, how much to ask) | Claude memory |
 | Progress, what's next | `docs/STATUS.md` |
 

@@ -1,65 +1,62 @@
-# Backlog
+# Backlog — moved to GitHub Issues (2026-09-29)
 
-Everything not in a frozen spec. Nothing here gets built until it's pulled into a spec (`/spec`) and frozen.
-IDs are permanent (`BL-NNN`, next free id at the bottom). Close items by moving them to **Done** with the
-PR/commit — never delete. When this file passes ~150 open items, split into `docs/backlog/<module>.md`
-and keep this file as the index (see `docs/KNOWLEDGE.md`).
+Open items are now **GitHub issues**: <https://github.com/ArunDoesCode/ERP-diecast/issues>.
+Old `BL-NNN` ids stay in the issue title. New items get no BL id — use the issue number.
+Labels: priority `P1/P2/P3` · type `defect/feature/debt/change/infra/idea/uat-bug` · module `mod:<name>`.
+Milestones: M3 BOM spec, M4 Sale order, UAT-1 factory. This file keeps only the closed history below.
 
-Priority: **P1** blocks current milestone · **P2** needed before UAT · **P3** nice to have.
-Type: defect · infra · feature · debt · idea.
-
-## Open
-| ID | P | Type | Module | Item | Why / source | Raised |
-|---|---|---|---|---|---|---|
-| BL-010 | P2 | infra | frontend | Playwright for 5–8 golden paths | workflow setup | 2026-09-27 |
-| BL-011 | P2 | debt | backend | Switch `db:push` → generated migrations before UAT-1 (D-004) | decisions | 2026-09-27 |
-| BL-012 | P1 | infra | repo | Protect `main` on GitHub: require PR + CI jobs `backend`, `frontend` | workflow setup | 2026-09-27 |
-| BL-017 | P3 | feature | auth-setup | Operator QR login has no route — QR token issuance exists (`qr-token.ts`, `employeeService.regenerateQr`) but `/auth/login` is email+password only. Needed for floor PWA (later milestone) | module mapping (verified) | 2026-09-27 |
-| BL-023 | P3 | debt | approval | `ApprovalPoliciesView` edit-form effect: review deps/reset flow in approval spec (lint fixed by adding `policyForm.reset`) | CI fix | 2026-09-27 |
-| BL-030 | P2 | debt | purchase-requisition | `prService.update` writes lines one row at a time (`updatePrItemById`/`createPrItem` in loops) and is one ~200-line function — batch + split (audit P1.2, §4) | BL-021 audit | 2026-09-27 |
-| BL-032 | P3 | debt | suppliers | `supplierRepository.list` search = OR + ILIKE + EXISTS, no `pg_trgm` indexes (audit S2) | BL-021 audit | 2026-09-27 |
-| BL-033 | P3 | debt | suppliers | Item vs service create/batch-edit in `supplierService.ts` are near-duplicates (audit S4) | BL-021 audit | 2026-09-27 |
-| BL-034 | P2 | defect | purchase-requisition | `prRepository.list` `q` still matches `type::text`/`status::text`; frontend sends status/type through `q` instead of the `status`/`type` params (audit B1) | BL-021 audit | 2026-09-27 |
-| BL-036 | P3 | debt | auth-setup | Access token returned in JSON and stored in localStorage + JS-readable cookie + persisted Zustand (`frontend/src/lib/auth/token.ts`, `auth-session-store.ts`) — XSS exposure (audit B3, deferred) | BL-021 audit | 2026-09-27 |
-| BL-037 | P3 | debt | frontend | `frontend/proxy.ts` fetches `/auth/me` on every navigation although `allowedPages` is in the JWT (audit B4) | BL-021 audit | 2026-09-27 |
-| BL-038 | P2 | infra | repo | Worktree bootstrap: new `.claude/worktrees/*` have no `backend/.env` or `node_modules`, so agents must export env by hand to run `bun test` — add a `scripts/worktree-setup.sh` (copy/symlink `.env`, `bun install` both packages, `db:test:prepare`) and call it from `/feature` | test-writer report (PR #6) | 2026-09-27 |
-| BL-039 | P3 | idea | inventory | Should `opening_stock` be stock-in only? Today a negative opening-stock row is accepted (spec silent; BR-GRN-40 says "goes in") | m1-stock review SPEC-6 | 2026-09-29 |
-| BL-040 | P3 | debt | grn | Add the input caps to the spec: qty ≤ 1e9, unit cost ≤ int4, row value ≤ 2^53 → 400; unknown location → 404 | m1-stock review | 2026-09-29 |
-| BL-041 | P3 | debt | grn | `applyDraftUpdate` reads `findLineUoms`/`findByChallan` on `db` not `tx` (extra pooled connection inside tx) | m1-stock review PERF-6/SPEC-8 | 2026-09-29 |
-| BL-042 | P3 | defect | grn | Frontend over-receipt warning ignores earlier receipts (only 105% of ordered); server still asks for the reason | m1-stock FE-note-1 | 2026-09-29 |
-| BL-043 | P3 | debt | grn | Whole-number unit list duplicated in `frontend/src/lib/grn-units.ts` and backend `WHOLE_NUMBER_UNITS`; expose from backend or add a contract test | m1-stock review CR-7 | 2026-09-29 |
-| BL-044 | P3 | debt | grn | grn-stock BR-GRN-43 example says owner → 200; API returns 201. Align the spec example at the next change | m1-stock test-writer note | 2026-09-29 |
-| BL-045 | P2 | feature | inventory | Stock reconciliation screen (API `GET /api/asset/inventory/reconciliation` exists) | m1-stock plan | 2026-09-29 |
-| BL-046 | P2 | defect | purchase-order | inventory BR-INV-05: an inactive item must not go on a new PO — a PR line approved before the item was deactivated can still become a PO line. Add the check where PO lines are drafted (PO code: auth session). SCO part of BR-INV-10 → subcontracting build | m1-stock review SPEC-20 | 2026-09-29 |
-| BL-047 | P3 | debt | purchase-order | Last-rate `source`: `pr_estimate` means item average (rename `item_average`); PO screen has no label for `standard_rate` and prefills 0 for legacy items with no standard rate — skip prefill when 0 | m1-stock review SPEC-24, CR-28 | 2026-09-29 |
-| BL-048 | P2 | debt | inventory | Spec touch-up at next change: BR-INV-13 "the only main store can't be deactivated (409)" (decided by Arun 2026-09-29); BR-INV-07 reorder level whole for pcs/set; BR-INV-24 legacy item with standard rate 0 → 0; posting to unknown location → 404 | m1-stock review SPEC-26..29 | 2026-09-29 |
-| BL-049 | P3 | idea | inventory | Location `isVirtual` is derived from type (vendor_premise only); spec silent for other types — confirm | m1-stock review SPEC-25 | 2026-09-29 |
-| BL-050 | P3 | debt | inventory | Stock list search `ilike %q%` can't use an index; add pg_trgm if items pass ~50k | m1-stock review PERF-23 | 2026-09-29 |
-| BL-051 | P3 | debt | backend | Move `likePattern` (escapes `\ % _`) to lib and use it in supplier/po/pr/grn/approval/employee searches | m1-stock review SEC-21 | 2026-09-29 |
-| BL-052 | P3 | defect | inventory | PATCH location with only `isVirtual` returns 200 and changes nothing but the audit stamp; return 400 on empty payload | m1-stock review CR-27 | 2026-09-29 |
-| BL-053 | P2 | defect | purchase-order | PO supplier picker should list only active suppliers (`status=active`, suppliers BR-SUP-24). Today it loads the first 20 and hides inactive ones on the client | m1-stock suppliers review; checked 2026-09-29 | 2026-09-29 |
-| BL-054 | P3 | debt | suppliers | Batch edit runs ~3 queries per row (≤ 300 in one tx); `supplier_services.service_id` unindexed; GSTIN change to an invalid value keeps the old PAN in the form | m1-stock review PERF-41/42, CR-43 | 2026-09-29 |
-| BL-055 | P3 | debt | suppliers | Spec touch-up at next change: field caps (name 200, contact 200, phone 30, email 254, address 500, SKU 100, qty ≤ 1e9); history also tracks SKU/qty/unit/lead time (BR-SUP-10); single-row edit of unknown row → 404; BR-SUP-04 PAN refilled on GSTIN change | m1-stock review SPEC-41..45 | 2026-09-29 |
-| BL-056 | P2 | debt | auth-setup | `pages` / `role_pages` removed from the schema (S7) but no migration drops them; stale DBs keep them (also blocks `db:test:prepare` on an old test DB). Drop with the migrations switch | m1 SEC-12 | 2026-09-29 |
-| BL-057 | P3 | debt | auth-setup | Actor cache is per process (2 s TTL): with more than one instance, role/grant changes lag up to 2 s. Optional: one query per miss, share in-flight loads | m1 SEC-8, PERF-6 | 2026-09-29 |
-| BL-058 | P3 | defect | auth-setup | `authService.refresh` runs outside the revocation tx: a refresh racing a password reset can keep a session (ms window). Re-check active + password version before storing the token | m1 SEC-10 | 2026-09-29 |
-| BL-059 | P3 | defect | auth-setup | `employeeService.regenerateQr` gives a password-method employee a QR credential → 400 unless login method is QR. Do with BL-017 | m1 SEC-11 | 2026-09-29 |
-| BL-060 | P3 | debt | auth-setup | Access-log handler lives in `employeeController`; move to its own controller | m1 CR-6 | 2026-09-29 |
-| BL-061 | P3 | debt | backend | Lists use `count(*)` + OFFSET (access log also returns full before/after JSON). Fine now; keyset paging when tables pass ~100k rows | m1 PERF-3, PERF-10 | 2026-09-29 |
-| BL-062 | P3 | debt | auth-setup | `/auth/me` reads all screens + an extra employee query; screens tab loads every role; `listCatalog` read on every grants call — cache / merge queries | m1 PERF-7, 8, 9 | 2026-09-29 |
-| BL-063 | P3 | debt | frontend | Setup grant save invalidates 4 queries; Sidebar re-sorts screens every render (`useMemo`) | m1 PERF-11, 12 (auth review) | 2026-09-29 |
-| BL-064 | P3 | debt | purchase-order | `poRepository` throws HTTP `AppError`s and duplicates `assertEditable`; service should throw, repo return a sentinel | m1 CRP-5 | 2026-09-29 |
-| BL-066 | P3 | debt | purchase-order | PO create/update run queries per line, and the rate default calls `getLastRate` per line — batch (e.g. `DISTINCT ON`) | m1 PERF-03, PERF-05 | 2026-09-29 |
-| BL-067 | P3 | debt | backend | List `q` search uses leading-wildcard `ilike` (PR, PO, GRN number) — no index; add pg_trgm when lists grow. See BL-032, BL-050 | m1 PERF-09, PERF-M2 | 2026-09-29 |
-| BL-068 | P3 | debt | approval | `assertChainHasEligibleApprovers` runs one count per chain step; group into one query if touched | m1 PERF-11 (procurement review) | 2026-09-29 |
-| BL-071 | P1 | defect | known-defects | `db:reset` guard lets a local DB named `diecast` through with no confirm, so a script run with the dev `DATABASE_URL` wiped the dev DB (2026-09-29). Also local `db:test:prepare` builds a different DB than CI's `db:reset --no-fixtures` (no baseline policies) → tests pass locally, fail in CI. Needs a known-defects spec change: confirm for any DB that isn't a test DB; one test-DB build path for local + CI | — | 2026-09-29 |
-| BL-073 | P3 | debt | subcontracting | `create` checks vendor + prepares lines outside the tx (update does it inside after the lock) | CR-8 | 2026-09-29 |
-| BL-074 | P3 | feature | company-settings | Keep change history (old/new) for company settings (GSTIN prints on legal challans) | SEC-1 | 2026-09-29 |
-| BL-075 | P3 | debt | subcontracting | BR-SCO-21 test only proves SCO DELETE ≥ 400; add challan/receipt delete cases; spec example says 400 but there is no route (404) | SPEC-1 | 2026-09-29 |
-| BL-076 | P3 | defect | subcontracting | QA issue cost when processed part maps to 0 raw pieces (ratio < 1): fall back to all-segments cost; needs a ratio<1 test | SPEC-7 | 2026-09-29 |
-| BL-077 | P3 | debt | subcontracting | Dead `!submitKey` guard in approvalService; receipt line rows inserted in item-id order | CR-9, CR-10 | 2026-09-29 |
-| BL-078 | P3 | debt | subcontracting | Reports: vendor-stock sums the ledger per request; SCO `q` search has no trigram index; inventory invalidation refetches broadly. Fine now; revisit at scale | PERF-2, 6, 7 | 2026-09-29 |
-| BL-079 | P3 | defect | subcontracting | Challan date rule is UTC, date picker max is local: between 00:00 and 05:30 IST the picker allows today's date but the server rejects it (400). Pick one day rule (IST for the plant) in server + UI | v3 build (SCO_CHALLAN_DATE_FUTURE) | 2026-09-29 |
+## Open items → issue
+| Old id | Issue |
+|---|---|
+| BL-010 | [#15](https://github.com/ArunDoesCode/ERP-diecast/issues/15) |
+| BL-011 | [#16](https://github.com/ArunDoesCode/ERP-diecast/issues/16) |
+| BL-012 | [#17](https://github.com/ArunDoesCode/ERP-diecast/issues/17) |
+| BL-017 | [#18](https://github.com/ArunDoesCode/ERP-diecast/issues/18) |
+| BL-023 | [#19](https://github.com/ArunDoesCode/ERP-diecast/issues/19) |
+| BL-030 | [#20](https://github.com/ArunDoesCode/ERP-diecast/issues/20) |
+| BL-032 | [#21](https://github.com/ArunDoesCode/ERP-diecast/issues/21) |
+| BL-033 | [#22](https://github.com/ArunDoesCode/ERP-diecast/issues/22) |
+| BL-034 | [#23](https://github.com/ArunDoesCode/ERP-diecast/issues/23) |
+| BL-036 | [#24](https://github.com/ArunDoesCode/ERP-diecast/issues/24) |
+| BL-037 | [#25](https://github.com/ArunDoesCode/ERP-diecast/issues/25) |
+| BL-038 | [#26](https://github.com/ArunDoesCode/ERP-diecast/issues/26) |
+| BL-039 | [#27](https://github.com/ArunDoesCode/ERP-diecast/issues/27) |
+| BL-040 | [#28](https://github.com/ArunDoesCode/ERP-diecast/issues/28) |
+| BL-041 | [#29](https://github.com/ArunDoesCode/ERP-diecast/issues/29) |
+| BL-042 | [#30](https://github.com/ArunDoesCode/ERP-diecast/issues/30) |
+| BL-043 | [#31](https://github.com/ArunDoesCode/ERP-diecast/issues/31) |
+| BL-044 | [#32](https://github.com/ArunDoesCode/ERP-diecast/issues/32) |
+| BL-045 | [#33](https://github.com/ArunDoesCode/ERP-diecast/issues/33) |
+| BL-046 | [#34](https://github.com/ArunDoesCode/ERP-diecast/issues/34) |
+| BL-047 | [#35](https://github.com/ArunDoesCode/ERP-diecast/issues/35) |
+| BL-048 | [#36](https://github.com/ArunDoesCode/ERP-diecast/issues/36) |
+| BL-049 | [#37](https://github.com/ArunDoesCode/ERP-diecast/issues/37) |
+| BL-050 | [#38](https://github.com/ArunDoesCode/ERP-diecast/issues/38) |
+| BL-051 | [#39](https://github.com/ArunDoesCode/ERP-diecast/issues/39) |
+| BL-052 | [#40](https://github.com/ArunDoesCode/ERP-diecast/issues/40) |
+| BL-053 | [#41](https://github.com/ArunDoesCode/ERP-diecast/issues/41) |
+| BL-054 | [#42](https://github.com/ArunDoesCode/ERP-diecast/issues/42) |
+| BL-055 | [#43](https://github.com/ArunDoesCode/ERP-diecast/issues/43) |
+| BL-056 | [#44](https://github.com/ArunDoesCode/ERP-diecast/issues/44) |
+| BL-057 | [#45](https://github.com/ArunDoesCode/ERP-diecast/issues/45) |
+| BL-058 | [#46](https://github.com/ArunDoesCode/ERP-diecast/issues/46) |
+| BL-059 | [#47](https://github.com/ArunDoesCode/ERP-diecast/issues/47) |
+| BL-060 | [#48](https://github.com/ArunDoesCode/ERP-diecast/issues/48) |
+| BL-061 | [#49](https://github.com/ArunDoesCode/ERP-diecast/issues/49) |
+| BL-062 | [#50](https://github.com/ArunDoesCode/ERP-diecast/issues/50) |
+| BL-063 | [#51](https://github.com/ArunDoesCode/ERP-diecast/issues/51) |
+| BL-064 | [#52](https://github.com/ArunDoesCode/ERP-diecast/issues/52) |
+| BL-066 | [#53](https://github.com/ArunDoesCode/ERP-diecast/issues/53) |
+| BL-067 | [#54](https://github.com/ArunDoesCode/ERP-diecast/issues/54) |
+| BL-068 | [#55](https://github.com/ArunDoesCode/ERP-diecast/issues/55) |
+| BL-071 | [#56](https://github.com/ArunDoesCode/ERP-diecast/issues/56) |
+| BL-073 | [#57](https://github.com/ArunDoesCode/ERP-diecast/issues/57) |
+| BL-074 | [#58](https://github.com/ArunDoesCode/ERP-diecast/issues/58) |
+| BL-075 | [#59](https://github.com/ArunDoesCode/ERP-diecast/issues/59) |
+| BL-076 | [#60](https://github.com/ArunDoesCode/ERP-diecast/issues/60) |
+| BL-077 | [#61](https://github.com/ArunDoesCode/ERP-diecast/issues/61) |
+| BL-078 | [#62](https://github.com/ArunDoesCode/ERP-diecast/issues/62) |
+| BL-079 | [#63](https://github.com/ArunDoesCode/ERP-diecast/issues/63) |
 
 ## Done
 | ID | Item | PR / commit | Closed |

@@ -1,0 +1,25 @@
+name: UAT bug
+description: Something wrong found while using the app (factory UAT or manual test)
+labels: ["uat-bug", "defect"]
+body:
+  - type: dropdown
+    id: module
+    attributes:
+      label: Screen / module
+      options: [PR, Approval, PO, GRN, Inventory, Suppliers, Subcontracting, Setup, Other]
+    validations: {required: true}
+  - type: input
+    id: role
+    attributes: {label: Logged in as (role)}
+  - type: textarea
+    id: steps
+    attributes: {label: Steps, placeholder: "1. Open ... 2. Click ..."}
+    validations: {required: true}
+  - type: textarea
+    id: expected
+    attributes: {label: What you expected}
+    validations: {required: true}
+  - type: textarea
+    id: actual
+    attributes: {label: What happened (paste a screenshot if you can)}
+    validations: {required: true}
