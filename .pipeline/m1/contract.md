@@ -10,6 +10,8 @@ No endpoints in this slice. Nothing reads these yet.
 - `SEED_GRANTS: Record<RoleSeedName, PermissionKey[]>` (`RoleSeedName` = super-admin | owner | back_office | floor_supervisor | qa_inspector | die_designer | operator). super-admin and operator = `[]`.
 - Types only (not implemented): `SyncCatalogFn = () => Promise<SyncCatalogResult>` (idempotent catalog -> `permissions` + `screens`; screens sync never overwrites label/sortOrder/menuGroup; removed rows deleted + audit row), `SeedGrantsFn = () => Promise<{ inserted: number }>` (insert-missing only). `SyncCatalogResult = { permissions: {inserted,updated,deleted}, screens: {inserted,updated,deleted} }`.
 
+- Implementations (S2 build): `backend/src/lib/permissions-sync.ts` exports `syncCatalog: SyncCatalogFn` and `seedGrants: SeedGrantsFn`; run on app start and by `bun run db:test:prepare`.
+
 ## Tables: `backend/src/db/schemas/01_auth.ts`
 | Table | Columns |
 |---|---|
@@ -28,6 +30,12 @@ Drizzle exports: `permissions`, `rolePermissions`, `screens`, `authAuditLog`.
 - die_designer: grn.view
 - super-admin, operator: none
 - No role holds: setup.roles.manage, setup.employees.manage, approval.policy.manage, approval.view_others_pending.
+
+## Route → key (coordinator decisions for routes the spec table doesn't name; used from S3)
+- `GET /asset/items`, `GET /asset/inventory/movements`, `GET /asset/items/:itemId/last-rate` → `inventory.view`
+- `POST /asset/inventory/movements` → `inventory.adjust`
+- `GET /supplier/listSuppliers`, `GET /supplier/detail/:id`, `GET /supplier/:id/listItems`, `GET /supplier/:id/listServices` → `supplier.view`
+- All other `/asset` and `/supplier` writes → `asset.manage` / `supplier.manage`
 
 ## Screens (built pages only)
 landing `/landing` (null), setup `/setup` (setup.roles.manage), employee-directory `/employee-directory` (employees.directory.view), suppliers (supplier.view), purchase-orders (po.manage), purchase-requisitions (pr.manage), grn (grn.view), inventory (inventory.view), approvals `/approvals` (null).
