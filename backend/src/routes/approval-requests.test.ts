@@ -223,12 +223,15 @@ const act = (
   tag: string,
   requestId: number,
   action: "approve" | "reject" | "sent_back" | "withdraw" | "cancel",
-  notes: string | undefined = "TEST_aprreq note",
-) =>
-  call(tag, "POST", `/api/approval/actOnRequest/${requestId}`, {
+  ...rest: [notes?: string]
+) => {
+  // Argument omitted -> default note; explicit undefined -> no notes field sent.
+  const notes = rest.length === 0 ? "TEST_aprreq note" : rest[0];
+  return call(tag, "POST", `/api/approval/actOnRequest/${requestId}`, {
     action,
     ...(notes === undefined ? {} : { notes }),
   });
+};
 
 const prRow = async (id: number) =>
   (
