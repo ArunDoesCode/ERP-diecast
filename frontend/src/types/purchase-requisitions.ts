@@ -78,6 +78,10 @@ export interface PurchaseRequisition {
 	totalApprovalLevels: number;
 	estimatedAmountPaise: number;
 	notes: string | null;
+	cancelledBy?: number | null;
+	cancelledByName?: string | null;
+	cancelledAt?: string | null;
+	cancelReason?: string | null;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -201,4 +205,8 @@ export type PRUpdatePayload = {
 
 export type PRDeletePayload = {
 	prId: number;
+	reason: string;
 };
+
+export const PR_CANCEL_REASON_MIN = 3;
+export const PR_CANCEL_REASON_MAX = 500;

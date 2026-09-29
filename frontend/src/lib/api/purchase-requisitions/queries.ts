@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { ApiClientError } from "@/lib/api/client";
 import type {
 	PRCreatePayload,
+	PRDeletePayload,
 	PRUpdatePayload,
 	PurchaseRequisitionListParams,
 } from "@/types/purchase-requisitions";
@@ -114,13 +115,12 @@ export function useUpdatePurchaseRequisitionMutation() {
 export function useDeletePurchaseRequisitionMutation() {
 	const queryClient = useQueryClient();
 
+	// No error toast: the cancel dialog stays open and shows the message inline.
 	return useMutation({
-		mutationFn: (prId: number) => deletePurchaseRequisition({ prId }),
-		onSuccess: async (result, prId) => {
-			if (!result.success) {
-				toast.error(result.message || "Failed to cancel PR");
-				return;
-			}
+		mutationFn: (payload: PRDeletePayload) =>
+			deletePurchaseRequisition(payload),
+		onSuccess: async (result, { prId }) => {
+			if (!result.success) return;
 
 			await Promise.all([
 				queryClient.invalidateQueries({
@@ -129,11 +129,9 @@ export function useDeletePurchaseRequisitionMutation() {
 				queryClient.invalidateQueries({
 					queryKey: purchaseRequisitionKeys.detail(prId),
 				}),
+				queryClient.invalidateQueries({ queryKey: ["approval"] }),
 			]);
 			toast.success(result.message || "PR cancelled");
-		},
-		onError: (error) => {
-			toast.error(errorMessage(error, "Failed to cancel PR"));
 		},
 	});
 }

@@ -52,8 +52,8 @@ export function updatePurchaseRequisition(payload: PRUpdatePayload) {
 }
 
 export function deletePurchaseRequisition(payload: PRDeletePayload) {
-	return api.delete<ApiResult<PurchaseRequisition>, PRDeletePayload>(
-		API_ROUTES.purchaseRequisitions.remove,
-		payload,
+	return api.delete<ApiResult<PurchaseRequisition>, { reason: string }>(
+		API_ROUTES.purchaseRequisitions.remove(payload.prId),
+		{ reason: payload.reason },
 	);
 }

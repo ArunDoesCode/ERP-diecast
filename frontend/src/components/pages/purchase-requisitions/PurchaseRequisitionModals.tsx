@@ -21,6 +21,10 @@ import {
 	type SearchableSelectOption,
 } from "@/components/common/SearchableSelect";
 import {
+	CancelPurchaseRequisitionDialog,
+	getCancelBlockedReason,
+} from "@/components/pages/purchase-requisitions/CancelPurchaseRequisitionDialog";
+import {
 	createDefaults,
 	type FormStep,
 	ItemRowsTable,
@@ -437,6 +441,7 @@ export function EditPurchaseRequisitionModal({
 	const [activeStep, setActiveStep] = useState<FormStep>("details");
 	const [submitAction, setSubmitAction] = useState<"save" | "submit">("save");
 	const [itemLookupSearch, setItemLookupSearch] = useState("");
+	const [cancelOpen, setCancelOpen] = useState(false);
 
 	const detailQuery = usePurchaseRequisitionDetailQuery(
 		prId ?? 0,
@@ -452,6 +457,9 @@ export function EditPurchaseRequisitionModal({
 	const isMutating =
 		updateMutation.isPending || submitApprovalMutation.isPending;
 	const statusBadgeStyle = getPRStatusBadgeStyle(pr?.status);
+	const cancelBlockedReason = pr
+		? getCancelBlockedReason(pr.status, detail?.items ?? [])
+		: null;
 	const itemOptions = useMemo(() => {
 		const fetched =
 			itemLookupQuery.data?.pages.flatMap((page) =>
@@ -595,37 +603,6 @@ export function EditPurchaseRequisitionModal({
 		);
 	}
 
-	function onCancelPR() {
-		if (!pr || !detail || pr.status === "cancelled") return;
-
-		updateMutation.mutate(
-			toPRUpdatePayload({
-				prId: pr.id,
-				type: pr.type,
-				saleOrderId: pr.saleOrderId,
-				assetId: pr.assetId,
-				status: "cancelled",
-				notes: pr.notes ?? undefined,
-				originalItems: detail.items.map((item) => ({
-					id: item.id,
-					itemId: item.itemId,
-					requestedQty: item.requestedQty,
-				})),
-				items: detail.items.map((item) => ({
-					id: item.id,
-					itemId: item.itemId,
-					requestedQty: item.requestedQty,
-				})),
-			}),
-			{
-				onSuccess: (result) => {
-					if (!result.success) return;
-					onOpenChange(false);
-				},
-			},
-		);
-	}
-
 	if (!open) return null;
 
 	return (
@@ -669,6 +646,20 @@ export function EditPurchaseRequisitionModal({
 											{humanizeStatusLabel(pr.status)}
 										</Badge>
 									</div>
+
+									{pr.status === "cancelled" ? (
+										<div className="rounded-md border p-3 text-sm">
+											<p>
+												Cancelled by {pr.cancelledByName ?? "unknown"}
+												{pr.cancelledAt
+													? ` on ${new Date(pr.cancelledAt).toLocaleString()}`
+													: ""}
+											</p>
+											<p className="text-muted-foreground">
+												Reason: {pr.cancelReason ?? "-"}
+											</p>
+										</div>
+									) : null}
 
 									<Tabs
 										value={activeStep}
@@ -877,15 +868,22 @@ export function EditPurchaseRequisitionModal({
 
 						<DialogFooter className="border-t px-6 py-4 sm:justify-between">
 							<div>
-								{detail && pr?.status !== "cancelled" ? (
-									<Button
-										type="button"
-										variant="destructive"
-										disabled={isMutating}
-										onClick={onCancelPR}
-									>
-										{updateMutation.isPending ? "Cancelling..." : "Cancel PR"}
-									</Button>
+								{detail && pr && pr.status !== "cancelled" ? (
+									<div className="flex flex-col items-start gap-1">
+										<Button
+											type="button"
+											variant="destructive"
+											disabled={isMutating || cancelBlockedReason != null}
+											onClick={() => setCancelOpen(true)}
+										>
+											Cancel PR
+										</Button>
+										{cancelBlockedReason ? (
+											<p className="text-xs text-muted-foreground">
+												{cancelBlockedReason}
+											</p>
+										) : null}
+									</div>
 								) : null}
 							</div>
 
@@ -925,6 +923,15 @@ export function EditPurchaseRequisitionModal({
 							</div>
 						</DialogFooter>
 					</div>
+					{pr ? (
+						<CancelPurchaseRequisitionDialog
+							prId={pr.id}
+							prNumber={pr.prNumber}
+							open={cancelOpen}
+							onOpenChange={setCancelOpen}
+							onCancelled={() => onOpenChange(false)}
+						/>
+					) : null}
 				</DialogContent>
 			</Form>
 		</Dialog>

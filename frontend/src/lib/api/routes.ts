@@ -124,7 +124,7 @@ export const API_ROUTES = {
 		detail: (prId: number) => `${API_Header.pr}/getprdetails/${prId}`,
 		create: `${API_Header.pr}/createpr`,
 		update: `${API_Header.pr}/updatepr`,
-		remove: `${API_Header.pr}/deletepr`,
+		remove: (prId: number) => `${API_Header.pr}/deletepr/${prId}`,
 	},
 	purchaseOrders: {
 		list: `${API_Header.po}/getpos`,
