@@ -119,6 +119,14 @@ export const locations = pgTable(
     nameNormUq: uniqueIndex("uq_locations_name_norm").on(
       sql`lower(btrim(${t.name}))`,
     ),
+    // BR-INV-13: exactly one main_store
+    oneMainStoreUq: uniqueIndex("uq_locations_one_main_store")
+      .on(t.type)
+      .where(sql`${t.type} = 'main_store'`),
+    // BR-INV-12: at most one vendor_premise per supplier
+    oneVendorPremiseUq: uniqueIndex("uq_locations_one_vendor_premise")
+      .on(t.linkedVendorId)
+      .where(sql`${t.type} = 'vendor_premise'`),
   }),
 );
 

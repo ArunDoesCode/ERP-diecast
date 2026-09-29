@@ -221,10 +221,9 @@ export const assetRepository = {
     return updated;
   },
 
-  // Fallback chain for "what should this line cost": most recent PO price
-  // paid to this supplier for this item, then the supplier's catalog price,
-  // then the item master's average cost (the PR estimate). Returns
-  // undefined only if none of the three exist.
+  // BR-INV-24 fallback chain: newest line of an approved-or-later PO for this
+  // supplier+item; else the supplier's catalog price; else the item average
+  // cost if > 0; else the item's standard rate. Undefined only for an unknown item.
   async getLastRate(itemId: number, supplierId: number) {
     const [poHistoryRow] = await db
       .select({ ratePaise: purchaseOrderItems.unitPricePaise })
@@ -234,12 +233,20 @@ export const assetRepository = {
         and(
           eq(purchaseOrders.supplierId, supplierId),
           eq(purchaseOrderItems.itemId, itemId),
+          inArray(purchaseOrders.status, [
+            "approved",
+            "dispatched",
+            "partial_received",
+            "fully_received",
+            "invoiced",
+            "closed",
+          ]),
         ),
       )
-      .orderBy(desc(purchaseOrders.createdAt))
+      .orderBy(desc(purchaseOrders.createdAt), desc(purchaseOrderItems.id))
       .limit(1);
 
-    if (poHistoryRow) {
+    if (poHistoryRow && poHistoryRow.ratePaise > 0) {
       return {
         ratePaise: poHistoryRow.ratePaise,
         source: "po_history" as const,
@@ -257,7 +264,7 @@ export const assetRepository = {
       )
       .limit(1);
 
-    if (supplierCatalogRow) {
+    if (supplierCatalogRow && supplierCatalogRow.ratePaise > 0) {
       return {
         ratePaise: supplierCatalogRow.ratePaise,
         source: "supplier_catalog" as const,
@@ -265,16 +272,27 @@ export const assetRepository = {
     }
 
     const [itemRow] = await db
-      .select({ ratePaise: itemMaster.averageCostPaise })
+      .select({
+        averageCostPaise: itemMaster.averageCostPaise,
+        standardRatePaise: itemMaster.standardRatePaise,
+      })
       .from(itemMaster)
       .where(eq(itemMaster.id, itemId))
       .limit(1);
 
-    if (itemRow) {
-      return { ratePaise: itemRow.ratePaise, source: "pr_estimate" as const };
+    if (!itemRow) {
+      return undefined;
     }
-
-    return undefined;
+    if (itemRow.averageCostPaise > 0) {
+      return {
+        ratePaise: itemRow.averageCostPaise,
+        source: "pr_estimate" as const,
+      };
+    }
+    return {
+      ratePaise: Math.max(itemRow.standardRatePaise, 1),
+      source: "standard_rate" as const,
+    };
   },
 
   async listServices(params: assetServiceListQuerySchemaType) {

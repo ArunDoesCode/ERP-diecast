@@ -61,6 +61,14 @@ function getConflictError(error: unknown) {
     return new ConflictError("Service code already exists");
   }
 
+  if (constraint.includes("locations_one_main_store")) {
+    return new ConflictError("There is already a main store");
+  }
+
+  if (constraint.includes("locations_one_vendor_premise")) {
+    return new ConflictError("This supplier already has a vendor premise");
+  }
+
   if (constraint.includes("locations_name")) {
     return new ConflictError("Location name already exists");
   }
@@ -182,9 +190,7 @@ export const assetService = {
   async getLastRate(itemId: number, params: assetLastRateQuerySchemaType) {
     const result = await assetRepository.getLastRate(itemId, params.supplierId);
     if (!result) {
-      throw new NotFoundError(
-        "No PO history, supplier catalog price, or item estimate found for this item.",
-      );
+      throw new NotFoundError("Item not found.");
     }
     return result;
   },

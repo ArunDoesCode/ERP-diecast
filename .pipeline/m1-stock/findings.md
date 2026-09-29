@@ -29,3 +29,4 @@
 | CR-8 | minor | frontend | usePoItemUoms | new Map per render, no effect today | reject: no functional impact |
 | TEST-1, TEST-2 | (blocker per runner) | test | cd77a53, b78b070 | test( commits also carry .pipeline briefs/reports | reject: PROTOCOL rule 5 only requires test files in test( commits and none in feat(/fix( — both hold; runner confirmed no feat/fix commit touches a test file |
 | TEST-3 | major | test | backend/src/service/stockPosting.test.ts (manual-movement tests) | 28 grn-stock tests post the old signed-qty body; spec inventory.md BR-INV-22: "Stock-take: the clerk enters the counted qty; the system posts counted − current balance at that location" and BR-INV-23 (opening stock qty + rate). Contract changed to match. | test-writer: update those tests to the new shape (brief 22) |
+| COORD-2 | minor | backend | locations | one main_store / one vendor_premise per supplier only checked in service (race) | fixed: partial unique indexes (brief 26) |
