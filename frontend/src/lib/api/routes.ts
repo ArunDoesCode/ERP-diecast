@@ -47,17 +47,6 @@ export const API_ROUTES = {
 		accessLog: {
 			list: `${API_Header.setup}/access-log`,
 		},
-		pages: {
-			list: `${API_Header.setup}/pages`,
-			create: `${API_Header.setup}/pages`,
-			update: (id: number) => `${API_Header.setup}/pages/${id}`,
-			remove: (id: number) => `${API_Header.setup}/pages/${id}`,
-		},
-		permissions: {
-			list: `${API_Header.setup}/permissions`,
-			updateForRole: (roleId: number) =>
-				`${API_Header.setup}/roles/${roleId}/permissions`,
-		},
 	},
 	approval: {
 		getPolicies: `${API_Header.approval}/getPolicies`,

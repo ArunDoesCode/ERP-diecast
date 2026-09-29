@@ -9,17 +9,12 @@ import type {
 	EmployeeListParams,
 	EmployeeSearchParams,
 	Module,
-	Page,
-	PageInput,
-	PageListParams,
 	PaginatedResponse,
 	Role,
 	RoleGrants,
 	RoleGrantsDiff,
 	RoleInput,
 	RoleListParams,
-	RolePage,
-	RolePermissionDiff,
 	Screen,
 	ScreenRolesDiff,
 	ScreenUpdateInput,
@@ -80,28 +75,6 @@ export const updateRole = (id: number, input: RoleInput) =>
 	api.patch<Ok<Role>, RoleInput>(API_ROUTES.setup.roles.update(id), input);
 export const deleteRole = (id: number) =>
 	api.delete<Ok<null>>(API_ROUTES.setup.roles.remove(id));
-
-export const getPages = (params?: PageListParams) =>
-	api.get<PaginatedResponse<Page>>(
-		`${API_ROUTES.setup.pages.list}${toQueryString(params)}`,
-	);
-export const createPage = (input: PageInput) =>
-	api.post<Ok<Page>, PageInput>(API_ROUTES.setup.pages.create, input);
-export const updatePage = (id: number, input: PageInput) =>
-	api.patch<Ok<Page>, PageInput>(API_ROUTES.setup.pages.update(id), input);
-export const deletePage = (id: number) =>
-	api.delete<Ok<null>>(API_ROUTES.setup.pages.remove(id));
-
-export const getPermissionGrants = () =>
-	api.get<Ok<RolePage[]>>(API_ROUTES.setup.permissions.list);
-export const updateRolePermissions = (
-	roleId: number,
-	diff: RolePermissionDiff,
-) =>
-	api.post<Ok<RolePage[]>, RolePermissionDiff>(
-		API_ROUTES.setup.permissions.updateForRole(roleId),
-		diff,
-	);
 
 // ---- S6: role grants, copy, screens, access log, role assignment ----
 

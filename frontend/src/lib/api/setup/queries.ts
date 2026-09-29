@@ -14,13 +14,9 @@ import type {
 	EmployeeInput,
 	EmployeeListParams,
 	EmployeeSearchParams,
-	PageInput,
-	PageListParams,
 	RoleGrantsDiff,
 	RoleInput,
 	RoleListParams,
-	RolePage,
-	RolePermissionDiff,
 	ScreenRolesDiff,
 	ScreenUpdateInput,
 } from "@/types/setup";
@@ -30,27 +26,21 @@ import {
 	assignEmployeeRole,
 	copyRole,
 	createEmployee,
-	createPage,
 	createRole,
 	deleteEmployee,
-	deletePage,
 	deleteRole,
 	generateEmployeeQr,
 	getAccessLog,
 	getAssignableRoles,
 	getEmployees,
 	getModules,
-	getPages,
-	getPermissionGrants,
 	getRoleGrants,
 	getRoles,
 	getScreens,
 	searchEmployees,
 	updateEmployee,
-	updatePage,
 	updateRole,
 	updateRoleGrants,
-	updateRolePermissions,
 	updateScreen,
 	updateScreenRoles,
 } from "./fetchers";
@@ -67,11 +57,6 @@ export const setupKeys = {
 		params
 			? (["setup", "roles", params] as const)
 			: (["setup", "roles"] as const),
-	pages: (params?: PageListParams) =>
-		params
-			? (["setup", "pages", params] as const)
-			: (["setup", "pages"] as const),
-	permissionGrants: () => ["setup", "permissions"] as const,
 	roleGrants: (id: number) => ["setup", "role-grants", id] as const,
 	screens: () => ["setup", "screens"] as const,
 	accessLog: (params?: AccessLogListParams) =>
@@ -83,9 +68,9 @@ export const setupKeys = {
 
 const errorMessage = setupErrorMessage;
 
-// Roles/Employees/Pages/Modules are cross-referenced by nearly every Setup tab
+// Roles/Employees/Modules are cross-referenced by nearly every Setup tab
 // (e.g. EmployeeTable resolves role names, RoleTable counts employees,
-// PermissionsTab joins all four) — a short staleTime avoids a refetch storm
+// — a short staleTime avoids a refetch storm
 // every time a tab remounts.
 const REFERENCE_STALE_TIME_MS = 60_000;
 
@@ -262,130 +247,6 @@ export function useDeleteRoleMutation() {
 		},
 		onError: (error) => {
 			toast.error(errorMessage(error, "Failed to delete role"));
-		},
-	});
-}
-
-// ---- pages ----
-
-export function usePagesQuery(params?: PageListParams) {
-	return useQuery({
-		queryKey: setupKeys.pages(params),
-		queryFn: () => getPages(params),
-		staleTime: REFERENCE_STALE_TIME_MS,
-		placeholderData: params ? keepPreviousData : undefined,
-	});
-}
-
-export function useCreatePageMutation() {
-	const queryClient = useQueryClient();
-
-	return useMutation({
-		mutationFn: (input: PageInput) => createPage(input),
-		onSuccess: async () => {
-			await queryClient.invalidateQueries({ queryKey: setupKeys.pages() });
-			toast.success("Page created");
-		},
-		onError: (error) => {
-			toast.error(errorMessage(error, "Failed to create page"));
-		},
-	});
-}
-
-export function useUpdatePageMutation() {
-	const queryClient = useQueryClient();
-
-	return useMutation({
-		mutationFn: ({ id, input }: { id: number; input: PageInput }) =>
-			updatePage(id, input),
-		onSuccess: async () => {
-			await queryClient.invalidateQueries({ queryKey: setupKeys.pages() });
-			toast.success("Page updated");
-		},
-		onError: (error) => {
-			toast.error(errorMessage(error, "Failed to update page"));
-		},
-	});
-}
-
-export function useDeletePageMutation() {
-	const queryClient = useQueryClient();
-
-	return useMutation({
-		mutationFn: (id: number) => deletePage(id),
-		onSuccess: async () => {
-			await queryClient.invalidateQueries({ queryKey: setupKeys.pages() });
-			toast.success("Page deleted");
-		},
-		onError: (error) => {
-			toast.error(errorMessage(error, "Failed to delete page"));
-		},
-	});
-}
-
-// ---- permissions ----
-
-export function usePermissionGrantsQuery() {
-	return useQuery({
-		queryKey: setupKeys.permissionGrants(),
-		queryFn: getPermissionGrants,
-	});
-}
-
-export function useUpdateRolePermissionsMutation() {
-	const queryClient = useQueryClient();
-
-	return useMutation({
-		mutationFn: ({
-			roleId,
-			diff,
-		}: {
-			roleId: number;
-			diff: RolePermissionDiff;
-		}) => updateRolePermissions(roleId, diff),
-		onMutate: async ({ roleId, diff }) => {
-			await queryClient.cancelQueries({
-				queryKey: setupKeys.permissionGrants(),
-			});
-
-			const previous = queryClient.getQueryData<{ data: RolePage[] }>(
-				setupKeys.permissionGrants(),
-			);
-
-			if (previous) {
-				const addedPageIds = Object.values(diff).flatMap((d) => d.added);
-				const deletedPageIds = Object.values(diff).flatMap((d) => d.deleted);
-
-				const next = previous.data
-					.filter(
-						(grant) =>
-							!(
-								grant.roleId === roleId && deletedPageIds.includes(grant.pageId)
-							),
-					)
-					.concat(addedPageIds.map((pageId) => ({ roleId, pageId })));
-
-				queryClient.setQueryData(setupKeys.permissionGrants(), {
-					data: next,
-				});
-			}
-
-			return { previous };
-		},
-		onError: (error, _variables, context) => {
-			if (context?.previous) {
-				queryClient.setQueryData(
-					setupKeys.permissionGrants(),
-					context.previous,
-				);
-			}
-			toast.error(errorMessage(error, "Failed to update permissions"));
-		},
-		onSuccess: () => {
-			toast.success("Permissions updated");
-		},
-		onSettled: () => {
-			queryClient.invalidateQueries({ queryKey: setupKeys.permissionGrants() });
 		},
 	});
 }
