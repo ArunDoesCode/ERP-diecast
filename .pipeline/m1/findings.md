@@ -73,11 +73,11 @@
 | MRG-F1 | coordinator | frontend/src/lib/api/suppliers/permissions.ts | role-name list (`SUPPLIER_MANAGE_ROLES`) from stock branch; BR-AUTH-11, 14 → `useCan("supplier.manage")` | fix now (frontend-dev, S7) | fixed (0dd880a) |
 | MRG-T3 | test-writer 64 | backend/src/routes/permissions-matrix.test.ts (BR-AUTH-21 rows `/setup/pages` GET/POST/PATCH/DELETE, `GET /setup/permissions`, `POST /setup/roles/:roleId/permissions`) | routes removed in S7; auth-setup BR-AUTH-15 retires page grants → drop these parity rows (assert 404 or remove) | fix now (test-writer) | fixed (test-writer 64) |
 | MRG-T4 | backend-dev 65 | backend/scripts/db-reset.test.ts:688 (BR-KD-46 "fixtures never set stock or average cost") | expects current_stock/average_cost 0; BL-014 fixed so GRN fixtures post real stock. known-defects v4 BR-KD-46: currentStock = ledger balance per item | fix now (test-writer) | fixed (test-writer 64) |
-| SPEC-M1, CR-M1 | spec 70, code 67 | frontend/src/types/purchase-requisitions.ts:101 + PR screens | BR-PR-14 `noCostHistory` never read → "estimate uses standard rate" note missing | fix now (frontend-dev) | open |
-| SEC-13 | security 68 | backend/src/routes/asset.ts:44-49 | `GET /asset/machines` guarded only in service | fix now (backend-dev): `requireAnyPermission("asset.manage","pr.link_machine")` on route + registry | open |
-| PERF-M1 | perf 69 | 02_procurement-purchasing.ts `grns` | no index on `grns.po_id` (PO edit/cancel scan under PO lock) | fix now (backend-dev): `idx_grns_po_id` | open |
-| SPEC-M2, CR-M2 | spec 70, code 67 | backend/src/routes/grn.ts:5, supplier.ts:5 | unused `requireAuth` import | fix now (backend-dev) | open |
-| CR-M3 | code 67 | backend/src/repository/prRepository.ts:394, prService.ts:48 | stale merge comment; inactive-item check done twice | fix now (backend-dev): keep one | open |
-| SPEC-M3 | spec 70 | backend/src/db/schemas/02_procurement-approval.ts:22 | role names in a code comment (example) | fix now (backend-dev): neutral example | open |
+| SPEC-M1, CR-M1 | spec 70, code 67 | frontend/src/types/purchase-requisitions.ts:101 + PR screens | BR-PR-14 `noCostHistory` never read → "estimate uses standard rate" note missing | fix now (frontend-dev) | fixed (eea4fb1) |
+| SEC-13 | security 68 | backend/src/routes/asset.ts:44-49 | `GET /asset/machines` guarded only in service | fix now (backend-dev): `requireAnyPermission("asset.manage","pr.link_machine")` on route + registry | fixed (6d5a301) |
+| PERF-M1 | perf 69 | 02_procurement-purchasing.ts `grns` | no index on `grns.po_id` (PO edit/cancel scan under PO lock) | fix now (backend-dev): `idx_grns_po_id` | fixed (6d5a301) |
+| SPEC-M2, CR-M2 | spec 70, code 67 | backend/src/routes/grn.ts:5, supplier.ts:5 | unused `requireAuth` import | fix now (backend-dev) | fixed (6d5a301) |
+| CR-M3 | code 67 | backend/src/repository/prRepository.ts:394, prService.ts:48 | stale merge comment; inactive-item check done twice | fix now (backend-dev): keep one | fixed (6d5a301) |
+| SPEC-M3 | spec 70 | backend/src/db/schemas/02_procurement-approval.ts:22 | role names in a code comment (example) | fix now (backend-dev): neutral example | fixed (6d5a301) |
 | SEC-12 | security 68 | role_pages table | removed from schema, no drop migration (deploys use push) | backlog (with BL-011) | backlog |
 | PERF-M2 | perf 69 | grnRepository.ts:541-573 | leading-wildcard ilike on grn_number | backlog (with PERF-05) | backlog |
