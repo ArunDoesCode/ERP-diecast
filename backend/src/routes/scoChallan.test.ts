@@ -215,6 +215,9 @@ async function setStatus(
     .where(eq(subcontractingOrders.id, scoId));
 }
 
+// Challans of Rs 50,000 or more need an e-way bill number (BR-SCO-10).
+const EWB = { ewayBillNo: "EWB-TEST-1" };
+
 function challan(
   actor: string,
   scoId: number,
@@ -397,9 +400,12 @@ describe("BR-SCO-07 lots", () => {
     const { scoId, itemIds } = await makeSco(localVendorId, [
       { rawItemId: raw },
     ]);
-    const res = await challan("bo", scoId, [
-      { scoItemId: itemIds[0] as number, qty: 600 },
-    ]);
+    const res = await challan(
+      "bo",
+      scoId,
+      [{ scoItemId: itemIds[0] as number, qty: 600 }],
+      EWB,
+    );
     expect(res.status).toBe(201);
     expect(res.json.data.lines).toHaveLength(1);
     expect(res.json.data.lines[0].qty).toBe(600);
@@ -415,9 +421,9 @@ describe("BR-SCO-07 lots", () => {
     ]);
     const id = itemIds[0] as number;
     expect(
-      (await challan("bo", scoId, [{ scoItemId: id, qty: 600 }])).status,
+      (await challan("bo", scoId, [{ scoItemId: id, qty: 600 }], EWB)).status,
     ).toBe(201);
-    const res = await challan("bo", scoId, [{ scoItemId: id, qty: 400 }]);
+    const res = await challan("bo", scoId, [{ scoItemId: id, qty: 400 }], EWB);
     expect(res.status).toBe(201);
     const d = await scoDetails(scoId);
     expect(d.items[0].issuedQty).toBe(1000);
@@ -430,8 +436,8 @@ describe("BR-SCO-07 lots", () => {
       { rawItemId: raw },
     ]);
     const id = itemIds[0] as number;
-    await challan("bo", scoId, [{ scoItemId: id, qty: 600 }]);
-    const res = await challan("bo", scoId, [{ scoItemId: id, qty: 500 }]);
+    await challan("bo", scoId, [{ scoItemId: id, qty: 600 }], EWB);
+    const res = await challan("bo", scoId, [{ scoItemId: id, qty: 500 }], EWB);
     expect(res.status).toBe(400);
     const d = await scoDetails(scoId);
     expect(d.items[0].issuedQty).toBe(600);
@@ -544,9 +550,12 @@ describe("BR-SCO-08 ledger postings", () => {
     const before = await itemRow(raw);
     expect(await vendorLocations(vendor)).toHaveLength(0);
 
-    const res = await challan("bo", scoId, [
-      { scoItemId: itemIds[0] as number, qty: 600 },
-    ]);
+    const res = await challan(
+      "bo",
+      scoId,
+      [{ scoItemId: itemIds[0] as number, qty: 600 }],
+      EWB,
+    );
     expect(res.status).toBe(201);
 
     const rows = await issueRows(raw);
@@ -968,10 +977,10 @@ describe("BR-SCO-24 one transaction, lock, races", () => {
       { rawItemId: raw },
     ]);
     const id = itemIds[0] as number;
-    await challan("bo", scoId, [{ scoItemId: id, qty: 600 }]);
+    await challan("bo", scoId, [{ scoItemId: id, qty: 600 }], EWB);
     const [a, b] = await Promise.all([
-      challan("bo", scoId, [{ scoItemId: id, qty: 400 }]),
-      challan("owner", scoId, [{ scoItemId: id, qty: 400 }]),
+      challan("bo", scoId, [{ scoItemId: id, qty: 400 }], EWB),
+      challan("owner", scoId, [{ scoItemId: id, qty: 400 }], EWB),
     ]);
     expect([a.status, b.status].sort()).toEqual([201, 409]);
     const d = await scoDetails(scoId);
@@ -987,8 +996,8 @@ describe("BR-SCO-24 one transaction, lock, races", () => {
     ]);
     const id = itemIds[0] as number;
     const [a, b] = await Promise.all([
-      challan("bo", scoId, [{ scoItemId: id, qty: 1000 }]),
-      challan("fs", scoId, [{ scoItemId: id, qty: 1000 }]),
+      challan("bo", scoId, [{ scoItemId: id, qty: 1000 }], EWB),
+      challan("fs", scoId, [{ scoItemId: id, qty: 1000 }], EWB),
     ]);
     expect([a.status, b.status].sort()).toEqual([201, 409]);
     expect(await challanCount(scoId)).toBe(1);
