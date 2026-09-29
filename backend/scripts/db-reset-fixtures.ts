@@ -208,6 +208,7 @@ export async function runFixtures(opts: {
         name: item.name,
         category: item.category,
         uom: item.uom,
+        standardRatePaise: item.ratePaise, // BR-INV-03, BR-KD-44
       },
       adminId,
     );
@@ -238,7 +239,7 @@ export async function runFixtures(opts: {
       },
       adminId,
     );
-    supplierId[s.key] = created.supplier.id;
+    supplierId[s.key] = created.id;
   }
   log("master data: 2 locations, 2 machines, 8 items, 4 suppliers");
 
@@ -639,9 +640,13 @@ export async function runFixtures(opts: {
     grnService.qaAction(
       grnId,
       lineId,
-      accept !== null
-        ? { decision: "accept", acceptedQty: accept, remarks }
-        : { decision: "reject", rejectedQty: reject ?? 0, remarks },
+      // BR-GRN-09: whole-line decisions; accepted + rejected must equal the arrived qty.
+      {
+        decision: accept !== null ? "accept" : "reject",
+        acceptedQty: accept ?? 0,
+        rejectedQty: reject ?? 0,
+        remarks,
+      },
       userId.qa_inspector,
       actors.qa_inspector,
     );

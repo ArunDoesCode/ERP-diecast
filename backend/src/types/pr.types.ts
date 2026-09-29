@@ -63,6 +63,8 @@ export const prItemDetailSchema = prItemSchema.extend({
   itemName: z.string(),
   itemCategory: z.string(),
   estRatePaise: z.number().int().nonnegative(),
+  /** BR-PR-14: average cost is 0, so estRatePaise is the item's standard rate. */
+  noCostHistory: z.boolean(),
   linkedPoId: z.number().int().nullable(),
   linkedPoNumber: z.string().nullable(),
   defaultSupplierId: z.number().int().nullable(),

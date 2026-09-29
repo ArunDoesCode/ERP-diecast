@@ -60,6 +60,9 @@ const purchaseRequestItemWriteColumns = {
   expectedDate: purchaseRequestItems.expectedDate,
 };
 
+/** BR-PR-11/14: line rate = average cost, or the standard rate while average cost is 0. */
+const effectiveRatePaise = sql<number>`case when ${itemMaster.averageCostPaise} > 0 then ${itemMaster.averageCostPaise} else ${itemMaster.standardRatePaise} end`;
+
 const purchaseRequestItemDetailColumns = {
   ...purchaseRequestItemWriteColumns,
   status: purchaseRequestItems.status,
@@ -69,7 +72,10 @@ const purchaseRequestItemDetailColumns = {
   itemSku: itemMaster.sku,
   itemName: itemMaster.name,
   itemCategory: itemMaster.category,
-  estRatePaise: itemMaster.averageCostPaise,
+  estRatePaise: effectiveRatePaise.mapWith(Number),
+  noCostHistory: sql<boolean>`${itemMaster.averageCostPaise} = 0`.mapWith(
+    Boolean,
+  ),
 };
 
 type PurchaseRequestInsert = typeof purchaseRequests.$inferInsert;
@@ -124,7 +130,7 @@ async function calculateEstimatedAmountPaiseByItems(
   const itemRows = await tx
     .select({
       id: itemMaster.id,
-      averageCostPaise: itemMaster.averageCostPaise,
+      averageCostPaise: effectiveRatePaise.mapWith(Number),
     })
     .from(itemMaster)
     .where(inArray(itemMaster.id, uniqueItemIds));
@@ -521,7 +527,7 @@ export const prRepository = {
     const costRows = await executor
       .select({
         requestedQty: purchaseRequestItems.requestedQty,
-        averageCostPaise: itemMaster.averageCostPaise,
+        averageCostPaise: effectiveRatePaise.mapWith(Number),
       })
       .from(purchaseRequestItems)
       .innerJoin(itemMaster, eq(itemMaster.id, purchaseRequestItems.itemId))
