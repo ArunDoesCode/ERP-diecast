@@ -619,8 +619,23 @@ export const prRepository = {
   // bypasses prService.assertValidStatusTransition, same rationale as the
   // existing approval-mirror writes in approvalRepository (poService is the
   // caller, after PO create/update/cancel touches PR items).
+  // BR-PR-36: worked out over the non-cancelled lines, and only for a PR that
+  // is approved / partial_ordered / fully_ordered (never draft, pending_approval,
+  // rejected or cancelled). Every line cancelled -> the PR is cancelled.
   async recomputeHeaderStatusFromItems(prId: number, tx?: Tx) {
     const executor = tx ?? db;
+    const [header] = await executor
+      .select({ status: purchaseRequests.status })
+      .from(purchaseRequests)
+      .where(eq(purchaseRequests.id, prId))
+      .limit(1);
+    if (
+      !header ||
+      !["approved", "partial_ordered", "fully_ordered"].includes(header.status)
+    ) {
+      return undefined;
+    }
+
     const items = await executor
       .select({ status: purchaseRequestItems.status })
       .from(purchaseRequestItems)
@@ -630,8 +645,25 @@ export const prRepository = {
       return undefined;
     }
 
-    const allPending = items.every((item) => item.status === "pending");
-    const allOrdered = items.every((item) =>
+    const live = items.filter((item) => item.status !== "cancelled");
+    const now = new Date();
+
+    if (live.length === 0) {
+      const [cancelled] = await executor
+        .update(purchaseRequests)
+        .set({
+          status: "cancelled",
+          cancelledAt: now,
+          cancelReason: "All lines cancelled",
+          updatedAt: now,
+        })
+        .where(eq(purchaseRequests.id, prId))
+        .returning(purchaseRequestColumns);
+      return cancelled;
+    }
+
+    const allPending = live.every((item) => item.status === "pending");
+    const allOrdered = live.every((item) =>
       ["po_draft", "ordered", "closed"].includes(item.status),
     );
 
@@ -643,10 +675,29 @@ export const prRepository = {
 
     const [row] = await executor
       .update(purchaseRequests)
-      .set({ status: nextStatus, updatedAt: new Date() })
+      .set({ status: nextStatus, updatedAt: now })
       .where(eq(purchaseRequests.id, prId))
       .returning(purchaseRequestColumns);
 
+    return row;
+  },
+
+  // BR-PR-33: lock one PR line (before the header, same order as PO create).
+  async findItemByIdForUpdate(itemId: number, tx: Tx) {
+    const [row] = await tx
+      .select()
+      .from(purchaseRequestItems)
+      .where(eq(purchaseRequestItems.id, itemId))
+      .for("update");
+    return row;
+  },
+
+  async cancelItem(itemId: number, tx: Tx) {
+    const [row] = await tx
+      .update(purchaseRequestItems)
+      .set({ status: "cancelled" })
+      .where(eq(purchaseRequestItems.id, itemId))
+      .returning();
     return row;
   },
 };

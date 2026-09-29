@@ -368,6 +368,60 @@ export const prService = {
     });
   },
 
+  // BR-PR-33, 36: cancel one pending line while the header is approved /
+  // partial_ordered. Requester or super-admin only. Line row is locked before
+  // the header (the same order PO create uses), header recomputed after.
+  // The body reason (3-500) is validated by the controller; PR lines have no
+  // reason column, so it is not stored.
+  async cancelLine(prId: number, lineId: number, actor: Actor) {
+    return db.transaction(async (tx) => {
+      const line = await prRepository.findItemByIdForUpdate(lineId, tx);
+      if (!line || line.prId !== prId) {
+        throw new AppError("PR line not found", 404, "PR_LINE_NOT_FOUND");
+      }
+
+      const pr = await prRepository.findPrByIdForUpdate(prId, tx);
+      if (!pr) {
+        throw new AppError("Purchase request not found", 404, "PR_NOT_FOUND");
+      }
+
+      if (pr.requestedBy !== actor.id && !actor.isSuperAdmin) {
+        throw new ForbiddenError(
+          "Only the requester or a super-admin can cancel a line of this PR",
+          "PR_NOT_REQUESTER",
+        );
+      }
+
+      if (line.status === "po_draft" || line.status === "ordered") {
+        throw new ConflictError(
+          "This line is on a purchase order. Cancel the PO first.",
+          "PR_LINE_ON_LIVE_PO",
+        );
+      }
+
+      if (line.status !== "pending") {
+        throw new ConflictError(
+          `A ${line.status} line cannot be cancelled`,
+          "PR_LINE_NOT_PENDING",
+        );
+      }
+
+      if (!["approved", "partial_ordered"].includes(pr.status)) {
+        throw new ConflictError(
+          `Cannot cancel a line of a PR in status ${pr.status}`,
+          "PR_INVALID_TRANSITION",
+        );
+      }
+
+      const item = await prRepository.cancelItem(lineId, tx);
+      const header = await prRepository.recomputeHeaderStatusFromItems(
+        prId,
+        tx,
+      );
+      return { pr: header ?? pr, item };
+    });
+  },
+
   // BR-PR-39, 41, 42, 43, 46, 47: one transaction, row lock, status re-checked under the lock.
   async cancel(prId: number, reason: string, actor: Actor) {
     return db.transaction(async (tx) => {

@@ -46,6 +46,13 @@ export const prItemSchema = createSelectSchema(purchaseRequestItems).pick({
 });
 export type prItemSchemaType = z.infer<typeof prItemSchema>;
 
+// POST /pr/:id/lines/:lineId/cancel response payload (BR-PR-33, 36):
+// the recomputed header and the cancelled line.
+export const prLineCancelResultSchema = z.object({
+  pr: prSchema,
+  item: prItemSchema.extend({ status: prItemStatusSchema }),
+});
+
 // PR item row joined with item master fields, as returned by getDetails.
 export const prItemDetailSchema = prItemSchema.extend({
   status: prItemStatusSchema,

@@ -11,6 +11,7 @@ import {
   createPrSchema,
   prCancelResultSchema,
   prDetailsSchema,
+  prLineCancelResultSchema,
   prListQuerySchema,
   prSchema,
   prUpdateResultSchema,
@@ -102,6 +103,24 @@ register({
   auth: { type: "permission", key: "pr.manage" },
   request: { body: cancelPrSchema },
   responses: { "200": successResponse(prCancelResultSchema) },
+});
+
+prRouter.post(
+  PR_ROUTES.cancelLine,
+  requirePermission("pr.manage"),
+  asyncHandler(prController.cancelLine),
+);
+register({
+  method: "POST",
+  path: `${PR_BASE_PATH}${PR_ROUTES.cancelLine}`,
+  tags: ["pr"],
+  summary:
+    "Cancel one pending PR line (BR-PR-33): header must be approved/partial_ordered, requester or super-admin only. " +
+    "A line on a PO is 409 PR_LINE_ON_LIVE_PO; the header is recomputed (BR-PR-36, all lines cancelled -> PR cancelled). " +
+    "Reason 3-500 chars is required.",
+  auth: { type: "permission", key: "pr.manage" },
+  request: { body: cancelPrSchema },
+  responses: { "200": successResponse(prLineCancelResultSchema) },
 });
 
 export { prRouter as prRoutes };

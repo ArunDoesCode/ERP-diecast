@@ -1,4 +1,4 @@
-import { createSelectSchema, createUpdateSchema } from "drizzle-zod";
+import { createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 import {
   poCommunicationChannelEnum,
@@ -31,23 +31,16 @@ export const gstPercentSchema = z.union([
 ]);
 export type gstPercentSchemaType = z.infer<typeof gstPercentSchema>;
 
-// CONTRACT (PO-S1/S2): PO row as returned once the build lands. Adds who/when
-// for cancel, short-close and invoice (BR-PO-11, 13, 21) plus the due date
-// (BR-PO-19). Used for response registration only until the columns exist.
+// PO row as returned: the stored columns (cancel / short-close / invoice who and
+// when, BR-PO-11, 13, 21) plus the canceller's name and the due date (BR-PO-19).
 export const poResponseSchema = poSchema.extend({
-  cancelledBy: z.number().int().nullable(),
   cancelledByName: z.string().nullable(),
-  cancelledAt: z.date().nullable(),
-  cancelReason: z.string().nullable(),
-  shortClosed: z.boolean(),
-  invoicedBy: z.number().int().nullable(),
-  invoicedAt: z.date().nullable(),
   // BR-PO-19: revisedDeliveryDate if set, else expectedDeliveryDate.
   dueDate: z.date().nullable(),
 });
 export type poResponseSchemaType = z.infer<typeof poResponseSchema>;
 
-// CONTRACT (PO-S1): per-line GST fields as returned once the build lands.
+// Per-line GST fields (BR-PO-04).
 export const poItemGstSchema = z.object({
   gstPercent: gstPercentSchema,
   lineValuePaise: z.number().int(),
@@ -105,9 +98,9 @@ export const createPoSchema = z.object({
     .array(
       z.object({
         prItemId: z.number().int().positive(),
-        // BR-PO-03: paise, >= 1. The UI prefills it from the supplier price
-        // suggestion (BR-SUP-16, supplier module) and the user may edit it.
-        unitPricePaise: z.number().int().min(1),
+        // BR-PO-03: paise, >= 1. Omitted = the supplier price suggestion
+        // (last PO rate, else price list, else average cost); editable in draft.
+        unitPricePaise: z.number().int().min(1).optional(),
         // BR-PO-04: omitted = supplier's active price-list GST % (else 0).
         gstPercent: gstPercentSchema.optional(),
       }),
@@ -119,7 +112,7 @@ export type createPoSchemaType = z.infer<typeof createPoSchema>;
 // A new line added on update — pulls in a not-yet-drafted PR item.
 export const updatePoInsertItemSchema = z.object({
   prItemId: z.number().int().positive(),
-  unitPricePaise: z.number().int().min(1),
+  unitPricePaise: z.number().int().min(1).optional(),
   gstPercent: gstPercentSchema.optional(),
 });
 export type updatePoInsertItemSchemaType = z.infer<
@@ -130,7 +123,7 @@ export type updatePoInsertItemSchemaType = z.infer<
 // remaining PR-item quantity at draft time).
 export const updatePoUpdateItemSchema = z.object({
   id: z.number().int().positive(),
-  unitPricePaise: z.number().int().min(1),
+  unitPricePaise: z.number().int().min(1).optional(),
   gstPercent: gstPercentSchema.optional(),
 });
 export type updatePoUpdateItemSchemaType = z.infer<
@@ -141,19 +134,12 @@ export const updatePoDeleteItemSchema = z.object({
   id: z.number().int().positive(),
 });
 
-const poUpdateBaseSchema = createUpdateSchema(purchaseOrders, {
-  paymentTermsDays: z.number().int().min(0).max(365).nullable(),
-  deliveryTerms: z.string().max(500).nullable(),
-  notes: z.string().max(2000).nullable(),
-  expectedDeliveryDate: z.coerce.date().nullable(),
-});
-
-export const updatePoSchema = poUpdateBaseSchema
-  .pick({
-    paymentTermsDays: true,
-    deliveryTerms: true,
-    notes: true,
-    expectedDeliveryDate: true,
+export const updatePoSchema = z
+  .object({
+    paymentTermsDays: z.number().int().min(0).max(365).optional(),
+    deliveryTerms: z.string().max(500).nullish(),
+    notes: z.string().max(2000).nullish(),
+    expectedDeliveryDate: z.coerce.date().nullish(),
   })
   .extend({
     poId: z.number().int().positive(),
@@ -295,7 +281,7 @@ export type confirmPoSchemaType = z.infer<typeof confirmPoSchema>;
 // PO and moves it to `invoiced`. Full 3-way-match/payment workflow is a
 // future AP feature; this only creates the supplierInvoices row.
 export const markPoInvoicedSchema = z.object({
-  invoiceNumber: z.string().min(1).max(100),
+  invoiceNumber: z.string().trim().min(1).max(100),
   invoiceDate: z.coerce.date(),
   billedAmountPaise: z.number().int().nonnegative(),
   dueDate: z.coerce.date().optional(),

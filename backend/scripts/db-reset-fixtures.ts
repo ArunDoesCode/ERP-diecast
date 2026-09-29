@@ -8,6 +8,7 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "../src/db/client";
 import { roles } from "../src/db/schemas/01_auth";
 import { approvalRequests } from "../src/db/schemas/02_procurement-approval";
+import { purchaseOrders } from "../src/db/schemas/02_procurement-purchasing";
 import { employees } from "../src/db/schemas/03_hcm";
 import { type Actor, loadActor } from "../src/lib/auth-middleware";
 import { approvalService } from "../src/service/approvalService";
@@ -454,12 +455,15 @@ export async function runFixtures(opts: {
     expected: Date,
     notes: string,
   ) {
+    // BR-PO-18: the API refuses an expected date before the PO date, so a PO
+    // that must look late is created with today's date and back-dated by sendPo.
     const created = await poService.create(
       {
         supplierId: supplierId[supplier],
         paymentTermsDays: 30,
         deliveryTerms: "Ex-works",
-        expectedDeliveryDate: expected,
+        expectedDeliveryDate:
+          expected.getTime() < Date.now() ? new Date() : expected,
         notes,
         lines: lines.map((l) => ({
           prItemId: l.pr.line(l.sku),
@@ -475,6 +479,7 @@ export async function runFixtures(opts: {
     }
     return {
       id: created.po.id,
+      expected,
       totalPaise: created.po.totalAmountPaise ?? 0,
       poItem: (sku: Sku) => must(itemBySku[sku], `PO line ${sku}`),
     };
@@ -498,6 +503,12 @@ export async function runFixtures(opts: {
       { channel: "phone", note: "Confirmed by phone" },
       userId.back_office,
     );
+    if (po.expected.getTime() < Date.now()) {
+      await db
+        .update(purchaseOrders)
+        .set({ expectedDeliveryDate: po.expected })
+        .where(eq(purchaseOrders.id, po.id));
+    }
   }
 
   // 1 draft
@@ -584,7 +595,11 @@ export async function runFixtures(opts: {
     daysFromNow(20),
     "Small LM24 lot",
   );
-  await poService.cancel(po9.id, "Raised on the wrong supplier");
+  await poService.cancel(
+    po9.id,
+    "Raised on the wrong supplier",
+    userId.back_office,
+  );
   log("purchase orders: 9 statuses");
 
   // ---- GRNs: stock only arrives here ----
@@ -687,11 +702,15 @@ export async function runFixtures(opts: {
   // PO7: full delivery, accepted, invoiced
   const g7 = await makeGrn(po7, [{ sku: "CN-GLOVES", qty: 2000 }], "CH-7001");
   await qa(g7.id, g7.line(po7, "CN-GLOVES"), 2000, null, "Count and size OK");
-  await poService.markInvoiced(po7.id, {
-    invoiceNumber: "SM/INV/0042",
-    invoiceDate: new Date(),
-    billedAmountPaise: po7.totalPaise,
-  });
+  await poService.markInvoiced(
+    po7.id,
+    {
+      invoiceNumber: "SM/INV/0042",
+      invoiceDate: new Date(),
+      billedAmountPaise: po7.totalPaise,
+    },
+    userId.back_office,
+  );
 
   // PO8: QA bypass by the owner, then closed
   const g8 = await makeGrn(po8, [{ sku: "RM-ADC12", qty: 500 }], "CH-8001");

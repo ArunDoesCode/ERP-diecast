@@ -1,6 +1,6 @@
 import type { Context } from "hono";
 
-import { AppError, BadRequestError, UnauthorizedError } from "../lib/errors";
+import { BadRequestError, UnauthorizedError } from "../lib/errors";
 import type { AppEnv } from "../lib/types";
 import { poService } from "../service/poService";
 import {
@@ -12,6 +12,7 @@ import {
   markPoInvoicedSchema,
   markPoSentSchema,
   poListQuerySchema,
+  shortClosePoSchema,
   updatePoDelaySchema,
   updatePoSchema,
 } from "../types/po.types";
@@ -62,12 +63,11 @@ export const poController = {
       throw new BadRequestError("Invalid PO id");
     }
 
-    // Body is optional — a draft discard sends none. Only parse it if the
-    // client actually sent one.
+    // BR-PO-11: the reason is required for every status, draft included.
     const rawBody = await c.req.text();
     const { reason } = cancelPoSchema.parse(rawBody ? JSON.parse(rawBody) : {});
 
-    const data = await poService.cancel(id, reason);
+    const data = await poService.cancel(id, reason, parseActorId(c));
     return c.json({ success: true, data });
   },
 
@@ -137,7 +137,7 @@ export const poController = {
     }
 
     const body = markPoInvoicedSchema.parse(await c.req.json());
-    const data = await poService.markInvoiced(id, body);
+    const data = await poService.markInvoiced(id, body, parseActorId(c));
     return c.json({ success: true, data });
   },
 
@@ -153,12 +153,24 @@ export const poController = {
     return c.json({ success: true, data });
   },
 
-  // CONTRACT stubs (PO-S2): logic lands in the build step.
-  async shortClose(_c: Context<AppEnv>) {
-    throw new AppError("Not implemented", 501, "NOT_IMPLEMENTED");
+  async shortClose(c: Context<AppEnv>) {
+    const id = Number(c.req.param("id"));
+    if (!Number.isInteger(id) || id <= 0) {
+      throw new BadRequestError("Invalid PO id");
+    }
+
+    const body = shortClosePoSchema.parse(await c.req.json());
+    const data = await poService.shortClose(id, body, parseActorId(c));
+    return c.json({ success: true, data });
   },
 
-  async communications(_c: Context<AppEnv>) {
-    throw new AppError("Not implemented", 501, "NOT_IMPLEMENTED");
+  async communications(c: Context<AppEnv>) {
+    const id = Number(c.req.param("id"));
+    if (!Number.isInteger(id) || id <= 0) {
+      throw new BadRequestError("Invalid PO id");
+    }
+
+    const data = await poService.communications(id);
+    return c.json({ success: true, data });
   },
 };

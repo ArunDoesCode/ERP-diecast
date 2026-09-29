@@ -4,9 +4,9 @@ import {
   count,
   desc,
   eq,
+  getTableColumns,
   ilike,
   inArray,
-  lt,
   or,
   sql,
 } from "drizzle-orm";
@@ -23,43 +23,35 @@ import {
   purchaseRequests,
   supplierInvoices,
 } from "../db/schemas/02_procurement-purchasing";
-import { supplierMaster } from "../db/schemas/02_procurement-suppliers";
+import {
+  supplierItems,
+  supplierMaster,
+} from "../db/schemas/02_procurement-suppliers";
+import { employees } from "../db/schemas/03_hcm";
 import { allocateDocumentSequence } from "../lib/document-number";
-import { AppError, ConflictError } from "../lib/errors";
+import { AppError, BadRequestError, ConflictError } from "../lib/errors";
 import type {
   poListQuerySchemaType,
   poStatusSchemaType,
 } from "../types/po.types";
 import { prRepository } from "./prRepository";
 
+// All stored PO columns plus the canceller's name and the due date
+// (BR-PO-19: revised date if set, else expected date).
 const purchaseOrderColumns = {
-  id: purchaseOrders.id,
-  poNumber: purchaseOrders.poNumber,
-  supplierId: purchaseOrders.supplierId,
-  status: purchaseOrders.status,
-  subtotalPaise: purchaseOrders.subtotalPaise,
-  taxAmountPaise: purchaseOrders.taxAmountPaise,
-  totalAmountPaise: purchaseOrders.totalAmountPaise,
-  paymentTermsDays: purchaseOrders.paymentTermsDays,
-  deliveryTerms: purchaseOrders.deliveryTerms,
-  notes: purchaseOrders.notes,
-  expectedDeliveryDate: purchaseOrders.expectedDeliveryDate,
-  approvedBy: purchaseOrders.approvedBy,
-  currentApprovalLevel: purchaseOrders.currentApprovalLevel,
-  totalApprovalLevels: purchaseOrders.totalApprovalLevels,
-  createdAt: purchaseOrders.createdAt,
-  createdBy: purchaseOrders.createdBy,
+  ...getTableColumns(purchaseOrders),
+  cancelledByName: sql<
+    string | null
+  >`(select ${employees.name} from ${employees} where ${employees.id} = ${purchaseOrders.cancelledBy})`.as(
+    "cancelled_by_name",
+  ),
+  dueDate:
+    sql<Date | null>`coalesce(${purchaseOrders.revisedDeliveryDate}, ${purchaseOrders.expectedDeliveryDate})`
+      .mapWith(purchaseOrders.expectedDeliveryDate)
+      .as("due_date"),
 };
 
-const purchaseOrderItemWriteColumns = {
-  id: purchaseOrderItems.id,
-  poId: purchaseOrderItems.poId,
-  itemId: purchaseOrderItems.itemId,
-  qty: purchaseOrderItems.qty,
-  receivedQty: purchaseOrderItems.receivedQty,
-  unitPricePaise: purchaseOrderItems.unitPricePaise,
-  uom: purchaseOrderItems.uom,
-};
+const purchaseOrderItemWriteColumns = getTableColumns(purchaseOrderItems);
 
 const purchaseOrderItemDetailColumns = {
   ...purchaseOrderItemWriteColumns,
@@ -86,6 +78,7 @@ export type CreatePoData = Pick<
 export type CreatePoLineData = {
   prItemId: number;
   unitPricePaise: number;
+  gstPercent: number;
 };
 
 export type UpdatePoData = Partial<
@@ -105,11 +98,22 @@ export type UpdatePoData = Partial<
     | "closedAt"
     | "closedBy"
     | "closeNote"
+    | "cancelledBy"
+    | "cancelledAt"
+    | "cancelReason"
+    | "shortClosed"
+    | "invoicedBy"
+    | "invoicedAt"
+    | "status"
   >
 >;
 
 export type PoLineInsertData = CreatePoLineData;
-export type PoLineUpdateData = { id: number; unitPricePaise: number };
+export type PoLineUpdateData = {
+  id: number;
+  unitPricePaise?: number | undefined;
+  gstPercent?: number | undefined;
+};
 
 type PrItemForUpdateRow = {
   id: number;
@@ -130,13 +134,25 @@ const poSortColumns = {
   createdAt: purchaseOrders.createdAt,
 } as const;
 
-function computeTotalsPaise(lines: { qty: number; unitPricePaise: number }[]) {
-  const subtotalPaise = Math.round(
-    lines.reduce((sum, line) => sum + line.qty * line.unitPricePaise, 0),
+// BR-PO-04: line value = round(qty x rate); line tax = round(value x GST% / 100).
+// GST % is turned into whole basis points first so the tax maths is integer only.
+export function computeLinePaise(
+  qty: number,
+  unitPricePaise: number,
+  gstPercent: number,
+) {
+  const lineValuePaise = Math.round(qty * unitPricePaise);
+  const lineTaxPaise = Math.round(
+    (lineValuePaise * Math.round(gstPercent * 100)) / 10000,
   );
-  // No per-line tax-rate field on purchaseOrderItems today, so tax stays 0
-  // for MVP — see backend build plan "KNOWN OPEN ITEM".
-  const taxAmountPaise = 0;
+  return { lineValuePaise, lineTaxPaise };
+}
+
+function computeTotalsPaise(
+  lines: { lineValuePaise: number; lineTaxPaise: number }[],
+) {
+  const subtotalPaise = lines.reduce((sum, l) => sum + l.lineValuePaise, 0);
+  const taxAmountPaise = lines.reduce((sum, l) => sum + l.lineTaxPaise, 0);
   return {
     subtotalPaise,
     taxAmountPaise,
@@ -171,7 +187,8 @@ export const poRepository = {
       params.overdue
         ? and(
             inArray(purchaseOrders.status, ["dispatched", "partial_received"]),
-            lt(purchaseOrders.expectedDeliveryDate, sql`now()`),
+            // BR-PO-19: due date = revised date if set, else expected date; before today.
+            sql`coalesce(${purchaseOrders.revisedDeliveryDate}, ${purchaseOrders.expectedDeliveryDate}) < current_date`,
             sql`exists (
               select 1 from ${purchaseOrderItems}
               where ${purchaseOrderItems.poId} = ${purchaseOrders.id}
@@ -223,7 +240,11 @@ export const poRepository = {
   async findSupplierById(supplierId: number, tx?: Tx) {
     const executor = tx ?? db;
     const [row] = await executor
-      .select({ id: supplierMaster.id, isActive: supplierMaster.isActive })
+      .select({
+        id: supplierMaster.id,
+        isActive: supplierMaster.isActive,
+        defaultPaymentTermsDays: supplierMaster.defaultPaymentTermsDays,
+      })
       .from(supplierMaster)
       .where(eq(supplierMaster.id, supplierId))
       .limit(1);
@@ -293,6 +314,36 @@ export const poRepository = {
       .where(inArray(purchaseRequestItems.id, ids));
   },
 
+  // BR-PO-22: read a PO under its row lock; the caller re-checks status on the result.
+  async lockPoById(poId: number, tx: Tx) {
+    const [row] = await tx
+      .select(getTableColumns(purchaseOrders))
+      .from(purchaseOrders)
+      .where(eq(purchaseOrders.id, poId))
+      .for("update");
+    return row;
+  },
+
+  // BR-PO-04 / BR-SUP-16: the supplier's active price-list rows for these items.
+  async findActivePriceRows(supplierId: number, itemIds: number[]) {
+    if (itemIds.length === 0) {
+      return [];
+    }
+    return db
+      .select({
+        itemId: supplierItems.itemId,
+        taxPercentage: supplierItems.taxPercentage,
+      })
+      .from(supplierItems)
+      .where(
+        and(
+          eq(supplierItems.supplierId, supplierId),
+          inArray(supplierItems.itemId, itemIds),
+          eq(supplierItems.isActive, true),
+        ),
+      );
+  },
+
   async createWithItems(data: CreatePoData, lines: CreatePoLineData[]) {
     return db.transaction(async (tx) => {
       const prItemIds = lines.map((line) => line.prItemId);
@@ -336,6 +387,8 @@ export const poRepository = {
           qty,
           uom: prItem.uom,
           unitPricePaise: line.unitPricePaise,
+          gstPercent: line.gstPercent,
+          ...computeLinePaise(qty, line.unitPricePaise, line.gstPercent),
         };
       });
 
@@ -358,7 +411,7 @@ export const poRepository = {
           totalApprovalLevels: 0,
           createdBy: data.createdBy,
         })
-        .returning(purchaseOrderColumns);
+        .returning({ id: purchaseOrders.id });
 
       if (!createdPo) {
         throw new AppError(
@@ -377,6 +430,9 @@ export const poRepository = {
             qty: line.qty,
             unitPricePaise: line.unitPricePaise,
             uom: line.uom,
+            gstPercent: line.gstPercent,
+            lineValuePaise: line.lineValuePaise,
+            lineTaxPaise: line.lineTaxPaise,
           })),
         )
         .returning(purchaseOrderItemWriteColumns);
@@ -421,22 +477,26 @@ export const poRepository = {
         await prRepository.recomputeHeaderStatusFromItems(prId, tx);
       }
 
-      return {
-        po: createdPo,
-        items: createdItems,
-      };
+      const po = await this.findPoById(createdPo.id, tx);
+      if (!po) {
+        throw new AppError(
+          "Failed to create purchase order",
+          500,
+          "PO_CREATE_FAILED",
+        );
+      }
+
+      return { po, items: createdItems };
     });
   },
 
   async findPoItemsByPoId(poId: number, tx?: Tx) {
     const executor = tx ?? db;
     return executor
-      .select({
-        id: purchaseOrderItems.id,
-        itemId: purchaseOrderItems.itemId,
-      })
+      .select(purchaseOrderItemWriteColumns)
       .from(purchaseOrderItems)
-      .where(eq(purchaseOrderItems.poId, poId));
+      .where(eq(purchaseOrderItems.poId, poId))
+      .orderBy(asc(purchaseOrderItems.id));
   },
 
   // Scoped by poId (joined) so a link belonging to a different PO's item
@@ -465,27 +525,6 @@ export const poRepository = {
     return row;
   },
 
-  async updatePoItemById(
-    poId: number,
-    poItemId: number,
-    data: { unitPricePaise: number },
-    tx?: Tx,
-  ) {
-    const executor = tx ?? db;
-    const [row] = await executor
-      .update(purchaseOrderItems)
-      .set(data)
-      .where(
-        and(
-          eq(purchaseOrderItems.id, poItemId),
-          eq(purchaseOrderItems.poId, poId),
-        ),
-      )
-      .returning(purchaseOrderItemWriteColumns);
-
-    return row;
-  },
-
   async deletePoItemsByIds(poId: number, itemIds: number[], tx?: Tx) {
     if (itemIds.length === 0) {
       return [];
@@ -510,6 +549,7 @@ export const poRepository = {
       .returning({ id: prPoItemLinks.id });
   },
 
+  // BR-PR-31: a line removed from a draft PO goes back to pending.
   async revertPrItemToPending(prItemId: number, linkedQty: number, tx: Tx) {
     await tx
       .update(purchaseRequestItems)
@@ -531,27 +571,26 @@ export const poRepository = {
     return row;
   },
 
-  async recalculateTotalsByPoId(poId: number, tx?: Tx) {
-    const executor = tx ?? db;
-    const lines = await executor
+  // BR-PO-04: totals are always the sum of the stored line columns.
+  async recalculateTotalsByPoId(poId: number, tx: Tx) {
+    const lines = await tx
       .select({
-        qty: purchaseOrderItems.qty,
-        unitPricePaise: purchaseOrderItems.unitPricePaise,
+        lineValuePaise: purchaseOrderItems.lineValuePaise,
+        lineTaxPaise: purchaseOrderItems.lineTaxPaise,
       })
       .from(purchaseOrderItems)
       .where(eq(purchaseOrderItems.poId, poId));
 
-    const totals = computeTotalsPaise(lines);
-
-    const [row] = await executor
+    const [row] = await tx
       .update(purchaseOrders)
-      .set(totals)
+      .set(computeTotalsPaise(lines))
       .where(eq(purchaseOrders.id, poId))
       .returning(purchaseOrderColumns);
 
     return row;
   },
 
+  // BR-PO-05: draft only, checked again under the row lock. A PO can't be left with no lines.
   async updateWithItems(
     poId: number,
     headerData: UpdatePoData,
@@ -560,12 +599,29 @@ export const poRepository = {
     deletes: { id: number }[],
   ) {
     return db.transaction(async (tx) => {
-      const po = await this.updatePoById(poId, headerData, tx);
-      if (!po) {
+      const locked = await this.lockPoById(poId, tx);
+      if (!locked) {
         throw new AppError("Purchase order not found", 404, "NOT_FOUND");
       }
+      if (locked.status === "pending_approval") {
+        throw new ConflictError(
+          "Purchase order is locked while it is in approval",
+          "DOC_LOCKED_IN_APPROVAL",
+        );
+      }
+      if (locked.status !== "draft") {
+        throw new ConflictError(
+          `Purchase order can only be edited in draft (now ${locked.status})`,
+          "PO_NOT_EDITABLE",
+        );
+      }
 
-      const changedItems = [];
+      if (Object.keys(headerData).length > 0) {
+        await this.updatePoById(poId, headerData, tx);
+      }
+
+      const changedItems: Awaited<ReturnType<typeof this.findPoItemsByPoId>> =
+        [];
       const affectedPrIds = new Set<number>();
 
       for (const del of deletes) {
@@ -593,20 +649,37 @@ export const poRepository = {
       }
 
       for (const update of updates) {
-        const updatedItem = await this.updatePoItemById(
-          poId,
-          update.id,
-          { unitPricePaise: update.unitPricePaise },
-          tx,
-        );
-        if (!updatedItem) {
+        const [existing] = await tx
+          .select(purchaseOrderItemWriteColumns)
+          .from(purchaseOrderItems)
+          .where(
+            and(
+              eq(purchaseOrderItems.id, update.id),
+              eq(purchaseOrderItems.poId, poId),
+            ),
+          )
+          .for("update");
+        if (!existing) {
           throw new AppError(
             `PO item not found for id ${update.id}`,
             404,
             "NOT_FOUND",
           );
         }
-        changedItems.push(updatedItem);
+        const unitPricePaise = update.unitPricePaise ?? existing.unitPricePaise;
+        const gstPercent = update.gstPercent ?? existing.gstPercent;
+        const [updatedItem] = await tx
+          .update(purchaseOrderItems)
+          .set({
+            unitPricePaise,
+            gstPercent,
+            ...computeLinePaise(existing.qty, unitPricePaise, gstPercent),
+          })
+          .where(eq(purchaseOrderItems.id, update.id))
+          .returning(purchaseOrderItemWriteColumns);
+        if (updatedItem) {
+          changedItems.push(updatedItem);
+        }
       }
 
       if (inserts.length > 0) {
@@ -645,6 +718,8 @@ export const poRepository = {
               qty,
               unitPricePaise: line.unitPricePaise,
               uom: prItem.uom,
+              gstPercent: line.gstPercent,
+              ...computeLinePaise(qty, line.unitPricePaise, line.gstPercent),
             })
             .returning(purchaseOrderItemWriteColumns);
 
@@ -673,6 +748,14 @@ export const poRepository = {
           affectedPrIds.add(prItem.prId);
           changedItems.push(createdItem);
         }
+      }
+
+      const remaining = await this.findPoItemsByPoId(poId, tx);
+      if (remaining.length === 0) {
+        throw new BadRequestError(
+          "A purchase order needs at least one line",
+          "PO_NEEDS_A_LINE",
+        );
       }
 
       for (const prId of affectedPrIds) {
@@ -730,8 +813,9 @@ export const poRepository = {
     };
   },
 
-  async hasGrnForPo(poId: number) {
-    const [row] = await db
+  async hasGrnForPo(poId: number, tx?: Tx) {
+    const executor = tx ?? db;
+    const [row] = await executor
       .select({ id: grns.id })
       .from(grns)
       .where(eq(grns.poId, poId))
@@ -740,60 +824,118 @@ export const poRepository = {
     return row !== undefined;
   },
 
-  async setStatusCancelled(poId: number) {
-    return db.transaction(async (tx) => {
-      const [po] = await tx
-        .update(purchaseOrders)
-        .set({ status: "cancelled" })
-        .where(eq(purchaseOrders.id, poId))
-        .returning(purchaseOrderColumns);
-
-      if (!po) {
-        return undefined;
-      }
-
-      const poItems = await this.findPoItemsByPoId(poId, tx);
-      const affectedPrIds = new Set<number>();
-
-      for (const poItem of poItems) {
-        const link = await this.findLinkByPoItemId(poId, poItem.id, tx);
-        if (!link || link.prItemId == null) {
-          continue;
-        }
-
-        await this.revertPrItemToPending(link.prItemId, link.linkedQty, tx);
-
-        const [prItemRow] = await tx
-          .select({ prId: purchaseRequestItems.prId })
-          .from(purchaseRequestItems)
-          .where(eq(purchaseRequestItems.id, link.prItemId))
-          .limit(1);
-        if (prItemRow) {
-          affectedPrIds.add(prItemRow.prId);
-        }
-      }
-
-      for (const prId of affectedPrIds) {
-        await prRepository.recomputeHeaderStatusFromItems(prId, tx);
-      }
-
-      return po;
-    });
+  // PR lines behind a PO, with their parent PR (BR-PR-30..32).
+  async listLinkedPrLines(poId: number, tx: Tx) {
+    return tx
+      .select({
+        prItemId: prPoItemLinks.prItemId,
+        linkedQty: prPoItemLinks.linkedQty,
+        prId: purchaseRequestItems.prId,
+        status: purchaseRequestItems.status,
+      })
+      .from(prPoItemLinks)
+      .innerJoin(
+        purchaseOrderItems,
+        eq(purchaseOrderItems.id, prPoItemLinks.poItemId),
+      )
+      .innerJoin(
+        purchaseRequestItems,
+        eq(purchaseRequestItems.id, prPoItemLinks.prItemId),
+      )
+      .where(eq(purchaseOrderItems.poId, poId));
   },
 
-  async setStatus(poId: number, status: poStatusSchemaType, tx?: Tx) {
-    const executor = tx ?? db;
-    const [row] = await executor
-      .update(purchaseOrders)
-      .set({ status })
-      .where(eq(purchaseOrders.id, poId))
-      .returning(purchaseOrderColumns);
+  // BR-PR-30: the PO is approved -> its po_draft PR lines become ordered.
+  async orderPrLinesOfPo(poId: number, tx: Tx) {
+    const lines = await this.listLinkedPrLines(poId, tx);
+    const ids = lines
+      .filter((l) => l.status === "po_draft" && l.prItemId != null)
+      .map((l) => l.prItemId as number);
+    if (ids.length === 0) {
+      return;
+    }
+    await tx
+      .update(purchaseRequestItems)
+      .set({ status: "ordered" })
+      .where(inArray(purchaseRequestItems.id, ids));
+  },
 
+  // BR-PR-31: PO cancelled or rejected -> its live PR lines are cancelled for
+  // good, issuedQty drops by the linked qty, PR headers recomputed (BR-PR-36).
+  async cancelPrLinesOfPo(poId: number, tx: Tx) {
+    const lines = await this.listLinkedPrLines(poId, tx);
+    const affectedPrIds = new Set<number>();
+    for (const line of lines) {
+      if (line.prItemId == null) {
+        continue;
+      }
+      if (line.status !== "po_draft" && line.status !== "ordered") {
+        continue;
+      }
+      await tx
+        .update(purchaseRequestItems)
+        .set({
+          status: "cancelled",
+          issuedQty: sql`greatest(${purchaseRequestItems.issuedQty} - ${line.linkedQty}, 0)`,
+        })
+        .where(eq(purchaseRequestItems.id, line.prItemId));
+      affectedPrIds.add(line.prId);
+    }
+    for (const prId of affectedPrIds) {
+      await prRepository.recomputeHeaderStatusFromItems(prId, tx);
+    }
+  },
+
+  // BR-PR-32: PO short-closed -> its ordered PR lines are closed; issuedQty stays.
+  async closePrLinesOfPo(poId: number, tx: Tx) {
+    const lines = await this.listLinkedPrLines(poId, tx);
+    const affectedPrIds = new Set<number>();
+    for (const line of lines) {
+      if (line.prItemId == null) {
+        continue;
+      }
+      if (line.status !== "ordered" && line.status !== "po_draft") {
+        continue;
+      }
+      await tx
+        .update(purchaseRequestItems)
+        .set({ status: "closed" })
+        .where(eq(purchaseRequestItems.id, line.prItemId));
+      affectedPrIds.add(line.prId);
+    }
+    for (const prId of affectedPrIds) {
+      await prRepository.recomputeHeaderStatusFromItems(prId, tx);
+    }
+  },
+
+  // BR-PO-11, 21: the one place a PO becomes cancelled (user cancel, approval
+  // reject, approval cancel). The caller holds the PO row lock.
+  async cancelLockedPo(
+    poId: number,
+    input: { actorId: number; reason: string },
+    tx: Tx,
+  ) {
+    const row = await this.updatePoById(
+      poId,
+      {
+        status: "cancelled",
+        cancelledBy: input.actorId,
+        cancelledAt: new Date(),
+        cancelReason: input.reason,
+      },
+      tx,
+    );
+    await this.cancelPrLinesOfPo(poId, tx);
     return row;
   },
 
-  async setStatusDispatched(poId: number, tx?: Tx) {
-    return this.setStatus(poId, "dispatched", tx);
+  async setStatus(
+    poId: number,
+    status: poStatusSchemaType,
+    tx?: Tx,
+    extra: UpdatePoData = {},
+  ) {
+    return this.updatePoById(poId, { ...extra, status }, tx);
   },
 
   async insertCommunication(
@@ -820,6 +962,25 @@ export const poRepository = {
       })
       .returning();
 
+    return row;
+  },
+
+  async findSupplierInvoice(
+    supplierId: number,
+    invoiceNumber: string,
+    tx?: Tx,
+  ) {
+    const executor = tx ?? db;
+    const [row] = await executor
+      .select({ id: supplierInvoices.id })
+      .from(supplierInvoices)
+      .where(
+        and(
+          eq(supplierInvoices.supplierId, supplierId),
+          eq(supplierInvoices.invoiceNumber, invoiceNumber),
+        ),
+      )
+      .limit(1);
     return row;
   },
 
@@ -850,10 +1011,15 @@ export const poRepository = {
     return row;
   },
 
+  // BR-PO-21: the PO log with who sent it, newest first.
   async listCommunications(poId: number) {
     return db
-      .select()
+      .select({
+        ...getTableColumns(poCommunications),
+        sentByName: employees.name,
+      })
       .from(poCommunications)
+      .leftJoin(employees, eq(employees.id, poCommunications.sentBy))
       .where(eq(poCommunications.poId, poId))
       .orderBy(desc(poCommunications.sentAt), desc(poCommunications.id));
   },

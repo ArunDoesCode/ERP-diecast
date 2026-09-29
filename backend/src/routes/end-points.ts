@@ -88,6 +88,7 @@ export const END_POINTS = {
     create: "/createpr",
     update: "/updatepr",
     remove: "/deletepr/:id",
+    cancelLine: "/:id/lines/:lineId/cancel",
   },
   po: {
     list: "/getpos",

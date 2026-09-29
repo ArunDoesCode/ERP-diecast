@@ -1,5 +1,6 @@
 import { db } from "../db/client";
 import { type Actor, can } from "../lib/auth-middleware";
+import { isUniqueViolation } from "../lib/db-errors";
 import {
   BadRequestError,
   ConflictError,
@@ -8,6 +9,7 @@ import {
   NotFoundError,
 } from "../lib/errors";
 import { approvalRepository } from "../repository/approvalRepository";
+import { poRepository } from "../repository/poRepository";
 import { prRepository } from "../repository/prRepository";
 import type {
   approvalActionRequestSchemaType,
@@ -84,26 +86,6 @@ function currentApproverFields(chain: approvalChainSchemaType, level: number) {
         currentApproverRole: step.role ?? null,
         currentApproverEmployeeId: null,
       };
-}
-
-// Drizzle wraps driver errors in a DrizzleQueryError whose `cause` is the
-// Postgres error, so walk the cause chain to find the 23505 code.
-function isUniqueViolation(error: unknown): boolean {
-  let current: unknown = error;
-  for (let depth = 0; depth < 5 && current; depth += 1) {
-    if (
-      typeof current === "object" &&
-      "code" in current &&
-      current.code === "23505"
-    ) {
-      return true;
-    }
-    current =
-      typeof current === "object" && "cause" in current
-        ? current.cause
-        : undefined;
-  }
-  return false;
 }
 
 const POLICY_SLOT_TAKEN_MESSAGE =
@@ -453,6 +435,33 @@ export const approvalService = {
         }
       }
 
+      // BR-PO-06 / BR-PO-22: a PO is re-read under its row lock, so a racing
+      // edit, cancel or second submit wins cleanly and the policy is matched on
+      // the total incl. GST as it stands now.
+      if (input.docType === "po") {
+        const locked = await poRepository.lockPoById(input.docId, tx);
+        if (!locked || !canSubmitForApproval(locked.status)) {
+          const raced = await approvalRepository.findPendingRequestByDoc(
+            input.docType,
+            input.docId,
+            tx,
+          );
+          if (raced) {
+            throw new ConflictError(
+              "Document already has an open approval request",
+              "APPROVAL_ALREADY_OPEN",
+            );
+          }
+          throw new ConflictError(
+            `Cannot submit PO for approval from status ${locked?.status ?? "missing"}`,
+            "APPROVAL_INVALID_SOURCE_STATUS",
+          );
+        }
+        if (locked.totalAmountPaise !== doc.amountPaise) {
+          policy = await resolvePolicy(locked.totalAmountPaise);
+        }
+      }
+
       const chain = policy.approvalChain;
 
       // BR-APR-28 / 61: an auto-approve policy, or a requester who holds
@@ -555,6 +564,10 @@ export const approvalService = {
           },
           tx,
         );
+        // BR-PR-30: an auto-approved PO orders its PR lines at once.
+        if (autoApproved) {
+          await poRepository.orderPrLinesOfPo(input.docId, tx);
+        }
       }
 
       if (input.docType === "sco" && autoApproved) {
@@ -759,29 +772,51 @@ export const approvalService = {
       }
 
       if (request.docType === "po") {
-        const poStatus =
-          input.action === "withdraw"
-            ? "draft"
-            : nextStatus === "approved"
-              ? "approved"
-              : nextStatus === "rejected"
-                ? "cancelled"
-                : nextStatus === "require_more_info"
-                  ? "draft"
-                  : nextStatus === "cancelled"
-                    ? "cancelled"
-                    : "pending_approval";
+        if (input.action === "reject" || input.action === "cancel") {
+          // BR-APR-43 / BR-PO-07: a rejected or cancelled request cancels the PO
+          // through the normal cancel path, so its PR lines are cancelled too.
+          await poRepository.lockPoById(request.docId, tx);
+          await poRepository.cancelLockedPo(
+            request.docId,
+            {
+              actorId,
+              reason: notes ?? "Approval request cancelled",
+            },
+            tx,
+          );
+          await approvalRepository.updatePoApprovalMirror(
+            request.docId,
+            {
+              currentApprovalLevel: updatedRequest.currentLevel,
+              totalApprovalLevels: updatedRequest.totalLevels,
+              approvedBy: null,
+            },
+            tx,
+          );
+        } else {
+          const poStatus =
+            input.action === "withdraw" || nextStatus === "require_more_info"
+              ? "draft"
+              : nextStatus === "approved"
+                ? "approved"
+                : "pending_approval";
 
-        await approvalRepository.updatePoApprovalMirror(
-          request.docId,
-          {
-            status: poStatus,
-            currentApprovalLevel: updatedRequest.currentLevel,
-            totalApprovalLevels: updatedRequest.totalLevels,
-            approvedBy: nextStatus === "approved" ? actorId : null,
-          },
-          tx,
-        );
+          await approvalRepository.updatePoApprovalMirror(
+            request.docId,
+            {
+              status: poStatus,
+              currentApprovalLevel: updatedRequest.currentLevel,
+              totalApprovalLevels: updatedRequest.totalLevels,
+              approvedBy: nextStatus === "approved" ? actorId : null,
+            },
+            tx,
+          );
+
+          // BR-PR-30: the last-level approve orders the PO's PR lines.
+          if (nextStatus === "approved") {
+            await poRepository.orderPrLinesOfPo(request.docId, tx);
+          }
+        }
       }
 
       if (request.docType === "sco") {

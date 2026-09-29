@@ -8,6 +8,7 @@ import {
   serial,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { itemMaster } from "./02_procurement-catalog";
 import { supplierMaster } from "./02_procurement-suppliers";
@@ -137,6 +138,15 @@ export const purchaseOrders = pgTable("purchase_orders", {
   closedAt: timestamp("closed_at"),
   closedBy: integer("closed_by").references(() => employees.id),
   closeNote: text("close_note"),
+  // Cancel audit trail (BR-PO-11, 21): who, when, why.
+  cancelledBy: integer("cancelled_by").references(() => employees.id),
+  cancelledAt: timestamp("cancelled_at"),
+  cancelReason: text("cancel_reason"),
+  // BR-PO-13: closed from partial_received with open qty dropped.
+  shortClosed: boolean("short_closed").default(false).notNull(),
+  // BR-PO-15, 21: who recorded the supplier invoice, and when.
+  invoicedBy: integer("invoiced_by").references(() => employees.id),
+  invoicedAt: timestamp("invoiced_at"),
 });
 
 export const purchaseOrderItems = pgTable(
@@ -151,6 +161,11 @@ export const purchaseOrderItems = pgTable(
     receivedQty: doublePrecision("received_qty").default(0), // Updated by GRN
     unitPricePaise: integer("unit_price_paise").notNull(),
     uom: text("uom").notNull(),
+    // BR-PO-04: GST % per line (allowed set BR-SUP-13) and the paise maths,
+    // stored so the header totals and approval matching never re-derive them.
+    gstPercent: doublePrecision("gst_percent").default(0).notNull(),
+    lineValuePaise: integer("line_value_paise").default(0).notNull(),
+    lineTaxPaise: integer("line_tax_paise").default(0).notNull(),
   },
   (table) => ({
     poIdIdx: index("idx_po_items_po_id").on(table.poId),
@@ -398,21 +413,31 @@ export const purchaseReturnItems = pgTable("purchase_return_items", {
 });
 
 // --- 5. SUPPLIER INVOICE & 3-WAY MATCH ---
-export const supplierInvoices = pgTable("supplier_invoices", {
-  id: serial("id").primaryKey(),
-  invoiceNumber: text("invoice_number").notNull(), //supplier invoice number
-  invoiceDate: timestamp("invoice_date").notNull(),
-  poId: integer("po_id").references(() => purchaseOrders.id),
-  supplierId: integer("supplier_id")
-    .references(() => supplierMaster.id)
-    .notNull(),
-  billedAmountPaise: integer("billed_amount_paise").notNull(),
-  // 3-way match status
-  matchStatus: text("match_status").default("pending"), // 'matched', 'exception', 'approved'
-  paymentStatus: text("payment_status").default("unpaid"), // 'unpaid', 'scheduled', 'paid'
-  dueDate: timestamp("due_date"), // Calculated: GRN Date + paymentTermsDays
-  createdAt: timestamp("created_at").defaultNow(),
-});
+export const supplierInvoices = pgTable(
+  "supplier_invoices",
+  {
+    id: serial("id").primaryKey(),
+    invoiceNumber: text("invoice_number").notNull(), //supplier invoice number
+    invoiceDate: timestamp("invoice_date").notNull(),
+    poId: integer("po_id").references(() => purchaseOrders.id),
+    supplierId: integer("supplier_id")
+      .references(() => supplierMaster.id)
+      .notNull(),
+    billedAmountPaise: integer("billed_amount_paise").notNull(),
+    // 3-way match status
+    matchStatus: text("match_status").default("pending"), // 'matched', 'exception', 'approved'
+    paymentStatus: text("payment_status").default("unpaid"), // 'unpaid', 'scheduled', 'paid'
+    dueDate: timestamp("due_date"), // Calculated: GRN Date + paymentTermsDays
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (table) => ({
+    // BR-PO-15: the same invoice number from the same supplier is refused.
+    supplierInvoiceNumberUq: uniqueIndex("uq_supplier_invoice_number").on(
+      table.supplierId,
+      table.invoiceNumber,
+    ),
+  }),
+);
 
 export const supplierBankDetails = pgTable("supplier_bank_details", {
   id: serial("id").primaryKey(),

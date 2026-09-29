@@ -68,4 +68,28 @@ export const prController = {
     const data = await prService.cancel(id, parsed.data.reason, c.get("actor"));
     return c.json({ success: true, data: { pr: data } });
   },
+
+  // BR-PR-33: POST /pr/:id/lines/:lineId/cancel { reason }
+  async cancelLine(c: Context<AppEnv>) {
+    const id = Number(c.req.param("id"));
+    const lineId = Number(c.req.param("lineId"));
+    if (!Number.isInteger(id) || id <= 0) {
+      throw new AppError("Invalid PR id", 400, "INVALID_PR_ID");
+    }
+    if (!Number.isInteger(lineId) || lineId <= 0) {
+      throw new AppError("Invalid PR line id", 400, "INVALID_PR_LINE_ID");
+    }
+
+    const raw = await c.req.json().catch(() => ({}));
+    const parsed = cancelPrSchema.safeParse(raw);
+    if (!parsed.success) {
+      throw new BadRequestError(
+        "A cancel reason of 3 to 500 characters is required",
+        "PR_CANCEL_REASON_REQUIRED",
+      );
+    }
+
+    const data = await prService.cancelLine(id, lineId, c.get("actor"));
+    return c.json({ success: true, data });
+  },
 };
