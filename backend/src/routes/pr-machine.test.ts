@@ -254,8 +254,19 @@ describe("BR-AUTH-26 saving a PR with a machine", () => {
   });
 
   test("BR-AUTH-26 updating a PR to add a machine with pr.link_machine succeeds", async () => {
+    // BR-PR-17: only the requester (or super-admin) may edit, so the linker edits their own PR.
+    const [own] = await db
+      .insert(purchaseRequests)
+      .values({
+        prNumber: "TEST_PRMACH_PR2",
+        type: "tooling",
+        requestedBy: emp.linker as number,
+        notes: "TEST_prmach seed linker",
+      })
+      .returning({ id: purchaseRequests.id });
+    if (!own) throw new Error("Fixture setup: linker PR insert failed");
     const res = await call("linker", "PATCH", "/api/pr/updatepr", {
-      prId: seededPrId,
+      prId: own.id,
       assetId: machineId,
     });
     expect(res.status).toBe(200);

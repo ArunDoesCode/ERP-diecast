@@ -19,12 +19,14 @@ import {
 } from "../db/schemas/02_procurement-approval";
 import { purchaseRequests } from "../db/schemas/02_procurement-purchasing";
 import { employees } from "../db/schemas/03_hcm";
+import { loadActor } from "../lib/auth-middleware";
 import { approvalService } from "../service/approvalService";
 import { approvalRepository } from "./approvalRepository";
 
 const NAME_PREFIX = "TEST_approval_engine_";
 
 let ownerEmployeeId: number;
+let plainRoleId: number;
 let requestorEmployeeId: number;
 let tierFixturePolicyId: number;
 let toolingPrPolicyId: number;
@@ -63,11 +65,19 @@ beforeAll(async () => {
     .returning({ id: employees.id });
   ownerEmployeeId = requireId(owner, "employees (owner fixture)");
 
+  // BR-APR-61: an owner's own request is auto-approved, so the requester holds a
+  // role without approval.auto_approve_own and gets the pending Owner step.
+  const [plainRole] = await db
+    .insert(roles)
+    .values({ name: `${NAME_PREFIX}plain_role`, isSystem: false })
+    .returning({ id: roles.id });
+  plainRoleId = requireId(plainRole, "roles (plain fixture)");
+
   const [requestor] = await db
     .insert(employees)
     .values({
       name: `${NAME_PREFIX}requestor`,
-      roleId: ownerRoleId,
+      roleId: plainRoleId,
       isActive: true,
     })
     .returning({ id: employees.id });
@@ -150,6 +160,7 @@ afterAll(async () => {
   await db
     .delete(employees)
     .where(inArray(employees.id, [ownerEmployeeId, requestorEmployeeId]));
+  await db.delete(roles).where(eq(roles.id, plainRoleId));
   // No disconnectDb() here: all test files share one client in one process;
   // src/test/setup-env.ts closes it once after every file has run.
 });
@@ -170,9 +181,14 @@ describe("approvalRepository.findMatchingActivePolicy", () => {
 
 describe("approvalService.submitRequest", () => {
   test("resolves an expensive tooling PR to the Owner-only chain (doc section 7, scenario 1)", async () => {
+    const actor = await loadActor(requestorEmployeeId);
+    if (!actor) {
+      throw new Error("Fixture setup: requestor actor not found");
+    }
     const created = await approvalService.submitRequest(
       { docType: "pr", docId: toolingPrId },
       requestorEmployeeId,
+      actor,
     );
 
     if (!created) {

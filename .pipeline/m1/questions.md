@@ -19,3 +19,4 @@
 | 15 | test-writer (21) | PR cancel: reason transport, cancel fields, test level | body {reason}; cancelledBy/cancelledByName/cancelledAt/cancelReason; HTTP tests | contract PR-S1 |
 | 16 | test-writer (24) | db:reset: failure hooks, fixture passwords, desk emails | uncovered (no prod hooks); SEED_USER_PASSWORD for all incl. admin; <role>@diecast.local | known-defects v2 |
 | 17 | test-writer (36) | resubmit code / withdraw call / standard rate test | APPROVAL_ALREADY_OPEN; actOnRequest action "withdraw" → PR draft; after stock merge | contract PR-S2 |
+| 18 | backend-dev (38) | super-admin submit/withdraw? | no — spec: requester only (BR-APR-24/39, BR-PR-17); super-admin may edit | spec |
