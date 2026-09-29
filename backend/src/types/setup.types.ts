@@ -185,4 +185,150 @@ export type rolePermissionDiffSchemaType = z.infer<
   typeof rolePermissionDiffSchema
 >;
 
+// ---------------------------------------------------------------------------
+// S6 (auth-setup v7): role editor, screens admin, guardrails, access log.
+// Old role_pages endpoints (/pages*, /permissions, /roles/:roleId/permissions)
+// stay unchanged until S7.
+// ---------------------------------------------------------------------------
+
+/** GET /roles row (BR-AUTH-07, 19): role + key and active-employee counts. */
+export const roleListItemSchema = roleSchema.extend({
+  isSuperAdmin: z.boolean(),
+  keyCount: z.number().int().min(0),
+  employeeCount: z.number().int().min(0),
+});
+export type roleListItemSchemaType = z.infer<typeof roleListItemSchema>;
+
+/** POST /roles/:id/copy body (BR-AUTH-25). */
+export const roleCopyInputSchema = z.object({ name: z.string().trim().min(1) });
+export type roleCopyInputSchemaType = z.infer<typeof roleCopyInputSchema>;
+
+export const roleGrantItemSchema = z.object({
+  key: z.string(),
+  module: z.string(),
+  label: z.string(),
+  description: z.string(),
+  grantable: z.boolean(),
+  granted: z.boolean(),
+});
+export type roleGrantItemSchemaType = z.infer<typeof roleGrantItemSchema>;
+
+/** GET/POST /roles/:id/grants response: the whole catalog with granted flags. */
+export const roleGrantsSchema = z.object({
+  roleId: z.number(),
+  roleName: z.string(),
+  isSystem: z.boolean(),
+  isSuperAdmin: z.boolean(),
+  // true for super-admin: every key shown granted, read-only (BR-AUTH-18)
+  readOnly: z.boolean(),
+  keys: z.array(roleGrantItemSchema),
+});
+export type roleGrantsSchemaType = z.infer<typeof roleGrantsSchema>;
+
+/** POST /roles/:id/grants body: the diff the UI confirmed (keys, not page ids). */
+export const roleGrantsDiffSchema = z
+  .object({
+    added: z.array(z.string()).default([]),
+    removed: z.array(z.string()).default([]),
+  })
+  .superRefine((data, ctx) => {
+    if (data.added.length === 0 && data.removed.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "At least one key must be added or removed",
+      });
+    }
+  });
+export type roleGrantsDiffSchemaType = z.infer<typeof roleGrantsDiffSchema>;
+
+/** GET /screens row (BR-AUTH-15): code-owned fields + UI-owned fields + ticked roles. */
+export const screenSchema = z.object({
+  key: z.string(),
+  path: z.string(),
+  // null = any signed-in user (no roles to tick)
+  permissionKey: z.string().nullable(),
+  label: z.string(),
+  sortOrder: z.number().int(),
+  menuGroup: z.string(),
+  // roles that hold the screen's key (super-admin excluded: always sees it)
+  roleIds: z.array(z.number()),
+});
+export type screenSchemaType = z.infer<typeof screenSchema>;
+
+/** PATCH /screens/:key body: key/path/permissionKey are code-owned (BR-AUTH-06). */
+export const screenUpdateSchema = z
+  .object({
+    label: z.string().trim().min(1).optional(),
+    sortOrder: z.number().int().optional(),
+    menuGroup: z.string().trim().min(1).optional(),
+  })
+  .strict()
+  .superRefine((data, ctx) => {
+    if (
+      data.label === undefined &&
+      data.sortOrder === undefined &&
+      data.menuGroup === undefined
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "At least one screen field must be provided",
+      });
+    }
+  });
+export type screenUpdateSchemaType = z.infer<typeof screenUpdateSchema>;
+
+/** POST /screens/:key/roles body: tick = grant the screen's key to the role. */
+export const screenRolesDiffSchema = z
+  .object({
+    added: z.array(z.number().int()).default([]),
+    removed: z.array(z.number().int()).default([]),
+  })
+  .superRefine((data, ctx) => {
+    if (data.added.length === 0 && data.removed.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "At least one role must be added or removed",
+      });
+    }
+  });
+export type screenRolesDiffSchemaType = z.infer<typeof screenRolesDiffSchema>;
+
+/** PATCH /employees/:id/role body. Strict: exactly one roleId (BR-AUTH-08). */
+export const employeeRoleAssignSchema = z
+  .object({ roleId: z.number().int() })
+  .strict();
+export type employeeRoleAssignSchemaType = z.infer<
+  typeof employeeRoleAssignSchema
+>;
+
+/** GET /employees/assignable-roles row (BR-AUTH-16). */
+export const assignableRoleSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+});
+export type assignableRoleSchemaType = z.infer<typeof assignableRoleSchema>;
+
+/** GET /access-log row (BR-AUTH-20). before/after are free JSON snapshots. */
+export const accessLogSchema = z.object({
+  id: z.number(),
+  at: z.string(),
+  actorId: z.number().nullable(),
+  actorName: z.string().nullable(),
+  action: z.string(),
+  target: z.string(),
+  before: z.unknown().nullable(),
+  after: z.unknown().nullable(),
+});
+export type accessLogSchemaType = z.infer<typeof accessLogSchema>;
+
+export const accessLogListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(10),
+  sortBy: z.enum(["at", "action", "actorId"]).optional(),
+  sortDir: z.enum(["asc", "desc"]).default("asc"),
+});
+export type accessLogListQuerySchemaType = z.infer<
+  typeof accessLogListQuerySchema
+>;
+
 export * from "./supplier.types";

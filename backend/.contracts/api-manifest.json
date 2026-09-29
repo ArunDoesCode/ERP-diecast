@@ -2470,7 +2470,10 @@
         "200": {
           "success": "boolean.required"
         }
-      }
+      },
+      "notes": [
+        "409 LAST_ADMIN if it would leave no active super-admin (BR-AUTH-17). Logged."
+      ]
     },
     {
       "id": "POST /api/setup/employees/:id/qr",
@@ -2533,7 +2536,10 @@
           "name"
         ],
         "searchable": false
-      }
+      },
+      "notes": [
+        "S6: each row carries keyCount and employeeCount (active employees). Super-admin row: isSuperAdmin=true."
+      ]
     },
     {
       "id": "POST /api/setup/roles",
@@ -2543,7 +2549,7 @@
         "setup",
         "roles"
       ],
-      "summary": "Create a role.",
+      "summary": "Create a role (no keys, isSystem=false).",
       "auth": {
         "type": "permission",
         "key": "setup.roles.manage"
@@ -2562,7 +2568,10 @@
             "isSystem": "boolean.required"
           }
         }
-      }
+      },
+      "notes": [
+        "409 CONFLICT on duplicate name. Logged (BR-AUTH-20)."
+      ]
     },
     {
       "id": "PATCH /api/setup/roles/:id",
@@ -2572,7 +2581,7 @@
         "setup",
         "roles"
       ],
-      "summary": "Update a role.",
+      "summary": "Rename a role.",
       "auth": {
         "type": "permission",
         "key": "setup.roles.manage"
@@ -2591,7 +2600,10 @@
             "isSystem": "boolean.required"
           }
         }
-      }
+      },
+      "notes": [
+        "403 SYSTEM_ROLE_PROTECTED for any system role (BR-AUTH-18); 409 ROLE_IN_APPROVAL_CHAIN (BR-AUTH-19); 409 CONFLICT duplicate name. Logged."
+      ]
     },
     {
       "id": "DELETE /api/setup/roles/:id",
@@ -2611,7 +2623,10 @@
         "200": {
           "success": "boolean.required"
         }
-      }
+      },
+      "notes": [
+        "403 SYSTEM_ROLE_PROTECTED; 409 ROLE_HAS_EMPLOYEES (any active employee); 409 ROLE_IN_APPROVAL_CHAIN (BR-AUTH-19). Logged."
+      ]
     },
     {
       "id": "GET /api/setup/pages",
@@ -2621,7 +2636,7 @@
         "setup",
         "pages"
       ],
-      "summary": "List pages, paginated.",
+      "summary": "List pages, paginated. Legacy: replaced by GET /screens; removed in S7.",
       "auth": {
         "type": "permission",
         "key": "setup.roles.manage"
@@ -2664,7 +2679,7 @@
         "setup",
         "pages"
       ],
-      "summary": "Create a page.",
+      "summary": "Create a page. Legacy: BR-AUTH-06 forbids creating screens; removed in S7.",
       "auth": {
         "type": "permission",
         "key": "setup.roles.manage"
@@ -2700,7 +2715,7 @@
         "setup",
         "pages"
       ],
-      "summary": "Update a page (key is immutable).",
+      "summary": "Update a page (key is immutable). Legacy: replaced by PATCH /screens/:key; removed in S7.",
       "auth": {
         "type": "permission",
         "key": "setup.roles.manage"
@@ -2735,7 +2750,7 @@
         "setup",
         "pages"
       ],
-      "summary": "Delete a page.",
+      "summary": "Delete a page. Legacy: removed in S7.",
       "auth": {
         "type": "permission",
         "key": "setup.roles.manage"
@@ -2755,7 +2770,7 @@
         "setup",
         "permissions"
       ],
-      "summary": "List all role-page permission assignments.",
+      "summary": "List all role-page permission assignments. Legacy (role_pages): removed in S7.",
       "auth": {
         "type": "permission",
         "key": "setup.roles.manage"
@@ -2779,7 +2794,7 @@
         "setup",
         "permissions"
       ],
-      "summary": "Apply an added/deleted page-permission diff for a role.",
+      "summary": "Apply an added/deleted page-permission diff for a role. Legacy (role_pages): replaced by POST /roles/:id/grants; removed in S7.",
       "auth": {
         "type": "permission",
         "key": "setup.roles.manage"
@@ -2793,6 +2808,318 @@
           "data": "array<object>.required"
         }
       }
+    },
+    {
+      "id": "POST /api/setup/roles/:id/copy",
+      "method": "POST",
+      "path": "/api/setup/roles/:id/copy",
+      "tags": [
+        "setup",
+        "roles"
+      ],
+      "summary": "Create a role as a copy of an existing role (same keys, BR-AUTH-25).",
+      "auth": {
+        "type": "permission",
+        "key": "setup.roles.manage"
+      },
+      "request": {
+        "body": {
+          "name": "string.nonempty.required"
+        }
+      },
+      "responses": {
+        "201": {
+          "success": "boolean.required",
+          "data": {
+            "id": "number.required",
+            "name": "string.required",
+            "isSystem": "boolean.required"
+          }
+        }
+      },
+      "notes": [
+        "404 source role missing; 403 SYSTEM_ROLE_PROTECTED if source is super-admin; 409 CONFLICT duplicate name. Copy is never a system role. Logged."
+      ]
+    },
+    {
+      "id": "GET /api/setup/roles/:id/grants",
+      "method": "GET",
+      "path": "/api/setup/roles/:id/grants",
+      "tags": [
+        "setup",
+        "roles",
+        "permissions"
+      ],
+      "summary": "Get a role's grants: the whole key catalog with a granted flag.",
+      "auth": {
+        "type": "permission",
+        "key": "setup.roles.manage"
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "roleId": "number.required",
+            "roleName": "string.required",
+            "isSystem": "boolean.required",
+            "isSuperAdmin": "boolean.required",
+            "readOnly": "boolean.required",
+            "keys": "array<object>.required"
+          }
+        }
+      },
+      "notes": [
+        "Bounded reference data (permission catalog) — pagination intentionally omitted",
+        "Super-admin role: readOnly=true, every key granted:true (no list to edit, BR-AUTH-18). 404 unknown role."
+      ]
+    },
+    {
+      "id": "POST /api/setup/roles/:id/grants",
+      "method": "POST",
+      "path": "/api/setup/roles/:id/grants",
+      "tags": [
+        "setup",
+        "roles",
+        "permissions"
+      ],
+      "summary": "Apply a grant diff (keys added / removed) to a role.",
+      "auth": {
+        "type": "permission",
+        "key": "setup.roles.manage"
+      },
+      "request": {
+        "body": {
+          "added": "array<string>.required",
+          "removed": "array<string>.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "roleId": "number.required",
+            "roleName": "string.required",
+            "isSystem": "boolean.required",
+            "isSuperAdmin": "boolean.required",
+            "readOnly": "boolean.required",
+            "keys": "array<object>.required"
+          }
+        }
+      },
+      "notes": [
+        "400 KEY_NOT_GRANTABLE for setup.roles.manage (BR-AUTH-07); 400 UNKNOWN_KEY for a key not in the catalog; 403 SYSTEM_ROLE_PROTECTED for the super-admin role; 404 unknown role. Whole diff is applied in one transaction or not at all. Actor/role cache cleared. Logged with before/after."
+      ]
+    },
+    {
+      "id": "GET /api/setup/screens",
+      "method": "GET",
+      "path": "/api/setup/screens",
+      "tags": [
+        "setup",
+        "screens"
+      ],
+      "summary": "List screens with the roles that see each (BR-AUTH-15).",
+      "auth": {
+        "type": "permission",
+        "key": "setup.roles.manage"
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required"
+        }
+      },
+      "notes": [
+        "Bounded reference data (screens come from code) — pagination intentionally omitted",
+        "Ordered by menuGroup, sortOrder, key."
+      ]
+    },
+    {
+      "id": "PATCH /api/setup/screens/:key",
+      "method": "PATCH",
+      "path": "/api/setup/screens/:key",
+      "tags": [
+        "setup",
+        "screens"
+      ],
+      "summary": "Change a screen's label, order or menu group.",
+      "auth": {
+        "type": "permission",
+        "key": "setup.roles.manage"
+      },
+      "request": {
+        "body": {
+          "label": "string.nonempty.optional",
+          "sortOrder": "integer.optional",
+          "menuGroup": "string.nonempty.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "key": "string.required",
+            "path": "string.required",
+            "permissionKey": "string.nullable.required",
+            "label": "string.required",
+            "sortOrder": "integer.required",
+            "menuGroup": "string.required",
+            "roleIds": "array<number>.required"
+          }
+        }
+      },
+      "notes": [
+        "404 unknown screen key; 400 for any other field (path, permissionKey are code-owned). Logged with before/after."
+      ]
+    },
+    {
+      "id": "POST /api/setup/screens/:key/roles",
+      "method": "POST",
+      "path": "/api/setup/screens/:key/roles",
+      "tags": [
+        "setup",
+        "screens"
+      ],
+      "summary": "Tick / untick roles on a screen = grant / revoke the screen's key.",
+      "auth": {
+        "type": "permission",
+        "key": "setup.roles.manage"
+      },
+      "request": {
+        "body": {
+          "added": "array<integer>.required",
+          "removed": "array<integer>.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "key": "string.required",
+            "path": "string.required",
+            "permissionKey": "string.nullable.required",
+            "label": "string.required",
+            "sortOrder": "integer.required",
+            "menuGroup": "string.required",
+            "roleIds": "array<number>.required"
+          }
+        }
+      },
+      "notes": [
+        "Same grant as POST /roles/:id/grants (also opens the API). 404 unknown screen or role; 400 SCREEN_HAS_NO_KEY when permissionKey is null; 400 KEY_NOT_GRANTABLE when the key is setup.roles.manage; 403 SYSTEM_ROLE_PROTECTED for the super-admin role. One transaction, logged per role."
+      ]
+    },
+    {
+      "id": "GET /api/setup/employees/assignable-roles",
+      "method": "GET",
+      "path": "/api/setup/employees/assignable-roles",
+      "tags": [
+        "setup",
+        "employees",
+        "roles"
+      ],
+      "summary": "Roles the caller may assign (BR-AUTH-16).",
+      "auth": {
+        "type": "permission",
+        "key": "setup.employees.manage"
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required"
+        }
+      },
+      "notes": [
+        "Bounded reference data (roles) — pagination intentionally omitted",
+        "Super-admin: every role. Others: roles whose keys they all hold, never the super-admin role."
+      ]
+    },
+    {
+      "id": "PATCH /api/setup/employees/:id/role",
+      "method": "PATCH",
+      "path": "/api/setup/employees/:id/role",
+      "tags": [
+        "setup",
+        "employees"
+      ],
+      "summary": "Assign an employee's one role (BR-AUTH-08, 16, 17).",
+      "auth": {
+        "type": "permission",
+        "key": "setup.employees.manage"
+      },
+      "request": {
+        "body": {
+          "roleId": "integer.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "unrepresentable.required",
+            "name": "string.required",
+            "email": "string.nullable.required",
+            "phone": "string.nullable.required",
+            "qrToken": "null.required",
+            "roleId": "unrepresentable.required",
+            "dailyRatePaise": "unrepresentable.nullable.required",
+            "isActive": "boolean.required",
+            "createdAt": "unrepresentable.required",
+            "lastUpdatedAt": "unrepresentable.required"
+          }
+        }
+      },
+      "notes": [
+        "400 if body has anything but a single roleId (e.g. roleIds[]); 404 unknown employee or role; 403 ROLE_NOT_ASSIGNABLE when the caller (non-super-admin) lacks any key of the role or targets super-admin; 409 LAST_ADMIN when it would leave no active super-admin. Actor cache cleared for that employee. Logged."
+      ]
+    },
+    {
+      "id": "GET /api/setup/access-log",
+      "method": "GET",
+      "path": "/api/setup/access-log",
+      "tags": [
+        "setup",
+        "access-log"
+      ],
+      "summary": "Read-only access log, paginated (BR-AUTH-20).",
+      "auth": {
+        "type": "permission",
+        "key": "setup.roles.manage"
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "sortBy": "enum:at,action,actorId.optional",
+          "sortDir": "enum:asc,desc.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "at",
+          "action",
+          "actorId"
+        ],
+        "searchable": false
+      },
+      "notes": [
+        "No write endpoints exist. Send sortBy=at&sortDir=desc for newest first."
+      ]
     },
     {
       "id": "GET /api/supplier/listSuppliers",

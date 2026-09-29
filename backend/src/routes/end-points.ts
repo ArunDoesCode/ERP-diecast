@@ -39,12 +39,25 @@ export const END_POINTS = {
       update: "/employees/:id",
       remove: "/employees/:id",
       generateQr: "/employees/:id/qr",
+      assignableRoles: "/employees/assignable-roles",
+      assignRole: "/employees/:id/role",
     },
     roles: {
       list: "/roles",
       create: "/roles",
       update: "/roles/:id",
       remove: "/roles/:id",
+      copy: "/roles/:id/copy",
+      getGrants: "/roles/:id/grants",
+      setGrants: "/roles/:id/grants",
+    },
+    screens: {
+      list: "/screens",
+      update: "/screens/:key",
+      setRoles: "/screens/:key/roles",
+    },
+    accessLog: {
+      list: "/access-log",
     },
     pages: {
       list: "/pages",

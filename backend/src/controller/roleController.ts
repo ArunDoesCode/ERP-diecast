@@ -45,4 +45,12 @@ export const roleController = {
     await roleService.remove(id);
     return c.json({ success: true });
   },
+
+  // S6 contract stub: 501 until the build step.
+  async copy(c: Context<AppEnv>) {
+    return c.json(
+      { success: false, message: "Not implemented", code: "NOT_IMPLEMENTED" },
+      501,
+    );
+  },
 };

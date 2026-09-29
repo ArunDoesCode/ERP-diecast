@@ -45,4 +45,28 @@ export const pageController = {
     await pageService.remove(id);
     return c.json({ success: true });
   },
+
+  // S6 contract stub: 501 until the build step.
+  async listScreens(c: Context<AppEnv>) {
+    return c.json(
+      { success: false, message: "Not implemented", code: "NOT_IMPLEMENTED" },
+      501,
+    );
+  },
+
+  // S6 contract stub: 501 until the build step.
+  async updateScreen(c: Context<AppEnv>) {
+    return c.json(
+      { success: false, message: "Not implemented", code: "NOT_IMPLEMENTED" },
+      501,
+    );
+  },
+
+  // S6 contract stub: 501 until the build step.
+  async setScreenRoles(c: Context<AppEnv>) {
+    return c.json(
+      { success: false, message: "Not implemented", code: "NOT_IMPLEMENTED" },
+      501,
+    );
+  },
 };

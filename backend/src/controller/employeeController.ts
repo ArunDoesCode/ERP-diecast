@@ -60,4 +60,28 @@ export const employeeController = {
     const data = await employeeService.regenerateQr(id);
     return c.json({ success: true, data });
   },
+
+  // S6 contract stub: 501 until the build step.
+  async assignableRoles(c: Context<AppEnv>) {
+    return c.json(
+      { success: false, message: "Not implemented", code: "NOT_IMPLEMENTED" },
+      501,
+    );
+  },
+
+  // S6 contract stub: 501 until the build step.
+  async assignRole(c: Context<AppEnv>) {
+    return c.json(
+      { success: false, message: "Not implemented", code: "NOT_IMPLEMENTED" },
+      501,
+    );
+  },
+
+  // S6 contract stub: 501 until the build step.
+  async accessLog(c: Context<AppEnv>) {
+    return c.json(
+      { success: false, message: "Not implemented", code: "NOT_IMPLEMENTED" },
+      501,
+    );
+  },
 };
