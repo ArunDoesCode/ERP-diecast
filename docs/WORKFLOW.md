@@ -142,9 +142,9 @@ cd ../frontend
 # .env: NEXT_PUBLIC_API_URL=http://localhost:4000/api
 bun install && bun run dev                 # UI on :3000
 ```
-**First user:** `POST /api/auth/register` requires an existing `super-admin`/`owner`, so on an empty DB insert
-the first admin employee manually (password hashed with `Bun.password.hash`). A `bootstrap-admin` script is on
-the backlog; ask Claude to write it as your first M0 task.
+**First user:** `POST /api/auth/register` needs an existing admin. On a seeded empty DB set
+`BOOTSTRAP_ADMIN_NAME`, `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PASSWORD` (min 8) and run
+`cd backend && bun run bootstrap-admin`. Exit 2 = already bootstrapped, 3 = roles not seeded (run db:reset).
 
 ### B. Automated checks you can run now
 ```bash

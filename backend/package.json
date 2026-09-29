@@ -13,6 +13,7 @@
     "db:push": "bun drizzle-kit push",
     "db:studio": "bun drizzle-kit studio",
     "db:test:prepare": "bun scripts/prepare-test-db.ts",
+    "bootstrap-admin": "bun scripts/bootstrap-admin.ts",
     "db:seed:approval-policies": "bun scripts/seed-approval-policies.ts",
     "contract:generate": "bun scripts/generate-api-manifest.ts",
     "contract:check": "bun scripts/generate-api-manifest.ts --check",
