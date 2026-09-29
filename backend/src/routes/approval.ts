@@ -9,6 +9,7 @@ import { register } from "../lib/route-registry";
 import type { AppEnv } from "../lib/types";
 import {
   approvalActionRequestSchema,
+  approvalHistoryItemSchema,
   approvalPolicyListQuerySchema,
   approvalPolicySchema,
   approvalRequestDetailSchema,
@@ -148,7 +149,7 @@ register({
   path: `${APPROVAL_BASE_PATH}${APPROVAL_ROUTES.actOnRequest}`,
   tags: ["approval"],
   summary:
-    "Act on the current approval level of a request (approve/reject/sent_back/cancel).",
+    "Act on the current approval level of a request (approve/reject/sent_back/withdraw/cancel). `notes` is required for approve/reject/sent_back (400 APPROVAL_NOTES_REQUIRED).",
   auth: { type: "any-authenticated" },
   request: { body: approvalActionRequestSchema },
   responses: { "200": successResponse(approvalRequestSchema) },
@@ -189,6 +190,21 @@ register({
   responses: {
     "200": successResponse(approvalRequestListItemSchema.nullable()),
   },
+});
+
+approvalRouter.get(
+  APPROVAL_ROUTES.getApprovalHistory,
+  requireAuth,
+  asyncHandler(approvalController.getApprovalHistory),
+);
+register({
+  method: "GET",
+  path: `${APPROVAL_BASE_PATH}${APPROVAL_ROUTES.getApprovalHistory}`,
+  tags: ["approval"],
+  summary:
+    "Approval history of a document (BR-APR-54): all its requests newest first, each with its trail oldest first. Readable per BR-APR-51.",
+  auth: { type: "any-authenticated" },
+  responses: { "200": successResponse(z.array(approvalHistoryItemSchema)) },
 });
 
 export { approvalRouter as approvalRoutes };

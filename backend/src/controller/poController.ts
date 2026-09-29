@@ -1,6 +1,6 @@
 import type { Context } from "hono";
 
-import { BadRequestError, UnauthorizedError } from "../lib/errors";
+import { AppError, BadRequestError, UnauthorizedError } from "../lib/errors";
 import type { AppEnv } from "../lib/types";
 import { poService } from "../service/poService";
 import {
@@ -151,5 +151,14 @@ export const poController = {
     const actorId = parseActorId(c);
     const data = await poService.close(id, body, actorId);
     return c.json({ success: true, data });
+  },
+
+  // CONTRACT stubs (PO-S2): logic lands in the build step.
+  async shortClose(_c: Context<AppEnv>) {
+    throw new AppError("Not implemented", 501, "NOT_IMPLEMENTED");
+  },
+
+  async communications(_c: Context<AppEnv>) {
+    throw new AppError("Not implemented", 501, "NOT_IMPLEMENTED");
   },
 };

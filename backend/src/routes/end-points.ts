@@ -102,6 +102,8 @@ export const END_POINTS = {
     confirm: "/:id/confirm",
     invoice: "/:id/invoice",
     close: "/:id/close",
+    shortClose: "/:id/short-close",
+    communications: "/:id/communications",
   },
   grn: {
     list: "/getgrns",
@@ -124,5 +126,6 @@ export const END_POINTS = {
     actOnRequest: "/actOnRequest/:id",
     getMyPendingApprovals: "/getMyPendingApprovals",
     getCurrentApprovalByDoc: "/getCurrentApprovalByDoc/:docType/:docId",
+    getApprovalHistory: "/getApprovalHistory/:docType/:docId",
   },
 } as const;

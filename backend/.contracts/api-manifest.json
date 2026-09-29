@@ -298,7 +298,7 @@
       "tags": [
         "approval"
       ],
-      "summary": "Act on the current approval level of a request (approve/reject/sent_back/cancel).",
+      "summary": "Act on the current approval level of a request (approve/reject/sent_back/withdraw/cancel). `notes` is required for approve/reject/sent_back (400 APPROVAL_NOTES_REQUIRED).",
       "auth": {
         "type": "any-authenticated"
       },
@@ -407,6 +407,25 @@
               "supplierName": "string.nullable.optional"
             }
           }
+        }
+      }
+    },
+    {
+      "id": "GET /api/approval/getApprovalHistory/:docType/:docId",
+      "method": "GET",
+      "path": "/api/approval/getApprovalHistory/:docType/:docId",
+      "tags": [
+        "approval"
+      ],
+      "summary": "Approval history of a document (BR-APR-54): all its requests newest first, each with its trail oldest first. Readable per BR-APR-51.",
+      "auth": {
+        "type": "any-authenticated"
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required"
         }
       }
     },
@@ -1444,7 +1463,7 @@
       "tags": [
         "po"
       ],
-      "summary": "List purchase orders, paginated. `overdue=true` filters to dispatched/partial_received POs past their expected delivery date with remaining qty.",
+      "summary": "List purchase orders, paginated. `overdue=true` (BR-PO-19) filters to dispatched/partial_received POs with open qty whose due date (revised date if set, else expected date) is before today.",
       "auth": {
         "type": "permission",
         "key": "po.manage"
@@ -1526,7 +1545,15 @@
               "confirmationNote": "string.nullable.required",
               "closedAt": "unrepresentable.nullable.required",
               "closedBy": "unrepresentable.nullable.required",
-              "closeNote": "string.nullable.required"
+              "closeNote": "string.nullable.required",
+              "cancelledBy": "integer.nullable.required",
+              "cancelledByName": "string.nullable.required",
+              "cancelledAt": "unrepresentable.nullable.required",
+              "cancelReason": "string.nullable.required",
+              "shortClosed": "boolean.required",
+              "invoicedBy": "integer.nullable.required",
+              "invoicedAt": "unrepresentable.nullable.required",
+              "dueDate": "unrepresentable.nullable.required"
             },
             "items": "array<object>.required"
           }
@@ -1585,7 +1612,15 @@
               "confirmationNote": "string.nullable.required",
               "closedAt": "unrepresentable.nullable.required",
               "closedBy": "unrepresentable.nullable.required",
-              "closeNote": "string.nullable.required"
+              "closeNote": "string.nullable.required",
+              "cancelledBy": "integer.nullable.required",
+              "cancelledByName": "string.nullable.required",
+              "cancelledAt": "unrepresentable.nullable.required",
+              "cancelReason": "string.nullable.required",
+              "shortClosed": "boolean.required",
+              "invoicedBy": "integer.nullable.required",
+              "invoicedAt": "unrepresentable.nullable.required",
+              "dueDate": "unrepresentable.nullable.required"
             },
             "items": "array<object>.required"
           }
@@ -1646,7 +1681,15 @@
               "confirmationNote": "string.nullable.required",
               "closedAt": "unrepresentable.nullable.required",
               "closedBy": "unrepresentable.nullable.required",
-              "closeNote": "string.nullable.required"
+              "closeNote": "string.nullable.required",
+              "cancelledBy": "integer.nullable.required",
+              "cancelledByName": "string.nullable.required",
+              "cancelledAt": "unrepresentable.nullable.required",
+              "cancelReason": "string.nullable.required",
+              "shortClosed": "boolean.required",
+              "invoicedBy": "integer.nullable.required",
+              "invoicedAt": "unrepresentable.nullable.required",
+              "dueDate": "unrepresentable.nullable.required"
             },
             "items": "array<object>.required"
           }
@@ -1660,14 +1703,14 @@
       "tags": [
         "po"
       ],
-      "summary": "Cancel a purchase order — reverts linked PR items back to pending. Rejected if the PO has GRN(s) recorded. `reason` is required unless the PO is still a draft.",
+      "summary": "Cancel a purchase order (BR-PO-11): only draft/pending_approval/approved/dispatched with no GRN (else 409). `reason` (3-500 chars) is required for every status. Linked PR lines are cancelled and the open approval request is cancelled.",
       "auth": {
         "type": "permission",
         "key": "po.manage"
       },
       "request": {
         "body": {
-          "reason": "string.nonempty.optional"
+          "reason": "string.nonempty.required"
         }
       },
       "responses": {
@@ -1699,7 +1742,15 @@
             "confirmationNote": "string.nullable.required",
             "closedAt": "unrepresentable.nullable.required",
             "closedBy": "unrepresentable.nullable.required",
-            "closeNote": "string.nullable.required"
+            "closeNote": "string.nullable.required",
+            "cancelledBy": "integer.nullable.required",
+            "cancelledByName": "string.nullable.required",
+            "cancelledAt": "unrepresentable.nullable.required",
+            "cancelReason": "string.nullable.required",
+            "shortClosed": "boolean.required",
+            "invoicedBy": "integer.nullable.required",
+            "invoicedAt": "unrepresentable.nullable.required",
+            "dueDate": "unrepresentable.nullable.required"
           }
         }
       }
@@ -1752,7 +1803,15 @@
             "confirmationNote": "string.nullable.required",
             "closedAt": "unrepresentable.nullable.required",
             "closedBy": "unrepresentable.nullable.required",
-            "closeNote": "string.nullable.required"
+            "closeNote": "string.nullable.required",
+            "cancelledBy": "integer.nullable.required",
+            "cancelledByName": "string.nullable.required",
+            "cancelledAt": "unrepresentable.nullable.required",
+            "cancelReason": "string.nullable.required",
+            "shortClosed": "boolean.required",
+            "invoicedBy": "integer.nullable.required",
+            "invoicedAt": "unrepresentable.nullable.required",
+            "dueDate": "unrepresentable.nullable.required"
           }
         }
       }
@@ -1845,8 +1904,8 @@
       },
       "request": {
         "body": {
-          "revisedDeliveryDate": "unrepresentable.optional",
-          "delayReason": "string.optional"
+          "revisedDeliveryDate": "unrepresentable.required",
+          "delayReason": "string.nonempty.required"
         }
       },
       "responses": {
@@ -1878,7 +1937,15 @@
             "confirmationNote": "string.nullable.required",
             "closedAt": "unrepresentable.nullable.required",
             "closedBy": "unrepresentable.nullable.required",
-            "closeNote": "string.nullable.required"
+            "closeNote": "string.nullable.required",
+            "cancelledBy": "integer.nullable.required",
+            "cancelledByName": "string.nullable.required",
+            "cancelledAt": "unrepresentable.nullable.required",
+            "cancelReason": "string.nullable.required",
+            "shortClosed": "boolean.required",
+            "invoicedBy": "integer.nullable.required",
+            "invoicedAt": "unrepresentable.nullable.required",
+            "dueDate": "unrepresentable.nullable.required"
           }
         }
       }
@@ -1930,7 +1997,15 @@
             "confirmationNote": "string.nullable.required",
             "closedAt": "unrepresentable.nullable.required",
             "closedBy": "unrepresentable.nullable.required",
-            "closeNote": "string.nullable.required"
+            "closeNote": "string.nullable.required",
+            "cancelledBy": "integer.nullable.required",
+            "cancelledByName": "string.nullable.required",
+            "cancelledAt": "unrepresentable.nullable.required",
+            "cancelReason": "string.nullable.required",
+            "shortClosed": "boolean.required",
+            "invoicedBy": "integer.nullable.required",
+            "invoicedAt": "unrepresentable.nullable.required",
+            "dueDate": "unrepresentable.nullable.required"
           }
         }
       }
@@ -1984,7 +2059,15 @@
             "confirmationNote": "string.nullable.required",
             "closedAt": "unrepresentable.nullable.required",
             "closedBy": "unrepresentable.nullable.required",
-            "closeNote": "string.nullable.required"
+            "closeNote": "string.nullable.required",
+            "cancelledBy": "integer.nullable.required",
+            "cancelledByName": "string.nullable.required",
+            "cancelledAt": "unrepresentable.nullable.required",
+            "cancelReason": "string.nullable.required",
+            "shortClosed": "boolean.required",
+            "invoicedBy": "integer.nullable.required",
+            "invoicedAt": "unrepresentable.nullable.required",
+            "dueDate": "unrepresentable.nullable.required"
           }
         }
       }
@@ -2035,8 +2118,95 @@
             "confirmationNote": "string.nullable.required",
             "closedAt": "unrepresentable.nullable.required",
             "closedBy": "unrepresentable.nullable.required",
-            "closeNote": "string.nullable.required"
+            "closeNote": "string.nullable.required",
+            "cancelledBy": "integer.nullable.required",
+            "cancelledByName": "string.nullable.required",
+            "cancelledAt": "unrepresentable.nullable.required",
+            "cancelReason": "string.nullable.required",
+            "shortClosed": "boolean.required",
+            "invoicedBy": "integer.nullable.required",
+            "invoicedAt": "unrepresentable.nullable.required",
+            "dueDate": "unrepresentable.nullable.required"
           }
+        }
+      }
+    },
+    {
+      "id": "POST /api/po/:id/short-close",
+      "method": "POST",
+      "path": "/api/po/:id/short-close",
+      "tags": [
+        "po"
+      ],
+      "summary": "Short-close a partial_received PO as a whole (BR-PO-13): open qty dropped, PR lines closed, PO closed. Reason 3-500 chars.",
+      "auth": {
+        "type": "permission",
+        "key": "po.manage"
+      },
+      "request": {
+        "body": {
+          "reason": "string.nonempty.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "unrepresentable.required",
+            "poNumber": "string.required",
+            "supplierId": "unrepresentable.required",
+            "status": "enum:draft,pending_approval,approved,dispatched,partial_received,fully_received,invoiced,closed,cancelled.required",
+            "subtotalPaise": "unrepresentable.required",
+            "taxAmountPaise": "unrepresentable.required",
+            "totalAmountPaise": "unrepresentable.required",
+            "paymentTermsDays": "unrepresentable.nullable.required",
+            "deliveryTerms": "string.nullable.required",
+            "notes": "string.nullable.required",
+            "expectedDeliveryDate": "unrepresentable.nullable.required",
+            "approvedBy": "unrepresentable.nullable.required",
+            "currentApprovalLevel": "unrepresentable.required",
+            "totalApprovalLevels": "unrepresentable.required",
+            "createdAt": "unrepresentable.required",
+            "createdBy": "unrepresentable.required",
+            "revisedDeliveryDate": "unrepresentable.nullable.required",
+            "delayReason": "string.nullable.required",
+            "supplierConfirmed": "boolean.required",
+            "confirmationMethod": "string.nullable.required",
+            "confirmedAt": "unrepresentable.nullable.required",
+            "confirmedBy": "unrepresentable.nullable.required",
+            "confirmationNote": "string.nullable.required",
+            "closedAt": "unrepresentable.nullable.required",
+            "closedBy": "unrepresentable.nullable.required",
+            "closeNote": "string.nullable.required",
+            "cancelledBy": "integer.nullable.required",
+            "cancelledByName": "string.nullable.required",
+            "cancelledAt": "unrepresentable.nullable.required",
+            "cancelReason": "string.nullable.required",
+            "shortClosed": "boolean.required",
+            "invoicedBy": "integer.nullable.required",
+            "invoicedAt": "unrepresentable.nullable.required",
+            "dueDate": "unrepresentable.nullable.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "GET /api/po/:id/communications",
+      "method": "GET",
+      "path": "/api/po/:id/communications",
+      "tags": [
+        "po"
+      ],
+      "summary": "PO log (sent / reminder / escalation rows: who, when, channel, note), newest first.",
+      "auth": {
+        "type": "permission",
+        "key": "po.manage"
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required"
         }
       }
     },

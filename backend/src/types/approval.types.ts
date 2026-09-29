@@ -52,46 +52,59 @@ export const approvalChainStepSchema = z
     }
   });
 
+const approvalChainLevelsCheck = (
+  steps: { level: number }[],
+  ctx: z.RefinementCtx,
+) => {
+  const levels = new Set<number>();
+  for (const step of steps) {
+    if (levels.has(step.level)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Duplicate approval level: ${step.level}`,
+      });
+    }
+    levels.add(step.level);
+  }
+
+  const sortedLevels = [...levels].sort((a, b) => a - b);
+  for (let index = 0; index < sortedLevels.length; index += 1) {
+    const expectedLevel = index + 1;
+    if (sortedLevels[index] !== expectedLevel) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "approvalChain levels must be sequential starting from 1",
+      });
+      break;
+    }
+  }
+};
+
+// At least one step (auto-approve off).
 export const approvalChainSchema = z
   .array(approvalChainStepSchema)
   .min(1)
-  .superRefine((steps, ctx) => {
-    const levels = new Set<number>();
-    for (const step of steps) {
-      if (levels.has(step.level)) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: `Duplicate approval level: ${step.level}`,
-        });
-      }
-      levels.add(step.level);
-    }
+  .superRefine(approvalChainLevelsCheck);
 
-    const sortedLevels = [...levels].sort((a, b) => a - b);
-    for (let index = 0; index < sortedLevels.length; index += 1) {
-      const expectedLevel = index + 1;
-      if (sortedLevels[index] !== expectedLevel) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "approvalChain levels must be sequential starting from 1",
-        });
-        break;
-      }
-    }
-  });
+// May be empty (BR-APR-05: auto-approve policies and their requests carry no
+// steps). Used for stored rows and for input; "auto-approve off needs a step"
+// is checked next to `autoApprove` (create schema / service on edit).
+export const approvalChainOrEmptySchema = z
+  .array(approvalChainStepSchema)
+  .superRefine(approvalChainLevelsCheck);
 
 export type approvalChainSchemaType = z.infer<typeof approvalChainSchema>;
 
 // Response shape for a stored approval policy row — approvalChain narrows
 // drizzle-zod's generic jsonb inference to the actual step-array contract.
 export const approvalPolicySchema = createSelectSchema(approvalPolicies, {
-  approvalChain: () => approvalChainSchema,
+  approvalChain: () => approvalChainOrEmptySchema,
 });
 export type approvalPolicySchemaType = z.infer<typeof approvalPolicySchema>;
 
 // Response shape for a stored approval request row.
 export const approvalRequestSchema = createSelectSchema(approvalRequests, {
-  chainSnapshot: () => approvalChainSchema,
+  chainSnapshot: () => approvalChainOrEmptySchema,
 });
 export type approvalRequestSchemaType = z.infer<typeof approvalRequestSchema>;
 
@@ -154,7 +167,7 @@ export type approvalPolicyListQuerySchemaType = z.infer<
 export const createApprovalPolicySchema = createInsertSchema(approvalPolicies, {
   name: (schema) => schema.min(1),
   priority: z.number().int().positive(),
-  approvalChain: () => approvalChainSchema,
+  approvalChain: () => approvalChainOrEmptySchema,
 })
   .pick({
     name: true,
@@ -171,8 +184,14 @@ export const createApprovalPolicySchema = createInsertSchema(approvalPolicies, {
     // hand-authored here instead of silently widening the accepted shape.
     description: z.string().optional(),
     subDocType: z.enum(procurementCategoryEnum.enumValues).default("any"),
+    // TODO(build APR-S1, BR-APR-15): `isSaleOrderLinked` is dropped and must
+    // stop being accepted. BR-APR-05: `approvalChain` becomes optional (an
+    // auto-approve policy sends none); empty/omitted with autoApprove off = 400.
+    // Kept type-compatible here because the service is not touched in the
+    // contract step.
     isSaleOrderLinked: z.boolean().optional(),
-
+    // Whole paise (BR-APR-06). The form takes rupees (up to 2 decimals) and
+    // sends rupees x 100 (BL-025 is a frontend bug: it must not send rupees).
     minAmountPaise: z.coerce
       .number()
       .int()
@@ -197,6 +216,14 @@ export const createApprovalPolicySchema = createInsertSchema(approvalPolicies, {
         code: z.ZodIssueCode.custom,
         message: "maxAmountPaise must be greater than minAmountPaise",
         path: ["maxAmountPaise"],
+      });
+    }
+
+    if (!data.autoApprove && data.approvalChain.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "approvalChain needs at least one step unless autoApprove",
+        path: ["approvalChain"],
       });
     }
   });
@@ -225,7 +252,7 @@ export const updateApprovalPolicySchema = createUpdateSchema(approvalPolicies, {
     .nonnegative()
     .nullable()
     .optional(),
-  approvalChain: () => approvalChainSchema,
+  approvalChain: () => approvalChainOrEmptySchema,
 })
   .pick({
     name: true,
@@ -317,6 +344,9 @@ export const approvalActionSchema = z.enum([
   "withdraw",
 ]);
 
+// `notes` (the typed comment) is REQUIRED for approve / reject / sent_back
+// (BR-APR-37): the service answers 400 `APPROVAL_NOTES_REQUIRED` (not a Zod
+// error, so the code is stable). Optional for withdraw / cancel (BR-APR-39).
 export const approvalActionRequestSchema = z.object({
   action: approvalActionSchema,
   notes: z.string().trim().min(1).optional(),
@@ -337,4 +367,14 @@ export const myPendingApprovalsQuerySchema = z.object({
 
 export type myPendingApprovalsQuerySchemaType = z.infer<
   typeof myPendingApprovalsQuerySchema
+>;
+
+// GET /getApprovalHistory/:docType/:docId (BR-APR-54): every request of a
+// document newest first, each with its trail oldest first. Readable per
+// BR-APR-51 (403 otherwise). Empty array when the doc was never submitted.
+export const approvalHistoryItemSchema = approvalRequestListItemSchema.extend({
+  trail: z.array(approvalTrailEntrySchema),
+});
+export type approvalHistoryItemSchemaType = z.infer<
+  typeof approvalHistoryItemSchema
 >;
