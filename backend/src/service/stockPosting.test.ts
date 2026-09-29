@@ -26,8 +26,9 @@ import {
 } from "../db/schemas/02_procurement-purchasing";
 import { supplierMaster } from "../db/schemas/02_procurement-suppliers";
 import { employees } from "../db/schemas/03_hcm";
+import { loadActor } from "../lib/auth-middleware";
 import { ConflictError, NotFoundError } from "../lib/errors";
-import { type Role, signAccessToken } from "../lib/token";
+import { signAccessToken } from "../lib/token";
 import {
   grnBypassSchema,
   grnCorrectionSchema,
@@ -36,6 +37,16 @@ import {
 import { grnService } from "./grnService";
 
 const P = "TEST_stock_";
+// Seed role names (test data), used to pick which real employee makes the call.
+type Role =
+  | "owner"
+  | "back_office"
+  | "floor_supervisor"
+  | "qa_inspector"
+  | "die_designer"
+  | "operator"
+  | "super-admin";
+
 const app = createApp();
 
 let actorId: number;
@@ -162,7 +173,7 @@ async function accept(
     lineId,
     grnQaActionSchema.parse({ acceptedQty, rejectedQty }),
     actorId,
-    "owner" as Role,
+    await ownerActor(),
   );
 }
 
@@ -172,7 +183,7 @@ async function bypass(grnId: number, lineId: number, acceptedQty?: number) {
     lineId,
     grnBypassSchema.parse({ bypassReason: "test bypass", acceptedQty }),
     actorId,
-    "owner" as Role,
+    await ownerActor(),
   );
 }
 
@@ -221,9 +232,39 @@ async function expectRejects<T extends Error>(
   expect(err).toBeInstanceOf(cls);
 }
 
+// The caller's role is read from the employee row (BR-AUTH-12), never from the
+// token: each role gets its own real employee (P-prefixed, removed in afterAll).
+// The owner's is actorId.
+const roleUsers = new Map<string, number>();
+async function userFor(role: string): Promise<number> {
+  if (role === "owner") return actorId;
+  let id = roleUsers.get(role);
+  if (!id) {
+    const [r] = await db
+      .select({ id: roles.id })
+      .from(roles)
+      .where(eq(roles.name, role))
+      .limit(1);
+    if (!r) throw new Error(`seed role ${role} missing`);
+    const [e] = await db
+      .insert(employees)
+      .values({ name: `${P}u_${role}`, roleId: r.id, isActive: true })
+      .returning({ id: employees.id });
+    id = e!.id;
+    roleUsers.set(role, id);
+  }
+  return id;
+}
+
+async function ownerActor() {
+  const a = await loadActor(actorId);
+  if (!a) throw new Error("actor fixture missing");
+  return a;
+}
+
 async function token(role: Role) {
   return signAccessToken({
-    userId: actorId,
+    userId: await userFor(role),
     userName: `${P}${role}`,
     role,
     allowedPages: [],

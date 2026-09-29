@@ -269,6 +269,10 @@ async function cleanup() {
       await db.delete(purchaseOrders).where(inArray(purchaseOrders.id, poIds));
     }
     await db
+      .update(documentNumberCounters)
+      .set({ lastUpdatedBy: null })
+      .where(inArray(documentNumberCounters.lastUpdatedBy, ids));
+    await db
       .delete(documentNumberCounters)
       .where(inArray(documentNumberCounters.createdBy, ids));
   }

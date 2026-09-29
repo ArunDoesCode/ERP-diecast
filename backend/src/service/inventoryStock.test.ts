@@ -23,7 +23,17 @@ import {
   supplierMaster,
 } from "../db/schemas/02_procurement-suppliers";
 import { employees } from "../db/schemas/03_hcm";
-import { type Role, signAccessToken } from "../lib/token";
+import { signAccessToken } from "../lib/token";
+
+// Seed role names (test data), used to pick which real employee makes the call.
+type Role =
+  | "owner"
+  | "back_office"
+  | "floor_supervisor"
+  | "qa_inspector"
+  | "die_designer"
+  | "operator"
+  | "super-admin";
 
 const app = createApp();
 const RUN = `TEST_inv_s_${Date.now()}`;
@@ -31,6 +41,28 @@ let seq = 0;
 const uid = () => `${RUN}_${++seq}`;
 
 let actorId = 0;
+// The caller's role is read from the employee row (BR-AUTH-12), never from the
+// token: each role gets its own real employee on first use. The owner's is actorId.
+const roleUsers = new Map<string, number>();
+async function userFor(role: string): Promise<number> {
+  let id = roleUsers.get(role);
+  if (!id) {
+    const [r] = await db
+      .select({ id: roles.id })
+      .from(roles)
+      .where(eq(roles.name, role))
+      .limit(1);
+    if (!r) throw new Error(`seed role ${role} missing`);
+    const [e] = await db
+      .insert(employees)
+      .values({ name: `${RUN}_u_${role}`, roleId: r.id, isActive: true })
+      .returning({ id: employees.id });
+    id = e!.id;
+    roleUsers.set(role, id);
+  }
+  return id;
+}
+
 const supplierIds: number[] = [];
 
 const tokens = new Map<Role, string>();
@@ -38,7 +70,7 @@ async function tokenFor(role: Role) {
   let t = tokens.get(role);
   if (!t) {
     t = await signAccessToken({
-      userId: actorId,
+      userId: role === "owner" ? actorId : await userFor(role),
       userName: `${RUN}_${role}`,
       role,
       allowedPages: [],
@@ -200,7 +232,9 @@ afterAll(async () => {
       .delete(supplierMaster)
       .where(inArray(supplierMaster.id, supplierIds));
   }
-  await db.delete(employees).where(eq(employees.id, actorId));
+  await db
+    .delete(employees)
+    .where(inArray(employees.id, [actorId, ...roleUsers.values()]));
 });
 
 // ---------------------------------------------------------------- BR-INV-21..23

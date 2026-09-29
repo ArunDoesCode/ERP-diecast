@@ -22,20 +22,51 @@ import {
   supplierServices,
 } from "../db/schemas/02_procurement-suppliers";
 import { employees } from "../db/schemas/03_hcm";
-import { type Role, signAccessToken } from "../lib/token";
+import { signAccessToken } from "../lib/token";
+
+// Seed role names (test data), used to pick which real employee makes the call.
+type Role =
+  | "owner"
+  | "back_office"
+  | "floor_supervisor"
+  | "qa_inspector"
+  | "die_designer"
+  | "operator"
+  | "super-admin";
 
 const app = createApp();
 const RUN = `TEST_sup_${Date.now()}`;
 let seq = 0;
 const uid = () => `${RUN}_${++seq}`;
 let actor = 0;
+// The caller's role is read from the employee row (BR-AUTH-12), never from the
+// token: each role gets its own real employee on first use. The owner's is actorId.
+const roleUsers = new Map<string, number>();
+async function userFor(role: string): Promise<number> {
+  let id = roleUsers.get(role);
+  if (!id) {
+    const [r] = await db
+      .select({ id: roles.id })
+      .from(roles)
+      .where(eq(roles.name, role))
+      .limit(1);
+    if (!r) throw new Error(`seed role ${role} missing`);
+    const [e] = await db
+      .insert(employees)
+      .values({ name: `${RUN}_u_${role}`, roleId: r.id, isActive: true })
+      .returning({ id: employees.id });
+    id = e!.id;
+    roleUsers.set(role, id);
+  }
+  return id;
+}
 
 const tokens = new Map<string, string>();
 async function tokenFor(role: Role) {
   let t = tokens.get(role);
   if (!t) {
     t = await signAccessToken({
-      userId: actor,
+      userId: role === "owner" ? actor : await userFor(role),
       userName: `${RUN}_${role}`,
       role,
       allowedPages: [],
@@ -165,7 +196,9 @@ afterAll(async () => {
   }
   await db.delete(itemMaster).where(ilike(itemMaster.sku, `${RUN}%`));
   await db.delete(serviceMaster).where(ilike(serviceMaster.code, `${RUN}%`));
-  await db.delete(employees).where(eq(employees.id, actor));
+  await db
+    .delete(employees)
+    .where(inArray(employees.id, [actor, ...roleUsers.values()]));
 });
 
 describe("contract shape", () => {
@@ -391,7 +424,7 @@ describe("BR-SUP-10 history", () => {
     expect(row!.entity).toBe("supplier");
     expect(row!.oldValue).toBe("111");
     expect(row!.newValue).toBe("222");
-    expect(row!.changedBy).toBe(actor);
+    expect(row!.changedBy).toBe(await userFor("back_office"));
   });
   test("BR-SUP-10 price, GST % and active changes write history rows", async () => {
     const s = await mkSupplier();

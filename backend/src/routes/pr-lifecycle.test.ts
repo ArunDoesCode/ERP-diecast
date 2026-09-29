@@ -2,7 +2,7 @@
  * docs/specs/purchase-requisition.md (v1)
  * BR-PR-01 create (draft, requester, number, one transaction)   BR-PR-02 header checks
  * BR-PR-06 item master lines (uom copied, one line per item)      BR-PR-08 qty and required-by date
- * BR-PR-11 estimate (paise, recomputed, frozen after submit)      BR-PR-14 standard rate (see gap below)
+ * BR-PR-11 estimate (paise, recomputed, frozen after submit)      BR-PR-14 standard rate, noCostHistory flag
  * BR-PR-15 edit only in draft                                     BR-PR-17 requester or super-admin
  * BR-PR-19 submit                                                 BR-PR-21 approval outcomes
  * BR-PR-45 login + pr.manage                                      BR-PR-46 who/when readable
@@ -10,7 +10,7 @@
  *
  * HTTP-level through createApp(), real DB, real logins. Written by test-writer from the spec only.
  * Known gaps (not tested):
- *  - BR-PR-14: item master has no standard-rate column yet, so the fixture cannot be built; report.
+ *  - BR-PR-14 "screen says 'estimate uses standard rate'" is a frontend message, not tested here.
  *  - BR-PR-46 "PO-driven change": PO module owns it, not in this slice.
  *  - BR-PR-17 "cancel one line": no line-cancel endpoint in the contract.
  */
@@ -213,6 +213,10 @@ async function cleanup() {
         .delete(purchaseRequests)
         .where(inArray(purchaseRequests.id, prIds));
     }
+    await db
+      .update(documentNumberCounters)
+      .set({ lastUpdatedBy: null })
+      .where(inArray(documentNumberCounters.lastUpdatedBy, ids));
     await db
       .delete(documentNumberCounters)
       .where(inArray(documentNumberCounters.createdBy, ids));
@@ -548,6 +552,87 @@ describe("BR-PR-11 estimate", () => {
     } finally {
       await setAvgCost("c", 1000);
     }
+  });
+});
+
+// BR-PR-14: the spec does not say where the per-line flag is exposed; the tests read it from
+// the PR details lines (`data.items` or `data.pr.items`, matched by itemId).
+async function newPricedItem(key: string, avgPaise: number, stdPaise: number) {
+  const [it] = await db
+    .insert(itemMaster)
+    .values({
+      sku: `TEST_PRLIFE_${key.toUpperCase()}`,
+      name: `TEST_prlife item ${key}`,
+      category: "Consumable",
+      uom: "kg",
+      averageCostPaise: avgPaise,
+      standardRatePaise: stdPaise,
+    })
+    .returning({ id: itemMaster.id });
+  if (!it) throw new Error("Fixture setup: item failed");
+  item[key] = it.id;
+}
+
+async function detailLine(prId: number, itemKey: string) {
+  const res = await call("a", "GET", `/api/pr/getprdetails/${prId}`);
+  expect(res.status).toBe(200);
+  const d = (await json(res)).data as Record<string, unknown>;
+  const lines = (d.items ??
+    (d.pr as Record<string, unknown>)?.items ??
+    []) as Array<Record<string, unknown>>;
+  return lines.find((l) => l.itemId === item[itemKey]);
+}
+
+describe("BR-PR-14 standard rate while average cost is 0", () => {
+  test("BR-PR-14 avg cost 0, standard rate 24000, qty 10 -> estimate 240000", async () => {
+    await newPricedItem("std0", 0, 24000);
+    const res = await create("a", { items: [line("std0", 10)] });
+    expect(res.status).toBe(201);
+    expect(prOf(await json(res)).estimatedAmountPaise).toBe(240000);
+  });
+
+  test("BR-PR-14 that line is flagged noCostHistory = true", async () => {
+    await newPricedItem("std1", 0, 24000);
+    const prId = await createOk("a", { items: [line("std1", 10)] });
+    const l = await detailLine(prId, "std1");
+    expect(l).toBeDefined();
+    expect(l?.noCostHistory).toBe(true);
+  });
+
+  test("BR-PR-14 submit is still allowed and the standard-rate estimate is kept", async () => {
+    await newPricedItem("std2", 0, 24000);
+    const prId = await createOk("a", { items: [line("std2", 10)] });
+    const res = await submit("a", prId);
+    expect(res.status).toBe(201);
+    expect((await prRow(prId))?.estimatedAmountPaise).toBe(240000);
+  });
+
+  test("BR-PR-14 item with average cost above 0 uses the average, not the standard rate, and is not flagged", async () => {
+    await newPricedItem("std3", 25000, 24000);
+    const prId = await createOk("a", { items: [line("std3", 10)] });
+    expect((await prRow(prId))?.estimatedAmountPaise).toBe(250000);
+    const l = await detailLine(prId, "std3");
+    expect(l).toBeDefined();
+    expect(l?.noCostHistory).not.toBe(true);
+  });
+
+  test("BR-PR-14 mixed PR: average-cost line and standard-rate line add up; only the second is flagged", async () => {
+    await newPricedItem("std4", 0, 24000);
+    const prId = await createOk("a", {
+      items: [line("b", 3), line("std4", 10)],
+    });
+    expect((await prRow(prId))?.estimatedAmountPaise).toBe(3150 + 240000);
+    expect((await detailLine(prId, "b"))?.noCostHistory).not.toBe(true);
+    expect((await detailLine(prId, "std4"))?.noCostHistory).toBe(true);
+  });
+
+  test("BR-PR-14 average cost appears before submit -> submit recomputes with the average and clears the flag", async () => {
+    await newPricedItem("std5", 0, 24000);
+    const prId = await createOk("a", { items: [line("std5", 10)] });
+    await setAvgCost("std5", 26000);
+    await submitOk("a", prId);
+    expect((await prRow(prId))?.estimatedAmountPaise).toBe(260000);
+    expect((await detailLine(prId, "std5"))?.noCostHistory).not.toBe(true);
   });
 });
 

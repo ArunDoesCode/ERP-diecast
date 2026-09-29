@@ -173,7 +173,7 @@ describe("BR-AUTH-09 permission check on every API action", () => {
 describe("BR-AUTH-10 every non-public route declares one key or any-signed-in", () => {
   test("BR-AUTH-10 no route is left on a role-name list", () => {
     const legacy = getRegistry()
-      .filter((d) => d.auth.type === "roles")
+      .filter((d) => (d.auth as { type: string }).type === "roles")
       .map((d) => `${d.method} ${d.path}`);
     expect(legacy).toEqual([]);
   });

@@ -303,6 +303,10 @@ async function cleanup() {
         .where(inArray(purchaseRequests.id, prIds));
     }
     await db
+      .update(documentNumberCounters)
+      .set({ lastUpdatedBy: null })
+      .where(inArray(documentNumberCounters.lastUpdatedBy, ids));
+    await db
       .delete(documentNumberCounters)
       .where(inArray(documentNumberCounters.createdBy, ids));
   }

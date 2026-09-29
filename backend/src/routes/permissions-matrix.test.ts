@@ -219,7 +219,7 @@ describe("BR-AUTH-21 seed grants give each seed role the intended API access", (
   test("BR-AUTH-21 every existing role-guarded route is covered by the matrix", () => {
     const covered = new Set(MATRIX.map(([m, p]) => `${m} ${p}`));
     const missing = getRegistry()
-      .filter((d) => d.auth.type === "roles")
+      .filter((d) => (d.auth as { type: string }).type === "roles")
       .map((d) => `${d.method} ${d.path}`)
       .filter(
         (k) =>

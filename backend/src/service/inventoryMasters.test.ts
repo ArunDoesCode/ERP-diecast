@@ -30,7 +30,17 @@ import {
   supplierMaster,
 } from "../db/schemas/02_procurement-suppliers";
 import { employees } from "../db/schemas/03_hcm";
-import { type Role, signAccessToken } from "../lib/token";
+import { signAccessToken } from "../lib/token";
+
+// Seed role names (test data), used to pick which real employee makes the call.
+type Role =
+  | "owner"
+  | "back_office"
+  | "floor_supervisor"
+  | "qa_inspector"
+  | "die_designer"
+  | "operator"
+  | "super-admin";
 
 const app = createApp();
 const RUN = `TEST_inv_m_${Date.now()}`;
@@ -43,11 +53,38 @@ let supplierId = 0;
 let createdMainStoreId: number | undefined;
 let mainStoreId = 0;
 
+// The caller's role is read from the employee row (BR-AUTH-12), never from the
+// token. actorA / actorB are back_office employees; any other role gets its own
+// real employee per slot, created on first use.
+const ACTOR_ROLE = "back_office";
+const siblings = new Map<string, number>();
+async function employeeFor(role: Role, slot: number) {
+  if (role === ACTOR_ROLE) return slot;
+  const key = `${role}:${slot}`;
+  let id = siblings.get(key);
+  if (!id) {
+    const [r] = await db
+      .select({ id: roles.id })
+      .from(roles)
+      .where(eq(roles.name, role))
+      .limit(1);
+    if (!r) throw new Error(`seed role ${role} missing`);
+    const [e] = await db
+      .insert(employees)
+      .values({ name: `${RUN}_${key}`, roleId: r.id, isActive: true })
+      .returning({ id: employees.id });
+    id = e!.id;
+    siblings.set(key, id);
+  }
+  return id;
+}
+
 const tokens = new Map<string, string>();
-async function tokenFor(role: Role, userId: number) {
-  const key = `${role}:${userId}`;
+async function tokenFor(role: Role, slot: number) {
+  const key = `${role}:${slot}`;
   let t = tokens.get(key);
   if (!t) {
+    const userId = await employeeFor(role, slot);
     t = await signAccessToken({
       userId,
       userName: `${RUN}_${role}`,
@@ -139,7 +176,7 @@ beforeAll(async () => {
   const [ownerRole] = await db
     .select({ id: roles.id })
     .from(roles)
-    .where(eq(roles.name, "owner"))
+    .where(eq(roles.name, ACTOR_ROLE))
     .limit(1);
   const [a] = await db
     .insert(employees)
@@ -243,7 +280,7 @@ afterAll(async () => {
     documentNumberCounters.createdBy,
     documentNumberCounters.lastUpdatedBy,
   ]) {
-    for (const id of [actorA, actorB]) {
+    for (const id of [actorA, actorB, ...siblings.values()]) {
       await db
         .update(documentNumberCounters)
         .set(
@@ -254,7 +291,9 @@ afterAll(async () => {
         .where(eq(col, id));
     }
   }
-  await db.delete(employees).where(inArray(employees.id, [actorA, actorB]));
+  await db
+    .delete(employees)
+    .where(inArray(employees.id, [actorA, actorB, ...siblings.values()]));
   if (createdMainStoreId) {
     await db.delete(locations).where(eq(locations.id, createdMainStoreId));
   }

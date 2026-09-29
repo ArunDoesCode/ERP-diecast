@@ -1,6 +1,6 @@
 /**
  * docs/specs/purchase-order.md (v1) and docs/specs/purchase-requisition.md (v1)
- * BR-PO-01..09, 11..23  (BR-PO-10 receipt status waits for the GRN branch)
+ * BR-PO-01..09, 11..23  (BR-PO-10 receipt status: src/service/poReceiptStatus.test.ts)
  * BR-PR-25, 28, 30, 31, 33, 36 (PR line / header effects of PO actions)
  *
  * HTTP-level through createApp(), real DB, real logins. Written by test-writer from the spec only.
@@ -12,7 +12,7 @@
  *  - Expected / revised dates in the past are written straight to the row (the API refuses a date
  *    before the PO date, BR-PO-18).
  * Known gaps (not tested here):
- *  - BR-PO-10 (receipt status from GRN postings): waits for the GRN branch.
+ *  - BR-PO-10 (receipt status from GRN postings): src/service/poReceiptStatus.test.ts.
  *  - BR-PO-12 / 13 "new GRN after cancel/short-close -> 400": GRN module, needs the GRN branch.
  *  - BR-PO-22 "cancel and GRN create at once": needs the GRN branch; cancel/cancel, send/send and
  *    submit/submit races are covered.
@@ -430,6 +430,10 @@ async function cleanup() {
     await db.delete(supplierMaster).where(inArray(supplierMaster.id, supIds));
   }
   if (ids.length) {
+    await db
+      .update(documentNumberCounters)
+      .set({ lastUpdatedBy: null })
+      .where(inArray(documentNumberCounters.lastUpdatedBy, ids));
     await db
       .delete(documentNumberCounters)
       .where(inArray(documentNumberCounters.createdBy, ids));

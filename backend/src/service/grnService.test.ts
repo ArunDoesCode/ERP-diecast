@@ -23,7 +23,17 @@ import {
 } from "../db/schemas/02_procurement-purchasing";
 import { supplierMaster } from "../db/schemas/02_procurement-suppliers";
 import { employees } from "../db/schemas/03_hcm";
-import { type Role, signAccessToken } from "../lib/token";
+import { signAccessToken } from "../lib/token";
+
+// Seed role names (test data), used to pick which real employee makes the call.
+type Role =
+  | "owner"
+  | "back_office"
+  | "floor_supervisor"
+  | "qa_inspector"
+  | "die_designer"
+  | "operator"
+  | "super-admin";
 
 const app = createApp();
 const RUN = `TEST_grn_${Date.now()}`;
@@ -31,6 +41,28 @@ let seq = 0;
 const uid = () => `${RUN}_${++seq}`;
 
 let actorId = 0;
+// The caller's role is read from the employee row (BR-AUTH-12), never from the
+// token: each role gets its own real employee on first use. The owner's is actorId.
+const roleUsers = new Map<string, number>();
+async function userFor(role: string): Promise<number> {
+  let id = roleUsers.get(role);
+  if (!id) {
+    const [r] = await db
+      .select({ id: roles.id })
+      .from(roles)
+      .where(eq(roles.name, role))
+      .limit(1);
+    if (!r) throw new Error(`seed role ${role} missing`);
+    const [e] = await db
+      .insert(employees)
+      .values({ name: `${RUN}_u_${role}`, roleId: r.id, isActive: true })
+      .returning({ id: employees.id });
+    id = e!.id;
+    roleUsers.set(role, id);
+  }
+  return id;
+}
+
 let supplierId = 0;
 let supplier2Id = 0;
 let createdLocationId: number | undefined;
@@ -43,7 +75,7 @@ async function tokenFor(role: Role) {
   let t = tokens.get(role);
   if (!t) {
     t = await signAccessToken({
-      userId: actorId,
+      userId: role === "owner" ? actorId : await userFor(role),
       userName: `${RUN}_${role}`,
       role,
       allowedPages: [],
@@ -258,12 +290,24 @@ afterAll(async () => {
   await db
     .update(documentNumberCounters)
     .set({ createdBy: null })
-    .where(eq(documentNumberCounters.createdBy, actorId));
+    .where(
+      inArray(documentNumberCounters.createdBy, [
+        actorId,
+        ...roleUsers.values(),
+      ]),
+    );
   await db
     .update(documentNumberCounters)
     .set({ lastUpdatedBy: null })
-    .where(eq(documentNumberCounters.lastUpdatedBy, actorId));
-  await db.delete(employees).where(eq(employees.id, actorId));
+    .where(
+      inArray(documentNumberCounters.lastUpdatedBy, [
+        actorId,
+        ...roleUsers.values(),
+      ]),
+    );
+  await db
+    .delete(employees)
+    .where(inArray(employees.id, [actorId, ...roleUsers.values()]));
 });
 
 describe("BR-GRN-01 PO status gate", () => {
@@ -723,7 +767,7 @@ describe("BR-GRN-12 traceability", () => {
       .where(eq(qaTests.grnItemId, g.lineIds[0]!));
     expect(rows).toHaveLength(1);
     expect(rows[0]!.status).toBe("passed");
-    expect(rows[0]!.testedBy).toBe(actorId);
+    expect(rows[0]!.testedBy).toBe(await userFor("qa_inspector"));
     expect(rows[0]!.testedAt).toBeTruthy();
     expect(rows[0]!.notes).toBe("spectro OK");
     expect(rows[0]!.testReportUrl).toBe("https://example.com/cert.pdf");
@@ -739,7 +783,7 @@ describe("BR-GRN-12 traceability", () => {
       .where(eq(qaTests.grnItemId, g.lineIds[0]!));
     expect(rows).toHaveLength(1);
     expect(rows[0]!.status).toBe("failed");
-    expect(rows[0]!.testedBy).toBe(actorId);
+    expect(rows[0]!.testedBy).toBe(await userFor("qa_inspector"));
   });
 
   test("BR-GRN-12 bypass stores who, when and why; posting stores who", async () => {
@@ -751,10 +795,10 @@ describe("BR-GRN-12 traceability", () => {
     const l = await lineRow(g.lineIds[0]!);
     expect(l.isQaBypassed).toBe(true);
     expect(l.qaBypassReason).toBe("furnace waiting");
-    expect(l.qaBypassedBy).toBe(actorId);
+    expect(l.qaBypassedBy).toBe(await userFor("back_office"));
     expect(l.qaBypassedAt).toBeTruthy();
     const ledger = await ledgerFor(po.itemIds[0]!);
-    expect(ledger[0]!.createdBy).toBe(actorId);
+    expect(ledger[0]!.createdBy).toBe(await userFor("back_office"));
     expect(ledger[0]!.createdAt).toBeTruthy();
   });
 
@@ -770,7 +814,7 @@ describe("BR-GRN-12 traceability", () => {
       .where(eq(grnCorrections.grnItemId, g.lineIds[0]!));
     expect(rows).toHaveLength(1);
     expect(rows[0]!.reason).toBe("short weight found");
-    expect(rows[0]!.createdBy).toBe(actorId);
+    expect(rows[0]!.createdBy).toBe(await userFor("back_office"));
     expect(rows[0]!.createdAt).toBeTruthy();
     expect(rows[0]!.qty).toBe(30);
   });
@@ -856,7 +900,7 @@ describe("BR-GRN-15 over-receipt", () => {
     const l = await lineRow(g.lineIds[0]!);
     expect(l.overReceiptExcessQty).toBeCloseTo(10, 3);
     expect(l.overReceiptReason).toBe("supplier sent extra, needed");
-    expect(l.overReceiptBy).toBe(actorId);
+    expect(l.overReceiptBy).toBe(await userFor("back_office"));
   });
 
   test("BR-GRN-15 bypass over tolerance follows the same rule", async () => {

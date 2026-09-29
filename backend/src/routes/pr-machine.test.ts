@@ -109,6 +109,10 @@ async function cleanup() {
   if (ids.length > 0) {
     // Numbering counters keep an FK to their first creator; they are recreated on demand.
     await db
+      .update(documentNumberCounters)
+      .set({ lastUpdatedBy: null })
+      .where(inArray(documentNumberCounters.lastUpdatedBy, ids));
+    await db
       .delete(documentNumberCounters)
       .where(inArray(documentNumberCounters.createdBy, ids));
   }
