@@ -1,0 +1,1 @@
+F-TEST-14: removed isSaleOrderLinked from approvalRepository.test.ts (findMatchingActivePolicy input) and changed approval.types.test.ts:33 to assert the key is absent (BR-APR-15). Types test passes. Repo test file still red until production adds lib/approval-fallback and drops isSaleOrderLinked in approvalService.ts (typecheck errors there are production, not test).

@@ -30,7 +30,7 @@ describe("BR-APR-08 — updateApprovalPolicySchema keeps omitted fields unset", 
     expect(parsed.isActive).toBeUndefined();
     expect(parsed.priority).toBeUndefined();
     expect(parsed.subDocType).toBeUndefined();
-    expect(parsed.isSaleOrderLinked).toBeUndefined();
+    expect("isSaleOrderLinked" in parsed).toBe(false); // BR-APR-15
     expect(parsed.minAmountPaise).toBeUndefined();
     expect(parsed.maxAmountPaise).toBeUndefined();
     expect(parsed.autoApprove).toBeUndefined();

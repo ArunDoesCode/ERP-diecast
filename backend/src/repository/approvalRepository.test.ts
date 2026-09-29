@@ -170,7 +170,6 @@ describe("approvalRepository.findMatchingActivePolicy", () => {
     const match = await approvalRepository.findMatchingActivePolicy({
       docType: "pr",
       subDocType: "misc",
-      isSaleOrderLinked: null,
       amountPaise: 3_000_000, // ₹30k — also within the seeded "any" 10k-50k range, if present
     });
 
