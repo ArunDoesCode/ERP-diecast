@@ -1,8 +1,8 @@
 ---
 module: grn
-status: draft            # draft | frozen | changed-after-freeze
-version: 0
-frozen_on:
+status: frozen           # draft | frozen | changed-after-freeze
+version: 1
+frozen_on: 2026-09-29
 owner: Arun
 depends_on: [purchase-order, inventory, suppliers, grn-stock, auth-setup]
 ---
@@ -55,7 +55,7 @@ Header status. Line status goes `pending` → `passed` / `failed` / `waived` and
 | ID | Rule | Example (given → then) |
 |---|---|---|
 | BR-GRN-01 | A GRN can be created, and a line accepted or bypassed, only while its PO is `dispatched` or `partial_received`. Otherwise create gets 400, accept/bypass get 409, and nothing is posted. | PO-1 cancelled after the GRN was made, QA accepts → 409, no ledger row, line stays `pending` |
-| BR-GRN-02 | Every line must be a line of the GRN's PO, have arrived qty > 0, and appear once per GRN. Supplier is copied from the PO. Qty has up to 3 decimals; whole numbers for items in pieces (assumed). | Two lines for L1 → 400; a line from PO-2 → 400 |
+| BR-GRN-02 | Every line must be a line of the GRN's PO, have arrived qty > 0, and appear once per GRN. Supplier is copied from the PO. Qty has up to 3 decimals; whole numbers for items in pieces. | Two lines for L1 → 400; a line from PO-2 → 400 |
 | BR-GRN-04 | The GRN number `GRN-<period>-<seq>` is given at create and never reused, even if the draft is deleted. | Draft seq 7 deleted → next GRN gets seq 8 |
 | BR-GRN-05 | Supplier challan number is mandatory. The same challan number from the same supplier is blocked with 409, unless the earlier GRN was deleted. | GRN A for S has "CH-11", GRN B for S with "CH-11" → 409; no challan → 400 |
 | BR-GRN-06 | Only a `draft` GRN can be edited (header, arrived qty) or deleted. Deleting removes its lines and posts nothing. Otherwise 400 "use the correction". | GRN in `pending_qa`, change arrived qty → 400, qty unchanged |
@@ -63,7 +63,7 @@ Header status. Line status goes `pending` → `passed` / `failed` / `waived` and
 | BR-GRN-09 | Each line gets exactly one decision (accept, reject or bypass). A second one gets 409. Two requests at the same time post at most once. | Two accepts on L1 at once → one 200, one 409, one ledger row |
 | BR-GRN-10 | A decision records accepted and rejected qty on the same line, and accepted + rejected = arrived. The line is `passed` if accepted > 0, else `failed`. Bypass defaults accepted = arrived; a smaller accepted qty records the rest as rejected. | Arrived 1000: 980+20 → `passed`; 980+10 → 400; 0+1000 → `failed`, no ledger row; bypass 990 → rejected 10 |
 | BR-GRN-12 | Every decision is traceable: QA accept/reject writes one QA test row (result, tester, time, remarks, certificate URL); bypass stores who and why; every posting and correction stores who, when and the reason. | Accept with remarks "spectro OK" → one QA row `passed`, tester = actor |
-| BR-GRN-13 | Rejected qty never goes into stock. It stays on the GRN line until a purchase return (later) handles it. (assumed) | Accepted 980, rejected 20 → stock moves by +980 only |
+| BR-GRN-13 | Rejected qty never goes into stock. It stays on the GRN line until a purchase return (later) handles it. | Accepted 980, rejected 20 → stock moves by +980 only |
 | BR-GRN-15 | If PO line received qty + accepted qty > ordered × 1.05 (one plant-wide 5%), accept/bypass is refused with 400, unless the actor holds `grn.over_receipt_override` and gives a reason. The reason, actor and excess qty are stored. The check uses the latest received qty, so two GRNs cannot both slip through. | L1 received 1000, QA accepts 60 → 400; back_office with reason → 200, excess 10 stored; two GRNs of 600 at once → one 400 |
 | BR-GRN-18 | Bypass needs `grn.qa_bypass` and a reason. The line becomes `waived`, marked bypassed with who did it, and is posted as `grn_bypass`. | Empty reason → 400; "furnace waiting" → `waived`, ledger type `grn_bypass` |
 | BR-GRN-19 | Every action needs the key in "Who can do what". Without it the caller gets 403 and nothing changes. | fs (no `grn.qa_bypass`) bypasses → 403; dd creates → 403, can view |
@@ -80,7 +80,7 @@ Header status. Line status goes `pending` → `passed` / `failed` / `waived` and
 - Landed cost (freight, loading) in the stock rate — stock is valued at the PO rate only.
 - Per-item "QA required" flag; per-item over-receipt tolerance; external lab tests; challan photo upload.
 - Subcontracting GRN (M2); backdated receipts.
-- Short-closing a short-supplied PO line — belongs to the PO spec (today `partial_received → closed` is not allowed).
+- Short-closing a short-supplied PO — owned by the PO spec: whole-PO short-close, purchase-order BR-PO-13.
 
 ## Questions for you
 
@@ -91,3 +91,6 @@ None open.
 - 2026-09-27 v0 — draft created from code at 0a406f4.
 - 2026-09-28 — rewritten in slim format; stock/cost rules moved to `grn-stock.md`. Merged: BR-GRN-01 (was 01, 14), 02 (was 02, 03), 06 (was 06, 07), 10 (was 10, 11, 20), 12 (was 12, 47), 15 (was 15, 16, 17), 19 (was 19, 46), 25 (was 25, 26), 27 (was 27, 28), 29 (was 29, 30, 31).
 - 2026-09-29 — answers folded in: Q1=A (BR-GRN-10), Q2=A (BR-GRN-15), Q3=A (BR-GRN-18, fs loses `grn.qa_bypass`), Q4=A (BR-GRN-05), Q5=A (BR-GRN-34). Access now uses permission keys from `auth-setup.md`.
+- 2026-09-29 — pre-freeze touch-up: short-close "Not now" line points to purchase-order BR-PO-13.
+- 2026-09-29 — accepted defaults at freeze (were "assumed"): BR-GRN-02, BR-GRN-13
+- 2026-09-29 — frozen v1 (all questions answered by Arun)

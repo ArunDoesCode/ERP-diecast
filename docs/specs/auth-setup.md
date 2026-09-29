@@ -1,8 +1,8 @@
 ---
 module: auth-setup
-status: draft            # draft | frozen | changed-after-freeze
-version: 4
-frozen_on:
+status: frozen           # draft | frozen | changed-after-freeze
+version: 5
+frozen_on: 2026-09-29
 owner: Arun
 depends_on: []           # every other module depends on this one
 ---
@@ -56,7 +56,11 @@ Super-admin needs no grants (bypass). ow = owner, bo = back_office, fs = floor_s
 | `approval.view_all` | read any approval request (service check) | ow, bo |
 | `approval.view_others_pending` | see another employee's pending list | none (super-admin) |
 | `approval.auto_approve_own` | own requests skip the chain (approval BR-APR-61; new behaviour) | ow |
-| `sco.view`, `sco.manage`, `sco.issue_receive`, `sco.qa_decide`, `sco.close`, `sco.loss_override` | subcontracting (`subcontracting.md`) | none until the M2 release seed |
+| `sco.view` | subcontracting screens, read (`subcontracting.md`) | ow, bo, fs, qa |
+| `sco.manage`, `sco.close` | create/edit/submit/cancel, close with nothing left at vendor | ow, bo |
+| `sco.issue_receive` | issue material (challan), enter receipt | ow, bo, fs |
+| `sco.qa_decide` | QA accept / reject SCO receipt lines | ow, bo, qa |
+| `sco.loss_override` | close an SCO with a loss write-off (BR-SCO-19) | ow |
 | Approval submit / act / trail stay "any signed-in user"; who may act is decided by the approval chain. | | |
 
 ## Flow
@@ -93,9 +97,9 @@ Super-admin needs no grants (bypass). ow = owner, bo = back_office, fs = floor_s
 | BR-AUTH-18 | Super-admin is a fixed system role that passes every permission check, including keys added later; it cannot be renamed, deleted or copied (403 `SYSTEM_ROLE_PROTECTED`) and has no grant list to edit. Other system roles cannot be renamed or deleted, but their grants can be edited. | super-admin calls a route of a key added this release → allowed; rename owner → 403 |
 | BR-AUTH-19 | A role cannot be deleted while any active employee has it (409 `ROLE_HAS_EMPLOYEES`), and cannot be renamed or deleted while an approval chain uses it (409 `ROLE_IN_APPROVAL_CHAIN`). | delete role with 2 active users → 409; rename "owner" used in PO policy → 409 |
 | BR-AUTH-20 | Every role create/copy/rename/delete, grant change, screen label/order/group change, employee role change and deactivation is logged with who, when, before and after; the log cannot be edited. | revoke key → log row "Arun, 29-09 10:00, back_office −po.manage" |
-| BR-AUTH-21 | The first seed grants reproduce today's API access (table above); a test proves every route gives the same allow/deny per seed role before and after. Intended differences, and only these: super-admin may override over-receipt; `/auth/register` is gone, so owner can no longer create users (only super-admin can); fs may read the machine list for the PR form (BR-AUTH-26); fs loses QA bypass (grn Q3=A); owner and fs may read suppliers (`supplier.view`, fixes owner 403 on the PO screen); owner and fs may read stock (`inventory.view`); owner's own requests auto-approve (`approval.auto_approve_own`). Any screen whose visibility changes is listed for sign-off before the switch. | fs on `GET /po` → 403 before and after; super-admin over-receipt → 403 before, allowed after; owner creates employee → 403 |
+| BR-AUTH-21 | The first seed grants reproduce today's API access (table above); a test proves every route gives the same allow/deny per seed role before and after. Intended differences, and only these: super-admin may override over-receipt; `/auth/register` is gone, so owner can no longer create users (only super-admin can); fs may read the machine list for the PR form (BR-AUTH-26); fs loses QA bypass (grn Q3=A); owner and fs may read suppliers (`supplier.view`, fixes owner 403 on the PO screen); owner and fs may read stock (`inventory.view`); owner may post stock-take and opening stock (`inventory.adjust`); owner's own requests auto-approve (`approval.auto_approve_own`); owner and bo get the new subcontracting keys, `sco.loss_override` owner only (new routes, nothing to compare). Any screen whose visibility changes is listed for sign-off before the switch. | fs on `GET /po` → 403 before and after; super-admin over-receipt → 403 before, allowed after; owner creates employee → 403 |
 | BR-AUTH-23 | A request with a missing, expired or bad access token is rejected 401 before any permission check. | expired token on `GET /grn` → 401, not 403 |
-| BR-AUTH-24 | Deny by default: a role with no keys can do nothing but sign in, and a key added in a later release is held by no role (only super-admin, by bypass) until granted in Setup or by that release's seed. | release adds `sco.manage` → only super-admin sees SCO menu |
+| BR-AUTH-24 | Deny by default: a role with no keys can do nothing but sign in, and a key added in a later release is held by no role (only super-admin, by bypass) until granted in Setup or by that release's seed. | a release adds `bom.manage` without a seed → only super-admin sees the BOM menu |
 | BR-AUTH-25 | A new role can be created as a copy of an existing non-super-admin role; the copy gets the same keys and is never a system role. | copy back_office as "accounts" → same keys, `isSystem=false` |
 | BR-AUTH-26 | The PR "Machine" field shows only to holders of `pr.link_machine`, who may also read the active machine list for it (name and code; code added by inventory Q3=A, BR-INV-16) without `asset.manage`; a PR saved with a machine by anyone else → 403. | fs opens PR form → Machine dropdown filled; back_office → no Machine field |
 
@@ -121,3 +125,5 @@ None open.
 - 2026-09-29 — v3: folded Q4–Q9. Q4=B super-admin bypass (BR-AUTH-09, 11, 13, 16, 17, 18, 24; sa dropped from seed table). Q5 resolved by Q4 (listed in BR-AUTH-21). Q6=A register retired, `auth.register` key removed. Q7=A `setup.roles.manage` super-admin only, not grantable (BR-AUTH-07). Q8 screens from code, labels/order/group/roles in UI (BR-AUTH-06, 15, 20). Q9=A new BR-AUTH-26. BR-AUTH-22 merged into BR-AUTH-19 (id retired). New Q10.
 - 2026-09-29 — v4: Q10=A folded. Only super-admin creates users; owner loses it; `setup.employees.manage` seed stays none (Who can do what, BR-AUTH-21). Tables made compact, inline-code spacing restored.
 - 2026-09-29 — consistency pass: fs removed from `grn.qa_bypass`; new keys `inventory.adjust`, `inventory.view` (inventory Q5=A), `supplier.view`, `approval.auto_approve_own`, `sco.*` (seed none until M2); BR-AUTH-21 differences extended; BR-AUTH-26 machine name and code (inventory Q3=A adds the code); bootstrap points to known-defects.
+- 2026-09-29 — pre-freeze touch-up: subcontracting is built now, so `sco.view/manage/issue_receive/qa_decide/close` seed ow + bo and `sco.loss_override` ow only. Confirmed rows for `inventory.adjust`, `inventory.view`, `supplier.view`, `approval.auto_approve_own`, `pr.link_machine`; BR-AUTH-21 now also lists owner `inventory.adjust` and the `sco.*` seed. BR-AUTH-24 example no longer uses `sco.manage`.
+- 2026-09-29 — frozen v5 (all questions answered by Arun)
