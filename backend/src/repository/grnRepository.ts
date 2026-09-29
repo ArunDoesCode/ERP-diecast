@@ -160,6 +160,19 @@ export const grnRepository = {
       );
   },
 
+  // Unit of each line of a GRN (from its PO line), keyed by GRN line id.
+  async findLineUoms(grnId: number) {
+    const rows = await db
+      .select({ id: grnItems.id, uom: purchaseOrderItems.uom })
+      .from(grnItems)
+      .innerJoin(
+        purchaseOrderItems,
+        eq(purchaseOrderItems.id, grnItems.poItemId),
+      )
+      .where(eq(grnItems.grnId, grnId));
+    return new Map(rows.map((r) => [r.id, r.uom]));
+  },
+
   // BR-GRN-05: same challan from the same supplier only once.
   async findByChallan(supplierId: number, challanNo: string) {
     const [row] = await db
@@ -286,6 +299,10 @@ export const grnRepository = {
       qaBypassReason: string | null;
       qaBypassedBy: number | null;
       batchNumber: string | null;
+      qaBypassedAt: Date;
+      overReceiptExcessQty: number;
+      overReceiptReason: string;
+      overReceiptBy: number;
     }>,
     tx?: Tx,
   ) {

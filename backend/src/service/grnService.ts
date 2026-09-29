@@ -18,10 +18,23 @@ import type {
   updateGrnSchemaType,
 } from "../types/grn.types";
 
-// Over-receipt tolerance: 5% above the PO line's ordered qty. Beyond that,
-// only owner/back_office may proceed (see overReceiptGuard).
+// Over-receipt tolerance: 5% above the PO line's ordered qty (BR-GRN-15).
+// Beyond that, the actor needs the override right and a reason.
 const OVER_RECEIPT_TOLERANCE_RATIO = 1.05;
-const OVER_RECEIPT_OVERRIDE_ROLES: Role[] = ["owner", "back_office"];
+const OVER_RECEIPT_OVERRIDE_ROLES: Role[] = [
+  "super-admin",
+  "owner",
+  "back_office",
+]; // perm: grn.over_receipt_override
+
+const toMilli = (qty: number) => Math.round(qty * 1000);
+
+// Accept / bypass only while the PO can still receive goods (BR-GRN-01).
+const RECEIVABLE_PO_STATUSES = [
+  "dispatched",
+  "partial_received",
+  "fully_received",
+];
 
 // Units counted in whole pieces (BR-GRN-02).
 const WHOLE_NUMBER_UNITS = ["pcs", "set", "sets", "nos"];
@@ -35,20 +48,54 @@ function toPaginatedMeta(page: number, pageSize: number, total: number) {
   };
 }
 
+// Returns the qty past the tolerance (to be stored on the line), or null when
+// within tolerance. Runs under the PO-line row lock, so `existingReceivedQty`
+// is the latest value.
 function overReceiptGuard(
   orderedQty: number,
   existingReceivedQty: number,
   incomingQty: number,
   actorRole: Role,
+  overrideReason: string | undefined,
 ) {
-  const tolerance = orderedQty * OVER_RECEIPT_TOLERANCE_RATIO;
-  if (existingReceivedQty + incomingQty > tolerance) {
-    if (!OVER_RECEIPT_OVERRIDE_ROLES.includes(actorRole)) {
-      throw new BadRequestError(
-        `Accepted quantity would exceed 105% of the ordered qty (${orderedQty}). ` +
-          "Only owner/back_office can override an over-receipt.",
-      );
-    }
+  const toleranceMilli = Math.round(
+    toMilli(orderedQty) * OVER_RECEIPT_TOLERANCE_RATIO,
+  );
+  const excessMilli =
+    toMilli(existingReceivedQty) + toMilli(incomingQty) - toleranceMilli;
+  if (excessMilli <= 0) {
+    return null;
+  }
+  if (!OVER_RECEIPT_OVERRIDE_ROLES.includes(actorRole)) {
+    throw new BadRequestError(
+      `Accepted quantity would exceed 105% of the ordered qty (${orderedQty}). ` +
+        "You do not have the right to override an over-receipt.",
+    );
+  }
+  if (!overrideReason) {
+    throw new BadRequestError(
+      `Accepted quantity would exceed 105% of the ordered qty (${orderedQty}). ` +
+        "Give an overrideReason to accept the excess.",
+    );
+  }
+  return {
+    overReceiptExcessQty: excessMilli / 1000,
+    overReceiptReason: overrideReason,
+  };
+}
+
+async function assertPoReceivable(
+  poId: number,
+  tx: Parameters<typeof poRepository.findPoById>[1],
+) {
+  const po = await poRepository.findPoById(poId, tx);
+  if (!po) {
+    throw new NotFoundError("Purchase order not found");
+  }
+  if (!RECEIVABLE_PO_STATUSES.includes(po.status)) {
+    throw new ConflictError(
+      `Purchase order is ${po.status} - goods can no longer be received against it`,
+    );
   }
 }
 
@@ -196,6 +243,23 @@ export const grnService = {
       );
     }
 
+    // Same whole-number rule as create (BR-GRN-02), checked before any write.
+    if (input.lines.length > 0) {
+      const uoms = await grnRepository.findLineUoms(input.grnId);
+      for (const line of input.lines) {
+        const uom = uoms.get(line.id)?.trim().toLowerCase();
+        if (
+          uom &&
+          WHOLE_NUMBER_UNITS.includes(uom) &&
+          !Number.isInteger(line.arrivedQty)
+        ) {
+          throw new BadRequestError(
+            `Arrived qty must be a whole number for items in ${uom}`,
+          );
+        }
+      }
+    }
+
     const headerData = {
       ...(input.challanNo !== undefined ? { challanNo: input.challanNo } : {}),
       ...(input.challanDate !== undefined
@@ -278,14 +342,26 @@ export const grnService = {
         );
       }
 
+      if (
+        toMilli(acceptedQty) + toMilli(rejectedQty) !==
+        toMilli(line.receivedQty)
+      ) {
+        throw new BadRequestError(
+          `Accepted (${acceptedQty}) + rejected (${rejectedQty}) must equal the arrived qty (${line.receivedQty})`,
+        );
+      }
+
       const batchNumber = input.batchNumber ?? line.batchNumber ?? null;
 
+      let overReceipt: ReturnType<typeof overReceiptGuard> = null;
       if (acceptedQty > 0) {
-        overReceiptGuard(
+        await assertPoReceivable(line.poId, tx);
+        overReceipt = overReceiptGuard(
           line.orderedQty,
           line.poItemReceivedQty ?? 0,
           acceptedQty,
           actorRole,
+          input.overrideReason,
         );
         const locationId =
           await grnRepository.findDefaultReceivingLocationId(tx);
@@ -311,6 +387,7 @@ export const grnService = {
           rejectedQty,
           qaStatus: acceptedQty > 0 ? "passed" : "failed",
           batchNumber,
+          ...(overReceipt ? { ...overReceipt, overReceiptBy: actorId } : {}),
         },
         tx,
       );
@@ -365,11 +442,21 @@ export const grnService = {
       const acceptedQty = input.acceptedQty ?? line.receivedQty;
       const batchNumber = input.batchNumber ?? line.batchNumber ?? null;
 
-      overReceiptGuard(
+      if (toMilli(acceptedQty) > toMilli(line.receivedQty)) {
+        throw new BadRequestError(
+          `Accepted qty (${acceptedQty}) cannot exceed the arrived qty (${line.receivedQty})`,
+        );
+      }
+      const rejectedQty =
+        (toMilli(line.receivedQty) - toMilli(acceptedQty)) / 1000;
+
+      await assertPoReceivable(line.poId, tx);
+      const overReceipt = overReceiptGuard(
         line.orderedQty,
         line.poItemReceivedQty ?? 0,
         acceptedQty,
         actorRole,
+        input.overrideReason,
       );
 
       const locationId = await grnRepository.findDefaultReceivingLocationId(tx);
@@ -391,11 +478,14 @@ export const grnService = {
         lineId,
         {
           acceptedQty,
+          rejectedQty,
           qaStatus: "waived",
           isQaBypassed: true,
           qaBypassReason: input.bypassReason,
           qaBypassedBy: actorId,
+          qaBypassedAt: new Date(),
           batchNumber,
+          ...(overReceipt ? { ...overReceipt, overReceiptBy: actorId } : {}),
         },
         tx,
       );
