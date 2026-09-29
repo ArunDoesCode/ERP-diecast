@@ -8,3 +8,4 @@
 | 4 | Challan date / heat number optional inputs? | coordinator (spec silent, BR-SCO-08 'heat number copied') | yes: date defaults today, heat defaults to SCO line batch | spec changelog |
 | 5 | BR-SCO-24 example (409) vs BR-SCO-07 (400) for the race loser | coordinator | 400 if over on arrival; 409 if lost the race after lock | spec changelog |
 | 6 | Ledger referenceId challan or SCO? | coordinator | challan id | spec changelog |
+| 7 | Uneven send:return ratio, fractional raw pcs | Arun | do what other ERPs do → proportional on cumulative processed, round half up | spec changelog |

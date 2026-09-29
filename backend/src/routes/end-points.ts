@@ -120,6 +120,10 @@ export const END_POINTS = {
     listChallans: "/:id/challans",
     openChallans: "/challans/open",
     challanDetails: "/challans/:challanId",
+    createReceipt: "/:id/receipts",
+    listReceipts: "/:id/receipts",
+    receiptDetails: "/receipts/:receiptId",
+    qaDecide: "/receipts/:receiptId/lines/:lineId/qa",
   },
   company: {
     settings: "/settings",

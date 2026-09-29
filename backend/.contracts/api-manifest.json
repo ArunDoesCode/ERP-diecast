@@ -2781,7 +2781,13 @@
               "vendorName": "string.required",
               "cancelledByName": "string.nullable.required"
             },
-            "items": "array<object>.required"
+            "items": "array<object>.required",
+            "chargeDue": {
+              "subtotalPaise": "integer.required",
+              "gstPaise": "integer.required",
+              "totalPaise": "integer.required"
+            },
+            "challanSettlements": "array<object>.required"
           }
         }
       }
@@ -3164,6 +3170,153 @@
               "stateCode": "string.nullable.required"
             },
             "declaration": "string.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/sco/:id/receipts",
+      "method": "POST",
+      "path": "/api/sco/:id/receipts",
+      "tags": [
+        "sco"
+      ],
+      "summary": "Receive processed/unprocessed goods back on a material_issued SCO (BR-SCO-12, 16, 17). Needs vendorChallanNo (unique per vendor, 409). Unprocessed qty returns to store at save; processed qty waits for QA. Path :id = SCO id.",
+      "auth": {
+        "type": "permission",
+        "key": "sco.issue_receive"
+      },
+      "request": {
+        "body": {
+          "vendorChallanNo": "string.nonempty.required",
+          "receivedDate": "unrepresentable.optional",
+          "notes": "string.optional",
+          "lines": "array<object>.required"
+        }
+      },
+      "responses": {
+        "201": {
+          "success": "boolean.required",
+          "data": {
+            "receipt": {
+              "id": "unrepresentable.required",
+              "grnNumber": "string.required",
+              "scoId": "unrepresentable.required",
+              "vendorId": "unrepresentable.required",
+              "vendorChallanNo": "string.required",
+              "status": "enum:draft,pending_qa,accepted,rejected,partial_accepted.required",
+              "receivedDate": "unrepresentable.required",
+              "notes": "string.nullable.required",
+              "createdBy": "unrepresentable.required",
+              "createdAt": "unrepresentable.required",
+              "scoNumber": "string.required",
+              "vendorName": "string.required",
+              "createdByName": "string.nullable.required"
+            },
+            "lines": "array<object>.required",
+            "settlements": "array<object>.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "GET /api/sco/:id/receipts",
+      "method": "GET",
+      "path": "/api/sco/:id/receipts",
+      "tags": [
+        "sco"
+      ],
+      "summary": "List all receipts of one SCO, newest first. Not paginated: an SCO has few receipts.",
+      "auth": {
+        "type": "permission",
+        "key": "sco.view"
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required"
+        }
+      }
+    },
+    {
+      "id": "GET /api/sco/receipts/:receiptId",
+      "method": "GET",
+      "path": "/api/sco/receipts/:receiptId",
+      "tags": [
+        "sco"
+      ],
+      "summary": "Receipt with its lines (QA state, decision actor/time) and the challan settlements (BR-SCO-17).",
+      "auth": {
+        "type": "permission",
+        "key": "sco.view"
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "receipt": {
+              "id": "unrepresentable.required",
+              "grnNumber": "string.required",
+              "scoId": "unrepresentable.required",
+              "vendorId": "unrepresentable.required",
+              "vendorChallanNo": "string.required",
+              "status": "enum:draft,pending_qa,accepted,rejected,partial_accepted.required",
+              "receivedDate": "unrepresentable.required",
+              "notes": "string.nullable.required",
+              "createdBy": "unrepresentable.required",
+              "createdAt": "unrepresentable.required",
+              "scoNumber": "string.required",
+              "vendorName": "string.required",
+              "createdByName": "string.nullable.required"
+            },
+            "lines": "array<object>.required",
+            "settlements": "array<object>.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/sco/receipts/:receiptId/lines/:lineId/qa",
+      "method": "POST",
+      "path": "/api/sco/receipts/:receiptId/lines/:lineId/qa",
+      "tags": [
+        "sco"
+      ],
+      "summary": "QA decision for one receipt line (BR-SCO-13..15): accepted + rejected = processed. Posts accepted to store and rejected to scrap yard. Second decision = 409.",
+      "auth": {
+        "type": "permission",
+        "key": "sco.qa_decide"
+      },
+      "request": {
+        "body": {
+          "acceptedQty": "integer.nonnegative.required",
+          "rejectedQty": "integer.nonnegative.required",
+          "notes": "string.nonempty.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "receipt": {
+              "id": "unrepresentable.required",
+              "grnNumber": "string.required",
+              "scoId": "unrepresentable.required",
+              "vendorId": "unrepresentable.required",
+              "vendorChallanNo": "string.required",
+              "status": "enum:draft,pending_qa,accepted,rejected,partial_accepted.required",
+              "receivedDate": "unrepresentable.required",
+              "notes": "string.nullable.required",
+              "createdBy": "unrepresentable.required",
+              "createdAt": "unrepresentable.required",
+              "scoNumber": "string.required",
+              "vendorName": "string.required",
+              "createdByName": "string.nullable.required"
+            },
+            "lines": "array<object>.required",
+            "settlements": "array<object>.required"
           }
         }
       }

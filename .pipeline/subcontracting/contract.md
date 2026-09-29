@@ -107,3 +107,51 @@ Response `data: Challan[]`, `meta {page,pageSize,total,totalPages}`.
 - Vendor location: existing `uq_locations_one_vendor_premise` already makes one-per-vendor unique; implementation must create with `onConflictDoNothing` then re-select.
 - Route order: `/challans/open` is registered before `/challans/:challanId`.
 - Assumption to confirm: `challanDate` and per-line `heatNumber` are optional inputs (spec only says date and heat copied).
+
+---
+
+# Contract — subcontracting S3 (receipt + QA)
+
+Status: CONTRACT ONLY. New handlers return 501 `NOT_IMPLEMENTED` until S3 backend lands. Qty whole pcs, money paise, dates ISO.
+Receipt number from counter `sco_grn` (existing). Receipt/line status = `grn_status` values, only `pending_qa | accepted | partial_accepted | rejected` (never `draft`).
+
+## Endpoints (all under `/api/sco`)
+| Method | Path | Key | Notes |
+|---|---|---|---|
+| POST | /sco/:id/receipts | `sco.issue_receive` | `:id` = SCO id. 201 |
+| GET | /sco/:id/receipts | `sco.view` | receipts of one SCO, newest first, not paginated |
+| GET | /sco/receipts/:receiptId | `sco.view` | receipt + lines + settlements |
+| POST | /sco/receipts/:receiptId/lines/:lineId/qa | `sco.qa_decide` | `:lineId` = receipt line id. 200 |
+| GET | /sco/getscodetails/:id | `sco.view` | CHANGED: response extended (below) |
+
+## Shapes
+Receipt = id, grnNumber, scoId, vendorId, vendorChallanNo, status, receivedDate, notes|null, createdBy, createdAt + `scoNumber`, `vendorName`, `createdByName|null`.
+ReceiptLine = id, scoGrnId, scoItemId, processedQty, unprocessedQty, acceptedQty|null, rejectedQty|null (null until decided), qaStatus (pending_qa|accepted|partial_accepted|rejected),
+qaDecidedBy|null, qaDecidedAt|null, qaNotes|null, heatNumber|null + `finishedItemSku`, `finishedItemName`, `rawItemSku`, `rawItemName`, `qaDecidedByName|null`.
+Settlement = id, receiptItemId, challanLineId, qty (raw pcs), createdAt + `challanId`, `challanNumber`, `scoItemId`.
+Receipt details = `{ receipt, lines, settlements }` (returned by create, details and QA decision).
+
+## POST /sco/:id/receipts -> 201 `data: { receipt, lines, settlements }`
+Body: `{ vendorChallanNo (1-50), receivedDate?: ISO (default now), notes?, lines: [ { scoItemId, processedQty (int >=0), unprocessedQty? (int >=0, default 0) } ] }` (lines >= 1; each line processed + unprocessed >= 1).
+Errors: 400 (validation; (processed x ratio) + unprocessed > qty still at vendor for the line, BR-SCO-12; scoItemId not on this SCO), 403, 404 (SCO), 409 (SCO not `material_issued`; vendorChallanNo already used for this vendor; lost the SCO lock race, BR-SCO-24).
+Effect: unprocessed raw qty posts vendor -> main store (`sco_receipt`, issue cost) immediately (BR-SCO-16); processed qty is held `pending_qa`; receipt settles oldest open challan lines first and writes settlements (BR-SCO-17); SCO -> `material_received` when nothing left at vendor (BR-SCO-18).
+
+## POST /sco/receipts/:receiptId/lines/:lineId/qa -> `data: { receipt, lines, settlements }`
+Body: `{ acceptedQty (int >=0), rejectedQty (int >=0), notes? (1-500) }`. accepted + rejected must equal the line's processedQty (else 400).
+Errors: 400, 403, 404 (receipt / line not in receipt), 409 (line already decided; lost the SCO lock race).
+Effect: accepted -> raw out of vendor location, finished into main store at ratio x issue cost + service price (BR-SCO-14); rejected -> raw vendor -> scrap yard, no charge (BR-SCO-15). Receipt status updated when all lines decided.
+
+## GET /sco/:id/receipts -> `data: Receipt[]`. 404 if SCO missing.
+## GET /sco/receipts/:receiptId -> `data: { receipt, lines, settlements }`. 404 if missing.
+
+## GET /sco/getscodetails/:id (changed)
+`data: { sco, items, chargeDue, challanSettlements }`
+- each item = S1 Line + `qtyAtVendor` (raw pcs still at vendor, incl. pending QA reservation), `chargeDuePaise` (acceptedQty x price), `chargeDueGstPaise` (at the line %), and new counter `pendingQaQty`.
+- `chargeDue` = `{ subtotalPaise, gstPaise, totalPaise }` summed over lines (BR-SCO-22; no bill posted).
+- `challanSettlements` = `[ { challanId, challanNumber, challanLineId, scoItemId, qty, settledQty, settled } ]` (every challan line of the SCO).
+Create/update/submit/cancel responses are unchanged (still `{ sco, items }`, items now carry `pendingQaQty`).
+
+## Notes
+- Schema: `subcontracting_grns` + `_items` rebuilt (tables were empty/unused): vendor challan no. unique per vendor, `processedQty`, `unprocessedQty`, nullable `acceptedQty/rejectedQty`, `qaStatus` enum, `qaDecidedBy/At`, `qaNotes`, `heatNumber`. New `sco_receipt_settlements`. New SCO line counter `pending_qa_qty`. Others (issued/accepted/rejected/unprocessed/loss) already existed.
+- Route order: `/receipts/:receiptId` and `/receipts/:receiptId/lines/:lineId/qa` do not clash with `/:id/receipts`.
+- Assumption (question in report): ratio = send / return; raw pcs consumed by accepted/rejected/pending processed = processed x ratio, rounding for non-integer ratios to be confirmed.
