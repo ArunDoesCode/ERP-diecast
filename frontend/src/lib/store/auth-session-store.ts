@@ -7,6 +7,7 @@ type AuthProfile = {
 	userId?: string;
 	userName?: string;
 	role?: string;
+	isSuperAdmin?: boolean;
 	permissions?: string[];
 	screens?: AuthScreen[];
 };
@@ -17,6 +18,8 @@ type AuthSessionState = {
 	userName: string | null;
 	/** Display only — never gate UI on this; use `permissions` (useCan). */
 	role: string | null;
+	/** For BR-PR-17 ownership checks only; other gates use useCan. */
+	isSuperAdmin: boolean;
 	permissions: string[];
 	screens: AuthScreen[];
 	hasHydrated: boolean;
@@ -31,6 +34,7 @@ const initialState = {
 	userId: null,
 	userName: null,
 	role: null,
+	isSuperAdmin: false,
 	permissions: [] as string[],
 	screens: [] as AuthScreen[],
 };
@@ -63,6 +67,7 @@ export const useAuthSessionStore = create<AuthSessionState>()(
 							userId: profile.userId ?? state.userId,
 							userName: profile.userName ?? state.userName,
 							role: profile.role ?? state.role,
+							isSuperAdmin: profile.isSuperAdmin ?? state.isSuperAdmin,
 							permissions: profile.permissions ?? state.permissions,
 							screens: profile.screens ?? state.screens,
 						}),
@@ -94,6 +99,7 @@ export const useAuthSessionStore = create<AuthSessionState>()(
 					userId: state.userId,
 					userName: state.userName,
 					role: state.role,
+					isSuperAdmin: state.isSuperAdmin,
 					permissions: state.permissions,
 					screens: state.screens,
 				}),

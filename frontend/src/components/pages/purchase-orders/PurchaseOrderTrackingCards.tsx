@@ -154,6 +154,13 @@ function CancelPOAlert({ poId, poNumber }: { poId: number; poNumber: string }) {
 	);
 }
 
+const CONFIRMATION_METHOD_LABEL: Record<string, string> = {
+	phone: "Phone call",
+	email: "Email",
+	whatsapp: "WhatsApp",
+	in_person: "In person",
+};
+
 export function PurchaseOrderTrackingCards({
 	purchaseOrders,
 	isLoading,
@@ -264,7 +271,9 @@ export function PurchaseOrderTrackingCards({
 								{po.supplierConfirmed ? (
 									<p className="flex items-center gap-1 text-emerald-700">
 										<IconCheck className="size-3.5" /> Confirmed
-										{po.confirmationMethod ? ` (${po.confirmationMethod})` : ""}
+										{po.confirmationMethod
+											? ` (${CONFIRMATION_METHOD_LABEL[po.confirmationMethod] ?? po.confirmationMethod})`
+											: ""}
 									</p>
 								) : null}
 

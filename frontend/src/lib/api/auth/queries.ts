@@ -32,6 +32,7 @@ export function useMeQuery(enabled: boolean) {
 			userId: String(result.data.id),
 			userName: result.data.name,
 			role: result.data.role,
+			isSuperAdmin: result.data.isSuperAdmin,
 			permissions: result.data.permissions,
 			screens: result.data.screens,
 		});
@@ -57,6 +58,7 @@ export function useLoginMutation() {
 				userId: String(result.data.user.id),
 				userName: result.data.user.name,
 				role: result.data.user.role,
+				isSuperAdmin: result.data.user.isSuperAdmin,
 				permissions: result.data.user.permissions,
 				screens: result.data.user.screens,
 			});

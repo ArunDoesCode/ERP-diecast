@@ -133,7 +133,7 @@ export function getSupplierHistory(
 
 export function getAssetItems(params?: AssetLookupParams) {
 	return api.get<PaginatedResponse<AssetItemOption>>(
-		`${API_ROUTES.assets.items}${toQueryString(params)}`,
+		`${API_ROUTES.assets.items}${toQueryString({ ...params, isActive: true })}`,
 	);
 }
 

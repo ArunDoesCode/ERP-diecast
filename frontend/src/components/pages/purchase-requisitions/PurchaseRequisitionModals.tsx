@@ -472,12 +472,14 @@ export function EditPurchaseRequisitionModal({
 	const detail = detailQuery.data?.success ? detailQuery.data.data : null;
 	const pr = detail?.pr;
 	const currentUserId = useAuthSessionStore((state) => state.userId);
+	const isSuperAdmin = useAuthSessionStore((state) => state.isSuperAdmin);
 	const isRequester =
 		pr != null &&
 		currentUserId != null &&
 		String(pr.requestedBy) === currentUserId;
-	// BR-PR-17: edit/submit only while draft and only by the requester.
-	const canEdit = pr?.status === "draft" && isRequester;
+	// BR-PR-17: edit/cancel by the requester or super-admin; submit/withdraw stay the requester's.
+	const canOwn = isRequester || isSuperAdmin;
+	const canEdit = pr?.status === "draft" && canOwn;
 	const canWithdraw = pr?.status === "pending_approval" && isRequester;
 	const currentApprovalQuery = useCurrentApprovalByDocQuery(
 		canWithdraw ? "pr" : undefined,
@@ -662,7 +664,7 @@ export function EditPurchaseRequisitionModal({
 							<DialogDescription>
 								{canEdit
 									? "Draft PR can be edited or submitted for approval."
-									: pr && !isRequester
+									: pr && !canOwn
 										? "Only the requester can edit this PR. Fields are read-only."
 										: "PR is not in draft. Fields are read-only."}
 							</DialogDescription>
@@ -939,7 +941,7 @@ export function EditPurchaseRequisitionModal({
 
 						<DialogFooter className="border-t px-6 py-4 sm:justify-between">
 							<div>
-								{detail && pr && pr.status !== "cancelled" ? (
+								{detail && pr && pr.status !== "cancelled" && canOwn ? (
 									<div className="flex flex-col items-start gap-1">
 										<Button
 											type="button"
@@ -989,17 +991,19 @@ export function EditPurchaseRequisitionModal({
 												? "Saving..."
 												: "Save changes"}
 										</Button>
-										<Button
-											type="submit"
-											form="edit-pr-form"
-											value="submit"
-											disabled={isMutating}
-										>
-											{submitApprovalMutation.isPending &&
-											submitAction === "submit"
-												? "Submitting..."
-												: "Submit for approval"}
-										</Button>
+										{isRequester ? (
+											<Button
+												type="submit"
+												form="edit-pr-form"
+												value="submit"
+												disabled={isMutating}
+											>
+												{submitApprovalMutation.isPending &&
+												submitAction === "submit"
+													? "Submitting..."
+													: "Submit for approval"}
+											</Button>
+										) : null}
 									</>
 								) : null}
 							</div>

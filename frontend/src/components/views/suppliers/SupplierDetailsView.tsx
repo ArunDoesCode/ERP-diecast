@@ -21,13 +21,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { canManageSuppliers } from "@/lib/api/suppliers/permissions";
+import { useCan } from "@/hooks/use-can";
 import {
 	toSupplierMasterUpdatePayload,
 	useSupplierDetailQuery,
 	useUpdateSupplierMasterMutation,
 } from "@/lib/api/suppliers/queries";
-import { useAuthSessionStore } from "@/lib/store/auth-session-store";
 import type { Supplier, SupplierMasterInput } from "@/types/suppliers";
 
 type SupplierDetailsViewProps = {
@@ -73,8 +72,7 @@ export function SupplierDetailsView({ supplierId }: SupplierDetailsViewProps) {
 	const router = useRouter();
 	const [editOpen, setEditOpen] = useState(false);
 	const [statusConfirmOpen, setStatusConfirmOpen] = useState(false);
-	const role = useAuthSessionStore((state) => state.role);
-	const canManage = canManageSuppliers(role);
+	const canManage = useCan("supplier.manage");
 
 	const detailQuery = useSupplierDetailQuery(supplierId);
 	const updateMasterMutation = useUpdateSupplierMasterMutation();

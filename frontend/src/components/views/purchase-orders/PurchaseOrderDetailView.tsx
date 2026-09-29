@@ -174,6 +174,7 @@ export function PurchaseOrderDetailView({ prId }: { prId: number }) {
 		null,
 	);
 	const currentUserId = useAuthSessionStore((state) => state.userId);
+	const isSuperAdmin = useAuthSessionStore((state) => state.isSuperAdmin);
 
 	const detailQuery = usePurchaseRequisitionDetailQuery(prId, prId > 0);
 	const detail = detailQuery.data?.success ? detailQuery.data.data : undefined;
@@ -185,8 +186,8 @@ export function PurchaseOrderDetailView({ prId }: { prId: number }) {
 	const canCancelLines =
 		pr != null &&
 		(pr.status === "approved" || pr.status === "partial_ordered") &&
-		currentUserId != null &&
-		String(pr.requestedBy) === currentUserId;
+		((currentUserId != null && String(pr.requestedBy) === currentUserId) ||
+			isSuperAdmin);
 
 	function toggleLine(lineId: number, checked: boolean) {
 		setSelectedLineIds((current) => {

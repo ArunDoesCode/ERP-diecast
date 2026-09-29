@@ -20,6 +20,7 @@ export type AuthUser = {
 	name: string;
 	email: string | null;
 	role: string;
+	isSuperAdmin: boolean;
 	permissions: string[];
 	screens: AuthScreen[];
 };

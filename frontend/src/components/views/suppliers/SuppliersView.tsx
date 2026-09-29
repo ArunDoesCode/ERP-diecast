@@ -20,13 +20,12 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { useCan } from "@/hooks/use-can";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
-import { canManageSuppliers } from "@/lib/api/suppliers/permissions";
 import {
 	useSupplierLookupQuery,
 	useSuppliersQuery,
 } from "@/lib/api/suppliers/queries";
-import { useAuthSessionStore } from "@/lib/store/auth-session-store";
 import type {
 	SupplierSortField,
 	SupplierStatusFilter,
@@ -42,9 +41,7 @@ const SORT_FIELDS: Array<{ label: string; value: SupplierSortField }> = [
 
 export function SuppliersView() {
 	const router = useRouter();
-	const canManage = canManageSuppliers(
-		useAuthSessionStore((state) => state.role),
-	);
+	const canManage = useCan("supplier.manage");
 
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(10);
