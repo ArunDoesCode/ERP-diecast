@@ -80,7 +80,7 @@ export type CreatePrData = Pick<
 
 export type CreatePrItemData = Pick<
   PurchaseRequestItemInsert,
-  "itemId" | "requestedQty" | "uom"
+  "itemId" | "requestedQty" | "uom" | "expectedDate"
 >;
 
 export type CreateOrUpdatePrItemData = Pick<
@@ -154,7 +154,7 @@ async function calculateEstimatedAmountPaiseByItems(
 
 type ItemMasterLookupRow = Pick<
   typeof itemMaster.$inferSelect,
-  "id" | "uom" | "averageCostPaise"
+  "id" | "uom" | "averageCostPaise" | "isActive"
 >;
 
 const prSortColumns = {
@@ -379,6 +379,7 @@ export const prRepository = {
         id: itemMaster.id,
         uom: itemMaster.uom,
         averageCostPaise: itemMaster.averageCostPaise,
+        isActive: itemMaster.isActive,
       })
       .from(itemMaster)
       .where(inArray(itemMaster.id, itemIds));
@@ -431,6 +432,7 @@ export const prRepository = {
             itemId: item.itemId,
             requestedQty: item.requestedQty,
             uom: item.uom,
+            expectedDate: item.expectedDate,
           })),
         )
 

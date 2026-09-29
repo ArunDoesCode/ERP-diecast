@@ -304,7 +304,7 @@
       },
       "request": {
         "body": {
-          "action": "enum:approve,reject,sent_back,cancel.required",
+          "action": "enum:approve,reject,sent_back,cancel,withdraw.required",
           "notes": "string.nonempty.optional"
         }
       },

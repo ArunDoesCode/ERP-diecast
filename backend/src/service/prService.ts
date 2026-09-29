@@ -28,6 +28,33 @@ function assertCanLinkMachine(
   }
 }
 
+// BR-PR-08: a required-by date cannot be before today when saved.
+function assertNotPastDate(date: Date | null | undefined) {
+  if (!date) return;
+  const startOfToday = new Date();
+  startOfToday.setUTCHours(0, 0, 0, 0);
+  if (date.getTime() < startOfToday.getTime()) {
+    throw new BadRequestError(
+      "Required-by date cannot be in the past",
+      "PR_DATE_IN_PAST",
+    );
+  }
+}
+
+// BR-PR-06: every line item must exist in the item master and be active.
+function assertItemsUsable(
+  itemIds: number[],
+  itemMap: Map<number, { isActive: boolean }>,
+) {
+  const bad = itemIds.filter((id) => !itemMap.get(id)?.isActive);
+  if (bad.length > 0) {
+    throw new BadRequestError(
+      `Item not found or inactive: ${bad.join(", ")}`,
+      "PR_INVALID_ITEM",
+    );
+  }
+}
+
 function toPaginatedMeta(page: number, pageSize: number, total: number) {
   return {
     page,
@@ -71,14 +98,16 @@ export const prService = {
     }
 
     const itemIds = [...new Set(input.items.map((item) => item.itemId))];
-    const itemMap = await prRepository.findItemMasterByIds(itemIds);
-
-    const missingItemIds = itemIds.filter((itemId) => !itemMap.has(itemId));
-    if (missingItemIds.length > 0) {
+    if (itemIds.length !== input.items.length) {
       throw new BadRequestError(
-        `Invalid itemId entries: ${missingItemIds.join(", ")}`,
+        "Each item can appear only once per PR",
+        "PR_DUPLICATE_ITEM",
       );
     }
+    for (const item of input.items) assertNotPastDate(item.expectedDate);
+
+    const itemMap = await prRepository.findItemMasterByIds(itemIds);
+    assertItemsUsable(itemIds, itemMap);
 
     const normalizedItems = input.items.map((item) => {
       const itemMasterRow = itemMap.get(item.itemId);
@@ -90,6 +119,7 @@ export const prService = {
         itemId: item.itemId,
         requestedQty: item.requestedQty,
         uom: itemMasterRow.uom,
+        expectedDate: item.expectedDate ?? null,
       };
     });
 
@@ -120,9 +150,17 @@ export const prService = {
       if (!existingPr) {
         throw new NotFoundError("Purchase request not found");
       }
-      if (existingPr.status === "cancelled") {
+      // BR-PR-17: only the requester or a super-admin edits.
+      if (existingPr.requestedBy !== actor.id && !actor.isSuperAdmin) {
+        throw new ForbiddenError(
+          "Only the requester or a super-admin can edit this PR",
+          "PR_NOT_REQUESTER",
+        );
+      }
+      // BR-PR-15: header and lines change only in draft.
+      if (existingPr.status !== "draft") {
         throw new ConflictError(
-          "A cancelled PR cannot be edited",
+          `A PR in status ${existingPr.status} cannot be edited`,
           "PR_NOT_EDITABLE",
         );
       }
@@ -212,16 +250,31 @@ export const prService = {
           }
         }
 
-        for (const item of inserts) {
-          finalItemIds.set(-(finalItemIds.size + 1), item.itemId);
+        inserts.forEach((item, index) => {
+          finalItemIds.set(-(index + 1), item.itemId);
+        });
+
+        // BR-PR-15: a PR cannot be left with zero lines.
+        if (finalItemIds.size === 0) {
+          throw new BadRequestError(
+            "A PR must keep at least one line",
+            "PR_MIN_ONE_LINE",
+          );
         }
 
         const uniqueFinalItemIds = new Set<number>();
         for (const itemId of finalItemIds.values()) {
           if (uniqueFinalItemIds.has(itemId)) {
-            throw new BadRequestError("Item already exists");
+            throw new BadRequestError(
+              "Each item can appear only once per PR",
+              "PR_DUPLICATE_ITEM",
+            );
           }
           uniqueFinalItemIds.add(itemId);
+        }
+
+        for (const item of [...inserts, ...updates]) {
+          assertNotPastDate(item.expectedDate);
         }
 
         const requestedItemIds = [
@@ -235,14 +288,7 @@ export const prService = {
         const itemMap =
           await prRepository.findItemMasterByIds(requestedItemIds);
 
-        const missingItemIds = requestedItemIds.filter(
-          (itemId) => !itemMap.has(itemId),
-        );
-        if (missingItemIds.length > 0) {
-          throw new BadRequestError(
-            `Invalid itemId entries: ${missingItemIds.join(", ")}`,
-          );
-        }
+        assertItemsUsable(requestedItemIds, itemMap);
 
         if (deleteIds.size > 0) {
           await prRepository.deletePrItemsByIds(input.prId, [...deleteIds], tx);
@@ -252,6 +298,9 @@ export const prService = {
           const updateItemData = {
             ...(item.requestedQty !== undefined
               ? { requestedQty: item.requestedQty }
+              : {}),
+            ...(item.expectedDate !== undefined
+              ? { expectedDate: item.expectedDate }
               : {}),
           };
 
@@ -292,6 +341,7 @@ export const prService = {
               itemId: item.itemId,
               requestedQty: item.requestedQty,
               uom: itemMasterRow.uom,
+              expectedDate: item.expectedDate ?? null,
             },
             tx,
           );

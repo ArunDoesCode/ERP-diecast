@@ -103,6 +103,7 @@ function toTrailAction(action: approvalActionRequestSchemaType["action"]) {
     reject: "rejected",
     sent_back: "require_more_info",
     cancel: "cancelled",
+    withdraw: "cancelled",
   };
 
   return mapped[action];
@@ -337,45 +338,45 @@ export const approvalService = {
     }
 
     if (!canSubmitForApproval(doc.status)) {
+      // BR-PR-19: an open request is the more specific answer than "wrong status".
+      const open = await approvalRepository.findPendingRequestByDoc(
+        input.docType,
+        input.docId,
+      );
+      if (open) {
+        throw new ConflictError(
+          "Document already has an open approval request",
+          "APPROVAL_ALREADY_OPEN",
+        );
+      }
       throw new ConflictError(
         `Cannot submit ${input.docType.toUpperCase()} for approval from status ${doc.status}`,
         "APPROVAL_INVALID_SOURCE_STATUS",
       );
     }
 
-    let policy = await approvalRepository.findMatchingActivePolicy({
-      docType: input.docType,
-      subDocType: doc.subDocType,
-      isSaleOrderLinked: doc.isSaleOrderLinked,
-      amountPaise: doc.amountPaise,
-    });
+    const resolvePolicy = async (amountPaise: number) => {
+      const matched =
+        (await approvalRepository.findMatchingActivePolicy({
+          docType: input.docType,
+          subDocType: doc.subDocType,
+          isSaleOrderLinked: doc.isSaleOrderLinked,
+          amountPaise,
+        })) ??
+        (await approvalRepository.findOrCreateFallbackPolicy(
+          input.docType,
+          actorId,
+        ));
+      if (!matched) {
+        throw new BadRequestError("Unable to resolve approval policy");
+      }
+      await assertChainHasEligibleApprovers(matched.approvalChain);
+      return matched;
+    };
 
-    if (!policy) {
-      policy = await approvalRepository.findOrCreateFallbackPolicy(
-        input.docType,
-        actorId,
-      );
-    }
-
-    if (!policy) {
-      throw new BadRequestError("Unable to resolve approval policy");
-    }
-
-    const chain = policy.approvalChain;
-    await assertChainHasEligibleApprovers(chain);
+    let policy = await resolvePolicy(doc.amountPaise);
 
     return db.transaction(async (tx) => {
-      // BR-PR-47: a PR is re-read under its row lock so a racing cancel wins cleanly.
-      if (input.docType === "pr") {
-        const locked = await prRepository.findPrByIdForUpdate(input.docId, tx);
-        if (!locked || !canSubmitForApproval(locked.status)) {
-          throw new ConflictError(
-            `Cannot submit PR for approval from status ${locked?.status ?? "missing"}`,
-            "APPROVAL_INVALID_SOURCE_STATUS",
-          );
-        }
-      }
-
       const existingPending = await approvalRepository.findPendingRequestByDoc(
         input.docType,
         input.docId,
@@ -388,6 +389,28 @@ export const approvalService = {
           "APPROVAL_ALREADY_OPEN",
         );
       }
+
+      // BR-PR-47: a PR is re-read under its row lock so a racing cancel or edit wins cleanly.
+      if (input.docType === "pr") {
+        const locked = await prRepository.findPrByIdForUpdate(input.docId, tx);
+        if (!locked || !canSubmitForApproval(locked.status)) {
+          throw new ConflictError(
+            `Cannot submit PR for approval from status ${locked?.status ?? "missing"}`,
+            "APPROVAL_INVALID_SOURCE_STATUS",
+          );
+        }
+
+        // BR-PR-11: estimate recomputed at submit, before the policy is picked.
+        const fresh = await prRepository.recalculateEstimatedAmountByPrId(
+          input.docId,
+          tx,
+        );
+        if (fresh && fresh.estimatedAmountPaise !== doc.amountPaise) {
+          policy = await resolvePolicy(fresh.estimatedAmountPaise);
+        }
+      }
+
+      const chain = policy.approvalChain;
 
       const autoApproved =
         policy.autoApprove === true ||
@@ -464,7 +487,7 @@ export const approvalService = {
             status: autoApproved ? "approved" : "pending_approval",
             currentApprovalLevel: createdRequest.currentLevel,
             totalApprovalLevels: createdRequest.totalLevels,
-            approvedBy: autoApproved ? actorId : null,
+            approvedBy: null,
           },
           tx,
         );
@@ -477,7 +500,7 @@ export const approvalService = {
             status: autoApproved ? "approved" : "pending_approval",
             currentApprovalLevel: createdRequest.currentLevel,
             totalApprovalLevels: createdRequest.totalLevels,
-            approvedBy: autoApproved ? actorId : null,
+            approvedBy: null,
           },
           tx,
         );
@@ -551,9 +574,14 @@ export const approvalService = {
       }
 
       const chain = request.chainSnapshot;
-      if (input.action === "cancel") {
+      if (input.action === "cancel" || input.action === "withdraw") {
         if (request.requestedBy !== actorId) {
-          throw new ForbiddenError("Only requester can cancel this approval");
+          throw new ForbiddenError(
+            input.action === "withdraw"
+              ? "Only the requester can withdraw this approval"
+              : "Only requester can cancel this approval",
+            input.action === "withdraw" ? "APPROVAL_NOT_REQUESTER" : undefined,
+          );
         }
       } else {
         await assertEligibleActorForCurrentStep(
@@ -586,7 +614,7 @@ export const approvalService = {
         completionTime = new Date();
       }
 
-      if (input.action === "cancel") {
+      if (input.action === "cancel" || input.action === "withdraw") {
         nextStatus = "cancelled";
         completionTime = new Date();
       }
@@ -625,15 +653,18 @@ export const approvalService = {
       );
 
       if (request.docType === "pr") {
+        // BR-PR-21 / BR-APR-39: withdraw returns the PR to draft (not cancelled).
         const prStatus =
-          nextStatus === "approved" ||
-          nextStatus === "rejected" ||
-          nextStatus === "cancelled" ||
-          nextStatus === "pending_approval"
-            ? nextStatus
-            : nextStatus === "require_more_info"
-              ? "draft"
-              : undefined;
+          input.action === "withdraw"
+            ? "draft"
+            : nextStatus === "approved" ||
+                nextStatus === "rejected" ||
+                nextStatus === "cancelled" ||
+                nextStatus === "pending_approval"
+              ? nextStatus
+              : nextStatus === "require_more_info"
+                ? "draft"
+                : undefined;
 
         await approvalRepository.updatePrApprovalMirror(
           request.docId,
@@ -649,15 +680,17 @@ export const approvalService = {
 
       if (request.docType === "po") {
         const poStatus =
-          nextStatus === "approved"
-            ? "approved"
-            : nextStatus === "rejected"
-              ? "cancelled"
-              : nextStatus === "require_more_info"
-                ? "draft"
-                : nextStatus === "cancelled"
-                  ? "cancelled"
-                  : "pending_approval";
+          input.action === "withdraw"
+            ? "draft"
+            : nextStatus === "approved"
+              ? "approved"
+              : nextStatus === "rejected"
+                ? "cancelled"
+                : nextStatus === "require_more_info"
+                  ? "draft"
+                  : nextStatus === "cancelled"
+                    ? "cancelled"
+                    : "pending_approval";
 
         await approvalRepository.updatePoApprovalMirror(
           request.docId,
@@ -672,7 +705,13 @@ export const approvalService = {
       }
 
       if (request.docType === "sco") {
-        if (nextStatus === "approved") {
+        if (input.action === "withdraw") {
+          await approvalRepository.updateScoApprovalMirror(
+            request.docId,
+            { status: "draft" },
+            tx,
+          );
+        } else if (nextStatus === "approved") {
           await approvalRepository.updateScoApprovalMirror(
             request.docId,
             { status: "approved" },
@@ -696,7 +735,7 @@ export const approvalService = {
           );
         }
 
-        if (nextStatus === "cancelled") {
+        if (nextStatus === "cancelled" && input.action !== "withdraw") {
           await approvalRepository.updateScoApprovalMirror(
             request.docId,
             { status: "cancelled" },

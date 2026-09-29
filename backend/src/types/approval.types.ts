@@ -314,6 +314,7 @@ export const approvalActionSchema = z.enum([
   "reject",
   "sent_back",
   "cancel",
+  "withdraw",
 ]);
 
 export const approvalActionRequestSchema = z.object({

@@ -92,12 +92,25 @@ export const prUpdateResultSchema = z.object({
 });
 export type prUpdateResultSchemaType = z.infer<typeof prUpdateResultSchema>;
 
+// BR-PR-08: quantity > 0 with at most 3 decimals.
+const prQtySchema = z
+  .number()
+  .positive()
+  .refine((v) => Math.abs(v * 1000 - Math.round(v * 1000)) < 1e-6, {
+    message: "requestedQty allows at most 3 decimals",
+  });
+
+// BR-PR-08: optional required-by date per line.
+const prExpectedDateSchema = z.coerce.date().optional();
+
 export const createPrItemSchema = createInsertSchema(purchaseRequestItems, {
   itemId: z.number().int().positive(),
-  requestedQty: z.number().int().positive(),
+  requestedQty: prQtySchema,
+  expectedDate: prExpectedDateSchema,
 }).pick({
   itemId: true,
   requestedQty: true,
+  expectedDate: true,
 });
 export type createPrItemSchemaType = z.infer<typeof createPrItemSchema>;
 
@@ -137,18 +150,24 @@ export const updatePrUpdateItemSchema = createUpdateSchema(
   purchaseRequestItems,
   {
     itemId: z.number().int().positive(),
-    requestedQty: z.number().int().positive(),
+    requestedQty: prQtySchema,
+    expectedDate: prExpectedDateSchema,
   },
 )
   .pick({
     itemId: true,
     requestedQty: true,
+    expectedDate: true,
   })
   .extend({
     id: z.number().int().positive(),
   })
   .superRefine((data, ctx) => {
-    if (data.itemId === undefined && data.requestedQty === undefined) {
+    if (
+      data.itemId === undefined &&
+      data.requestedQty === undefined &&
+      data.expectedDate === undefined
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "At least one field must be provided for item update",
