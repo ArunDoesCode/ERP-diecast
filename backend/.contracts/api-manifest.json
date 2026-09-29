@@ -3173,12 +3173,14 @@
       "tags": [
         "supplier"
       ],
-      "summary": "List suppliers, paginated.",
+      "summary": "List suppliers, paginated. q matches name, contact, email, phone, GSTIN or item SKU; status filter all|active|inactive (default all); default sort name asc.",
       "auth": {
         "type": "roles",
         "roles": [
           "super-admin",
-          "back_office"
+          "owner",
+          "back_office",
+          "floor_supervisor"
         ]
       },
       "request": {
@@ -3187,7 +3189,8 @@
           "pageSize": "integer.nonnegative.required",
           "sortBy": "enum:name,type,contactPerson,isActive,createdAt.optional",
           "sortDir": "enum:asc,desc.required",
-          "q": "string.optional"
+          "q": "string.optional",
+          "status": "enum:all,active,inactive.required"
         }
       },
       "responses": {
@@ -3225,7 +3228,9 @@
         "type": "roles",
         "roles": [
           "super-admin",
-          "back_office"
+          "owner",
+          "back_office",
+          "floor_supervisor"
         ]
       },
       "request": {
@@ -3264,7 +3269,9 @@
         "type": "roles",
         "roles": [
           "super-admin",
-          "back_office"
+          "owner",
+          "back_office",
+          "floor_supervisor"
         ]
       },
       "request": {
@@ -3303,7 +3310,9 @@
         "type": "roles",
         "roles": [
           "super-admin",
-          "back_office"
+          "owner",
+          "back_office",
+          "floor_supervisor"
         ]
       },
       "request": {},
@@ -3350,14 +3359,14 @@
       "request": {
         "body": {
           "name": "string.nonempty.required",
-          "type": "enum:raw_material,consumables,service_provider,trader,both.optional",
+          "type": "enum:raw_material,consumables,service_provider,trader,both.required",
           "gstNumber": "string.optional",
           "panNumber": "string.optional",
           "contactPerson": "string.optional",
-          "email": "string.email.optional",
+          "email": "string.optional",
           "phone": "string.optional",
           "address": "string.optional",
-          "defaultPaymentTermsDays": "integer.nonnegative.optional",
+          "defaultPaymentTermsDays": "integer.nonnegative.required",
           "isActive": "boolean.optional",
           "supplierItems": "array<object>.optional"
         }
@@ -3403,9 +3412,9 @@
           "itemId": "integer.positive.required",
           "supplierSku": "string.optional",
           "supplierUnitPricePaise": "integer.nonnegative.required",
-          "taxPercentage": "number.nonnegative.optional",
-          "leadTimeDays": "integer.nonnegative.optional",
-          "qty": "number.nonnegative.optional",
+          "taxPercentage": "number.required",
+          "leadTimeDays": "integer.nonnegative.required",
+          "qty": "number.nonnegative.required",
           "uom": "string.nonempty.required",
           "isActive": "boolean.optional"
         }
@@ -3451,8 +3460,8 @@
         "body": {
           "serviceId": "integer.positive.required",
           "serviceUnitPricePaise": "integer.nonnegative.required",
-          "taxPercentage": "number.nonnegative.optional",
-          "leadTimeDays": "integer.nonnegative.optional",
+          "taxPercentage": "number.required",
+          "leadTimeDays": "integer.nonnegative.required",
           "isActive": "boolean.optional"
         }
       },
@@ -3546,7 +3555,8 @@
         }
       },
       "notes": [
-        "response spreads service result fields directly ({success, data, summary}), not {success,data} — documented deviation, not normalized"
+        "response spreads service result fields directly ({success, data, summary}), not {success,data} — documented deviation, not normalized",
+        "max 100 rows; all rows save or none: any failed row -> 400 with body {success:false, message, code, data: rows[], summary} (rows carry success/error), nothing saved"
       ]
     },
     {
@@ -3579,8 +3589,50 @@
         }
       },
       "notes": [
-        "response spreads service result fields directly ({success, data, summary}), not {success,data} — documented deviation, not normalized"
+        "response spreads service result fields directly ({success, data, summary}), not {success,data} — documented deviation, not normalized",
+        "max 100 rows; all rows save or none: any failed row -> 400 with body {success:false, message, code, data: rows[], summary} (rows carry success/error), nothing saved"
       ]
+    },
+    {
+      "id": "GET /api/supplier/:supplierId/history",
+      "method": "GET",
+      "path": "/api/supplier/:supplierId/history",
+      "tags": [
+        "supplier"
+      ],
+      "summary": "A supplier's change history (master, item price rows, service price rows), newest first, paginated.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "owner",
+          "back_office",
+          "floor_supervisor"
+        ]
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "entity": "enum:supplier,item,service.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [],
+        "searchable": false
+      }
     }
   ]
 }

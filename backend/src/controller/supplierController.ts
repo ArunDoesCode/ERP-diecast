@@ -5,6 +5,7 @@ import type { AppEnv } from "../lib/types";
 import { supplierService } from "../service/supplierService";
 import {
   supplierCreateSchema,
+  supplierHistoryQuerySchema,
   supplierItemBatchEditSchema,
   supplierItemCreateSchema,
   supplierItemListQuerySchema,
@@ -51,6 +52,15 @@ export const supplierController = {
       query,
     );
     return c.json({ success: true, data, meta });
+  },
+
+  // BR-SUP-10 — contract only, 501 until S12
+  async history(c: Context<AppEnv>) {
+    parseSupplierId(c.req.param("supplierId"));
+    supplierHistoryQuerySchema.parse(
+      Object.fromEntries(new URL(c.req.url).searchParams),
+    );
+    return c.json({ success: false, message: "Not implemented" }, 501);
   },
 
   async getDetails(c: Context<AppEnv>) {

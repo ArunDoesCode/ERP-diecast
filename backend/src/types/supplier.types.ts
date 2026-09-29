@@ -1,6 +1,8 @@
 import { createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 import {
+  supplierHistory,
+  supplierHistoryEntityEnum,
   supplierItems,
   supplierMaster,
   supplierServices,
@@ -97,6 +99,65 @@ export type supplierServiceEditResponseSchemaType = z.infer<
   typeof supplierServiceEditResponseSchema
 >;
 
+// ---- shared field rules (BR-SUP-02, 04, 06, 12, 13, 14) ----
+const GSTIN_RE = /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
+const PAN_RE = /^[A-Z]{5}\d{4}[A-Z]$/;
+export const SUPPLIER_GST_SLABS = [
+  0, 0.1, 0.25, 1.5, 3, 5, 12, 18, 28, 40,
+] as const;
+
+// "" means "no value" (saved as null); anything else is trimmed, upper-cased and format-checked.
+const gstinField = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .refine((v) => v === "" || GSTIN_RE.test(v), "Invalid GST number");
+const panField = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .refine((v) => v === "" || PAN_RE.test(v), "Invalid PAN");
+const emailField = z
+  .string()
+  .trim()
+  .refine((v) => v === "" || z.email().safeParse(v).success, "Invalid email");
+const optText = z.string().trim();
+const nameField = z.string().trim().min(1, "Name is required");
+const paymentTermsField = z.number().int().min(0).max(365);
+const gstPercentField = z
+  .number()
+  .refine((v) => (SUPPLIER_GST_SLABS as readonly number[]).includes(v), {
+    message: "GST % must be one of 0, 0.1, 0.25, 1.5, 3, 5, 12, 18, 28, 40",
+  });
+const pricePaiseField = z.number().int().min(1).max(2147483647);
+const leadTimeField = z.number().int().min(0).max(365);
+const qtyField = z
+  .number()
+  .min(0)
+  .refine((v) => Math.abs(v * 1000 - Math.round(v * 1000)) < 1e-6, {
+    message: "Qty allows at most 3 decimals",
+  });
+
+// PAN characters must equal GSTIN characters 3-12 when both are given (BR-SUP-04).
+// The service also checks this against the stored value when only one of them is sent.
+function refinePanMatchesGstin(
+  data: {
+    gstNumber?: string | null | undefined;
+    panNumber?: string | null | undefined;
+  },
+  ctx: z.RefinementCtx,
+) {
+  const gst = data.gstNumber?.trim().toUpperCase();
+  const pan = data.panNumber?.trim().toUpperCase();
+  if (gst && pan && GSTIN_RE.test(gst) && gst.slice(2, 12) !== pan) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["panNumber"],
+      message: "PAN must match characters 3-12 of the GST number",
+    });
+  }
+}
+
 export const supplierListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(10),
@@ -104,7 +165,10 @@ export const supplierListQuerySchema = z.object({
     .enum(["name", "type", "contactPerson", "isActive", "createdAt"])
     .optional(),
   sortDir: z.enum(["asc", "desc"]).default("asc"),
+  // BR-SUP-23: matches name, contact person, email, phone, GSTIN, or SKU of a supplied item (ignore case, any part)
   q: z.string().optional(),
+  // BR-SUP-24: the PO supplier picker sends "active"
+  status: z.enum(["all", "active", "inactive"]).default("all"),
 });
 export type supplierListQuerySchemaType = z.infer<
   typeof supplierListQuerySchema
@@ -137,12 +201,13 @@ export type supplierDetailQuerySchemaType = z.infer<
 
 export const supplierItemCreateSchema = z.object({
   itemId: z.number().int().positive(),
-  supplierSku: z.string().optional(),
-  supplierUnitPricePaise: z.number().int().nonnegative(),
-  taxPercentage: z.number().nonnegative().optional(),
-  leadTimeDays: z.number().int().nonnegative().optional(),
-  qty: z.number().nonnegative().optional(),
-  uom: z.string().min(1),
+  supplierSku: optText.optional(),
+  supplierUnitPricePaise: pricePaiseField,
+  taxPercentage: gstPercentField.default(0),
+  leadTimeDays: leadTimeField.default(0),
+  qty: qtyField.default(0), // 0 = no limit
+  // must equal the item's own unit, else 400 (BR-SUP-14); the form locks it to the item unit
+  uom: z.string().trim().min(1),
   isActive: z.boolean().optional(),
 });
 export type supplierItemCreateSchemaType = z.infer<
@@ -151,63 +216,56 @@ export type supplierItemCreateSchemaType = z.infer<
 
 export const supplierServiceCreateSchema = z.object({
   serviceId: z.number().int().positive(),
-  serviceUnitPricePaise: z.number().int().nonnegative(),
-  taxPercentage: z.number().nonnegative().optional(),
-  leadTimeDays: z.number().int().nonnegative().optional(),
+  serviceUnitPricePaise: pricePaiseField,
+  taxPercentage: gstPercentField.default(0),
+  leadTimeDays: leadTimeField.default(0),
   isActive: z.boolean().optional(),
 });
 export type supplierServiceCreateSchemaType = z.infer<
   typeof supplierServiceCreateSchema
 >;
 
-export const supplierCreateSchema = z.object({
-  name: z.string().min(1),
-  type: supplierTypeSchema.optional(),
-  gstNumber: z.string().optional(),
-  panNumber: z.string().optional(),
-  contactPerson: z.string().optional(),
-  email: z.string().email().optional(),
-  phone: z.string().optional(),
-  address: z.string().optional(),
-  defaultPaymentTermsDays: z.number().int().nonnegative().optional(),
-  isActive: z.boolean().optional(),
-  supplierItems: z.array(supplierItemCreateSchema).optional(),
-});
+export const supplierCreateSchema = z
+  .object({
+    name: nameField,
+    type: supplierTypeSchema.default("raw_material"),
+    gstNumber: gstinField.optional(),
+    panNumber: panField.optional(), // blank + GSTIN given -> filled from GSTIN
+    contactPerson: optText.optional(),
+    email: emailField.optional(),
+    phone: optText.optional(),
+    address: optText.optional(),
+    defaultPaymentTermsDays: paymentTermsField.default(0),
+    isActive: z.boolean().optional(),
+    supplierItems: z.array(supplierItemCreateSchema).optional(),
+  })
+  .superRefine(refinePanMatchesGstin);
 export type supplierCreateSchemaType = z.infer<typeof supplierCreateSchema>;
 
+// Optional fields are clearable with "" or null (BR-SUP-09); name is not.
 const supplierMasterUpdateSchema = z
   .object({
     mode: z.literal("master"),
-    name: z.string().min(1).optional(),
+    name: nameField.optional(),
     type: supplierTypeSchema.optional(),
-    gstNumber: z.string().nullable().optional(),
-    panNumber: z.string().nullable().optional(),
-    contactPerson: z.string().nullable().optional(),
-    email: z.string().email().nullable().optional(),
-    phone: z.string().nullable().optional(),
-    address: z.string().nullable().optional(),
-    defaultPaymentTermsDays: z.number().int().nonnegative().optional(),
-    isActive: z.boolean().optional(),
+    gstNumber: gstinField.nullable().optional(),
+    panNumber: panField.nullable().optional(),
+    contactPerson: optText.nullable().optional(),
+    email: emailField.nullable().optional(),
+    phone: optText.nullable().optional(),
+    address: optText.nullable().optional(),
+    defaultPaymentTermsDays: paymentTermsField.optional(),
+    isActive: z.boolean().optional(), // false = deactivate, true = reactivate (BR-SUP-07, 08)
   })
   .superRefine((data, ctx) => {
-    const hasUpdateField =
-      data.name !== undefined ||
-      data.type !== undefined ||
-      data.gstNumber !== undefined ||
-      data.panNumber !== undefined ||
-      data.contactPerson !== undefined ||
-      data.email !== undefined ||
-      data.phone !== undefined ||
-      data.address !== undefined ||
-      data.defaultPaymentTermsDays !== undefined ||
-      data.isActive !== undefined;
-
-    if (!hasUpdateField) {
+    const { mode: _mode, ...fields } = data;
+    if (Object.values(fields).every((v) => v === undefined)) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         message: "At least one supplier master field must be provided",
       });
     }
+    refinePanMatchesGstin(data, ctx);
   });
 
 const supplierItemUpdateSchema = z
@@ -215,37 +273,25 @@ const supplierItemUpdateSchema = z
     mode: z.literal("item"),
     supplierItemsId: z.number().int().positive().optional(),
     itemId: z.number().int().positive().optional(),
-    supplierSku: z.string().nullable().optional(),
-    supplierUnitPricePaise: z.number().int().nonnegative().optional(),
-    taxPercentage: z.number().nonnegative().optional(),
-    leadTimeDays: z.number().int().nonnegative().optional(),
-    qty: z.number().nonnegative().optional(),
-    uom: z.string().min(1).optional(),
+    supplierSku: optText.nullable().optional(),
+    supplierUnitPricePaise: pricePaiseField.optional(),
+    taxPercentage: gstPercentField.optional(),
+    leadTimeDays: leadTimeField.optional(),
+    qty: qtyField.optional(),
+    uom: z.string().trim().min(1).optional(),
     isActive: z.boolean().optional(),
   })
   .superRefine((data, ctx) => {
-    const hasSupplierItemsId = data.supplierItemsId !== undefined;
-    const hasItemId = data.itemId !== undefined;
-
-    if (hasSupplierItemsId === hasItemId) {
+    if ((data.supplierItemsId !== undefined) === (data.itemId !== undefined)) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         message: "Provide exactly one selector: supplierItemsId or itemId",
       });
     }
-
-    const hasUpdateField =
-      data.supplierSku !== undefined ||
-      data.supplierUnitPricePaise !== undefined ||
-      data.taxPercentage !== undefined ||
-      data.leadTimeDays !== undefined ||
-      data.qty !== undefined ||
-      data.uom !== undefined ||
-      data.isActive !== undefined;
-
-    if (!hasUpdateField) {
+    const { mode: _mode, supplierItemsId: _a, itemId: _b, ...fields } = data;
+    if (Object.values(fields).every((v) => v === undefined)) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         message: "At least one supplier item field must be provided",
       });
     }
@@ -266,96 +312,68 @@ export type supplierItemListQuerySchemaType = z.infer<
   typeof supplierItemListQuerySchema
 >;
 
-export const supplierItemEditSchema = z
-  .object({
-    supplierItemsId: z.number().int().positive().optional(),
-    itemId: z.number().int().positive().optional(),
-    supplierSku: z.string().nullable().optional(),
-    supplierUnitPricePaise: z.number().int().nonnegative().optional(),
-    taxPercentage: z.number().nonnegative().optional(),
-    leadTimeDays: z.number().int().nonnegative().optional(),
-    qty: z.number().nonnegative().optional(),
-    uom: z.string().min(1).optional(),
-    isActive: z.boolean().optional(),
-  })
-  .superRefine((data, ctx) => {
-    const hasSupplierItemsId = data.supplierItemsId !== undefined;
-    const hasItemId = data.itemId !== undefined;
-
-    if (hasSupplierItemsId === hasItemId) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Provide exactly one selector: supplierItemsId or itemId",
-      });
-    }
-
-    const hasUpdateField =
-      data.supplierSku !== undefined ||
-      data.supplierUnitPricePaise !== undefined ||
-      data.taxPercentage !== undefined ||
-      data.leadTimeDays !== undefined ||
-      data.qty !== undefined ||
-      data.uom !== undefined ||
-      data.isActive !== undefined;
-
-    if (!hasUpdateField) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "At least one supplier item field must be provided",
-      });
-    }
-  });
+// Batch rows are NOT refined here: "one target" / "at least one field" are checked per row by the service so the
+// reply can list each row with its reason (BR-SUP-20, 21). Only value rules and the 100-row cap fail the whole request.
+export const supplierItemEditSchema = z.object({
+  supplierItemsId: z.number().int().positive().optional(),
+  itemId: z.number().int().positive().optional(),
+  supplierSku: optText.nullable().optional(),
+  supplierUnitPricePaise: pricePaiseField.optional(),
+  taxPercentage: gstPercentField.optional(),
+  leadTimeDays: leadTimeField.optional(),
+  qty: qtyField.optional(),
+  uom: z.string().trim().min(1).optional(),
+  isActive: z.boolean().optional(),
+});
 export type supplierItemEditSchemaType = z.infer<typeof supplierItemEditSchema>;
 
 export const supplierItemBatchEditSchema = z.union([
   supplierItemEditSchema,
-  z.array(supplierItemEditSchema).min(1),
+  z.array(supplierItemEditSchema).min(1).max(100),
 ]);
 export type supplierItemBatchEditSchemaType = z.infer<
   typeof supplierItemBatchEditSchema
 >;
 
-export const supplierServiceEditSchema = z
-  .object({
-    supplierServiceId: z.number().int().positive().optional(),
-    serviceId: z.number().int().positive().optional(),
-    serviceUnitPricePaise: z.number().int().nonnegative().optional(),
-    taxPercentage: z.number().nonnegative().optional(),
-    leadTimeDays: z.number().int().nonnegative().optional(),
-    isActive: z.boolean().optional(),
-  })
-  .superRefine((data, ctx) => {
-    const hasSupplierServiceId = data.supplierServiceId !== undefined;
-    const hasServiceId = data.serviceId !== undefined;
-
-    if (hasSupplierServiceId === hasServiceId) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Provide exactly one selector: supplierServiceId or serviceId",
-      });
-    }
-
-    const hasUpdateField =
-      data.serviceUnitPricePaise !== undefined ||
-      data.taxPercentage !== undefined ||
-      data.leadTimeDays !== undefined ||
-      data.isActive !== undefined;
-
-    if (!hasUpdateField) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "At least one supplier service field must be provided",
-      });
-    }
-  });
+export const supplierServiceEditSchema = z.object({
+  supplierServiceId: z.number().int().positive().optional(),
+  serviceId: z.number().int().positive().optional(),
+  serviceUnitPricePaise: pricePaiseField.optional(),
+  taxPercentage: gstPercentField.optional(),
+  leadTimeDays: leadTimeField.optional(),
+  isActive: z.boolean().optional(),
+});
 export type supplierServiceEditSchemaType = z.infer<
   typeof supplierServiceEditSchema
 >;
 
 export const supplierServiceBatchEditSchema = z.union([
   supplierServiceEditSchema,
-  z.array(supplierServiceEditSchema).min(1),
+  z.array(supplierServiceEditSchema).min(1).max(100),
 ]);
 export type supplierServiceBatchEditSchemaType = z.infer<
   typeof supplierServiceBatchEditSchema
+>;
+
+// ---- history (BR-SUP-10) ----
+export const supplierHistoryEntitySchema = z.enum(
+  supplierHistoryEntityEnum.enumValues,
+);
+export const supplierHistoryRowSchema = createSelectSchema(
+  supplierHistory,
+).extend({
+  changedByName: z.string().nullable(),
+  entityLabel: z.string().nullable(), // item sku / service code / null for supplier
+});
+export type supplierHistoryRowSchemaType = z.infer<
+  typeof supplierHistoryRowSchema
+>;
+
+export const supplierHistoryQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(10),
+  entity: supplierHistoryEntitySchema.optional(),
+});
+export type supplierHistoryQuerySchemaType = z.infer<
+  typeof supplierHistoryQuerySchema
 >;

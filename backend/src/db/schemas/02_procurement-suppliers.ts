@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
   doublePrecision,
@@ -21,23 +22,66 @@ export const supplierTypeEnum = pgEnum("supplier_type", [
   "both", // Provides materials and job-work services
 ]);
 
-export const supplierMaster = pgTable("supplier_master", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  type: supplierTypeEnum("type").default("raw_material").notNull(),
-  gstNumber: text("gst_number").unique(),
-  panNumber: text("pan_number"),
-  contactPerson: text("contact_person"),
-  email: text("email"),
-  phone: text("phone"),
-  address: text("address"),
-  defaultPaymentTermsDays: integer("default_payment_terms_days")
-    .default(0)
-    .notNull(), // e.g., 30 days
-  isActive: boolean("is_active").notNull().default(true),
-  createdBy: integer("created_by").references(() => employees.id),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+export const supplierMaster = pgTable(
+  "supplier_master",
+  {
+    id: serial("id").primaryKey(),
+    name: text("name").notNull(),
+    type: supplierTypeEnum("type").default("raw_material").notNull(),
+    gstNumber: text("gst_number").unique(),
+    panNumber: text("pan_number"),
+    contactPerson: text("contact_person"),
+    email: text("email"),
+    phone: text("phone"),
+    address: text("address"),
+    defaultPaymentTermsDays: integer("default_payment_terms_days")
+      .default(0)
+      .notNull(), // e.g., 30 days
+    isActive: boolean("is_active").notNull().default(true),
+    createdBy: integer("created_by").references(() => employees.id),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    // BR-SUP-01: unique ignoring case and outer spaces.
+    // db:push RISK: fails if existing rows already clash (e.g. "Hindalco" and "hindalco ") - rename them first.
+    nameNormUq: uniqueIndex("uq_supplier_master_name_norm").on(
+      sql`lower(btrim(${t.name}))`,
+    ),
+  }),
+);
+
+// BR-SUP-10: one row per changed field (supplier master, item price row, service price row).
+export const supplierHistoryEntityEnum = pgEnum("supplier_history_entity", [
+  "supplier",
+  "item",
+  "service",
+]);
+
+export const supplierHistory = pgTable(
+  "supplier_history",
+  {
+    id: serial("id").primaryKey(),
+    supplierId: integer("supplier_id")
+      .references(() => supplierMaster.id)
+      .notNull(),
+    entity: supplierHistoryEntityEnum("entity").notNull(),
+    // supplier_items.id / supplier_services.id for entity item/service; supplier id for entity supplier
+    entityId: integer("entity_id").notNull(),
+    field: text("field").notNull(), // e.g. name, gstNumber, supplierUnitPricePaise, taxPercentage, isActive
+    oldValue: text("old_value"), // null = was empty / row created
+    newValue: text("new_value"), // null = cleared
+    changedBy: integer("changed_by")
+      .references(() => employees.id)
+      .notNull(),
+    changedAt: timestamp("changed_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    supplierChangedIdx: index("idx_supplier_history_supplier_changed").on(
+      t.supplierId,
+      t.changedAt,
+    ),
+  }),
+);
 
 export const supplierServices = pgTable(
   "supplier_services",

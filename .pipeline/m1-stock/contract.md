@@ -177,3 +177,82 @@ Query `supplierId` (unchanged). 200 `data = { ratePaise: int >= 1, source: "po_h
 - `locations`: `is_active` bool default true, `created_by`, `last_updated_by`, `last_updated_at`; unique `uq_locations_name_norm`.
 - `machines`: `code` text NULL, `is_active` bool default true; unique `uq_machines_name_norm`, `uq_machines_code_norm` (Postgres unique ignores NULL codes).
 - Not indexed (service enforces, note race): one `main_store`; one `vendor_premise` per supplier.
+
+
+# Suppliers (part 3, BR-SUP-01..25) — `/api/supplier`
+Envelope as before: success `{ success:true, data, meta? }`, error `{ success:false, message, code }` (message = fixed plain sentence, never DB text, BR-SUP-22). `GET /:supplierId/history` returns **501** until S12; all other routes exist today and the new rules land in S11-S12.
+
+## Roles (perm key = seed roles + super-admin)
+| Routes | Key | Roles |
+|---|---|---|
+| GET `/listSuppliers`, `/:supplierId/detail`, `/:supplierId/listItems`, `/:supplierId/listServices`, `/:supplierId/history` | `supplier.view` | super-admin, owner, back_office, floor_supervisor |
+| POST `/createSupplier`, `/:supplierId/createItem`, `/:supplierId/createService`; PATCH `/updateSupplier/:id`, `/:supplierId/editItem`, `/:supplierId/editService` | `supplier.manage` | super-admin, back_office |
+No DELETE route (deactivate via PATCH `isActive:false`). BR-SUP-25 (403 `PERMISSION_DENIED` naming key) comes from the auth layer on work/m1, not this branch.
+
+## Field rules (all requests)
+| Field | Rule |
+|---|---|
+| `name` | trimmed, >= 1 char. Unique ignoring case + outer spaces (create and rename) |
+| `type` | `raw_material` (default) \| `consumables` \| `service_provider` \| `trader` \| `both` |
+| `gstNumber` | optional; `""`/null = none (saved null); else saved UPPER-CASE, 15-char GSTIN pattern `^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$`; unique ignoring case |
+| `panNumber` | optional; `""`/null = none; else UPPER-CASE `^[A-Z]{5}\d{4}[A-Z]$`. If GSTIN present (sent or stored) PAN must equal GSTIN chars 3-12; blank PAN + GSTIN -> filled from GSTIN |
+| `email` | optional; `""`/null = none; else valid address |
+| `contactPerson`, `phone`, `address` | optional strings, trimmed; `""`/null clears (on update) |
+| `defaultPaymentTermsDays` | int 0..365 (default 0) |
+| `isActive` | boolean |
+| price (`supplierUnitPricePaise`, `serviceUnitPricePaise`) | int paise, 1..2147483647 (0 -> 400) |
+| `taxPercentage` | one of `0, 0.1, 0.25, 1.5, 3, 5, 12, 18, 28, 40` (default 0) |
+| `leadTimeDays` | int 0..365 (default 0) |
+| `qty` (items only) | number >= 0, at most 3 decimals, 0 = no limit (default 0) |
+| `uom` (items) | required string; must equal the item's own `uom`, else 400 (form locks it to the item unit) |
+Any bad value -> 400 "Validation failed" (Zod), except the service-side checks below.
+
+## GET `/listSuppliers` — paginated
+Query: `page`=1, `pageSize`=10 (1..100, else 400), `sortBy` name\|type\|contactPerson\|isActive\|createdAt (default `name`), `sortDir` asc (default), `q`, **`status`** `all`(default)\|`active`\|`inactive` (BR-SUP-24; PO picker sends `active`).
+`q` matches, ignoring case and on any part: name, contactPerson, email, phone, gstNumber, or SKU of an item the supplier supplies.
+Row = supplier row: `id, name, type, gstNumber|null, panNumber|null, contactPerson|null, email|null, phone|null, address|null, defaultPaymentTermsDays, isActive, createdBy|null, createdAt`.
+
+## POST `/createSupplier` — 201 `data = supplier row`
+Body: `{ name, type?, gstNumber?, panNumber?, contactPerson?, email?, phone?, address?, defaultPaymentTermsDays?, isActive?, supplierItems?: [{ itemId, supplierSku?, supplierUnitPricePaise, taxPercentage?, leadTimeDays?, qty?, uom, isActive? }] }`. Only `name` required.
+All-or-nothing: repeated or unknown/inactive `itemId` -> 400, message names the ids (e.g. `Unknown or repeated items: 999`), nothing saved.
+
+## PATCH `/updateSupplier/:id` — 200 `data = supplier row`
+Body discriminated on `mode`:
+- `"master"`: `{ mode, name?, type?, gstNumber?: string|null, panNumber?, contactPerson?, email?, phone?, address?, defaultPaymentTermsDays?, isActive? }` — >= 1 field else 400; optional fields clearable with `""`/null; `name` not clearable. `isActive:false` deactivates, `true` reactivates.
+- `"item"`: `{ mode, supplierItemsId | itemId (exactly one), supplierSku?, supplierUnitPricePaise?, taxPercentage?, leadTimeDays?, qty?, uom?, isActive? }` (>= 1 field). Response is still the supplier row (unchanged legacy shape).
+
+## GET `/:supplierId/listItems` , `/:supplierId/listServices` — paginated (`page`, `pageSize` 1..100, `q`)
+Rows unchanged (item row / service row incl. `isActive`; inactive rows are returned, shown greyed).
+
+## POST `/:supplierId/createItem`, `/:supplierId/createService` — 201 `data = row`
+Bodies as the field table (`itemId`/`serviceId` int). Errors: 400 validation / unknown item or service / `uom` differs from item's; 404 unknown supplier; 409 row already exists for this supplier+item/service.
+
+## PATCH `/:supplierId/editItem`, `/:supplierId/editService` — batch
+Body: one row object or an array of **1..100** rows (101 -> 400 "Validation failed", nothing saved). Row (item): `{ supplierItemsId? | itemId?, supplierSku?, supplierUnitPricePaise?, taxPercentage?, leadTimeDays?, qty?, uom?, isActive? }`; row (service): `{ supplierServiceId? | serviceId?, serviceUnitPricePaise?, taxPercentage?, leadTimeDays?, isActive? }`.
+"Exactly one target" and "at least one field" are checked **per row by the service** (not Zod) so the reply can name the row.
+- All rows ok -> 200 `{ success:true, data: Row[], summary:{ total, success, failed:0 } }` (NOT the `{success,data}` envelope; documented deviation).
+- Any row bad -> **400** `{ success:false, message:"Some rows could not be saved, nothing was saved", code:"BATCH_FAILED", data: Row[], summary:{ total, success:n_ok, failed } }`; nothing saved (single transaction). Controller writes this body itself (global onError only emits message/code).
+- `Row` = `{ index: int (0-based), selector: {…ids sent}, success: boolean, data?: row (only on 200), error?: string (fixed sentence) }`. (Field names `success`/`error` kept from today's shape; they mean "ok"/"reason" of BR-SUP-21.)
+Row `error` sentences: `Give one target: row id or item/service id` · `Give at least one field to change` · `Item not on this supplier` / `Service not on this supplier` · `Unit must be the item's unit`.
+
+## GET `/:supplierId/history` — `supplier.view` — NEW (501 until S12) — paginated
+Query: `page`, `pageSize` (1..100, default 10), `entity?` `supplier`\|`item`\|`service`. Newest first (`changedAt` desc, `id` desc).
+Row: `{ id, supplierId, entity, entityId (supplier id / supplier_items.id / supplier_services.id), field (e.g. name, gstNumber, isActive, supplierUnitPricePaise, taxPercentage), oldValue: string|null, newValue: string|null, changedBy: int, changedByName: string|null, entityLabel: string|null (item sku / service code, null for supplier), changedAt }`.
+History rows are written for every supplier field change and every price-list price, GST % or active change (BR-SUP-10). Values are stored as text (price = paise as text). 404 unknown supplier.
+
+## Errors (fixed messages, BR-SUP-22)
+| Status | code | message | when |
+|---|---|---|---|
+| 409 | `CONFLICT` | `Supplier name already exists, use a different name` | BR-SUP-01 create/rename |
+| 409 | `CONFLICT` | `Supplier GST number already exists` | BR-SUP-03 |
+| 409 | `CONFLICT` | `Already on this supplier's price list` | BR-SUP-11/22 create item/service, also DB unique clash |
+| 400 | `BAD_REQUEST` | `Unknown or repeated items: <ids>` | BR-SUP-17 |
+| 400 | `BATCH_FAILED` | `Some rows could not be saved, nothing was saved` | BR-SUP-21 |
+| 400 | — | `Validation failed` | any Zod rule above (format, range, 101 rows, PAN != GSTIN) |
+| 404 | `NOT_FOUND` | `Supplier not found` | unknown supplier id |
+| 403 | `FORBIDDEN` | (role guard today) | no role; becomes `PERMISSION_DENIED` on merge |
+
+## Data model additions (part 3, schema only)
+- `supplier_master`: unique index `uq_supplier_master_name_norm` on `lower(btrim(name))`. **db:push risk:** fails on a dev DB that already has two suppliers whose names match ignoring case/outer spaces — rename those first. Existing `gst_number` unique index kept (service upper-cases; pre-existing lower-case GSTINs stay as they are).
+- New enum `supplier_history_entity` (`supplier`, `item`, `service`) and table `supplier_history` (`id, supplier_id fk, entity, entity_id, field, old_value text null, new_value text null, changed_by fk employees, changed_at`), index `idx_supplier_history_supplier_changed (supplier_id, changed_at)`.
+- No change to `supplier_items` / `supplier_services` columns; value rules (price >= 1, GST slab, lead time <= 365, qty 3 dp) live in Zod only (no CHECK constraints, so `db:push` is safe on rows with old data).

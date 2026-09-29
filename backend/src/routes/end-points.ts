@@ -71,6 +71,7 @@ export const END_POINTS = {
     listServices: "/:supplierId/listServices",
     createService: "/:supplierId/createService",
     editService: "/:supplierId/editService",
+    history: "/:supplierId/history",
   },
   pr: {
     list: "/getprs",
