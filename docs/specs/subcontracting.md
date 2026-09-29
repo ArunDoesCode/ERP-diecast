@@ -98,6 +98,15 @@ Seed: ow owner, bo back_office.
 
 None open.
 
+## Implementation status
+
+| BR | Status | Test file | Enforced at |
+|---|---|---|---|
+| BR-SCO-01..06, 20, 21, 23 | done | sco.test.ts | scoService, approvalService |
+| BR-SCO-07..11, 24, 25 | done | scoChallan.test.ts | scoChallanService |
+| BR-SCO-12..18, 22 | done | scoReceipt.test.ts, scoReceiptCost.test.ts | scoReceiptService, sco-math |
+| BR-SCO-19, 22–25 | done | scoClose.test.ts | scoService.close, scoReportService |
+
 ## Changelog
 
 - 2026-09-29 v0 — draft from schema (no SCO code yet) + ERPNext/Odoo/SAP benchmark + CGST Sec 143, Rule 55.

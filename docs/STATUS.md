@@ -3,8 +3,8 @@
 > Single entry point for "where are we and what's next". Updated by `/feature` (at phase changes and in
 > every PR), `/watch-prs` (merges), `/status` (on demand) and `/wrap`. Humans: read this, then run `/status`.
 
-**Updated:** 2026-09-29 · **Milestone:** M2 Subcontracting — `/feature subcontracting` running (BL-070)
-**Next action:** wait for the subcontracting PR, then review + merge it.
+**Updated:** 2026-09-29 · **Milestone:** M2 Subcontracting — built, PR open
+**Next action:** review the subcontracting PR (manual UI checklist in it), merge, then dev DB `db:push` (see PR notes), then UAT-1.
 
 ## Modules
 | Module | Spec | Map | Code | Next step |
@@ -17,7 +17,7 @@
 | grn + grn-stock | frozen v1 / v1 | [map](modules/grn.md) | full — built on work/m1-stock, merged da516f2 | merge m1 PR |
 | inventory | frozen v1 | [map](modules/inventory.md) | full — merged da516f2 | merge m1 PR |
 | suppliers | frozen v1 | [map](modules/suppliers.md) | full — merged da516f2 | merge m1 PR |
-| subcontracting | frozen v1 | [map](modules/subcontracting.md) | schema only — **not built** | `/feature subcontracting` (next batch, BL-070) |
+| subcontracting | frozen v2 | [map](modules/subcontracting.md) | full — built on feature/subcontracting, PR open | merge PR, then UAT-1 |
 | bom | none | — | none | M3 (after UAT-1 starts) |
 | sale-order | none | — | none | M4 |
 
@@ -26,7 +26,7 @@ Legend — Code: none / schema only / partial / full. Tests per module: see each
 ## Active pipelines
 | Feature | Branch | Phase | PR | Waiting on |
 |---|---|---|---|---|
-| subcontracting | claude/subcontracting-feature-b19136 | verify (iteration 0) | — | — |
+| subcontracting | claude/subcontracting-feature-b19136 | pr | (see PR) | your review + merge |
 
 ## Waiting on you
 - [ ] Review + merge the m1 PR. Run the manual UI checklist in it (includes SPEC-P3: approval
