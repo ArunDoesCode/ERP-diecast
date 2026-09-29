@@ -6,8 +6,8 @@
   "spec": "docs/specs/subcontracting.md v2",
   "slices": ["S1","S2","S3","S4"],
   "currentSlice": "S4",
-  "iteration": 0,
-  "nextSeq": 32,
+  "iteration": 1,
+  "nextSeq": 31,
   "pr": null,
   "lastProcessedCommentAt": null,
   "envFile": "/Users/turbo_fltr/.claude/diecast-env/main-test.env"
