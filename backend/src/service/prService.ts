@@ -371,9 +371,9 @@ export const prService = {
   // BR-PR-33, 36: cancel one pending line while the header is approved /
   // partial_ordered. Requester or super-admin only. Line row is locked before
   // the header (the same order PO create uses), header recomputed after.
-  // The body reason (3-500) is validated by the controller; PR lines have no
-  // reason column, so it is not stored.
-  async cancelLine(prId: number, lineId: number, actor: Actor) {
+  // The body reason (3-500) is validated by the controller and stored on the
+  // line with who/when.
+  async cancelLine(prId: number, lineId: number, reason: string, actor: Actor) {
     return db.transaction(async (tx) => {
       const line = await prRepository.findItemByIdForUpdate(lineId, tx);
       if (!line || line.prId !== prId) {
@@ -413,7 +413,11 @@ export const prService = {
         );
       }
 
-      const item = await prRepository.cancelItem(lineId, tx);
+      const item = await prRepository.cancelItem(
+        lineId,
+        { reason, actorId: actor.id },
+        tx,
+      );
       const header = await prRepository.recomputeHeaderStatusFromItems(
         prId,
         tx,

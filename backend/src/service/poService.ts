@@ -191,6 +191,19 @@ const LOGGABLE_STATUSES: poStatusSchemaType[] = [
   "dispatched",
   "partial_received",
 ];
+const CONFIRMATION_CHANNELS: Record<
+  string,
+  "email" | "whatsapp" | "phone" | "in_person"
+> = {
+  "phone call": "phone",
+  phone: "phone",
+  "email reply": "email",
+  email: "email",
+  whatsapp: "whatsapp",
+  "in person": "in_person",
+  in_person: "in_person",
+};
+
 const CANCELLABLE_STATUSES: poStatusSchemaType[] = [
   "draft",
   "pending_approval",
@@ -486,6 +499,20 @@ export const poService = {
           confirmationNote: input.note ?? null,
           confirmedAt: new Date(),
           confirmedBy: actorId,
+        },
+        tx,
+      );
+      // BR-PO-17: also a PO log row (columns above stay in sync for the UI).
+      await poRepository.insertCommunication(
+        {
+          poId,
+          type: "confirmation",
+          channel:
+            CONFIRMATION_CHANNELS[
+              input.confirmationMethod.trim().toLowerCase()
+            ] ?? "in_person",
+          note: input.note ?? null,
+          sentBy: actorId,
         },
         tx,
       );

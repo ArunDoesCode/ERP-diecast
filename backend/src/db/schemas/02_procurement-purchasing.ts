@@ -80,6 +80,10 @@ export const purchaseRequestItems = pgTable(
     uom: text("uom").notNull(),
     expectedDate: timestamp("expected_date"),
     status: prItemStatusEnum("status").default("pending").notNull(),
+    // Line cancel audit trail (BR-PR-33, 46): why, who, when.
+    cancelReason: text("cancel_reason"),
+    cancelledBy: integer("cancelled_by").references(() => employees.id),
+    cancelledAt: timestamp("cancelled_at"),
   },
   (table) => ({
     prIdIdx: index("idx_pr_items_pr_id").on(table.prId),
@@ -185,6 +189,7 @@ export const poCommunicationTypeEnum = pgEnum("po_communication_type", [
   "po_sent",
   "reminder",
   "escalation",
+  "confirmation",
 ]);
 
 export const poCommunicationChannelEnum = pgEnum("po_communication_channel", [

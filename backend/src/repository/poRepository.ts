@@ -941,7 +941,7 @@ export const poRepository = {
   async insertCommunication(
     data: {
       poId: number;
-      type: "po_sent" | "reminder" | "escalation";
+      type: "po_sent" | "reminder" | "escalation" | "confirmation";
       channel: "email" | "whatsapp" | "phone" | "in_person";
       toEmail?: string | null;
       note?: string | null;

@@ -56,6 +56,9 @@ export const prLineCancelResultSchema = z.object({
 // PR item row joined with item master fields, as returned by getDetails.
 export const prItemDetailSchema = prItemSchema.extend({
   status: prItemStatusSchema,
+  cancelReason: z.string().nullable(),
+  cancelledBy: z.number().int().nullable(),
+  cancelledAt: z.coerce.date().nullable(),
   itemSku: z.string(),
   itemName: z.string(),
   itemCategory: z.string(),

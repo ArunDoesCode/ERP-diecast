@@ -63,6 +63,9 @@ const purchaseRequestItemWriteColumns = {
 const purchaseRequestItemDetailColumns = {
   ...purchaseRequestItemWriteColumns,
   status: purchaseRequestItems.status,
+  cancelReason: purchaseRequestItems.cancelReason,
+  cancelledBy: purchaseRequestItems.cancelledBy,
+  cancelledAt: purchaseRequestItems.cancelledAt,
   itemSku: itemMaster.sku,
   itemName: itemMaster.name,
   itemCategory: itemMaster.category,
@@ -692,10 +695,19 @@ export const prRepository = {
     return row;
   },
 
-  async cancelItem(itemId: number, tx: Tx) {
+  async cancelItem(
+    itemId: number,
+    audit: { reason: string; actorId: number },
+    tx: Tx,
+  ) {
     const [row] = await tx
       .update(purchaseRequestItems)
-      .set({ status: "cancelled" })
+      .set({
+        status: "cancelled",
+        cancelReason: audit.reason,
+        cancelledBy: audit.actorId,
+        cancelledAt: new Date(),
+      })
       .where(eq(purchaseRequestItems.id, itemId))
       .returning();
     return row;

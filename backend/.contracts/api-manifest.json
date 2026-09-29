@@ -1846,7 +1846,7 @@
           "data": {
             "id": "unrepresentable.required",
             "poId": "unrepresentable.required",
-            "type": "enum:po_sent,reminder,escalation.required",
+            "type": "enum:po_sent,reminder,escalation,confirmation.required",
             "channel": "enum:email,whatsapp,phone,in_person.required",
             "status": "enum:logged,success,failed.required",
             "toEmail": "string.nullable.required",
@@ -1883,7 +1883,7 @@
           "data": {
             "id": "unrepresentable.required",
             "poId": "unrepresentable.required",
-            "type": "enum:po_sent,reminder,escalation.required",
+            "type": "enum:po_sent,reminder,escalation,confirmation.required",
             "channel": "enum:email,whatsapp,phone,in_person.required",
             "status": "enum:logged,success,failed.required",
             "toEmail": "string.nullable.required",

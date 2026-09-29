@@ -89,7 +89,12 @@ export const prController = {
       );
     }
 
-    const data = await prService.cancelLine(id, lineId, c.get("actor"));
+    const data = await prService.cancelLine(
+      id,
+      lineId,
+      parsed.data.reason,
+      c.get("actor"),
+    );
     return c.json({ success: true, data });
   },
 };
