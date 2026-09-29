@@ -8,8 +8,9 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { eq, inArray, like } from "drizzle-orm";
 import { createApp } from "../app";
 import { db } from "../db/client";
-import { roles } from "../db/schemas/01_auth";
+import { documentNumberCounters, roles } from "../db/schemas/01_auth";
 import {
+  approvalPolicies,
   approvalRequests,
   approvalTrails,
 } from "../db/schemas/02_procurement-approval";
@@ -48,6 +49,7 @@ let otherServiceId: number; // exists but not on vendor's list
 let inactiveServiceId: number; // on vendor's list but inactive
 
 const createdScoIds: number[] = [];
+const POLICY_PRIORITIES = [-95001, -95002];
 
 function requireRow<T>(row: T | undefined, what: string): T {
   if (!row) throw new Error(`Fixture setup: ${what} returned no row`);
@@ -250,6 +252,10 @@ afterAll(async () => {
       .delete(subcontractingOrders)
       .where(inArray(subcontractingOrders.id, createdScoIds));
   }
+  // Approval requests of our SCOs are gone above; now drop the test policies.
+  await db
+    .delete(approvalPolicies)
+    .where(inArray(approvalPolicies.priority, POLICY_PRIORITIES));
   const vendorRows = await db
     .select({ id: supplierMaster.id })
     .from(supplierMaster)
@@ -265,6 +271,22 @@ afterAll(async () => {
   }
   await db.delete(serviceMaster).where(like(serviceMaster.code, `${PREFIX}%`));
   await db.delete(itemMaster).where(like(itemMaster.sku, `${PREFIX}%`));
+  // Number counters are shared and must never roll back: detach, don't delete.
+  const empRows = await db
+    .select({ id: employees.id })
+    .from(employees)
+    .where(like(employees.email, `${EMAIL_PREFIX}%`));
+  const empIds = empRows.map((e) => e.id);
+  if (empIds.length > 0) {
+    await db
+      .update(documentNumberCounters)
+      .set({ createdBy: null })
+      .where(inArray(documentNumberCounters.createdBy, empIds));
+    await db
+      .update(documentNumberCounters)
+      .set({ lastUpdatedBy: null })
+      .where(inArray(documentNumberCounters.lastUpdatedBy, empIds));
+  }
   await db.delete(employees).where(like(employees.email, `${EMAIL_PREFIX}%`));
 });
 
@@ -461,6 +483,56 @@ describe("BR-SCO-04 value and GST", () => {
     expect(res.status).toBe(200);
     expect(res.json.data.sco.totalAmountPaise).toBe(2_950_000);
     expect(res.json.data.items).toHaveLength(1);
+  });
+});
+
+describe("BR-SCO-04 approval is matched on value incl. GST, category subcontracting", () => {
+  test("BR-SCO-04 SCO of 25,000 + 4,500 GST matches the policy for 29,500 and not the one below it", async () => {
+    const chain = [
+      {
+        level: 1,
+        approverType: "specific" as const,
+        employeeId: actors.owner?.id as number,
+      },
+    ];
+    const base = {
+      docType: "sco" as const,
+      subDocType: "subcontracting" as const,
+      approvalLevels: 1,
+      approvalChain: chain,
+    };
+    // A: max 29,500 (excluded) -> would match only if GST were left out.
+    // B: min 29,500 (included) -> matches the GST-inclusive value.
+    const [a, b] = await db
+      .insert(approvalPolicies)
+      .values([
+        {
+          ...base,
+          name: `${PREFIX}below`,
+          priority: -95001,
+          maxAmountPaise: 2_950_000,
+        },
+        {
+          ...base,
+          name: `${PREFIX}at_or_above`,
+          priority: -95002,
+          minAmountPaise: 2_950_000,
+          maxAmountPaise: 3_000_000,
+        },
+      ])
+      .returning({ id: approvalPolicies.id });
+    const created = await createSco("bo");
+    const id = created.json.data.sco.id;
+    expect(created.json.data.sco.totalAmountPaise).toBe(2_950_000);
+    const res = await call("bo", "POST", `/sco/${id}/submit`);
+    expect(res.status).toBe(200);
+    expect(res.json.data.sco.status).toBe("pending_approval");
+    const [req] = await db
+      .select({ policyId: approvalRequests.policyId })
+      .from(approvalRequests)
+      .where(eq(approvalRequests.docId, id));
+    expect(req?.policyId).toBe(requireRow(b, "policy B").id);
+    expect(req?.policyId).not.toBe(requireRow(a, "policy A").id);
   });
 });
 
