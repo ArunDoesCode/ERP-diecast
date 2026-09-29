@@ -57,7 +57,7 @@ Autonomous (Opus coordinator = main session, `claude --model opus`):
 Pick-up & knowledge: `/status` (where are we, next action), `/map <module>` / `/map --stale` (module maps),
 `/wrap` (end of session). Manual helpers: `/slice` (one slice, you in the loop), `/bug`.
 
-Pipeline agents (repo-root `.claude/agents/`, model pinned): explorer (haiku), backend-dev, frontend-dev,
+Pipeline agents (repo-root `.claude/agents/`, model set by family alias — always the latest of that family): explorer (haiku), backend-dev, frontend-dev,
 test-writer, code-reviewer, security-auditor, performance-auditor, spec-reviewer (sonnet), test-runner (haiku),
 spec-analyst (opus). Agents communicate only via the coordinator and `.pipeline/<feature>/` —
 protocol: `.claude/pipeline/PROTOCOL.md`. Package agents (hono-*, nextjs-*) hold the detailed conventions
