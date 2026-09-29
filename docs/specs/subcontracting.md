@@ -1,7 +1,7 @@
 ---
 module: subcontracting
 status: frozen           # draft | frozen | changed-after-freeze
-version: 1
+version: 3
 frozen_on: 2026-09-29
 owner: Arun
 depends_on: [auth-setup, approval, approval-policies, grn, grn-stock, suppliers, inventory]
@@ -66,7 +66,7 @@ Seed: ow owner, bo back_office.
 | BR-SCO-06 | Submit, approve, reject, send back and withdraw follow `approval.md`; only its creator submits. Rejected is final: raise a new SCO. | SCO sent back → draft, editable |
 | BR-SCO-07 | An SCO may go out in several lots: a challan can be made on an `approved` or `material_issued` SCO, for qty > 0 per line and at most send qty − already issued. Main store must hold the qty (BR-GRN-33). | L1 issued 600, challan for 400 → ok; challan for 500 → 400; store has 300 → 409 |
 | BR-SCO-08 | Each challan line posts two ledger rows (`sco_issue`): main store −qty and the vendor's location +qty, at the item's current average cost, heat number copied. Item total stock and average do not change. The vendor's location is created on first use. | 600 pcs out → store −600, "Sai CNC (job work)" +600, both @ 12,000; item stock unchanged |
-| BR-SCO-09 | Challan number `JWC/<FY>/<seq>`: consecutive per financial year, max 16 characters, never reused. The printed challan carries the Rule 55 fields: date, number, our and vendor's name, address and GSTIN ("unregistered" if the vendor has none), item, HSN, qty, value at issue cost, "sent for job work u/s 143, no tax charged". | 1 Apr 2027 → JWC/27-28/1; vendor without GSTIN → prints "GSTIN: unregistered" |
+| BR-SCO-09 | Challan number `JWC/<FY>/<seq>`: consecutive per financial year, max 16 characters, never reused. The printed challan carries the Rule 55 fields: date, number, our and vendor's name, address and GSTIN ("unregistered" if the vendor has none), item, HSN, qty, value at issue cost, "sent for job work u/s 143, no tax charged". Our name, address, GSTIN and state come from company settings (one row, owner edits it); HSN comes from the raw item's `hsn_code`. If either is missing the challan is refused (400) and nothing posts. Challan date can't be in the future (400); it defaults to today. | 1 Apr 2027 → JWC/27-28/1; vendor without GSTIN → prints "GSTIN: unregistered" |
 | BR-SCO-10 | We always produce the e-way bill; its number must be entered before the challan is saved when the vendor is in another state (GSTIN state code differs from ours), the vendor has no GSTIN, or the challan value is ≥ ₹50,000. | inter-state, value ₹8,000, no EWB → 400; unregistered vendor, ₹5,000, no EWB → 400 |
 | BR-SCO-11 | Each challan's return due date = challan date + 1 year. Open challans show days left; ≤ 60 days = warning, past due = "overdue: deemed supply, tell accounts". Nothing is blocked, new challans to that vendor included. | challan 1 Oct 2026, today 15 Aug 2027 → 47 days left, warning; overdue challan, new challan to same vendor → ok |
 | BR-SCO-12 | A receipt can be made only on a `material_issued` SCO and needs the vendor's challan/invoice number, unique per vendor (409 if repeated). Per line: processed qty and unprocessed qty; (processed × ratio) + unprocessed ≤ qty still at the vendor for that line. | 600 at vendor, return 700 processed → 400 |
@@ -98,6 +98,15 @@ Seed: ow owner, bo back_office.
 
 None open.
 
+## Implementation status
+
+| BR | Status | Test file | Enforced at |
+|---|---|---|---|
+| BR-SCO-01..06, 20, 21, 23 | done | sco.test.ts | scoService, approvalService |
+| BR-SCO-07..11, 24, 25 | done | scoChallan.test.ts | scoChallanService |
+| BR-SCO-12..18, 22 | done | scoReceipt.test.ts, scoReceiptCost.test.ts | scoReceiptService, sco-math |
+| BR-SCO-19, 22–25 | done | scoClose.test.ts | scoService.close, scoReportService |
+
 ## Changelog
 
 - 2026-09-29 v0 — draft from schema (no SCO code yet) + ERPNext/Odoo/SAP benchmark + CGST Sec 143, Rule 55.
@@ -105,3 +114,10 @@ None open.
 - 2026-09-29 — final answers folded: Q1 direct SCO only (BR-SCO-01); Q2 rejects to scrap, no charge (BR-SCO-15); Q3 every loss needs owner + reason, no 2% tolerance (BR-SCO-19, who-table); Q4 many lots (BR-SCO-07); Q5 warn only (BR-SCO-11); Q6 QA on every line (BR-SCO-13); Q7 unregistered vendors allowed, EWB always by us (BR-SCO-01, 09, 10).
 - 2026-09-29 — pre-freeze touch-up: BR-SCO-04 approval matched incl. GST (approval-policies Q1=C). BR-SCO-01 inactive supplier → 400 (BR-SUP-07). `sco.*` seeded now with the build: ow + bo, `sco.loss_override` ow only (who-table, auth-setup). No "(assumed)" left (BR-SCO-10 firm).
 - 2026-09-29 — frozen v1 (all questions answered by Arun)
+- 2026-09-29 — v2 clarified during build (Arun): plant details live in a new one-row `company_settings` table; `hsn_code` added to item master; missing plant details or HSN → challan 400 (BR-SCO-09). No other rule changed.
+- 2026-09-29 — clarified during build (S2): challan date is optional (default today); per-line heat number optional (default = the SCO line heat/batch). No rule changed.
+- 2026-09-29 — clarified during build (S2): BR-SCO-07 vs BR-SCO-24 — qty over what is left when the request arrives → 400; qty that was valid on arrival but lost a race (over after the SCO lock) → 409. Ledger `sco_issue` rows reference the challan (challan id), SCO id kept on the row context.
+- 2026-09-29 — clarified during build (S3, Arun: "do what other ERPs do"): when send ÷ return is not whole, raw pieces used are proportional to the cumulative processed qty, rounded half up to whole pieces, minus what was already used (ERPNext/Odoo/SAP backflush style; no drift, fully returned = fully used). BR-SCO-12 and 14 use this for "processed × ratio".
+- 2026-09-29 — clarified during build (S4): close while any receipt line is still pending QA → 409 "decide QA first"; nothing is written off until every processed line has a QA decision (BR-SCO-19).
+- 2026-09-29 — clarified during build (S4, supersedes the S3 note): BR-SCO-18 — status becomes `material_received` once every line is fully issued and every issued piece is covered by a receipt (unprocessed or processed), even if QA on it is still pending; close still waits for QA (409, BR-SCO-19).
+- 2026-09-29 — v3 (Arun, BL-072): challan date can't be in the future → 400 (BR-SCO-09); back-dating stays open. No other rule changed.

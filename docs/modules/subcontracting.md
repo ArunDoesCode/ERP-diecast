@@ -1,41 +1,59 @@
 ---
 module: subcontracting
-spec: docs/specs/subcontracting.md (draft v0)
-last_verified_commit: 5bbfd58
+spec: docs/specs/subcontracting.md (v2, frozen)
+last_verified_commit: de0fcfc
 last_verified_on: 2026-09-29
 depends_on: [suppliers, inventory, approval, grn]
 ---
 
 # Subcontracting (SCO / job work) — as-built map
 
-> What the code **is** (the spec says what it **should be**). Today: schema + approval plumbing only.
-> No routes, controller, service, repository, types or frontend for SCO exist.
+> What the code **is** (the spec says what it **should be**). Built in PR `feature/subcontracting`
+> (S1 order + approval, S2 challan, S3 receipt + QA, S4 close + loss + reports). Spec clarifications made
+> during the build are in the spec Changelog.
 
 ## Code locations
 | Layer | Path | Key symbols |
 |---|---|---|
-| schema | `backend/src/db/schemas/02_procurement-purchasing.ts` | `scoStatusEnum`, `subcontractingOrders`, `subcontractingOrderItems`, `subcontractingGrns`, `subcontractingGrnItems` (reuses `grnStatusEnum`) |
-| schema | `backend/src/db/schemas/02_procurement-catalog.ts` | `locationTypeEnum.vendor_premise`, `locations.linkedVendorId`/`isVirtual`, `inventoryRefTypeEnum.sco_issue`/`sco_receipt`, `serviceMaster` |
-| schema | `backend/src/db/schemas/02_procurement-suppliers.ts` | `supplierTypeEnum` (`service_provider`, `both`), `supplierServices` (price, tax %, lead time) |
-| approval | `backend/src/repository/approvalRepository.ts` | `updateScoApprovalMirror` (status only), SCO branch of `findDocumentContext` / doc summaries (amount hard-coded 0) |
+| schema | `backend/src/db/schemas/02_procurement-purchasing.ts` | `subcontractingOrders`, `subcontractingOrderItems`, `scoChallans`, `scoChallanLines`, `subcontractingGrns` (receipts), `subcontractingGrnItems`, `scoReceiptSettlements` |
+| schema | `backend/src/db/schemas/04_company.ts` | `companySettings` (one row: plant name, address, GSTIN, state) |
+| schema | `02_procurement-catalog.ts` | `item_master.hsn_code`; ledger types `sco_issue`, `sco_receipt`, `sco_loss` |
+| routes | `backend/src/routes/sco.ts`, `company.ts` (+ `end-points.ts`) | `/api/sco/*`, `/api/company/settings` |
+| service | `service/scoService.ts`, `scoChallanService.ts`, `scoReceiptService.ts`, `scoReportService.ts`, `companySettingsService.ts` | order/approval/close, challan, receipt + QA, reports |
+| repository | `repository/scoRepository.ts`, `scoChallanRepository.ts`, `scoReceiptRepository.ts`, `scoReportRepository.ts` | `escapeLike` in scoRepository |
+| lib | `lib/sco-math.ts`, `lib/document-number.ts` (`allocateFinancialYearSequence`) | ratio math, JWC numbering |
+| approval | `service/approvalService.ts`, `repository/approvalRepository.ts` | SCO branch: amount incl. GST, category `subcontracting`, sent back → `draft`, row lock on submit |
+| frontend | `frontend/src/app/(protected)/subcontracting/**`, `components/{views,pages}/subcontracting/**`, `lib/api/subcontracting/**` | list, form, detail, challans, receipts, QA, close, reports, company settings |
+
+Endpoints and payloads: `.pipeline/subcontracting/contract.md`, or `bun run contract:query "<METHOD /path>"`.
 
 ## Data model (as built)
-- `subcontracting_orders`: `scoNumber` unique, `vendorId` → supplier, `status` (`draft, pending_approval, approved, rejected, require_more_info, material_issued, material_received, closed, cancelled`), `projectRef`, `notes`, `createdBy` (nullable), `createdAt`.
-- `subcontracting_order_items`: `rawItemId`, `rawItemBatch` (heat no.), `rawQtyToIssue`, `serviceDescription` (free text), `serviceHsnSacCode`, `serviceUnitPricePaise`, `serviceTaxPercentage` (default 18), `finishedItemId`, `expectedReturnQty`.
-- `subcontracting_grns`: `grnNumber` unique, `scoId`, `vendorId`, `status` (grn_status), `receivedDate`, `createdBy`.
-- `subcontracting_grn_items`: `scoItemId`, `receivedQty`, `acceptedQty`, `rejectedQty`, `qaStatus` (free text), `isQaBypassed`, `qaBypassReason`.
+- Order + line: line names kept from the old schema — `rawQtyToIssue` = send qty, `expectedReturnQty` = return qty; counters `issuedQty`, `acceptedQty`, `rejectedQty`, `unprocessedQty`, `pendingQaQty`, `lossQty`; `serviceId` FK; price + GST rate copied from the vendor's service row.
+- Challan `JWC/<FY>/<seq>` (FY = Apr–Mar, e.g. `27-28`) + lines (qty, issue cost, heat, HSN, `settledQty`); due date = date + 1 year.
+- Receipt (`subcontracting_grns`) + lines; status/qaStatus reuse `grn_status` (`draft` never used; default `pending_qa`); vendor challan/invoice no. unique per vendor.
+- `sco_receipt_settlements`: receipt line ↔ challan line, `qty`, `processed_qty` (the part drawn by processed pieces — QA cost uses only this).
+- Ledger rows: `sco_issue` (referenceId = challan id), `sco_receipt` (receipt id / line id), `sco_loss` (SCO id / line id, notes = reason). Vendor location = `<vendor> (job work)`, virtual, one per vendor (unique index).
 
-## Known gaps vs spec (draft v0)
-- No SCO feature at all: routes, service, repository, Zod types, frontend, numbering (`document-number.ts` has no `sco`, `sco_grn`, FY-based `JWC`) — BR-SCO-01, 09.
-- No challan (issue) document: needs `sco_challans` + lines (number, date, e-way bill no., value, due date) and a receipt↔challan settlement table — BR-SCO-07..11, 17.
-- Order line has no issued / accepted / rejected / unprocessed / loss counters, no `serviceId` FK (free text), no expected return date on header — BR-SCO-02, 03, 07, 12, 18.
-- Header lacks cancel/close fields (who, when, reason) and the approval level fields PR/PO have (`approvedBy`, `currentApprovalLevel`, `totalApprovalLevels`); `createdBy` nullable but approval submit checks it — BR-SCO-06, 19, 20, 25.
-- Receipt lacks vendor challan no. (unique per vendor), unprocessed qty, QA actor/time; `qaStatus` is free text; `draft` grn_status has no meaning here — BR-SCO-12, 13, 16.
-- `inventory_ref_type` has no value for the loss write-off or vendor → scrap-yard move; propose `sco_loss` (and use `sco_receipt` for scrap move) — BR-SCO-15, 19.
-- `item_master` has no HSN code; plant GSTIN / state has no home (company settings); supplier state only derivable from GSTIN — BR-SCO-09, 10.
-- `locations.linkedVendorId` not unique → two job-work locations per vendor possible — BR-SCO-08.
-- Approval: SCO amount = 0 and category `any` in `findDocumentContext` (BL-028) — BR-SCO-04; SCO sent back stays `require_more_info` (approval BR-APR-44) — BR-SCO-06.
-- `POST /asset/inventory/movements` can post `sco_issue`/`sco_receipt` directly (BL-015; grn-stock BR-GRN-43 will block it).
+## Gotchas
+- `qtyAtVendor` = still to claim (pending QA already reserved). `material_received` = all pieces covered by receipts, even if QA pending; close then returns 409 until QA is decided.
+- Over-qty challan: 400 if over on arrival, 409 if it lost the race after the SCO lock (both checks are needed).
+- Uneven send:return ratio: raw used = round half up of cumulative processed × ratio, minus already used (spec Changelog).
+- E-way bill: required if vendor state ≠ ours, no GSTIN, or challan value ≥ ₹50,000 (5,000,000 paise) — money is paise everywhere; a fixture cost ≥ 1,000 paise × 50+ pcs crosses the line.
+- Challan needs company settings + raw item `hsn_code`, else 400. Frontend shows the e-way field always as optional; the server decides.
+- Route order: `/challans/open` before `/challans/:challanId`. Close body may be empty (`.json().catch`).
+- Drizzle subqueries need unique column aliases; `db:push` asks interactively about renames — old empty `subcontracting_grn*` tables were dropped once (dev DB: `drop table subcontracting_grn_items, subcontracting_grns cascade` before `db:push`, if it has no rows).
+- Loss write-off also raises `settledQty` on open challan lines with no settlement row (keeps ITC-04 data honest); there is no SCO delete route (404).
+- Receipt statuses (`pending_qa`, `accepted`, `partial_accepted`, `rejected`) and receipt number `SCO-GRN-<period>-<seq>` are build choices, not in the spec.
+- Scrap yard = first `scrap_yard` location; missing → 409 at QA when there are rejects.
+
+## Tests
+| File | BRs |
+|---|---|
+| `backend/src/routes/sco.test.ts` | 01–06, 20, 21, 23 |
+| `backend/src/routes/scoChallan.test.ts` | 07–11, 24, 25 |
+| `backend/src/routes/scoReceipt.test.ts` | 12–18, 22, 24, 25 |
+| `backend/src/routes/scoReceiptCost.test.ts` | 14, 17 (issue cost regression, CR-1) |
+| `backend/src/routes/scoClose.test.ts` | 19, 22–25 + reports |
 
 ## Indian GST notes (why the rules look like this)
 - CGST Sec 143: inputs sent for job work without tax must come back (or be supplied from the job worker's place) within 1 year; capital goods 3 years; moulds, dies, jigs, fixtures, tools exempt. Late = deemed supply on the day sent out, tax + interest.
@@ -67,3 +85,4 @@ GST sources: [TaxGuru Sec 143](https://taxguru.in/goods-and-service-tax/job-work
 | Date | PR / commit | Change |
 |---|---|---|
 | 2026-09-29 | — | Map created with spec draft v0 (schema only, no feature code) |
+| 2026-09-29 | PR feature/subcontracting | Built S1–S4 to spec v2; review round 1 fixes (CR-1 cost, indexes, deadlock order) |

@@ -132,6 +132,8 @@ export const assetItemUpdateSchema = z
     uom: itemUnitSchema.optional(),
     reorderLevel: reorderLevelSchema.optional(),
     standardRatePaise: standardRateSchema.optional(),
+    // BR-SCO-09: HSN for the job-work challan; null clears it.
+    hsnCode: z.string().trim().min(1).max(20).nullable().optional(),
     // deactivate / reactivate (BR-INV-05); items are never deleted
     isActive: z.boolean().optional(),
   })

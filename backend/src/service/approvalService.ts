@@ -8,9 +8,11 @@ import {
   InternalServerError,
   NotFoundError,
 } from "../lib/errors";
+import type { PermissionKey } from "../lib/permissions";
 import { approvalRepository } from "../repository/approvalRepository";
 import { poRepository } from "../repository/poRepository";
 import { prRepository } from "../repository/prRepository";
+import { scoRepository } from "../repository/scoRepository";
 import type {
   approvalActionRequestSchemaType,
   approvalChainSchemaType,
@@ -23,6 +25,16 @@ import type {
   submitApprovalRequestSchemaType,
   updateApprovalPolicySchemaType,
 } from "../types/approval.types";
+
+// BR-APR-24 (v2): permission key needed to submit each document type.
+const SUBMIT_KEYS: Record<
+  submitApprovalRequestSchemaType["docType"],
+  PermissionKey
+> = {
+  pr: "pr.manage",
+  po: "po.manage",
+  sco: "sco.manage",
+};
 
 type ActorContext = {
   actorId: number;
@@ -352,13 +364,11 @@ export const approvalService = {
     }
 
     // BR-APR-24 (v2): submit also needs the document type's own key.
-    const submitKey =
-      input.docType === "pr"
-        ? "pr.manage"
-        : input.docType === "po"
-          ? "po.manage"
-          : null;
-    if (submitKey && !can(actor, submitKey)) {
+    const submitKey = SUBMIT_KEYS[input.docType];
+    if (!submitKey) {
+      throw new BadRequestError(`Unknown document type ${input.docType}`);
+    }
+    if (!can(actor, submitKey)) {
       throw new ForbiddenError(
         `Submitting a ${input.docType.toUpperCase()} needs the ${submitKey} permission`,
         "PERMISSION_DENIED",
@@ -475,6 +485,33 @@ export const approvalService = {
         }
       }
 
+      // BL-065 / BR-SCO-06: an SCO is re-read under its row lock, so a racing
+      // edit, cancel or second submit wins cleanly and the policy is matched on
+      // the total incl. GST as it stands now.
+      if (input.docType === "sco") {
+        const locked = await scoRepository.lockById(input.docId, tx);
+        if (!locked || !canSubmitForApproval(locked.status)) {
+          const raced = await approvalRepository.findPendingRequestByDoc(
+            input.docType,
+            input.docId,
+            tx,
+          );
+          if (raced) {
+            throw new ConflictError(
+              "Document already has an open approval request",
+              "APPROVAL_ALREADY_OPEN",
+            );
+          }
+          throw new ConflictError(
+            `Cannot submit SCO for approval from status ${locked?.status ?? "missing"}`,
+            "APPROVAL_INVALID_SOURCE_STATUS",
+          );
+        }
+        if (locked.totalAmountPaise !== doc.amountPaise) {
+          policy = await resolvePolicy(locked.totalAmountPaise);
+        }
+      }
+
       const chain = policy.approvalChain;
 
       // BR-APR-28 / 61: an auto-approve policy, or a requester who holds
@@ -583,16 +620,15 @@ export const approvalService = {
         }
       }
 
-      if (input.docType === "sco" && autoApproved) {
+      if (input.docType === "sco") {
         await approvalRepository.updateScoApprovalMirror(
           input.docId,
-          { status: "approved" },
-          tx,
-        );
-      } else if (input.docType === "sco") {
-        await approvalRepository.updateScoApprovalMirror(
-          input.docId,
-          { status: "pending_approval" },
+          {
+            status: autoApproved ? "approved" : "pending_approval",
+            currentApprovalLevel: createdRequest.currentLevel,
+            totalApprovalLevels: createdRequest.totalLevels,
+            approvedBy: null,
+          },
           tx,
         );
       }
@@ -842,13 +878,16 @@ export const approvalService = {
               ? nextStatus
               : undefined;
 
-        if (scoStatus) {
-          await approvalRepository.updateScoApprovalMirror(
-            request.docId,
-            { status: scoStatus },
-            tx,
-          );
-        }
+        await approvalRepository.updateScoApprovalMirror(
+          request.docId,
+          {
+            ...(scoStatus ? { status: scoStatus } : {}),
+            currentApprovalLevel: updatedRequest.currentLevel,
+            totalApprovalLevels: updatedRequest.totalLevels,
+            approvedBy: nextStatus === "approved" ? actorId : null,
+          },
+          tx,
+        );
       }
 
       return updatedRequest;

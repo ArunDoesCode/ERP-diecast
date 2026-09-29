@@ -116,3 +116,12 @@ If a decision is reversed, add a new entry that references the old one — don't
   Fixtures still never write stock or average cost directly; stock comes only from GRN postings.
 - **Why:** BL-014 is fixed, so GRN accept posts real stock and average cost; the old "stays 0" check was
   written against the bug.
+
+### D-017 — Plant details, item HSN, company.manage (2026-09-29, subcontracting v2)
+- **Decision:** plant name/address/GSTIN/state live in a one-row `company_settings` table, edited by owner
+  through new key `company.manage`; `hsn_code` added to `item_master`; challan without either → 400.
+- **Why:** challan (BR-SCO-09) and the inter-state e-way check (BR-SCO-10) need them and nothing held them.
+
+### D-018 — Subcontracting build clarifications (2026-09-29, subcontracting v2)
+- **Decision:** uneven send:return ratio consumes raw pieces proportionally on cumulative processed qty, rounded half up (Arun: "do what other ERPs do"); race loser on a challan gets 409, over-qty on arrival 400; close waits for QA (409); `material_received` once all pieces are covered by receipts.
+- **Why:** spec was silent or its examples conflicted (BR-SCO-07 vs 24, 12 vs 18, 19). All recorded in the spec Changelog.

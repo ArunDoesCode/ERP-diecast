@@ -7,6 +7,8 @@ const API_Header = {
 	pr: "/pr",
 	po: "/po",
 	grn: "/grn",
+	sco: "/sco",
+	company: "/company",
 };
 export const API_ROUTES = {
 	auth: {
@@ -150,5 +152,28 @@ export const API_ROUTES = {
 			`${API_Header.grn}/${grnId}/lines/${lineId}/bypass`,
 		correction: (grnId: number, lineId: number) =>
 			`${API_Header.grn}/${grnId}/lines/${lineId}/correction`,
+	},
+	subcontracting: {
+		list: `${API_Header.sco}/getscos`,
+		detail: (scoId: number) => `${API_Header.sco}/getscodetails/${scoId}`,
+		create: `${API_Header.sco}/createsco`,
+		update: `${API_Header.sco}/updatesco`,
+		submit: (scoId: number) => `${API_Header.sco}/${scoId}/submit`,
+		cancel: (scoId: number) => `${API_Header.sco}/${scoId}/cancel`,
+		close: (scoId: number) => `${API_Header.sco}/${scoId}/close`,
+		vendorStock: `${API_Header.sco}/reports/vendor-stock`,
+		lossLog: `${API_Header.sco}/reports/loss-log`,
+		challans: (scoId: number) => `${API_Header.sco}/${scoId}/challans`,
+		receipts: (scoId: number) => `${API_Header.sco}/${scoId}/receipts`,
+		receiptDetail: (receiptId: number) =>
+			`${API_Header.sco}/receipts/${receiptId}`,
+		receiptQa: (receiptId: number, lineId: number) =>
+			`${API_Header.sco}/receipts/${receiptId}/lines/${lineId}/qa`,
+		openChallans: `${API_Header.sco}/challans/open`,
+		challanDetail: (challanId: number) =>
+			`${API_Header.sco}/challans/${challanId}`,
+	},
+	company: {
+		settings: `${API_Header.company}/settings`,
 	},
 } as const;

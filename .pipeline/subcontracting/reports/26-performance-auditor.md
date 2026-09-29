@@ -1,0 +1,18 @@
+# Report 26 — performance audit, subcontracting (BR-SCO-01..25)
+Result: no blocker. Lists are paginated (pageSize max 100), writes lock the SCO row first, loops are bounded by SCO line count (a handful), no N+1 across rows.
+
+| id | severity | area | file:line | finding | suggested fix |
+|---|---|---|---|---|---|
+| PERF-1 | major | backend | backend/src/repository/scoReportRepository.ts:90-152 | Loss log filters `inventory_ledger.reference_type = 'sco_loss'` then joins on `reference_id`. Ledger only has indexes on reference_line_id, item+location, location, created_at, so this scans up to ~500k rows on every page load, twice (rows + count). | Add partial index on inventory_ledger `(created_at desc, id)` where `reference_type = 'sco_loss'` (or `(reference_type, reference_id)`). |
+| PERF-2 | minor | backend | backend/src/repository/scoReportRepository.ts:33-75 | Vendor stock report sums the ledger per vendor location and item in a subquery that runs twice (page + count) per request. OK today (only vendor_premise locations), grows with ledger. | Keep as is for now. If slow, read the balance from a stock snapshot table, or run the count from the same grouped result. Filtered by `locations.type` (small table) then `idx_inventory_ledger_location`, so fine for UAT. |
+| PERF-3 | minor | backend | backend/src/db/schemas/02_procurement-purchasing.ts:~270-310 (subcontracting_orders) | No index on `vendor_id`, `status`, `created_at`, `expected_return_date` though the list filters and sorts on them. Fine at a few thousand SCOs, seq scan otherwise. | Add `idx_sco_vendor_status (vendor_id, status)` and `idx_sco_created_at (created_at desc)`. |
+| PERF-4 | minor | backend | backend/src/db/schemas/02_procurement-purchasing.ts (sco_challans, subcontracting_grns) | `vendor_id` filter on open-challan list (scoChallanRepository.ts:106) has no index; `sco_challans.sco_id` and `sco_grns (vendor_id, vendor_challan_no)` are covered. | Add `idx_sco_challans_vendor (vendor_id)`. |
+| PERF-5 | minor | backend | backend/src/service/scoReceiptService.ts:345-358, 465-495; scoService.ts:398 | Stock postings for several lines run in request order, not item id order. Two receipts on different SCOs that share items in opposite order can deadlock on `item_master` row locks (issue-challan path already sorts, scoChallanRepository.ts:193). Postgres aborts one with 40P01 and the user sees a 500. | Sort lines by raw/finished item id before the posting loop, or lock items in id order up front like `lockItems`. |
+| PERF-6 | minor | backend | backend/src/repository/scoRepository.ts:116-121 | `q` search uses `ilike '%q%'` on sco_number and vendor name, no trigram index. | Nothing now; add `pg_trgm` GIN only if the SCO table passes ~50k rows. |
+| PERF-7 | minor | frontend | frontend/src/lib/api/subcontracting/queries.ts:257,303,335,387 | Issue, receipt, QA and close all invalidate `["inventory"]`, which refetches every active inventory query (all pages, all filters). | Invalidate only the inventory list and ledger keys that are mounted, or leave `["inventory"]` and rely on staleTime. Low priority, invalidation only refetches active queries. |
+
+## Checked, no issue
+- Lists: sco list, open challans, vendor stock, loss log all use page/pageSize with max 100 and a stable tie-break sort. `listBySco` (challans, receipts) is unbounded but scoped to one SCO.
+- Locking: SCO row `for update` first on issue, receipt, QA, close, approval submit; challan lines locked with `of` and FIFO order; items locked in id order in challan issue.
+- Transactions: no external calls inside; document numbers allocated inside the tx.
+- Query keys: include params, `enabled` set on id-based queries, `keepPreviousData` on list queries.

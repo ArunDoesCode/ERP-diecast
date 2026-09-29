@@ -49,16 +49,24 @@ Type: defect · infra · feature · debt · idea.
 | BL-062 | P3 | debt | auth-setup | `/auth/me` reads all screens + an extra employee query; screens tab loads every role; `listCatalog` read on every grants call — cache / merge queries | m1 PERF-7, 8, 9 | 2026-09-29 |
 | BL-063 | P3 | debt | frontend | Setup grant save invalidates 4 queries; Sidebar re-sorts screens every render (`useMemo`) | m1 PERF-11, 12 (auth review) | 2026-09-29 |
 | BL-064 | P3 | debt | purchase-order | `poRepository` throws HTTP `AppError`s and duplicates `assertEditable`; service should throw, repo return a sentinel | m1 CRP-5 | 2026-09-29 |
-| BL-065 | P2 | defect | approval | SCO submit has no row lock / re-check (PR and PO do). Fix in the subcontracting build | m1 CRP-9 | 2026-09-29 |
 | BL-066 | P3 | debt | purchase-order | PO create/update run queries per line, and the rate default calls `getLastRate` per line — batch (e.g. `DISTINCT ON`) | m1 PERF-03, PERF-05 | 2026-09-29 |
 | BL-067 | P3 | debt | backend | List `q` search uses leading-wildcard `ilike` (PR, PO, GRN number) — no index; add pg_trgm when lists grow. See BL-032, BL-050 | m1 PERF-09, PERF-M2 | 2026-09-29 |
 | BL-068 | P3 | debt | approval | `assertChainHasEligibleApprovers` runs one count per chain step; group into one query if touched | m1 PERF-11 (procurement review) | 2026-09-29 |
-| BL-070 | P1 | feature | subcontracting | Build subcontracting (spec frozen v1): `/feature subcontracting` on a fresh branch from main after the m1 PR merges. Includes SCO parts of BR-INV-05/10, BR-SUP-06/07, BL-065 | m1 plan (next batch) | 2026-09-29 |
 | BL-071 | P1 | defect | known-defects | `db:reset` guard lets a local DB named `diecast` through with no confirm, so a script run with the dev `DATABASE_URL` wiped the dev DB (2026-09-29). Also local `db:test:prepare` builds a different DB than CI's `db:reset --no-fixtures` (no baseline policies) → tests pass locally, fail in CI. Needs a known-defects spec change: confirm for any DB that isn't a test DB; one test-DB build path for local + CI | — | 2026-09-29 |
+| BL-073 | P3 | debt | subcontracting | `create` checks vendor + prepares lines outside the tx (update does it inside after the lock) | CR-8 | 2026-09-29 |
+| BL-074 | P3 | feature | company-settings | Keep change history (old/new) for company settings (GSTIN prints on legal challans) | SEC-1 | 2026-09-29 |
+| BL-075 | P3 | debt | subcontracting | BR-SCO-21 test only proves SCO DELETE ≥ 400; add challan/receipt delete cases; spec example says 400 but there is no route (404) | SPEC-1 | 2026-09-29 |
+| BL-076 | P3 | defect | subcontracting | QA issue cost when processed part maps to 0 raw pieces (ratio < 1): fall back to all-segments cost; needs a ratio<1 test | SPEC-7 | 2026-09-29 |
+| BL-077 | P3 | debt | subcontracting | Dead `!submitKey` guard in approvalService; receipt line rows inserted in item-id order | CR-9, CR-10 | 2026-09-29 |
+| BL-078 | P3 | debt | subcontracting | Reports: vendor-stock sums the ledger per request; SCO `q` search has no trigram index; inventory invalidation refetches broadly. Fine now; revisit at scale | PERF-2, 6, 7 | 2026-09-29 |
+| BL-079 | P3 | defect | subcontracting | Challan date rule is UTC, date picker max is local: between 00:00 and 05:30 IST the picker allows today's date but the server rejects it (400). Pick one day rule (IST for the plant) in server + UI | v3 build (SCO_CHALLAN_DATE_FUTURE) | 2026-09-29 |
 
 ## Done
 | ID | Item | PR / commit | Closed |
 |---|---|---|---|
+| BL-072 | Decided + fixed: challan date can't be in the future (subcontracting v3, BR-SCO-09) | PR #14 | 2026-09-29 |
+| BL-065 | Fixed: SCO submit locks and re-checks the row (subcontracting BR-SCO-06) | feature/subcontracting | 2026-09-29 |
+| BL-070 | Built subcontracting to spec v2 (S1–S4); SCO parts of BR-INV-05/10, BR-SUP-07 included | feature/subcontracting | 2026-09-29 |
 | BL-069 | Fixed: `GET /asset/locations` readable with `asset.manage` or `inventory.view`, so owner can fill the stock-take location picker (auth-setup v10) | work/m1 cc28d80 | 2026-09-29 |
 | BL-001 | Fixed: frontend sends the id in the path plus a reason; one cancel path (BR-PR-39..47, BR-KD-01..13) | work/m1 2208a02, acd5c37 | 2026-09-29 |
 | BL-002 | Decided B: `isSaleOrderLinked` dropped from matching and the policy API (approval-policies BR-APR-15) | work/m1 966f37d, f1c9812 | 2026-09-29 |

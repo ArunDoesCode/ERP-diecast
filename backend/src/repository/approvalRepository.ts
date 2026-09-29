@@ -158,11 +158,25 @@ async function fetchDocSummaries(
     .select({
       id: subcontractingOrders.id,
       docNumber: subcontractingOrders.scoNumber,
+      // BR-SCO-04: value incl. GST, same basis as a PO.
+      amountPaise: subcontractingOrders.totalAmountPaise,
+      supplierName: supplierMaster.name,
     })
     .from(subcontractingOrders)
+    .leftJoin(
+      supplierMaster,
+      eq(supplierMaster.id, subcontractingOrders.vendorId),
+    )
     .where(inArray(subcontractingOrders.id, docIds));
   return new Map(
-    rows.map((row) => [row.id, { docNumber: row.docNumber, amountPaise: 0 }]),
+    rows.map((row) => [
+      row.id,
+      {
+        docNumber: row.docNumber,
+        amountPaise: row.amountPaise,
+        supplierName: row.supplierName,
+      },
+    ]),
   );
 }
 
@@ -755,6 +769,9 @@ export const approvalRepository = {
     scoId: number,
     input: {
       status?: (typeof subcontractingOrders.$inferSelect)["status"];
+      currentApprovalLevel?: number;
+      totalApprovalLevels?: number;
+      approvedBy?: number | null;
     },
     tx?: Tx,
   ) {
@@ -762,7 +779,19 @@ export const approvalRepository = {
 
     const [row] = await executor
       .update(subcontractingOrders)
-      .set({ ...(input.status !== undefined ? { status: input.status } : {}) })
+      .set({
+        ...(input.status !== undefined ? { status: input.status } : {}),
+        ...(input.currentApprovalLevel !== undefined
+          ? { currentApprovalLevel: input.currentApprovalLevel }
+          : {}),
+        ...(input.totalApprovalLevels !== undefined
+          ? { totalApprovalLevels: input.totalApprovalLevels }
+          : {}),
+        ...(input.approvedBy !== undefined
+          ? { approvedBy: input.approvedBy }
+          : {}),
+        lastUpdatedAt: new Date(),
+      })
       .where(eq(subcontractingOrders.id, scoId))
       .returning({ id: subcontractingOrders.id });
 
@@ -850,6 +879,7 @@ export const approvalRepository = {
     const [row] = await db
       .select({
         id: subcontractingOrders.id,
+        amountPaise: subcontractingOrders.totalAmountPaise,
         status: subcontractingOrders.status,
         createdBy: subcontractingOrders.createdBy,
       })
@@ -864,8 +894,9 @@ export const approvalRepository = {
     return {
       docType,
       docId: row.id,
-      subDocType: "any" as const,
-      amountPaise: 0,
+      // BR-SCO-04: category subcontracting, amount incl. GST.
+      subDocType: "subcontracting" as const,
+      amountPaise: row.amountPaise,
       status: row.status,
       createdBy: row.createdBy,
     };

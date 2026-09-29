@@ -62,6 +62,7 @@ Super-admin needs no grants (bypass). ow = owner, bo = back_office, fs = floor_s
 | `sco.issue_receive` | issue material (challan), enter receipt | ow, bo, fs |
 | `sco.qa_decide` | QA accept / reject SCO receipt lines | ow, bo, qa |
 | `sco.loss_override` | close an SCO with a loss write-off (BR-SCO-19) | ow |
+| `company.manage` | edit company settings: plant name, address, GSTIN, state (subcontracting BR-SCO-09) | ow |
 | Approval submit / act / trail stay "any signed-in user"; who may act is decided by the approval chain. | | |
 
 ## Flow
@@ -133,3 +134,4 @@ None open.
 - 2026-09-29 — v8 clarified during build (BR-AUTH-19): a role held only by inactive employees can't be deleted either — 409 `ROLE_HAS_INACTIVE_EMPLOYEES` ("move them to another role first"); employees always keep a role.
 - 2026-09-29 — v9 clarified during build (security review): BR-AUTH-16 covers every change to an employee (edit, deactivate, QR regenerate), not only role assignment — a non-super-admin may act only on employees whose current role they could assign, never on a super-admin (403 `ROLE_NOT_ASSIGNABLE`). BR-AUTH-17's check runs inside the write transaction. BR-AUTH-20 also logs employee create, edit (email, password change — without the value — login method) and QR regenerate. BR-AUTH-05: a password or login-method change, or deactivation, revokes that employee's refresh tokens; rotation is atomic (a token can be used once even under concurrent calls). Error codes used: `ROLE_NOT_ASSIGNABLE` (BR-16), `SCREEN_HAS_NO_KEY` (BR-15, screen without a key can't be ticked), `UNKNOWN_KEY` (key not in the catalog).
 - 2026-09-29 — v10 clarified during build: `GET /asset/locations` (read only) is allowed for `asset.manage` or `inventory.view`, so the stock view and the stock-take / opening-stock form (inventory BR-INV-21..23, owner holds `inventory.adjust`) can fill the location picker. Creating and editing locations stays `asset.manage`.
+- 2026-09-29 — clarified during subcontracting build: new key `company.manage` (owner only) for company settings; no other key or seed changed.

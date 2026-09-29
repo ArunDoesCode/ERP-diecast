@@ -10,7 +10,7 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { itemMaster } from "./02_procurement-catalog";
+import { itemMaster, serviceMaster } from "./02_procurement-catalog";
 import { supplierMaster } from "./02_procurement-suppliers";
 import { employees } from "./03_hcm";
 
@@ -274,21 +274,51 @@ export const scoStatusEnum = pgEnum("sco_status", [
   "cancelled",
 ]);
 
-export const subcontractingOrders = pgTable("subcontracting_orders", {
-  id: serial("id").primaryKey(),
-  scoNumber: text("sco_number").unique().notNull(),
-  vendorId: integer("vendor_id")
-    .references(() => supplierMaster.id)
-    .notNull(),
-  status: scoStatusEnum("status").default("draft").notNull(),
+export const subcontractingOrders = pgTable(
+  "subcontracting_orders",
+  {
+    id: serial("id").primaryKey(),
+    scoNumber: text("sco_number").unique().notNull(),
+    vendorId: integer("vendor_id")
+      .references(() => supplierMaster.id)
+      .notNull(),
+    status: scoStatusEnum("status").default("draft").notNull(),
 
-  // Link to the internal Job Order or Project this service is for (for cost accounting)
-  projectRef: text("project_ref"),
+    // Link to the internal Job Order or Project this service is for (for cost accounting)
+    projectRef: text("project_ref"),
 
-  notes: text("notes"),
-  createdBy: integer("created_by").references(() => employees.id),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+    notes: text("notes"),
+    // BR-SCO-03: required, today .. today + 365 days (checked by the API).
+    expectedReturnDate: timestamp("expected_return_date").notNull(),
+    // BR-SCO-04: money in paise. subtotal = sum(service price x return qty), no GST.
+    subtotalPaise: integer("subtotal_paise").default(0).notNull(),
+    taxAmountPaise: integer("tax_amount_paise").default(0).notNull(),
+    totalAmountPaise: integer("total_amount_paise").default(0).notNull(),
+    // Approval mirror, same as PR/PO (BR-SCO-06).
+    approvedBy: integer("approved_by").references(() => employees.id),
+    currentApprovalLevel: integer("current_approval_level")
+      .default(0)
+      .notNull(),
+    totalApprovalLevels: integer("total_approval_levels").default(0).notNull(),
+    // Kept nullable (older rows); the API always sets it and checks it on submit (BR-SCO-06).
+    createdBy: integer("created_by").references(() => employees.id),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    lastUpdatedBy: integer("last_updated_by").references(() => employees.id),
+    lastUpdatedAt: timestamp("last_updated_at").defaultNow().notNull(),
+    // BR-SCO-20: cancel who, when, why.
+    cancelledBy: integer("cancelled_by").references(() => employees.id),
+    cancelledAt: timestamp("cancelled_at"),
+    cancelReason: text("cancel_reason"),
+    // BR-SCO-19: close who, when, why (reason only when a loss is written off).
+    closedBy: integer("closed_by").references(() => employees.id),
+    closedAt: timestamp("closed_at"),
+    closeReason: text("close_reason"),
+  },
+  (t) => ({
+    vendorStatusIdx: index("idx_sco_vendor_status").on(t.vendorId, t.status),
+    createdAtIdx: index("idx_sco_created_at").on(t.createdAt.desc()),
+  }),
+);
 
 export const subcontractingOrderItems = pgTable("subcontracting_order_items", {
   id: serial("id").primaryKey(),
@@ -303,11 +333,16 @@ export const subcontractingOrderItems = pgTable("subcontracting_order_items", {
     .references(() => itemMaster.id)
     .notNull(),
   rawItemBatch: text("raw_item_batch"), // CRITICAL: Heat Number or Melt Number for traceability!
-  rawQtyToIssue: doublePrecision("raw_qty_to_issue").notNull(),
+  // BR-SCO-02: send qty, whole pieces > 0.
+  rawQtyToIssue: integer("raw_qty_to_issue").notNull(),
 
   // 2. THE SERVICE (Decoupled from the physical `itemMaster`!)
   // Services don't have stock, so they don't belong in the `itemMaster` table.
-  serviceDescription: text("service_description").notNull(), // e.g., "5-Axis CNC Machining"
+  // BR-SCO-02: the vendor's service (price + GST % below are copied from its price list).
+  serviceId: integer("service_id")
+    .references(() => serviceMaster.id)
+    .notNull(),
+  serviceDescription: text("service_description").notNull(), // service name copied at create
   serviceHsnSacCode: text("service_hsn_sac_code"), // GST SAC Code (e.g., 9988 for manufacturing services)
   serviceUnitPricePaise: integer("service_unit_price_paise").notNull(),
   serviceTaxPercentage: doublePrecision("service_tax_percentage")
@@ -318,8 +353,80 @@ export const subcontractingOrderItems = pgTable("subcontracting_order_items", {
   finishedItemId: integer("finished_item_id")
     .references(() => itemMaster.id)
     .notNull(),
-  expectedReturnQty: doublePrecision("expected_return_qty").notNull(),
+  // BR-SCO-02: return qty, whole pieces > 0. Ratio = send qty / return qty.
+  expectedReturnQty: integer("expected_return_qty").notNull(),
+  // Running counters, whole pieces (BR-SCO-07, 12-16, 18, 19); moved only by posting actions.
+  issuedQty: integer("issued_qty").default(0).notNull(),
+  acceptedQty: integer("accepted_qty").default(0).notNull(),
+  rejectedQty: integer("rejected_qty").default(0).notNull(),
+  unprocessedQty: integer("unprocessed_qty").default(0).notNull(),
+  lossQty: integer("loss_qty").default(0).notNull(),
+  // BR-SCO-12/13: processed qty received but awaiting its QA decision (reserved at the
+  // vendor so at-vendor = issued - (accepted+rejected+pending) x ratio - unprocessed - loss).
+  pendingQaQty: integer("pending_qa_qty").default(0).notNull(),
 });
+
+// BR-SCO-07..11, 25: job-work challan = one issue of material to the vendor.
+// Number JWC/<FY>/<seq> (Rule 55: consecutive per FY, max 16 chars, never reused).
+export const scoChallans = pgTable(
+  "sco_challans",
+  {
+    id: serial("id").primaryKey(),
+    challanNumber: text("challan_number").unique().notNull(),
+    scoId: integer("sco_id")
+      .references(() => subcontractingOrders.id)
+      .notNull(),
+    vendorId: integer("vendor_id")
+      .references(() => supplierMaster.id)
+      .notNull(),
+    challanDate: timestamp("challan_date").notNull(),
+    // BR-SCO-10: required for inter-state, unregistered vendor, or value >= Rs 50,000.
+    ewayBillNo: text("eway_bill_no"),
+    // Sum of line qty x unit issue cost, paise.
+    valuePaise: integer("value_paise").notNull(),
+    // BR-SCO-11: challan date + 1 year.
+    returnDueDate: timestamp("return_due_date").notNull(),
+    createdBy: integer("created_by")
+      .references(() => employees.id)
+      .notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    scoIdx: index("idx_sco_challans_sco").on(t.scoId),
+    dueIdx: index("idx_sco_challans_due").on(t.returnDueDate),
+    vendorIdx: index("idx_sco_challans_vendor").on(t.vendorId),
+  }),
+);
+
+export const scoChallanLines = pgTable(
+  "sco_challan_lines",
+  {
+    id: serial("id").primaryKey(),
+    challanId: integer("challan_id")
+      .references(() => scoChallans.id)
+      .notNull(),
+    scoItemId: integer("sco_item_id")
+      .references(() => subcontractingOrderItems.id)
+      .notNull(),
+    // Raw item sent (copied from the SCO line, kept for traceability, BR-SCO-25).
+    itemId: integer("item_id")
+      .references(() => itemMaster.id)
+      .notNull(),
+    // Whole pieces > 0.
+    qty: integer("qty").notNull(),
+    // Item's average cost at issue time, paise per piece (BR-SCO-08).
+    unitIssueCostPaise: integer("unit_issue_cost_paise").notNull(),
+    heatNumber: text("heat_number"),
+    // Raw item HSN at issue time (BR-SCO-09).
+    hsnCode: text("hsn_code").notNull(),
+    // Qty already settled by receipts (S3, FIFO); 0 <= settledQty <= qty.
+    settledQty: integer("settled_qty").default(0).notNull(),
+  },
+  (t) => ({
+    challanIdx: index("idx_sco_challan_lines_challan").on(t.challanId),
+    scoItemIdx: index("idx_sco_challan_lines_sco_item").on(t.scoItemId),
+  }),
+);
 
 export const grnStatusEnum = pgEnum("grn_status", [
   "draft",
@@ -437,35 +544,98 @@ export const qaTests = pgTable("qa_tests", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const subcontractingGrns = pgTable("subcontracting_grns", {
-  id: serial("id").primaryKey(),
-  grnNumber: text("grn_number").unique().notNull(), // Can use a prefix like SCO-GRN-001
-  scoId: integer("sco_id")
-    .references(() => subcontractingOrders.id)
-    .notNull(),
-  vendorId: integer("vendor_id")
-    .references(() => supplierMaster.id)
-    .notNull(),
-  status: grnStatusEnum("status").default("draft").notNull(),
-  receivedDate: timestamp("received_date").defaultNow(),
-  createdBy: integer("created_by").references(() => employees.id),
-});
+// BR-SCO-12..17, 25: receipt = one delivery of processed goods back from the vendor.
+// Number from the `sco_grn` counter. `status` reuses grn_status but only
+// pending_qa / accepted / partial_accepted / rejected are used (never `draft`):
+// pending_qa until every line is decided, then derived from the line decisions.
+export const subcontractingGrns = pgTable(
+  "subcontracting_grns",
+  {
+    id: serial("id").primaryKey(),
+    grnNumber: text("grn_number").unique().notNull(),
+    scoId: integer("sco_id")
+      .references(() => subcontractingOrders.id)
+      .notNull(),
+    vendorId: integer("vendor_id")
+      .references(() => supplierMaster.id)
+      .notNull(),
+    // BR-SCO-12: vendor's own challan / invoice number, unique per vendor (409).
+    vendorChallanNo: text("vendor_challan_no").notNull(),
+    status: grnStatusEnum("status").default("pending_qa").notNull(),
+    receivedDate: timestamp("received_date").defaultNow().notNull(),
+    notes: text("notes"),
+    createdBy: integer("created_by")
+      .references(() => employees.id)
+      .notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    vendorChallanUq: uniqueIndex("uq_sco_grns_vendor_challan").on(
+      t.vendorId,
+      t.vendorChallanNo,
+    ),
+    scoIdx: index("idx_sco_grns_sco").on(t.scoId),
+  }),
+);
 
-export const subcontractingGrnItems = pgTable("subcontracting_grn_items", {
-  id: serial("id").primaryKey(),
-  scoGrnId: integer("sco_grn_id")
-    .references(() => subcontractingGrns.id)
-    .notNull(),
-  scoItemId: integer("sco_item_id")
-    .references(() => subcontractingOrderItems.id)
-    .notNull(),
-  receivedQty: doublePrecision("received_qty").notNull(),
-  acceptedQty: doublePrecision("accepted_qty").notNull(), // Triggers sco_receipt in ledger
-  rejectedQty: doublePrecision("rejected_qty").default(0),
-  qaStatus: text("qa_status").default("pending"),
-  isQaBypassed: boolean("is_qa_bypassed").default(false),
-  qaBypassReason: text("qa_bypass_reason"),
-});
+export const subcontractingGrnItems = pgTable(
+  "subcontracting_grn_items",
+  {
+    id: serial("id").primaryKey(),
+    scoGrnId: integer("sco_grn_id")
+      .references(() => subcontractingGrns.id)
+      .notNull(),
+    scoItemId: integer("sco_item_id")
+      .references(() => subcontractingOrderItems.id)
+      .notNull(),
+    // BR-SCO-12: whole pieces of finished (processed) goods that came back, and raw
+    // pieces that came back unprocessed (BR-SCO-16).
+    processedQty: integer("processed_qty").notNull(),
+    unprocessedQty: integer("unprocessed_qty").default(0).notNull(),
+    // BR-SCO-13: null until the QA decision; accepted + rejected = processed.
+    acceptedQty: integer("accepted_qty"),
+    rejectedQty: integer("rejected_qty"),
+    // pending_qa -> accepted | partial_accepted | rejected (one decision per line, 409 after).
+    qaStatus: grnStatusEnum("qa_status").default("pending_qa").notNull(),
+    qaDecidedBy: integer("qa_decided_by").references(() => employees.id),
+    qaDecidedAt: timestamp("qa_decided_at"),
+    qaNotes: text("qa_notes"),
+    // Heat number of the settled challan line(s) (BR-SCO-25); first settled line's heat.
+    heatNumber: text("heat_number"),
+  },
+  (t) => ({
+    receiptIdx: index("idx_sco_grn_items_receipt").on(t.scoGrnId),
+    scoItemIdx: index("idx_sco_grn_items_sco_item").on(t.scoItemId),
+  }),
+);
+
+// BR-SCO-17: which challan lines a receipt line settled, and how many raw pieces.
+export const scoReceiptSettlements = pgTable(
+  "sco_receipt_settlements",
+  {
+    id: serial("id").primaryKey(),
+    receiptItemId: integer("receipt_item_id")
+      .references(() => subcontractingGrnItems.id)
+      .notNull(),
+    challanLineId: integer("challan_line_id")
+      .references(() => scoChallanLines.id)
+      .notNull(),
+    // Raw pieces settled against that challan line, > 0.
+    qty: integer("qty").notNull(),
+    // Part of qty drawn by processed pieces (the rest is unprocessed); QA costs from this part only (BR-SCO-14).
+    processedQty: integer("processed_qty").default(0).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    pairUq: uniqueIndex("uq_sco_settlement_receipt_challan_line").on(
+      t.receiptItemId,
+      t.challanLineId,
+    ),
+    challanLineIdx: index("idx_sco_settlements_challan_line").on(
+      t.challanLineId,
+    ),
+  }),
+);
 
 // --- GAP 2: PURCHASE RETURN ORDERS (PRO) ---
 export const purchaseReturns = pgTable("purchase_returns", {

@@ -29,6 +29,8 @@ export const itemMaster = pgTable(
     currentStock: doublePrecision("current_stock").default(0).notNull(),
     averageCostPaise: integer("average_cost_paise").default(0).notNull(),
     isActive: boolean("is_active").notNull().default(true),
+    // BR-SCO-09: HSN printed on the job-work challan; nullable, challan refused if missing.
+    hsnCode: text("hsn_code"),
     // BR-INV-03: PR estimate / last-rate fallback; > 0 enforced by the API.
     // DB default 0 keeps db:push safe on rows that already exist.
     standardRatePaise: integer("standard_rate_paise").default(0).notNull(),
@@ -185,6 +187,10 @@ export const inventoryLedger = pgTable(
       table.id.desc(),
     ),
     createdAtIdx: index("idx_inventory_ledger_created_at").on(table.createdAt),
+    // Loss log (BR-SCO-19): only the few write-off rows, newest first.
+    scoLossIdx: index("idx_inventory_ledger_sco_loss")
+      .on(table.createdAt.desc(), table.id)
+      .where(sql`${table.referenceType} = 'sco_loss'`),
   }),
 );
 

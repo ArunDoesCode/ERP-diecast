@@ -137,6 +137,7 @@ export function useSubmitApprovalRequestMutation() {
 				}),
 				queryClient.invalidateQueries({ queryKey: ["approval", "history"] }),
 				queryClient.invalidateQueries({ queryKey: ["purchase-requisitions"] }),
+				queryClient.invalidateQueries({ queryKey: ["subcontracting"] }),
 			]);
 			toast.success(result.message || "Submitted for approval");
 		},
@@ -182,6 +183,7 @@ export function useActOnApprovalRequestMutation() {
 				}),
 				queryClient.invalidateQueries({ queryKey: ["approval", "history"] }),
 				queryClient.invalidateQueries({ queryKey: ["purchase-requisitions"] }),
+				queryClient.invalidateQueries({ queryKey: ["subcontracting"] }),
 			]);
 			if (result.success) {
 				const messageByAction: Record<ApprovalActionInput["action"], string> = {

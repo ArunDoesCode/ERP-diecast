@@ -150,6 +150,11 @@ export const PERMISSIONS = {
     "Close SCO with loss write-off",
     "Close a subcontract order with a loss write-off",
   ),
+  "company.manage": p(
+    "company",
+    "Manage company settings",
+    "Edit our company name, address, GSTIN and state for the job-work challan",
+  ),
 } as const satisfies Record<string, PermissionDef>;
 
 export type PermissionKey = keyof typeof PERMISSIONS;
@@ -208,6 +213,13 @@ export const SCREENS = {
   grn: s("/grn", "grn.view", "GRN (Goods Receipt Note)", 170, "Procurement"),
   inventory: s("/inventory", "inventory.view", "Inventory", 180, "Inventory"),
   approvals: s("/approvals", null, "Approvals", 185, "Procurement"),
+  subcontracting: s(
+    "/subcontracting",
+    "sco.view",
+    "Subcontracting",
+    165,
+    "Procurement",
+  ),
 } as const satisfies Record<string, ScreenDef>;
 
 export type ScreenKey = keyof typeof SCREENS;
@@ -247,6 +259,7 @@ export const SEED_GRANTS: Record<RoleSeedName, PermissionKey[]> = {
     "sco.issue_receive",
     "sco.qa_decide",
     "sco.loss_override",
+    "company.manage",
   ],
   back_office: [
     "pr.link_machine",

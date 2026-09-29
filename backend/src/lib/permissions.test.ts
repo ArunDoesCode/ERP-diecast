@@ -59,6 +59,7 @@ const SPEC: Record<string, R[]> = {
   "sco.issue_receive": ["ow", "bo", "fs"],
   "sco.qa_decide": ["ow", "bo", "qa"],
   "sco.loss_override": ["ow"],
+  "company.manage": ["ow"],
 };
 
 describe("BR-AUTH-06 permission catalog defined in code", () => {
