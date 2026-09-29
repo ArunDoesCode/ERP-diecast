@@ -10,6 +10,10 @@ import type {
 	CompanySettingsResult,
 	OpenChallanParams,
 	OpenChallanResult,
+	QaDecisionPayload,
+	ReceiptCreatePayload,
+	ReceiptDetailResult,
+	ReceiptListResult,
 	ScoCancelPayload,
 	ScoCreatePayload,
 	ScoDetailPayload,
@@ -100,5 +104,33 @@ export function getOpenChallans(params?: OpenChallanParams) {
 export function getChallanById(challanId: number) {
 	return api.get<ChallanDetailResult>(
 		API_ROUTES.subcontracting.challanDetail(challanId),
+	);
+}
+
+export function createReceipt(scoId: number, payload: ReceiptCreatePayload) {
+	return api.post<ReceiptDetailResult, ReceiptCreatePayload>(
+		API_ROUTES.subcontracting.receipts(scoId),
+		payload,
+	);
+}
+
+export function getScoReceipts(scoId: number) {
+	return api.get<ReceiptListResult>(API_ROUTES.subcontracting.receipts(scoId));
+}
+
+export function getReceiptById(receiptId: number) {
+	return api.get<ReceiptDetailResult>(
+		API_ROUTES.subcontracting.receiptDetail(receiptId),
+	);
+}
+
+export function decideReceiptQa(
+	receiptId: number,
+	lineId: number,
+	payload: QaDecisionPayload,
+) {
+	return api.post<ReceiptDetailResult, QaDecisionPayload>(
+		API_ROUTES.subcontracting.receiptQa(receiptId, lineId),
+		payload,
 	);
 }

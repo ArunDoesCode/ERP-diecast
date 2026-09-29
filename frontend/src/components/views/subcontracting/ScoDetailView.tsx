@@ -7,8 +7,11 @@ import { useState } from "react";
 import { ApprovalHistoryPanel } from "@/components/pages/approval/ApprovalHistoryPanel";
 import { formatPaise } from "@/components/pages/inventory/inventory-format";
 import { CancelScoAlert } from "@/components/pages/subcontracting/CancelScoAlert";
+import { EnterReceiptDialog } from "@/components/pages/subcontracting/EnterReceiptDialog";
 import { IssueMaterialDialog } from "@/components/pages/subcontracting/IssueMaterialDialog";
 import { ScoChallansCard } from "@/components/pages/subcontracting/ScoChallansCard";
+import { ScoReceiptsCard } from "@/components/pages/subcontracting/ScoReceiptsCard";
+import { ScoSettlementCard } from "@/components/pages/subcontracting/ScoSettlementCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -50,6 +53,7 @@ const CAN_ISSUE_STATUS: ReadonlySet<ScoStatus> = new Set([
 export function ScoDetailView({ scoId }: { scoId: number }) {
 	const canManage = useCan("sco.manage");
 	const canIssue = useCan("sco.issue_receive");
+	const canQa = useCan("sco.qa_decide");
 	const userId = useAuthSessionStore((state) => state.userId);
 	const query = useScoDetailQuery(scoId);
 	const submitMutation = useSubmitScoMutation();
@@ -86,7 +90,7 @@ export function ScoDetailView({ scoId }: { scoId: number }) {
 		);
 	}
 
-	const { sco, items } = result.data;
+	const { sco, items, chargeDue, challanSettlements } = result.data;
 	const badgeStyle = getScoStatusBadgeStyle(sco.status);
 	const isDraft = sco.status === "draft";
 	// Only the creator submits (BR-SCO-06); the server enforces it too.
@@ -115,6 +119,13 @@ export function ScoDetailView({ scoId }: { scoId: number }) {
 					<div className="flex flex-wrap gap-2">
 						{canIssue && CAN_ISSUE_STATUS.has(sco.status) ? (
 							<IssueMaterialDialog
+								scoId={sco.id}
+								scoNumber={sco.scoNumber}
+								items={items}
+							/>
+						) : null}
+						{canIssue && sco.status === "material_issued" ? (
+							<EnterReceiptDialog
 								scoId={sco.id}
 								scoNumber={sco.scoNumber}
 								items={items}
@@ -243,6 +254,19 @@ export function ScoDetailView({ scoId }: { scoId: number }) {
 			</Card>
 
 			<ScoChallansCard scoId={sco.id} />
+
+			{sco.status === "material_issued" ||
+			sco.status === "material_received" ||
+			sco.status === "closed" ? (
+				<>
+					<ScoReceiptsCard scoId={sco.id} canQa={canQa} />
+					<ScoSettlementCard
+						items={items}
+						chargeDue={chargeDue}
+						settlements={challanSettlements}
+					/>
+				</>
+			) : null}
 
 			<div className="space-y-2">
 				<Button

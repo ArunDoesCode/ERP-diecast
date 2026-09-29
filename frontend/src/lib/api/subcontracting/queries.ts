@@ -13,6 +13,8 @@ import type {
 	ChallanCreatePayload,
 	CompanySettingsPayload,
 	OpenChallanParams,
+	QaDecisionPayload,
+	ReceiptCreatePayload,
 	ScoCreatePayload,
 	ScoListParams,
 	ScoUpdatePayload,
@@ -20,12 +22,16 @@ import type {
 
 import {
 	cancelSco,
+	createReceipt,
 	createSco,
+	decideReceiptQa,
 	getChallanById,
 	getCompanySettings,
 	getOpenChallans,
+	getReceiptById,
 	getScoById,
 	getScoChallans,
+	getScoReceipts,
 	getScos,
 	issueChallan,
 	saveCompanySettings,
@@ -45,6 +51,9 @@ export const scoKeys = {
 		params
 			? (["subcontracting", "open-challans", params] as const)
 			: (["subcontracting", "open-challans"] as const),
+	receipts: (scoId: number) => ["subcontracting", "receipts", scoId] as const,
+	receiptDetail: (receiptId: number) =>
+		["subcontracting", "receipt", receiptId] as const,
 	challanDetail: (challanId: number) =>
 		["subcontracting", "challan", challanId] as const,
 };
@@ -245,6 +254,81 @@ export function useIssueChallanMutation(scoId: number) {
 		},
 		onError: (error) => {
 			toast.error(errorMessage(error, "Failed to issue material"));
+		},
+	});
+}
+
+export function useScoReceiptsQuery(scoId: number) {
+	return useQuery({
+		queryKey: scoKeys.receipts(scoId),
+		queryFn: () => getScoReceipts(scoId),
+		enabled: Number.isFinite(scoId) && scoId > 0,
+	});
+}
+
+export function useReceiptDetailQuery(receiptId: number | null) {
+	return useQuery({
+		queryKey: scoKeys.receiptDetail(receiptId ?? 0),
+		queryFn: () => getReceiptById(receiptId as number),
+		enabled: receiptId !== null && receiptId > 0,
+	});
+}
+
+export function useCreateReceiptMutation(scoId: number) {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: (payload: ReceiptCreatePayload) =>
+			createReceipt(scoId, payload),
+		onSuccess: async (result) => {
+			if (!result.success) {
+				toast.error(result.message || "Failed to record receipt");
+				return;
+			}
+			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: scoKeys.list() }),
+				queryClient.invalidateQueries({ queryKey: scoKeys.detail(scoId) }),
+				queryClient.invalidateQueries({ queryKey: scoKeys.receipts(scoId) }),
+				queryClient.invalidateQueries({ queryKey: scoKeys.challans(scoId) }),
+				queryClient.invalidateQueries({ queryKey: scoKeys.openChallans() }),
+				queryClient.invalidateQueries({ queryKey: ["inventory"] }),
+			]);
+			toast.success(
+				result.message || `Receipt ${result.data.receipt.grnNumber} recorded`,
+			);
+		},
+		onError: (error) => {
+			toast.error(errorMessage(error, "Failed to record receipt"));
+		},
+	});
+}
+
+export function useDecideQaMutation(scoId: number, receiptId: number) {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: (variables: { lineId: number } & QaDecisionPayload) => {
+			const { lineId, ...payload } = variables;
+			return decideReceiptQa(receiptId, lineId, payload);
+		},
+		onSuccess: async (result) => {
+			if (!result.success) {
+				toast.error(result.message || "Failed to save QA decision");
+				return;
+			}
+			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: scoKeys.list() }),
+				queryClient.invalidateQueries({ queryKey: scoKeys.detail(scoId) }),
+				queryClient.invalidateQueries({ queryKey: scoKeys.receipts(scoId) }),
+				queryClient.invalidateQueries({
+					queryKey: scoKeys.receiptDetail(receiptId),
+				}),
+				queryClient.invalidateQueries({ queryKey: ["inventory"] }),
+			]);
+			toast.success(result.message || "QA decision saved");
+		},
+		onError: (error) => {
+			toast.error(errorMessage(error, "Failed to save QA decision"));
 		},
 	});
 }

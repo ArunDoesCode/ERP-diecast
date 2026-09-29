@@ -78,11 +78,34 @@ export interface ScoLine {
 	finishedItemName: string;
 	lineValuePaise: number;
 	lineTaxPaise: number;
+	/** S3: raw pcs still at vendor (incl. pending QA). Absent on create/update responses. */
+	qtyAtVendor?: number;
+	pendingQaQty?: number;
+	chargeDuePaise?: number;
+	chargeDueGstPaise?: number;
+}
+
+export interface ScoChargeDue {
+	subtotalPaise: number;
+	gstPaise: number;
+	totalPaise: number;
+}
+
+export interface ChallanSettlementRow {
+	challanId: number;
+	challanNumber: string;
+	challanLineId: number;
+	scoItemId: number;
+	qty: number;
+	settledQty: number;
+	settled: boolean;
 }
 
 export interface ScoDetailPayload {
 	sco: Sco;
 	items: ScoLine[];
+	chargeDue?: ScoChargeDue;
+	challanSettlements?: ChallanSettlementRow[];
 }
 
 export type ScoListParams = {
@@ -263,3 +286,84 @@ export interface ChallanDetailPayload {
 }
 
 export type ChallanDetailResult = ApiResult<ChallanDetailPayload>;
+
+// ---- S3: receipt + QA ----
+
+export type ReceiptQaStatus =
+	| "pending_qa"
+	| "accepted"
+	| "partial_accepted"
+	| "rejected";
+
+export interface Receipt {
+	id: number;
+	grnNumber: string;
+	scoId: number;
+	vendorId: number;
+	vendorChallanNo: string;
+	status: ReceiptQaStatus;
+	receivedDate: string;
+	notes: string | null;
+	createdBy: number;
+	createdAt: string;
+	scoNumber: string;
+	vendorName: string;
+	createdByName: string | null;
+}
+
+export interface ReceiptLine {
+	id: number;
+	scoGrnId: number;
+	scoItemId: number;
+	processedQty: number;
+	unprocessedQty: number;
+	acceptedQty: number | null;
+	rejectedQty: number | null;
+	qaStatus: ReceiptQaStatus;
+	qaDecidedBy: number | null;
+	qaDecidedAt: string | null;
+	qaNotes: string | null;
+	heatNumber: string | null;
+	finishedItemSku: string;
+	finishedItemName: string;
+	rawItemSku: string;
+	rawItemName: string;
+	qaDecidedByName: string | null;
+}
+
+export interface ReceiptSettlement {
+	id: number;
+	receiptItemId: number;
+	challanLineId: number;
+	qty: number;
+	createdAt: string;
+	challanId: number;
+	challanNumber: string;
+	scoItemId: number;
+}
+
+export interface ReceiptDetailPayload {
+	receipt: Receipt;
+	lines: ReceiptLine[];
+	settlements: ReceiptSettlement[];
+}
+
+export type ReceiptDetailResult = ApiResult<ReceiptDetailPayload>;
+export type ReceiptListResult = ApiResult<Receipt[]>;
+
+export interface ReceiptCreatePayload {
+	vendorChallanNo: string;
+	receivedDate?: string;
+	notes?: string;
+	lines: Array<{
+		scoItemId: number;
+		processedQty: number;
+		unprocessedQty?: number;
+	}>;
+}
+
+export interface QaDecisionPayload {
+	acceptedQty: number;
+	rejectedQty: number;
+	notes?: string;
+}
