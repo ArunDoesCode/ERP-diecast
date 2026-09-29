@@ -54,6 +54,7 @@ Type: defect · infra · feature · debt · idea.
 | BL-067 | P3 | debt | backend | List `q` search uses leading-wildcard `ilike` (PR, PO, GRN number) — no index; add pg_trgm when lists grow. See BL-032, BL-050 | m1 PERF-09, PERF-M2 | 2026-09-29 |
 | BL-068 | P3 | debt | approval | `assertChainHasEligibleApprovers` runs one count per chain step; group into one query if touched | m1 PERF-11 (procurement review) | 2026-09-29 |
 | BL-070 | P1 | feature | subcontracting | Build subcontracting (spec frozen v1): `/feature subcontracting` on a fresh branch from main after the m1 PR merges. Includes SCO parts of BR-INV-05/10, BR-SUP-06/07, BL-065 | m1 plan (next batch) | 2026-09-29 |
+| BL-071 | P1 | defect | known-defects | `db:reset` guard lets a local DB named `diecast` through with no confirm, so a script run with the dev `DATABASE_URL` wiped the dev DB (2026-09-29). Also local `db:test:prepare` builds a different DB than CI's `db:reset --no-fixtures` (no baseline policies) → tests pass locally, fail in CI. Needs a known-defects spec change: confirm for any DB that isn't a test DB; one test-DB build path for local + CI | — | 2026-09-29 |
 
 ## Done
 | ID | Item | PR / commit | Closed |
@@ -87,4 +88,4 @@ Type: defect · infra · feature · debt · idea.
 | BL-018 | Confirmed + fixed: `authService.refresh` re-reads active employee + role + pages (401 if deactivated — was also refreshing forever). Regression test `src/service/authService.test.ts`. Also fixed test isolation: per-file `disconnectDb()` moved to a global afterAll in the test preload | PR #4 (fix), PR #6 (tests by test-writer) | 2026-09-27 |
 | BL-021 | Audit doc statuses verified against code: 13 resolved, 4 partial, 7 open, 1 frontend-only; status block at top. Open items not already tracked → BL-030..BL-037 | PR #4 | 2026-09-27 |
 
-Next free id: **BL-071**
+Next free id: **BL-072**
