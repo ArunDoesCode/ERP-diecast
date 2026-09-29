@@ -32,3 +32,6 @@ db-reset.test.ts BR-KD-46: replaced "stock and average cost 0" with "currentStoc
 
 ## SPEC-P3 (appended)
 Manual UI checklist written: .pipeline/m1/manual-ui-checklist.md (8 sections: grants gating, roles, screens, isSuperAdmin, Cancel PR BR-KD-16/BR-PR-39, BR-PR-14 note, BR-APR-57..60, PO screens). Links the m1-stock checklist for grn/inventory/suppliers.
+
+## LOC-1 (appended)
+GET /asset/locations now expects asset.manage OR inventory.view (auth-setup v10): matrix row -> ow,bo,fs; new inventoryMasters test (ow/bo/fs/sa 200, qa/operator 403, ow/fs POST 403). 2 RED, waiting on backend-dev listLocations change.
