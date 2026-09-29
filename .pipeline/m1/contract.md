@@ -227,3 +227,4 @@ Base `/api`. Envelope `{ success, data }`; lists add `meta`. New handlers return
 ### APR / PO — coordinator decisions (2026-09-29)
 - PO defaults (BR-PO-03/04/23, BR-SUP-16): the frontend prefills rate, GST % and payment terms from `GET /api/supplier/:id/listItems` (active price rows) and supplier detail; on create/update the backend fills the same defaults when `unitPricePaise` / `gstPercent` / `paymentTermsDays` are omitted. Both stay editable.
 - Route names confirmed: `GET /api/approval/getApprovalHistory/:docType/:docId`, `POST /api/po/:id/short-close`, `GET /api/po/:id/communications`.
+- Line cancel (BR-PR-33): `POST /api/pr/:id/lines/:lineId/cancel` body `{ reason }` (3–500), key `pr.manage`, requester or super-admin; only a `pending` line while the header is `approved`/`partial_ordered`; header recomputed (BR-PR-36). Built in PO-S1.
