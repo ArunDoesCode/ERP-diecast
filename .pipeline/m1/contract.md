@@ -257,3 +257,4 @@ Envelope `{ success, data }`. All PO routes key `po.manage`; PR line cancel key 
 - `/auth/me` and login `user` add `isSuperAdmin: boolean` (FE-SA). Nothing else in the shape changes.
 - New stock-branch routes: `GET /asset/inventory/stock`, `GET /asset/inventory/reconciliation` → `inventory.view`; `GET /supplier/:id/history` → `supplier.view`. `GET /asset/locations` stays `asset.manage` (auth-setup table). `GET /asset/machines` stays any signed-in user, service allows `asset.manage` or `pr.link_machine` (BR-AUTH-26).
 - Removed: `role_pages` table and its routes, `Role` union in `lib/token.ts`, `requireRole`, `{type:"roles"}` auth requirement.
+- BR-PR-14: `GET /api/pr/getprdetails/:id` returns `noCostHistory: boolean` on each line in `items[]` (true when the item's average cost is 0 and the estimate used its standard rate).

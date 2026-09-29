@@ -71,3 +71,4 @@
 | MRG-B1 | coordinator | backend/scripts/db-reset-fixtures.ts | fixture items have no standard rate (BR-INV-03 required, BR-KD-44) → reset fails; 14 db-reset tests red | fix now (backend-dev) | open |
 | MRG-B2 | coordinator | backend/src/service/prService.ts | BR-PR-14 not built: estimate falls back to item standard rate + `noCostHistory` flag | fix now (backend-dev), after MRG-T2 red | open |
 | MRG-F1 | coordinator | frontend/src/lib/api/suppliers/permissions.ts | role-name list (`SUPPLIER_MANAGE_ROLES`) from stock branch; BR-AUTH-11, 14 → `useCan("supplier.manage")` | fix now (frontend-dev, S7) | open |
+| MRG-T3 | test-writer 64 | backend/src/routes/permissions-matrix.test.ts (BR-AUTH-21 rows `/setup/pages` GET/POST/PATCH/DELETE, `GET /setup/permissions`, `POST /setup/roles/:roleId/permissions`) | routes removed in S7; auth-setup BR-AUTH-15 retires page grants → drop these parity rows (assert 404 or remove) | fix now (test-writer) | open |
