@@ -65,7 +65,8 @@ have to be re-explained.
 | backend-dev, frontend-dev, test-writer, code-reviewer, security-auditor, performance-auditor, spec-reviewer | Sonnet | strong coding/review at lower cost |
 | explorer, test-runner | Haiku | search and command running — cheap and fast |
 
-Change a model by editing `model:` in `.claude/agents/<name>.md`.
+Change a model by editing `model:` in `.claude/agents/<name>.md`. Use the family alias (`opus` / `sonnet` /
+`haiku`), not a dated id — the alias picks up new releases (e.g. a new Sonnet) with no edit.
 
 ### Really large features (`/epic`)
 Spec → coordinator splits it into ordered sub-features (5–15 BRs each, e.g. `bom-master` →

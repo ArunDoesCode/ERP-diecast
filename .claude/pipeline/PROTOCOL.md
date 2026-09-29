@@ -42,15 +42,21 @@ Feature: <feature>  Branch: <branch>  Spec: docs/specs/<module>.md (vN, frozen)
 BR scope: BR-XXX-01, BR-XXX-02
 ## Task
 <what to do, concretely>
+## Scope (required — every line filled)
+- In: <exactly what to do, e.g. "BR-GRN-03..05 backend only">
+- Out: <what NOT to do, e.g. "no frontend, no refactors, no new endpoints">
+- May edit: <paths/globs>        May read: <paths/globs, or "anything">
+- Size: <e.g. "≤ 3 files, ≤ 150 changed lines">
+- Stop if: needs anything outside scope → return BLOCKED with the question, don't expand scope
 ## Inputs
 - files / reports / findings to read
-## Constraints
-- ownership: only edit <paths>
-- do not: <things out of scope>
 ## Done when
 - <verifiable checks>
 Write your report to: .pipeline/<feature>/reports/NN-<agent>.md
 ```
+Every subagent call uses this format — inside `/feature` **and** for one-off calls (`/bug`, `/spec`,
+a quick explorer lookup). A brief without a filled Scope block must not be sent. An agent that finds work
+outside its scope reports it under QUESTIONS; it never does it.
 
 ## Return format (agent → coordinator)
 Write the full report file, then return **only** this block as your final message:
@@ -102,6 +108,7 @@ Tests are the spec turned into code. They must not be shaped by the implementati
    Screens touched: .pipeline/<id>/reports/NN-frontend-dev.md#screens-touched   (checklist mode only)
    Test change request: findings.md#<finding-id>   (only when changing an existing test; the finding must
                                                     quote the spec rule)
+   May edit: <test file globs, e.g. backend/src/**/*.test.ts>   Out: production code, specs
    Write your report to: .pipeline/<id>/reports/NN-test-writer.md
    ```
    Nothing else goes in the brief — no extra sentences. If test-writer needs more, it returns `BLOCKED` and
