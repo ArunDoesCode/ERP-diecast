@@ -4,7 +4,7 @@ Also see: GRN + GRN stock, inventory, suppliers checklists in `.pipeline/m1-stoc
 
 Setup: `bun run db:reset` (fixture data). Logins `<role>@diecast.local`, password = `SEED_USER_PASSWORD`:
 ow = owner, bo = back_office, fs = floor_supervisor, qa = qa_inspector, dd = die_designer.
-sa = the super-admin (first admin, not a fixture user). Use two browsers/profiles when a check needs two people.
+sa = the super-admin, `admin@diecast.local` (same password). Use two browsers/profiles when a check needs two people.
 
 ## 1. Menus and buttons follow grants (BR-AUTH-13, 14, 15, 24)
 - [ ] sa, `/setup` > Roles > back_office: untick `po.manage`, save. bo, next click (no re-login): PO menu gone, `/purchase-orders` redirects home. Expected: BR-AUTH-12/15.
