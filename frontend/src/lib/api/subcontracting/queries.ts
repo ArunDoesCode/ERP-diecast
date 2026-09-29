@@ -254,6 +254,9 @@ export function useIssueChallanMutation(scoId: number) {
 				queryClient.invalidateQueries({ queryKey: scoKeys.detail(scoId) }),
 				queryClient.invalidateQueries({ queryKey: scoKeys.challans(scoId) }),
 				queryClient.invalidateQueries({ queryKey: scoKeys.openChallans() }),
+				queryClient.invalidateQueries({
+					queryKey: ["subcontracting", "vendor-stock"],
+				}),
 				queryClient.invalidateQueries({ queryKey: ["inventory"] }),
 			]);
 			toast.success(
@@ -300,6 +303,9 @@ export function useCreateReceiptMutation(scoId: number) {
 				queryClient.invalidateQueries({ queryKey: scoKeys.receipts(scoId) }),
 				queryClient.invalidateQueries({ queryKey: scoKeys.challans(scoId) }),
 				queryClient.invalidateQueries({ queryKey: scoKeys.openChallans() }),
+				queryClient.invalidateQueries({
+					queryKey: ["subcontracting", "vendor-stock"],
+				}),
 				queryClient.invalidateQueries({ queryKey: ["inventory"] }),
 			]);
 			toast.success(
@@ -331,6 +337,9 @@ export function useDecideQaMutation(scoId: number, receiptId: number) {
 				queryClient.invalidateQueries({ queryKey: scoKeys.receipts(scoId) }),
 				queryClient.invalidateQueries({
 					queryKey: scoKeys.receiptDetail(receiptId),
+				}),
+				queryClient.invalidateQueries({
+					queryKey: ["subcontracting", "vendor-stock"],
 				}),
 				queryClient.invalidateQueries({ queryKey: ["inventory"] }),
 			]);
