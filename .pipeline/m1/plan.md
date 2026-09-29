@@ -16,3 +16,12 @@ Explorer: reports/01-explorer.md (54-route parity table).
 | S7 | Cleanup (after merging work/m1-stock) | 11 (CI), 15 (retire role_pages) | drop `role_pages`, `Role` union, `requireRole`; convert stock branch `// perm:` routes; CI test fails on role-name literals | drop old Permissions tab | literal-scan test; parity green |
 
 Then: known-defects, purchase-requisition, approval(+policies), purchase-order — each gets its own plan section here when reached.
+
+## known-defects + purchase-requisition slices (explorer: reports/19-explorer.md)
+| # | Slice | BRs | Notes |
+|---|---|---|---|
+| KD-S1 | bootstrap-admin script | BR-KD-17, 20, 23, 25, 27, 28, 29 | `bun run bootstrap-admin`, env inputs, exit codes, one super-admin, race-safe |
+| KD-S2 | db:reset script + fixtures | BR-KD-30, 33, 35, 40, 44, 46 | guard → drop schema → push → seeds (roles + permission keys) → fixtures via real services; CI uses it |
+| PR-S1 | PR cancel | BR-PR-39, 41, 42, 43, 46 (cancel), 47; BR-KD-01..10, 13, 16 | one cancel path `DELETE /api/pr/deletepr/:id` + reason; audit cols; row lock; approval cancel in same tx; frontend BL-001 fix |
+| PR-S2 | PR create / edit / submit | BR-PR-01, 02, 06, 08, 11, 14, 15, 17, 19, 21, 45, 46, 47 | draft-only edits (PR_NOT_EDITABLE), requester-only, standard-rate estimate, 3-decimal qty |
+| PR-S3 | PR line states ↔ PO | BR-PR-25, 28, 30, 31, 32, 33, 36 | built with purchase-order module (PO writes drive PR lines) |

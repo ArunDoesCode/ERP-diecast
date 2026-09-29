@@ -162,3 +162,9 @@ GET `/access-log?page&pageSize&sortBy=at|action|actorId&sortDir` -> 200 paginate
 
 ## Error codes (new in S6)
 `SYSTEM_ROLE_PROTECTED` 403, `ROLE_HAS_EMPLOYEES` 409, `ROLE_IN_APPROVAL_CHAIN` 409, `LAST_ADMIN` 409, `KEY_NOT_GRANTABLE` 400, `UNKNOWN_KEY` 400, `SCREEN_HAS_NO_KEY` 400, `ROLE_NOT_ASSIGNABLE` 403. Existing: `PERMISSION_DENIED` 403 (with `key`), `NOT_FOUND`, `CONFLICT`. Stubs currently return 501 `NOT_IMPLEMENTED`.
+
+## PR-S1 — PR cancel (coordinator decisions; backend-dev updates the descriptor + schema in the build)
+- `DELETE /api/pr/deletepr/:id` — key `pr.manage`; JSON body `{ reason: string }` (trimmed 3–500, else 400 `PR_CANCEL_REASON_REQUIRED`), required for every status incl. draft (BR-PR-41).
+- Response 200 `{ success, data: { pr } }`; `pr` and `GET /api/pr/getprdetails/:id` carry `cancelledBy` (employee id), `cancelledByName`, `cancelledAt` (ISO), `cancelReason` (BR-PR-46, BR-KD-08).
+- Error codes per spec: BR-PR-39 / 41 / 42 / 43 / 47 (use the PR spec's codes; known-defects references them).
+- Tests are HTTP-level through `createApp().request()` with real logins; the forced "trail insert fails" sub-case of BR-PR-42 is a known gap (no production hook).

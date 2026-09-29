@@ -13,3 +13,7 @@
 | 9 | test-writer (10) | PR Machine field = purchase_requests.assetId? | yes | spec v7 changelog |
 | 10 | backend-dev (15) | S6 codes/choices: ROLE_NOT_ASSIGNABLE (BR-16), SCREEN_HAS_NO_KEY, unpaginated screens/assignable-roles, SYSTEM_ROLE_PROTECTED on super-admin grants (BR-18), UNKNOWN_KEY | all accepted | contract S6 |
 | 11 | test-writer (16) | delete role held only by inactive employees? | block: 409 ROLE_HAS_INACTIVE_EMPLOYEES (FK; employees keep a role) | spec v8 |
+| 12 | frontend-dev (17) | default Setup tab | first tab the user can open | frontend follow-up |
+| 13 | frontend-dev (17) | PATCH employee resends unchanged roleId | backend skips BR-16/17 when unchanged | backend S6 |
+| 14 | frontend-dev (17) | menuGroup "" | = no group (null), not 400 | backend S6 |
+| 15 | test-writer (21) | PR cancel: reason transport, cancel fields, test level | body {reason}; cancelledBy/cancelledByName/cancelledAt/cancelReason; HTTP tests | contract PR-S1 |
