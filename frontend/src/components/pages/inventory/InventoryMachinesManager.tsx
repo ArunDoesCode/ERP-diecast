@@ -17,6 +17,7 @@ import {
 	type SearchableSelectOption,
 } from "@/components/common/SearchableSelect";
 import { InventoryBackButton } from "@/components/pages/inventory/InventoryBackButton";
+import { todayIso } from "@/components/pages/inventory/inventory-format";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import {
 	useCreateMachineMutation,
@@ -53,7 +55,7 @@ import {
 	type AssetMachine,
 	type AssetMachineCreatePayload,
 	type AssetMachineStatus,
-	assetMachineCreateSchema,
+	assetMachineFormSchema,
 	assetMachineStatusValues,
 } from "@/types/asset";
 
@@ -82,13 +84,16 @@ function toMachinePayload(
 ): AssetMachineCreatePayload {
 	return {
 		name: values.name.trim(),
+		code: values.code.trim(),
 		type: values.type?.trim() ? values.type.trim() : null,
 		status: values.status ?? "idle",
 		lastMaintenanceAt: values.lastMaintenanceAt?.trim()
-			? values.lastMaintenanceAt.trim()
+			? values.lastMaintenanceAt.trim().slice(0, 10)
 			: null,
 	};
 }
+
+type MachineFormValues = AssetMachineCreatePayload & { isActive: boolean };
 
 type MachineEditorFormProps = {
 	mode: "create" | "edit";
@@ -105,25 +110,29 @@ function MachineEditorForm({ mode, machine, onDone }: MachineEditorFormProps) {
 			? createMachineMutation.isPending
 			: updateMachineMutation.isPending;
 
-	const form = useForm<AssetMachineCreatePayload>({
-		resolver: zodResolver(assetMachineCreateSchema),
+	const form = useForm<MachineFormValues>({
+		resolver: zodResolver(assetMachineFormSchema),
 		defaultValues:
 			mode === "edit" && machine
 				? {
 						name: machine.name,
+						code: machine.code ?? "",
 						type: machine.type,
 						status: machine.status,
-						lastMaintenanceAt: machine.lastMaintenanceAt,
+						lastMaintenanceAt: machine.lastMaintenanceAt?.slice(0, 10) ?? null,
+						isActive: machine.isActive,
 					}
 				: {
 						name: "",
+						code: "",
 						type: null,
 						status: "idle",
 						lastMaintenanceAt: null,
+						isActive: true,
 					},
 	});
 
-	function onSubmit(values: AssetMachineCreatePayload) {
+	function onSubmit(values: MachineFormValues) {
 		const payload = toMachinePayload(values);
 
 		if (mode === "create") {
@@ -136,7 +145,10 @@ function MachineEditorForm({ mode, machine, onDone }: MachineEditorFormProps) {
 		if (!machine) return;
 
 		updateMachineMutation.mutate(
-			{ machineId: machine.id, payload },
+			{
+				machineId: machine.id,
+				payload: { ...payload, isActive: values.isActive },
+			},
 			{
 				onSuccess: () => onDone(),
 			},
@@ -146,6 +158,23 @@ function MachineEditorForm({ mode, machine, onDone }: MachineEditorFormProps) {
 	return (
 		<Form {...form}>
 			<form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
+				{mode === "edit" ? (
+					<FormField
+						control={form.control}
+						name="isActive"
+						render={({ field }) => (
+							<FormItem className="flex flex-row items-center justify-end gap-2">
+								<FormLabel>Active</FormLabel>
+								<FormControl>
+									<Switch
+										checked={field.value}
+										onCheckedChange={field.onChange}
+									/>
+								</FormControl>
+							</FormItem>
+						)}
+					/>
+				) : null}
 				<FormField
 					control={form.control}
 					name="name"
@@ -156,6 +185,23 @@ function MachineEditorForm({ mode, machine, onDone }: MachineEditorFormProps) {
 									{...field}
 									id="machine-name"
 									label="Machine name"
+								/>
+							</FormControl>
+							<FormMessage />
+						</FormItem>
+					)}
+				/>
+
+				<FormField
+					control={form.control}
+					name="code"
+					render={({ field }) => (
+						<FormItem className="min-h-19">
+							<FormControl>
+								<FloatingLabelInput
+									{...field}
+									id="machine-code"
+									label="Machine code"
 								/>
 							</FormControl>
 							<FormMessage />
@@ -224,7 +270,9 @@ function MachineEditorForm({ mode, machine, onDone }: MachineEditorFormProps) {
 							<FormControl>
 								<FloatingLabelInput
 									id="machine-last-maintenance"
-									label="Last maintenance (ISO date)"
+									label="Last maintenance date"
+									type="date"
+									max={todayIso()}
 									name={field.name}
 									value={field.value ?? ""}
 									onBlur={field.onBlur}
@@ -300,11 +348,28 @@ export function InventoryMachinesManager() {
 				),
 			},
 			{
+				accessorKey: "code",
+				header: ({ column }) => (
+					<DataTableColumnHeader column={column} title="Code" />
+				),
+				cell: ({ getValue }) => getValue<string | null>() || "—",
+			},
+			{
 				accessorKey: "type",
 				header: ({ column }) => (
 					<DataTableColumnHeader column={column} title="Type" />
 				),
 				cell: ({ getValue }) => getValue<string | null>() || "—",
+			},
+			{
+				accessorKey: "isActive",
+				header: "Active",
+				cell: ({ getValue }) =>
+					getValue<boolean>() ? (
+						<Badge variant="secondary">Active</Badge>
+					) : (
+						<Badge variant="outline">Inactive</Badge>
+					),
 			},
 			{
 				accessorKey: "status",

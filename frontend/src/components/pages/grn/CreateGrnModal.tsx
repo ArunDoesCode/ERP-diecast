@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useCreateGrnMutation } from "@/lib/api/grn/queries";
 import { usePurchaseOrderDetailQuery } from "@/lib/api/purchase-orders/queries";
+import { qtyStep } from "@/lib/grn-units";
 import type { PurchaseOrderItem } from "@/types/purchase-orders";
 
 function remainingQty(item: PurchaseOrderItem) {
@@ -48,6 +49,7 @@ export function CreateGrnModal({
 	const [driverPhone, setDriverPhone] = useState("");
 	const [remarks, setRemarks] = useState("");
 	const [arrivedQty, setArrivedQty] = useState<Record<number, string>>({});
+	const [batchNumbers, setBatchNumbers] = useState<Record<number, string>>({});
 	const createMutation = useCreateGrnMutation();
 
 	function qtyFor(item: PurchaseOrderItem) {
@@ -62,22 +64,24 @@ export function CreateGrnModal({
 		setDriverPhone("");
 		setRemarks("");
 		setArrivedQty({});
+		setBatchNumbers({});
 	}
 
 	const lines = remainingLines
 		.map((item) => ({
 			poItemId: item.id,
 			arrivedQty: Number(qtyFor(item) || 0),
+			batchNumber: batchNumbers[item.id]?.trim() || undefined,
 		}))
 		.filter((line) => line.arrivedQty > 0);
 
 	function onSubmit() {
-		if (lines.length === 0) return;
+		if (lines.length === 0 || !challanNo.trim()) return;
 
 		createMutation.mutate(
 			{
 				poId,
-				challanNo: challanNo.trim() || undefined,
+				challanNo: challanNo.trim(),
 				challanDate: challanDate || undefined,
 				vehicleNo: vehicleNo.trim() || undefined,
 				driverName: driverName.trim() || undefined,
@@ -128,10 +132,11 @@ export function CreateGrnModal({
 										htmlFor="grn-create-challan-no"
 										className="mb-1 block text-xs font-medium"
 									>
-										Challan no
+										Challan no *
 									</label>
 									<Input
 										id="grn-create-challan-no"
+										required
 										value={challanNo}
 										onChange={(event) => setChallanNo(event.target.value)}
 									/>
@@ -210,7 +215,7 @@ export function CreateGrnModal({
 								{remainingLines.map((item) => (
 									<div
 										key={item.id}
-										className="grid gap-3 rounded-md border p-3 md:grid-cols-[1fr_8rem_8rem] md:items-center"
+										className="grid gap-3 rounded-md border p-3 md:grid-cols-[1fr_8rem_8rem_10rem] md:items-center"
 									>
 										<div className="min-w-0">
 											<span className="font-medium">
@@ -240,9 +245,28 @@ export function CreateGrnModal({
 												type="number"
 												min={0}
 												max={remainingQty(item)}
+												step={qtyStep(item.uom)}
 												value={qtyFor(item)}
 												onChange={(event) =>
 													setArrivedQty((current) => ({
+														...current,
+														[item.id]: event.target.value,
+													}))
+												}
+											/>
+										</div>
+										<div>
+											<label
+												htmlFor={`grn-create-batch-${item.id}`}
+												className="mb-1 block text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase"
+											>
+												Batch / heat no
+											</label>
+											<Input
+												id={`grn-create-batch-${item.id}`}
+												value={batchNumbers[item.id] ?? ""}
+												onChange={(event) =>
+													setBatchNumbers((current) => ({
 														...current,
 														[item.id]: event.target.value,
 													}))
@@ -269,7 +293,11 @@ export function CreateGrnModal({
 							</Button>
 							<Button
 								type="button"
-								disabled={lines.length === 0 || createMutation.isPending}
+								disabled={
+									lines.length === 0 ||
+									!challanNo.trim() ||
+									createMutation.isPending
+								}
 								onClick={onSubmit}
 							>
 								Record GRN · {lines.length} line{lines.length === 1 ? "" : "s"}

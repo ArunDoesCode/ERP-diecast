@@ -628,13 +628,22 @@ export const poService = {
       next = "fully_received";
     } else if (anyReceived) {
       next = "partial_received";
+    } else if (po.status === "partial_received") {
+      // everything received was corrected away (BR-PO-10)
+      next = "dispatched";
     }
 
     if (!next || next === po.status) {
       return po;
     }
 
-    assertValidStatusTransition(po.status, next);
+    // Receipt status moves both ways until invoiced or closed (BR-PO-10).
+    const receiptMove =
+      (po.status === "fully_received" || po.status === "partial_received") &&
+      (next === "partial_received" || next === "dispatched");
+    if (!receiptMove) {
+      assertValidStatusTransition(po.status, next);
+    }
     const row = await poRepository.setStatus(poId, next, tx);
     if (!row) {
       throw new NotFoundError("Purchase order not found");

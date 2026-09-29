@@ -17,12 +17,14 @@ type RequestOptions = {
 export class ApiClientError extends Error {
 	status: number;
 	code?: string;
+	body: unknown;
 
-	constructor(message: string, status: number, code?: string) {
+	constructor(message: string, status: number, code?: string, body?: unknown) {
 		super(message);
 		this.name = "ApiClientError";
 		this.status = status;
 		this.code = code;
+		this.body = body;
 	}
 }
 
@@ -66,6 +68,7 @@ async function request<T>(
 			errorBody?.message ?? fallback,
 			response.status,
 			errorBody?.code,
+			errorBody,
 		);
 	}
 

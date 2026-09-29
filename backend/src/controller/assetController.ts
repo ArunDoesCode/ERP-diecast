@@ -4,7 +4,6 @@ import { BadRequestError } from "../lib/errors";
 import type { AppEnv } from "../lib/types";
 import { assetService } from "../service/assetService";
 import {
-  assetInventoryMovementCreateSchema,
   assetInventoryMovementListQuerySchema,
   assetItemCreateSchema,
   assetItemListQuerySchema,
@@ -16,9 +15,12 @@ import {
   assetMachineCreateSchema,
   assetMachineListQuerySchema,
   assetMachineUpdateSchema,
+  assetManualMovementCreateSchema,
+  assetReconciliationQuerySchema,
   assetServiceCreateSchema,
   assetServiceListQuerySchema,
   assetServiceUpdateSchema,
+  assetStockListQuerySchema,
 } from "../types/asset.types";
 
 function parseId(value: unknown, label: string) {
@@ -48,7 +50,8 @@ export const assetController = {
   async updateItem(c: Context<AppEnv>) {
     const id = parseId(c.req.param("id"), "item id");
     const body = assetItemUpdateSchema.parse(await c.req.json());
-    const data = await assetService.updateItem(id, body);
+    const actorId = Number(c.get("user").userId);
+    const data = await assetService.updateItem(id, body, actorId);
     return c.json({ success: true, data });
   },
 
@@ -93,10 +96,26 @@ export const assetController = {
   },
 
   async createInventoryMovement(c: Context<AppEnv>) {
-    const body = assetInventoryMovementCreateSchema.parse(await c.req.json());
+    const body = assetManualMovementCreateSchema.parse(await c.req.json());
     const actorId = Number(c.get("user").userId);
     const data = await assetService.createInventoryMovement(body, actorId);
     return c.json({ success: true, data }, 201);
+  },
+
+  async inventoryStock(c: Context<AppEnv>) {
+    const query = assetStockListQuerySchema.parse(
+      Object.fromEntries(new URL(c.req.url).searchParams),
+    );
+    const { data, meta } = await assetService.inventoryStock(query);
+    return c.json({ success: true, data, meta });
+  },
+
+  async inventoryReconciliation(c: Context<AppEnv>) {
+    const query = assetReconciliationQuerySchema.parse(
+      Object.fromEntries(new URL(c.req.url).searchParams),
+    );
+    const { data, meta } = await assetService.inventoryReconciliation(query);
+    return c.json({ success: true, data, meta });
   },
 
   async listLocations(c: Context<AppEnv>) {
@@ -109,14 +128,16 @@ export const assetController = {
 
   async createLocation(c: Context<AppEnv>) {
     const body = assetLocationCreateSchema.parse(await c.req.json());
-    const data = await assetService.createLocation(body);
+    const actorId = Number(c.get("user").userId);
+    const data = await assetService.createLocation(body, actorId);
     return c.json({ success: true, data }, 201);
   },
 
   async updateLocation(c: Context<AppEnv>) {
     const id = parseId(c.req.param("id"), "location id");
     const body = assetLocationUpdateSchema.parse(await c.req.json());
-    const data = await assetService.updateLocation(id, body);
+    const actorId = Number(c.get("user").userId);
+    const data = await assetService.updateLocation(id, body, actorId);
     return c.json({ success: true, data });
   },
 

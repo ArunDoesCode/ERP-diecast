@@ -2,13 +2,15 @@ import { Hono } from "hono";
 
 import { supplierController } from "../controller/supplierController";
 import { asyncHandler } from "../lib/async-handler";
-import { requirePermission } from "../lib/auth-middleware";
+import { requireAuth, requirePermission } from "../lib/auth-middleware";
 import { paginatedResponse, successResponse } from "../lib/response-schemas";
 import { register } from "../lib/route-registry";
 import type { AppEnv } from "../lib/types";
 import {
   supplierCreateSchema,
   supplierDetailSchema,
+  supplierHistoryQuerySchema,
+  supplierHistoryRowSchema,
   supplierItemBatchEditSchema,
   supplierItemCreateSchema,
   supplierItemEditResponseSchema,
@@ -39,7 +41,8 @@ register({
   method: "GET",
   path: `${SUPPLIER_BASE_PATH}${SUPPLIER_ROUTES.listSuppliers}`,
   tags: ["supplier"],
-  summary: "List suppliers, paginated.",
+  summary:
+    "List suppliers, paginated. q matches name, contact, email, phone, GSTIN or item SKU; status filter all|active|inactive (default all); default sort name asc.",
   auth: { type: "permission", key: "supplier.view" },
   request: { query: supplierListQuerySchema },
   responses: { "200": paginatedResponse(supplierSchema) },
@@ -171,6 +174,7 @@ register({
   responses: { "200": supplierItemEditResponseSchema },
   notes: [
     "response spreads service result fields directly ({success, data, summary}), not {success,data} — documented deviation, not normalized",
+    "max 100 rows; all rows save or none: any failed row -> 400 with body {success:false, message, code, data: rows[], summary} (rows carry success/error), nothing saved",
   ],
 });
 
@@ -189,7 +193,25 @@ register({
   responses: { "200": supplierServiceEditResponseSchema },
   notes: [
     "response spreads service result fields directly ({success, data, summary}), not {success,data} — documented deviation, not normalized",
+    "max 100 rows; all rows save or none: any failed row -> 400 with body {success:false, message, code, data: rows[], summary} (rows carry success/error), nothing saved",
   ],
+});
+
+supplierRouter.get(
+  SUPPLIER_ROUTES.history,
+  requirePermission("supplier.view"),
+  asyncHandler(supplierController.history),
+);
+register({
+  method: "GET",
+  path: `${SUPPLIER_BASE_PATH}${SUPPLIER_ROUTES.history}`,
+  tags: ["supplier"],
+  summary:
+    "A supplier's change history (master, item price rows, service price rows), newest first, paginated.",
+  auth: { type: "permission", key: "supplier.view" },
+  request: { query: supplierHistoryQuerySchema },
+  responses: { "200": paginatedResponse(supplierHistoryRowSchema) },
+  pagination: { sortableFields: [], searchable: false },
 });
 
 export { supplierRouter as supplierRoutes };

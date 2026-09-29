@@ -15,7 +15,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useCan } from "@/hooks/use-can";
-import { useGrnBypassMutation } from "@/lib/api/grn/queries";
+import { useGrnBypassMutation, usePoItemUoms } from "@/lib/api/grn/queries";
+import { qtyStep } from "@/lib/grn-units";
 import type { GrnItemDetail } from "@/types/grn";
 
 const OVER_RECEIPT_MULTIPLIER = 1.05;
@@ -35,15 +36,25 @@ export function GrnBypassAlert({
 }) {
 	const [bypassReason, setBypassReason] = useState("");
 	const [acceptedQty, setAcceptedQty] = useState(String(line.receivedQty));
+	const [batchNumber, setBatchNumber] = useState(line.batchNumber ?? "");
+	const [overrideReason, setOverrideReason] = useState("");
+	const uoms = usePoItemUoms(poId, open);
+	const uom = line.poItemId != null ? uoms.get(line.poItemId) : undefined;
 	const mutation = useGrnBypassMutation();
 
-	const isOverReceipt =
-		Number(acceptedQty || 0) > line.orderedQty * OVER_RECEIPT_MULTIPLIER;
-	const isExempt = useCan("grn.over_receipt_override");
+	const accepted = Number(acceptedQty || 0);
+	const rejectedRest = Math.max(
+		0,
+		Math.round((line.receivedQty - accepted) * 1000) / 1000,
+	);
+	const isOverReceipt = accepted > line.orderedQty * OVER_RECEIPT_MULTIPLIER;
+	const canOverride = useCan("grn.over_receipt_override");
 
 	function reset() {
 		setBypassReason("");
 		setAcceptedQty(String(line.receivedQty));
+		setBatchNumber(line.batchNumber ?? "");
+		setOverrideReason("");
 	}
 
 	return (
@@ -74,20 +85,67 @@ export function GrnBypassAlert({
 							id="grn-bypass-accepted-qty"
 							type="number"
 							min={0}
+							step={qtyStep(uom)}
 							value={acceptedQty}
 							onChange={(event) => setAcceptedQty(event.target.value)}
+						/>
+						{rejectedRest > 0 ? (
+							<p className="mt-1 text-xs text-muted-foreground">
+								Rest ({rejectedRest}) will be recorded as rejected.
+							</p>
+						) : null}
+					</div>
+
+					<div>
+						<label
+							htmlFor="grn-bypass-batch-number"
+							className="mb-1 block text-xs font-medium"
+						>
+							Batch / heat no
+						</label>
+						<Input
+							id="grn-bypass-batch-number"
+							value={batchNumber}
+							onChange={(event) => setBatchNumber(event.target.value)}
+							placeholder="Optional"
 						/>
 					</div>
 
 					{isOverReceipt ? (
-						<p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-							{isExempt
-								? "This exceeds 105% of the ordered qty. Your role can still submit — the backend will not block this."
-								: "This exceeds 105% of the ordered qty. Only owner/back office roles can push this through if the server blocks it."}
-						</p>
+						canOverride ? (
+							<div>
+								<p className="mb-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+									This exceeds 105% of the ordered qty. Give a reason to
+									override.
+								</p>
+								<label
+									htmlFor="grn-bypass-override-reason"
+									className="mb-1 block text-xs font-medium"
+								>
+									Over-receipt override reason
+								</label>
+								<Textarea
+									id="grn-bypass-override-reason"
+									value={overrideReason}
+									onChange={(event) => setOverrideReason(event.target.value)}
+								/>
+							</div>
+						) : (
+							<p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+								This exceeds 105% of the ordered qty. You cannot override it;
+								ask the owner or back office.
+							</p>
+						)
 					) : null}
 
+					<label
+						htmlFor="grn-bypass-reason"
+						className="block text-xs font-medium"
+					>
+						Bypass reason
+					</label>
 					<Textarea
+						id="grn-bypass-reason"
 						value={bypassReason}
 						onChange={(event) => setBypassReason(event.target.value)}
 						placeholder="Reason for bypassing QA"
@@ -97,7 +155,13 @@ export function GrnBypassAlert({
 				<AlertDialogFooter>
 					<AlertDialogCancel>Back</AlertDialogCancel>
 					<AlertDialogAction
-						disabled={!bypassReason.trim() || mutation.isPending}
+						disabled={
+							!bypassReason.trim() ||
+							!(accepted > 0) ||
+							accepted > line.receivedQty ||
+							(isOverReceipt && canOverride && !overrideReason.trim()) ||
+							mutation.isPending
+						}
 						onClick={() =>
 							mutation.mutate({
 								grnId,
@@ -105,7 +169,12 @@ export function GrnBypassAlert({
 								poId,
 								payload: {
 									bypassReason: bypassReason.trim(),
-									acceptedQty: Number(acceptedQty || 0),
+									acceptedQty: accepted,
+									batchNumber: batchNumber.trim() || undefined,
+									overrideReason:
+										isOverReceipt && canOverride
+											? overrideReason.trim() || undefined
+											: undefined,
 								},
 							})
 						}

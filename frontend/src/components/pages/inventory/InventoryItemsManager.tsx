@@ -17,6 +17,8 @@ import {
 	type SearchableSelectOption,
 } from "@/components/common/SearchableSelect";
 import { InventoryBackButton } from "@/components/pages/inventory/InventoryBackButton";
+import { formatPaise } from "@/components/pages/inventory/inventory-format";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -34,6 +36,13 @@ import {
 	FormLabel,
 	FormMessage,
 } from "@/components/ui/form";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import {
@@ -43,8 +52,14 @@ import {
 } from "@/lib/api/asset/queries";
 import {
 	type AssetItem,
+	type AssetItemCategory,
 	type AssetItemCreatePayload,
-	assetItemCreateSchema,
+	type AssetItemFormValues,
+	type AssetItemUom,
+	type AssetItemUpdatePayload,
+	assetItemCategoryValues,
+	assetItemFormSchema,
+	assetItemUomValues,
 } from "@/types/asset";
 
 type ItemModalState =
@@ -60,18 +75,54 @@ function toItemOption(item: AssetItem): SearchableSelectOption {
 	};
 }
 
-function toItemPayload(values: AssetItemCreatePayload): AssetItemCreatePayload {
+function buildItemWirePayload(
+	values: AssetItemFormValues,
+): AssetItemCreatePayload {
 	return {
 		sku: values.sku.trim(),
 		name: values.name.trim(),
 		description: values.description?.trim() ? values.description.trim() : null,
-		category: values.category.trim(),
-		uom: values.uom.trim(),
+		category: values.category,
+		uom: values.uom,
 		reorderLevel: values.reorderLevel,
-		currentStock: values.currentStock,
-		averageCostPaise: values.averageCostPaise,
-		isActive: values.isActive,
+		standardRatePaise: Math.round(values.standardRate * 100),
 	};
+}
+
+// Edit sends only what changed, so an unchanged SKU/UOM never trips ITEM_IN_USE.
+function toUpdatePayload(
+	values: AssetItemFormValues,
+	item: AssetItem,
+): AssetItemUpdatePayload {
+	const next = buildItemWirePayload(values);
+	const payload: AssetItemUpdatePayload = {};
+	if (next.sku !== item.sku) payload.sku = next.sku;
+	if (next.name !== item.name) payload.name = next.name;
+	if (next.description !== (item.description ?? null))
+		payload.description = next.description;
+	if (next.category !== item.category) payload.category = next.category;
+	if (next.uom !== item.uom) payload.uom = next.uom;
+	if (
+		next.reorderLevel !== undefined &&
+		next.reorderLevel !== (item.reorderLevel ?? undefined)
+	)
+		payload.reorderLevel = next.reorderLevel;
+	if (next.standardRatePaise !== item.standardRatePaise)
+		payload.standardRatePaise = next.standardRatePaise;
+	if (values.isActive !== item.isActive) payload.isActive = values.isActive;
+	return payload;
+}
+
+function asCategory(value: string): AssetItemCategory | undefined {
+	return (assetItemCategoryValues as readonly string[]).includes(value)
+		? (value as AssetItemCategory)
+		: undefined;
+}
+
+function asUom(value: string): AssetItemUom | undefined {
+	return (assetItemUomValues as readonly string[]).includes(value)
+		? (value as AssetItemUom)
+		: undefined;
 }
 
 type ItemEditorFormProps = {
@@ -89,43 +140,49 @@ function ItemEditorForm({ mode, item, onDone }: ItemEditorFormProps) {
 			? createItemMutation.isPending
 			: updateItemMutation.isPending;
 
-	const form = useForm<AssetItemCreatePayload>({
-		resolver: zodResolver(assetItemCreateSchema),
+	const form = useForm<AssetItemFormValues>({
+		resolver: zodResolver(assetItemFormSchema),
 		defaultValues:
 			mode === "edit" && item
 				? {
 						sku: item.sku,
 						name: item.name,
 						description: item.description,
-						category: item.category,
-						uom: item.uom,
+						category: asCategory(item.category),
+						uom: asUom(item.uom),
 						reorderLevel: item.reorderLevel ?? undefined,
-						currentStock: item.currentStock ?? undefined,
-						averageCostPaise: item.averageCostPaise ?? undefined,
+						standardRate:
+							item.standardRatePaise > 0
+								? item.standardRatePaise / 100
+								: undefined,
 						isActive: item.isActive,
 					}
 				: {
 						sku: "",
 						name: "",
 						description: null,
-						category: "",
-						uom: "",
+						category: undefined,
+						uom: undefined,
 						reorderLevel: undefined,
-						currentStock: undefined,
-						averageCostPaise: undefined,
+						standardRate: undefined,
 						isActive: true,
 					},
 	});
 
-	function onSubmit(values: AssetItemCreatePayload) {
-		const payload = toItemPayload(values);
-
+	function onSubmit(values: AssetItemFormValues) {
 		if (mode === "create") {
-			createItemMutation.mutate(payload, { onSuccess: onDone });
+			createItemMutation.mutate(buildItemWirePayload(values), {
+				onSuccess: onDone,
+			});
 			return;
 		}
 
 		if (!item) return;
+		const payload = toUpdatePayload(values, item);
+		if (Object.keys(payload).length === 0) {
+			onDone();
+			return;
+		}
 		updateItemMutation.mutate(
 			{ itemId: item.id, payload },
 			{ onSuccess: onDone },
@@ -135,22 +192,23 @@ function ItemEditorForm({ mode, item, onDone }: ItemEditorFormProps) {
 	return (
 		<Form {...form}>
 			<form className="" onSubmit={form.handleSubmit(onSubmit)}>
-				<FormField
-					control={form.control}
-					name="isActive"
-					render={({ field }) => (
-						<FormItem className="flex flex-row items-center justify-end gap-2 -translate-y-3.5">
-							<FormLabel>Active</FormLabel>
-							<FormControl>
-								<Switch
-									checked={field.value ?? false}
-									onCheckedChange={field.onChange}
-									aria-label="Toggle item active status"
-								/>
-							</FormControl>
-						</FormItem>
-					)}
-				/>
+				{mode === "edit" ? (
+					<FormField
+						control={form.control}
+						name="isActive"
+						render={({ field }) => (
+							<FormItem className="flex flex-row items-center justify-end gap-2 -translate-y-3.5">
+								<FormLabel>Active</FormLabel>
+								<FormControl>
+									<Switch
+										checked={field.value}
+										onCheckedChange={field.onChange}
+									/>
+								</FormControl>
+							</FormItem>
+						)}
+					/>
+				) : null}
 				<div className="grid grid-cols-2 gap-4">
 					<FormField
 						control={form.control}
@@ -187,13 +245,24 @@ function ItemEditorForm({ mode, item, onDone }: ItemEditorFormProps) {
 						name="category"
 						render={({ field }) => (
 							<FormItem className="min-h-19">
-								<FormControl>
-									<FloatingLabelInput
-										{...field}
-										id="item-category"
-										label="Category"
-									/>
-								</FormControl>
+								<FormLabel>Category</FormLabel>
+								<Select
+									value={field.value ?? ""}
+									onValueChange={field.onChange}
+								>
+									<FormControl>
+										<SelectTrigger className="w-full">
+											<SelectValue placeholder="Select category" />
+										</SelectTrigger>
+									</FormControl>
+									<SelectContent>
+										{assetItemCategoryValues.map((category) => (
+											<SelectItem key={category} value={category}>
+												{category}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
 								<FormMessage />
 							</FormItem>
 						)}
@@ -204,8 +273,52 @@ function ItemEditorForm({ mode, item, onDone }: ItemEditorFormProps) {
 						name="uom"
 						render={({ field }) => (
 							<FormItem className="min-h-19">
+								<FormLabel>Unit</FormLabel>
+								<Select
+									value={field.value ?? ""}
+									onValueChange={field.onChange}
+								>
+									<FormControl>
+										<SelectTrigger className="w-full">
+											<SelectValue placeholder="Select unit" />
+										</SelectTrigger>
+									</FormControl>
+									<SelectContent>
+										{assetItemUomValues.map((uom) => (
+											<SelectItem key={uom} value={uom}>
+												{uom}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+								<FormMessage />
+							</FormItem>
+						)}
+					/>
+
+					<FormField
+						control={form.control}
+						name="standardRate"
+						render={({ field }) => (
+							<FormItem className="min-h-19">
 								<FormControl>
-									<FloatingLabelInput {...field} id="item-uom" label="UOM" />
+									<FloatingLabelInput
+										id="item-standard-rate"
+										label="Standard rate (₹)"
+										type="number"
+										step="0.01"
+										min="0"
+										name={field.name}
+										value={field.value ?? ""}
+										onBlur={field.onBlur}
+										ref={field.ref}
+										onChange={(event) => {
+											const value = event.target.value;
+											field.onChange(
+												value === "" ? undefined : event.target.valueAsNumber,
+											);
+										}}
+									/>
 								</FormControl>
 								<FormMessage />
 							</FormItem>
@@ -222,6 +335,8 @@ function ItemEditorForm({ mode, item, onDone }: ItemEditorFormProps) {
 										id="item-reorder-level"
 										label="Reorder level (optional)"
 										type="number"
+										step="0.001"
+										min="0"
 										name={field.name}
 										value={field.value ?? ""}
 										onBlur={field.onBlur}
@@ -239,65 +354,30 @@ function ItemEditorForm({ mode, item, onDone }: ItemEditorFormProps) {
 						)}
 					/>
 
-					<FormField
-						control={form.control}
-						name="currentStock"
-						render={({ field }) => (
-							<FormItem className="min-h-19">
-								<FormControl>
-									<FloatingLabelInput
-										id="item-current-stock"
-										label="Current stock (optional)"
-										type="number"
-										name={field.name}
-										value={field.value ?? ""}
-										onBlur={field.onBlur}
-										ref={field.ref}
-										onChange={(event) => {
-											const value = event.target.value;
-											field.onChange(
-												value === "" ? undefined : event.target.valueAsNumber,
-											);
-										}}
-									/>
-								</FormControl>
-								<FormMessage />
-							</FormItem>
-						)}
-					/>
-
-					<FormField
-						control={form.control}
-						name="averageCostPaise"
-						render={({ field }) => (
-							<FormItem className="min-h-19">
-								<FormControl>
-									<FloatingLabelInput
-										id="item-average-cost"
-										label="Average cost paise (optional)"
-										type="number"
-										name={field.name}
-										value={field.value ?? ""}
-										onBlur={field.onBlur}
-										ref={field.ref}
-										onChange={(event) => {
-											const value = event.target.value;
-											field.onChange(
-												value === "" ? undefined : event.target.valueAsNumber,
-											);
-										}}
-									/>
-								</FormControl>
-								<FormMessage />
-							</FormItem>
-						)}
-					/>
+					{mode === "edit" && item ? (
+						<div className="col-span-2 grid grid-cols-2 gap-3 text-sm">
+							<div>
+								<p className="text-xs font-medium text-muted-foreground">
+									Current stock (read-only)
+								</p>
+								<p>
+									{item.currentStock ?? 0} {item.uom}
+								</p>
+							</div>
+							<div>
+								<p className="text-xs font-medium text-muted-foreground">
+									Average cost (read-only)
+								</p>
+								<p>{formatPaise(item.averageCostPaise)}</p>
+							</div>
+						</div>
+					) : null}
 
 					<FormField
 						control={form.control}
 						name="description"
 						render={({ field }) => (
-							<FormItem className="min-h-19">
+							<FormItem className="col-span-2 min-h-19">
 								<FormControl>
 									<FloatingLabelInput
 										id="item-description"
@@ -388,6 +468,27 @@ export function InventoryItemsManager() {
 				),
 				cell: ({ getValue }) => getValue<string | null>() || "—",
 			},
+			{
+				accessorKey: "currentStock",
+				header: "Stock",
+				cell: ({ row }) =>
+					`${row.original.currentStock ?? 0} ${row.original.uom}`,
+			},
+			{
+				accessorKey: "standardRatePaise",
+				header: "Std rate",
+				cell: ({ getValue }) => formatPaise(getValue<number>()),
+			},
+			{
+				accessorKey: "isActive",
+				header: "Status",
+				cell: ({ getValue }) =>
+					getValue<boolean>() ? (
+						<Badge variant="secondary">Active</Badge>
+					) : (
+						<Badge variant="outline">Inactive</Badge>
+					),
+			},
 		],
 		[],
 	);
@@ -455,7 +556,7 @@ export function InventoryItemsManager() {
 								<DialogDescription>
 									{modal.mode === "create"
 										? "Create new inventory item."
-										: "Update item details."}
+										: "Update item details. SKU and unit cannot change once the item is used."}
 								</DialogDescription>
 							</DialogHeader>
 

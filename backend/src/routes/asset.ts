@@ -7,8 +7,8 @@ import { paginatedResponse, successResponse } from "../lib/response-schemas";
 import { register } from "../lib/route-registry";
 import type { AppEnv } from "../lib/types";
 import {
-  assetInventoryMovementCreateSchema,
   assetInventoryMovementListQuerySchema,
+  assetInventoryMovementListRowSchema,
   assetInventoryMovementSchema,
   assetItemCreateSchema,
   assetItemListQuerySchema,
@@ -24,10 +24,15 @@ import {
   assetMachineListQuerySchema,
   assetMachineSchema,
   assetMachineUpdateSchema,
+  assetManualMovementCreateSchema,
+  assetReconciliationQuerySchema,
+  assetReconciliationRowSchema,
   assetServiceCreateSchema,
   assetServiceListQuerySchema,
   assetServiceSchema,
   assetServiceUpdateSchema,
+  assetStockListQuerySchema,
+  assetStockRowSchema,
 } from "../types/asset.types";
 import { END_POINTS } from "./end-points";
 
@@ -50,7 +55,7 @@ register({
   request: { query: assetMachineListQuerySchema },
   responses: { "200": paginatedResponse(assetMachineSchema) },
   pagination: {
-    sortableFields: ["name", "type", "status", "createdAt"],
+    sortableFields: ["name", "code", "type", "status", "createdAt"],
     searchable: true,
   },
 });
@@ -144,9 +149,9 @@ register({
   path: `${ASSET_BASE_PATH}${ASSET_ROUTES.lastRate}`,
   tags: ["asset"],
   summary:
-    "Look up the rate to prefill for an item+supplier: latest PO price, " +
-    "falling back to the supplier's catalog price, falling back to the " +
-    "item master's average cost estimate.",
+    "Look up the rate to prefill for an item+supplier: newest approved-or-later " +
+    "PO line price, then supplier catalog price, then item average cost (> 0), " +
+    "then item standard rate. Returns the source.",
   auth: { type: "permission", key: "inventory.view" },
   request: { query: assetLastRateQuerySchema },
   responses: { "200": successResponse(assetLastRateSchema) },
@@ -213,7 +218,7 @@ register({
   summary: "List inventory movement rows, paginated.",
   auth: { type: "permission", key: "inventory.view" },
   request: { query: assetInventoryMovementListQuerySchema },
-  responses: { "200": paginatedResponse(assetInventoryMovementSchema) },
+  responses: { "200": paginatedResponse(assetInventoryMovementListRowSchema) },
   pagination: {
     sortableFields: ["createdAt", "transactionType", "quantityChange"],
     searchable: false,
@@ -229,10 +234,48 @@ register({
   method: "POST",
   path: `${ASSET_BASE_PATH}${ASSET_ROUTES.createInventoryMovements}`,
   tags: ["asset"],
-  summary: "Record an inventory movement (in/out/adjustment).",
+  summary:
+    "Manual stock movement: stock-take (stock_adjustment, counted qty) or opening stock (opening_stock, qty + rate) only, reason required. Document reference types get 400.",
   auth: { type: "permission", key: "inventory.adjust" },
-  request: { body: assetInventoryMovementCreateSchema },
+  request: { body: assetManualMovementCreateSchema },
   responses: { "201": successResponse(assetInventoryMovementSchema) },
+});
+
+assetRouter.get(
+  ASSET_ROUTES.inventoryStock,
+  requirePermission("inventory.view"),
+  asyncHandler(assetController.inventoryStock),
+);
+register({
+  method: "GET",
+  path: `${ASSET_BASE_PATH}${ASSET_ROUTES.inventoryStock}`,
+  tags: ["asset"],
+  summary:
+    "Stock view: per item unit, stock, average cost, value, per-location balances, reorder flag, inactive mark.",
+  auth: { type: "permission", key: "inventory.view" },
+  request: { query: assetStockListQuerySchema },
+  responses: { "200": paginatedResponse(assetStockRowSchema) },
+  pagination: {
+    sortableFields: ["sku", "name", "category", "currentStock", "valuePaise"],
+    searchable: true,
+  },
+});
+
+assetRouter.get(
+  ASSET_ROUTES.inventoryReconciliation,
+  requirePermission("inventory.view"),
+  asyncHandler(assetController.inventoryReconciliation),
+);
+register({
+  method: "GET",
+  path: `${ASSET_BASE_PATH}${ASSET_ROUTES.inventoryReconciliation}`,
+  tags: ["asset"],
+  summary:
+    "Stock reconciliation: items whose stock != ledger total and item+location pairs whose last balance != ledger total. Zero rows = OK.",
+  auth: { type: "permission", key: "inventory.view" },
+  request: { query: assetReconciliationQuerySchema },
+  responses: { "200": paginatedResponse(assetReconciliationRowSchema) },
+  pagination: { sortableFields: ["itemId"], searchable: false },
 });
 
 assetRouter.get(

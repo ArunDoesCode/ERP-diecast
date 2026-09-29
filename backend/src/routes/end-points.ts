@@ -24,6 +24,8 @@ export const END_POINTS = {
     updateService: "/services/:id",
     listInventoryMovements: "/inventory/movements",
     createInventoryMovements: "/inventory/movements",
+    inventoryReconciliation: "/inventory/reconciliation",
+    inventoryStock: "/inventory/stock",
     listLocations: "/locations",
     createLocation: "/locations",
     updateLocation: "/locations/:id",
@@ -81,6 +83,7 @@ export const END_POINTS = {
     listServices: "/:supplierId/listServices",
     createService: "/:supplierId/createService",
     editService: "/:supplierId/editService",
+    history: "/:supplierId/history",
   },
   pr: {
     list: "/getprs",

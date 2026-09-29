@@ -14,7 +14,7 @@ import {
   grnDetailsSchema,
   grnItemSchema,
   grnListQuerySchema,
-  grnQaActionSchema,
+  grnQaActionBodySchema,
   grnSchema,
   updateGrnSchema,
 } from "../types/grn.types";
@@ -23,14 +23,7 @@ import { END_POINTS } from "./end-points";
 const GRN_ROUTES = END_POINTS.grn;
 const GRN_BASE_PATH = "/api/grn";
 
-// Create/update draft, bypass.
-// QA accept/reject.
-// Correction.
-// List/details — every desk role, read-only.
-
 const grnRouter = new Hono<AppEnv>();
-
-grnRouter.use("*", requireAuth);
 
 grnRouter.get(
   GRN_ROUTES.list,
@@ -122,9 +115,9 @@ register({
   path: `${GRN_BASE_PATH}${GRN_ROUTES.qaAction}`,
   tags: ["grn"],
   summary:
-    "QA accept/reject a GRN line. Accept posts to the inventory ledger (referenceType=grn) and rolls the PO item/status forward. Blocked past 105% of ordered qty unless the actor is owner/back_office.",
+    "QA decision on a GRN line: acceptedQty + rejectedQty = arrived. Accepted qty > 0 posts to the inventory ledger (referenceType=grn) and rolls the PO item/status forward. Past 105% of ordered qty: 400 unless the actor holds grn.over_receipt_override and sends overrideReason.",
   auth: { type: "permission", key: "grn.qa_decide" },
-  request: { body: grnQaActionSchema },
+  request: { body: grnQaActionBodySchema },
   responses: { "200": successResponse(grnItemSchema) },
 });
 
@@ -154,7 +147,7 @@ register({
   path: `${GRN_BASE_PATH}${GRN_ROUTES.correction}`,
   tags: ["grn"],
   summary:
-    "Correct a previously posted GRN line — posts a negative stock_adjustment ledger entry without mutating the original GRN line row.",
+    "Correct a previously posted GRN line: posts one grn_correction ledger row (-qty at the posted cost), lowers PO received qty; the line's acceptedQty is never edited.",
   auth: { type: "permission", key: "grn.correct" },
   request: { body: grnCorrectionSchema },
   responses: { "201": successResponse(assetInventoryMovementSchema) },

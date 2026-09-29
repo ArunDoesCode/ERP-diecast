@@ -4,17 +4,30 @@ import { IconArrowLeft, IconEdit } from "@tabler/icons-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
+import { SupplierHistoryCard } from "@/components/pages/suppliers/SupplierHistoryCard";
 import { SupplierMasterModal } from "@/components/pages/suppliers/SupplierMasterModal";
 import { SupplierOfferingsSection } from "@/components/pages/suppliers/SupplierOfferingsSection";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { canManageSuppliers } from "@/lib/api/suppliers/permissions";
 import {
 	toSupplierMasterUpdatePayload,
 	useSupplierDetailQuery,
 	useUpdateSupplierMasterMutation,
 } from "@/lib/api/suppliers/queries";
+import { useAuthSessionStore } from "@/lib/store/auth-session-store";
 import type { Supplier, SupplierMasterInput } from "@/types/suppliers";
 
 type SupplierDetailsViewProps = {
@@ -25,28 +38,28 @@ function toMasterDefaultValues(supplier?: Supplier): SupplierMasterInput {
 	if (!supplier) {
 		return {
 			name: "",
-			type: undefined,
+			type: "raw_material",
 			gstNumber: "",
 			panNumber: "",
 			contactPerson: "",
 			email: "",
 			phone: "",
 			address: "",
-			defaultPaymentTermsDays: undefined,
+			defaultPaymentTermsDays: 0,
 			isActive: true,
 		};
 	}
 
 	return {
 		name: supplier.name,
-		type: (supplier.type ?? undefined) as SupplierMasterInput["type"],
+		type: (supplier.type ?? "raw_material") as SupplierMasterInput["type"],
 		gstNumber: supplier.gstNumber ?? "",
 		panNumber: supplier.panNumber ?? "",
 		contactPerson: supplier.contactPerson ?? "",
 		email: supplier.email ?? "",
 		phone: supplier.phone ?? "",
 		address: supplier.address ?? "",
-		defaultPaymentTermsDays: supplier.defaultPaymentTermsDays ?? undefined,
+		defaultPaymentTermsDays: supplier.defaultPaymentTermsDays ?? 0,
 		isActive: supplier.isActive,
 	};
 }
@@ -59,6 +72,9 @@ function renderValue(value?: string | number | null) {
 export function SupplierDetailsView({ supplierId }: SupplierDetailsViewProps) {
 	const router = useRouter();
 	const [editOpen, setEditOpen] = useState(false);
+	const [statusConfirmOpen, setStatusConfirmOpen] = useState(false);
+	const role = useAuthSessionStore((state) => state.role);
+	const canManage = canManageSuppliers(role);
 
 	const detailQuery = useSupplierDetailQuery(supplierId);
 	const updateMasterMutation = useUpdateSupplierMasterMutation();
@@ -127,14 +143,25 @@ export function SupplierDetailsView({ supplierId }: SupplierDetailsViewProps) {
 						</Badge>
 					</div>
 
-					<Button
-						type="button"
-						variant="outline"
-						onClick={() => setEditOpen(true)}
-					>
-						<IconEdit className="size-3.5" />
-						Edit details
-					</Button>
+					{canManage ? (
+						<div className="flex gap-2">
+							<Button
+								type="button"
+								variant="outline"
+								onClick={() => setStatusConfirmOpen(true)}
+							>
+								{supplier.isActive ? "Deactivate" : "Reactivate"}
+							</Button>
+							<Button
+								type="button"
+								variant="outline"
+								onClick={() => setEditOpen(true)}
+							>
+								<IconEdit className="size-3.5" />
+								Edit details
+							</Button>
+						</div>
+					) : null}
 				</CardHeader>
 
 				<CardContent>
@@ -181,10 +208,42 @@ export function SupplierDetailsView({ supplierId }: SupplierDetailsViewProps) {
 				</CardContent>
 			</Card>
 
-			<SupplierOfferingsSection supplierId={supplierId} />
+			<SupplierOfferingsSection supplierId={supplierId} canManage={canManage} />
+
+			<SupplierHistoryCard supplierId={supplierId} />
+
+			<AlertDialog open={statusConfirmOpen} onOpenChange={setStatusConfirmOpen}>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>
+							{supplier.isActive
+								? "Deactivate supplier?"
+								: "Reactivate supplier?"}
+						</AlertDialogTitle>
+						<AlertDialogDescription>
+							{supplier.isActive
+								? "New purchase orders can no longer pick this supplier. Existing orders and history stay as they are."
+								: "This supplier can be picked on new purchase orders again."}
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction
+							disabled={updateMasterMutation.isPending}
+							onClick={() =>
+								updateMasterMutation.mutate({
+									supplierId,
+									payload: { mode: "master", isActive: !supplier.isActive },
+								})
+							}
+						>
+							{supplier.isActive ? "Deactivate" : "Reactivate"}
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
 
 			<SupplierMasterModal
-				mode="edit"
 				open={editOpen}
 				onOpenChange={setEditOpen}
 				title="Edit supplier"

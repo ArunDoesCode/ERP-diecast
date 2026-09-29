@@ -96,6 +96,8 @@ export const API_ROUTES = {
 			`${API_Header.supplier}/${supplierId}/createService`,
 		editService: (supplierId: number) =>
 			`${API_Header.supplier}/${supplierId}/editService`,
+		history: (supplierId: number) =>
+			`${API_Header.supplier}/${supplierId}/history`,
 	},
 	assets: {
 		items: `${API_Header.asset}/items`,
@@ -115,6 +117,7 @@ export const API_ROUTES = {
 				`${API_Header.asset}/locations/${locationId}`,
 		},
 		inventory: {
+			stock: `${API_Header.asset}/inventory/stock`,
 			movements: {
 				list: `${API_Header.asset}/inventory/movements`,
 				create: `${API_Header.asset}/inventory/movements`,

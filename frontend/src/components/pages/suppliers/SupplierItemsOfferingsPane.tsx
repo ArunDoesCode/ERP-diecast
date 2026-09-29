@@ -26,6 +26,7 @@ export function SupplierItemsOfferingsPane({
 	pageSize,
 	onPageChange,
 	onEdit,
+	canManage,
 }: {
 	supplierId: number;
 	active: boolean;
@@ -34,6 +35,7 @@ export function SupplierItemsOfferingsPane({
 	pageSize: number;
 	onPageChange: (page: number) => void;
 	onEdit: (item: SupplierItem) => void;
+	canManage: boolean;
 }) {
 	const itemQuery = useSupplierItemsQuery(
 		supplierId,
@@ -55,16 +57,20 @@ export function SupplierItemsOfferingsPane({
 				header: ({ column }) => (
 					<DataTableColumnHeader column={column} title="Item" />
 				),
-				cell: ({ row }) => (
-					<Button
-						type="button"
-						variant="link"
-						className="h-auto p-0"
-						onClick={() => onEdit(row.original)}
-					>
-						{row.original.itemName}
-					</Button>
-				),
+				cell: ({ row }) => {
+					const label = <span>{row.original.itemName}</span>;
+					if (!canManage) return label;
+					return (
+						<Button
+							type="button"
+							variant="link"
+							className="h-auto p-0"
+							onClick={() => onEdit(row.original)}
+						>
+							{label}
+						</Button>
+					);
+				},
 			},
 			{
 				accessorKey: "supplierSku",
@@ -108,7 +114,7 @@ export function SupplierItemsOfferingsPane({
 				),
 			},
 		],
-		[onEdit],
+		[onEdit, canManage],
 	);
 
 	const pagination = useMemo<PaginationState>(
@@ -156,5 +162,11 @@ export function SupplierItemsOfferingsPane({
 		);
 	}
 
-	return <DataTable table={table} isLoading={itemQuery.isLoading} />;
+	return (
+		<DataTable
+			table={table}
+			isLoading={itemQuery.isLoading}
+			rowClassName={(row) => (row.isActive ? undefined : "opacity-50")}
+		/>
+	);
 }

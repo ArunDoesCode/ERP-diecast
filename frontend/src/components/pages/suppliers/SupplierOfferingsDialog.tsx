@@ -25,6 +25,13 @@ import {
 	FormLabel,
 	FormMessage,
 } from "@/components/ui/form";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -36,6 +43,9 @@ import {
 	useEditSupplierServiceMutation,
 } from "@/lib/api/suppliers/queries";
 import {
+	GST_SLABS,
+	paiseToRupees,
+	rupeesToPaise,
 	type SupplierItem,
 	type SupplierItemInput,
 	type SupplierService,
@@ -57,10 +67,10 @@ function toItemInput(item?: SupplierItem): SupplierItemInput {
 			supplierItemsId: undefined,
 			itemId: undefined,
 			supplierSku: "",
-			supplierUnitPricePaise: 0,
-			taxPercentage: undefined,
-			leadTimeDays: undefined,
-			qty: undefined,
+			supplierUnitPriceRupees: "",
+			taxPercentage: 0,
+			leadTimeDays: 0,
+			qty: 0,
 			uom: "",
 			isActive: true,
 		};
@@ -70,10 +80,10 @@ function toItemInput(item?: SupplierItem): SupplierItemInput {
 		supplierItemsId: item.id,
 		itemId: item.itemId,
 		supplierSku: item.supplierSku ?? "",
-		supplierUnitPricePaise: item.supplierUnitPricePaise,
-		taxPercentage: item.taxPercentage ?? undefined,
-		leadTimeDays: item.leadTimeDays ?? undefined,
-		qty: item.qty ?? undefined,
+		supplierUnitPriceRupees: paiseToRupees(item.supplierUnitPricePaise),
+		taxPercentage: item.taxPercentage ?? 0,
+		leadTimeDays: item.leadTimeDays ?? 0,
+		qty: item.qty ?? 0,
 		uom: item.uom,
 		isActive: item.isActive,
 	};
@@ -84,9 +94,9 @@ function toServiceInput(service?: SupplierService): SupplierServiceInput {
 		return {
 			supplierServiceId: undefined,
 			serviceId: undefined,
-			serviceUnitPricePaise: 0,
-			taxPercentage: undefined,
-			leadTimeDays: undefined,
+			serviceUnitPriceRupees: "",
+			taxPercentage: 0,
+			leadTimeDays: 0,
 			isActive: true,
 		};
 	}
@@ -94,10 +104,47 @@ function toServiceInput(service?: SupplierService): SupplierServiceInput {
 	return {
 		supplierServiceId: service.id,
 		serviceId: service.serviceId,
-		serviceUnitPricePaise: service.serviceUnitPricePaise,
-		taxPercentage: service.taxPercentage ?? undefined,
-		leadTimeDays: service.leadTimeDays ?? undefined,
+		serviceUnitPriceRupees: paiseToRupees(service.serviceUnitPricePaise),
+		taxPercentage: service.taxPercentage ?? 0,
+		leadTimeDays: service.leadTimeDays ?? 0,
 		isActive: service.isActive,
+	};
+}
+
+function GstSelect({
+	value,
+	onChange,
+	id,
+}: {
+	value: number;
+	onChange: (value: number) => void;
+	id: string;
+}) {
+	return (
+		<Select value={String(value)} onValueChange={(v) => onChange(Number(v))}>
+			<SelectTrigger
+				id={id}
+				className="h-12 w-full rounded-lg px-3 text-base md:text-sm"
+			>
+				<SelectValue placeholder="Select GST %" />
+			</SelectTrigger>
+			<SelectContent>
+				{GST_SLABS.map((slab) => (
+					<SelectItem key={slab} value={String(slab)}>
+						{slab}%
+					</SelectItem>
+				))}
+			</SelectContent>
+		</Select>
+	);
+}
+
+function numberChange(field: { onChange: (v: number) => void }) {
+	return (event: React.ChangeEvent<HTMLInputElement>) => {
+		const value = event.target.valueAsNumber;
+		field.onChange(
+			Number.isNaN(value) ? (undefined as unknown as number) : value,
+		);
 	};
 }
 
@@ -206,8 +253,10 @@ export function SupplierOfferingsDialog({
 					payload: {
 						supplierItemsId: values.supplierItemsId,
 						itemId: values.itemId,
-						supplierSku: values.supplierSku,
-						supplierUnitPricePaise: values.supplierUnitPricePaise,
+						supplierSku: values.supplierSku || undefined,
+						supplierUnitPricePaise: rupeesToPaise(
+							values.supplierUnitPriceRupees,
+						),
 						taxPercentage: values.taxPercentage,
 						leadTimeDays: values.leadTimeDays,
 						qty: values.qty,
@@ -231,8 +280,8 @@ export function SupplierOfferingsDialog({
 				supplierId,
 				payload: {
 					itemId: values.itemId,
-					supplierSku: values.supplierSku,
-					supplierUnitPricePaise: values.supplierUnitPricePaise,
+					supplierSku: values.supplierSku || undefined,
+					supplierUnitPricePaise: rupeesToPaise(values.supplierUnitPriceRupees),
 					taxPercentage: values.taxPercentage,
 					leadTimeDays: values.leadTimeDays,
 					qty: values.qty,
@@ -257,7 +306,7 @@ export function SupplierOfferingsDialog({
 					payload: {
 						supplierServiceId: values.supplierServiceId,
 						serviceId: values.serviceId,
-						serviceUnitPricePaise: values.serviceUnitPricePaise,
+						serviceUnitPricePaise: rupeesToPaise(values.serviceUnitPriceRupees),
 						taxPercentage: values.taxPercentage,
 						leadTimeDays: values.leadTimeDays,
 						isActive: values.isActive,
@@ -279,7 +328,7 @@ export function SupplierOfferingsDialog({
 				supplierId,
 				payload: {
 					serviceId: values.serviceId,
-					serviceUnitPricePaise: values.serviceUnitPricePaise,
+					serviceUnitPricePaise: rupeesToPaise(values.serviceUnitPriceRupees),
 					taxPercentage: values.taxPercentage,
 					leadTimeDays: values.leadTimeDays,
 					isActive: values.isActive,
@@ -387,6 +436,7 @@ export function SupplierOfferingsDialog({
 													{...field}
 													id="supplier-item-sku"
 													label="Supplier SKU"
+													maxLength={100}
 												/>
 											</FormControl>
 											<FormMessage />
@@ -396,21 +446,15 @@ export function SupplierOfferingsDialog({
 
 								<FormField
 									control={itemForm.control}
-									name="supplierUnitPricePaise"
+									name="supplierUnitPriceRupees"
 									render={({ field }) => (
 										<FormItem className="min-h-19">
 											<FormControl>
 												<FloatingLabelInput
+													{...field}
 													id="supplier-item-price"
-													label="Unit price (paise)"
-													type="number"
-													name={field.name}
-													value={field.value}
-													onBlur={field.onBlur}
-													ref={field.ref}
-													onChange={(event) =>
-														field.onChange(event.target.valueAsNumber)
-													}
+													label="Unit price (₹ per unit)"
+													inputMode="decimal"
 												/>
 											</FormControl>
 											<FormMessage />
@@ -423,21 +467,12 @@ export function SupplierOfferingsDialog({
 									name="taxPercentage"
 									render={({ field }) => (
 										<FormItem className="min-h-19">
+											<FormLabel htmlFor="supplier-item-tax">GST %</FormLabel>
 											<FormControl>
-												<FloatingLabelInput
+												<GstSelect
 													id="supplier-item-tax"
-													label="Tax %"
-													type="number"
-													name={field.name}
-													value={field.value ?? ""}
-													onBlur={field.onBlur}
-													ref={field.ref}
-													onChange={(event) => {
-														const value = event.target.valueAsNumber;
-														field.onChange(
-															Number.isNaN(value) ? undefined : value,
-														);
-													}}
+													value={field.value}
+													onChange={field.onChange}
 												/>
 											</FormControl>
 											<FormMessage />
@@ -453,18 +488,15 @@ export function SupplierOfferingsDialog({
 											<FormControl>
 												<FloatingLabelInput
 													id="supplier-item-lead"
-													label="Lead time days"
+													label="Lead time days (0-365)"
 													type="number"
+													min={0}
+													max={365}
 													name={field.name}
 													value={field.value ?? ""}
 													onBlur={field.onBlur}
 													ref={field.ref}
-													onChange={(event) => {
-														const value = event.target.valueAsNumber;
-														field.onChange(
-															Number.isNaN(value) ? undefined : value,
-														);
-													}}
+													onChange={numberChange(field)}
 												/>
 											</FormControl>
 											<FormMessage />
@@ -480,18 +512,15 @@ export function SupplierOfferingsDialog({
 											<FormControl>
 												<FloatingLabelInput
 													id="supplier-item-qty"
-													label="Qty capacity"
+													label="Qty capacity (0 = no limit)"
 													type="number"
+													step="0.001"
+													min={0}
 													name={field.name}
 													value={field.value ?? ""}
 													onBlur={field.onBlur}
 													ref={field.ref}
-													onChange={(event) => {
-														const value = event.target.valueAsNumber;
-														field.onChange(
-															Number.isNaN(value) ? undefined : value,
-														);
-													}}
+													onChange={numberChange(field)}
 												/>
 											</FormControl>
 											<FormMessage />
@@ -582,21 +611,15 @@ export function SupplierOfferingsDialog({
 								/>
 								<FormField
 									control={serviceForm.control}
-									name="serviceUnitPricePaise"
+									name="serviceUnitPriceRupees"
 									render={({ field }) => (
 										<FormItem className="min-h-19">
 											<FormControl>
 												<FloatingLabelInput
+													{...field}
 													id="supplier-service-price"
-													label="Service rate (paise)"
-													type="number"
-													name={field.name}
-													value={field.value}
-													onBlur={field.onBlur}
-													ref={field.ref}
-													onChange={(event) =>
-														field.onChange(event.target.valueAsNumber)
-													}
+													label="Service rate (₹)"
+													inputMode="decimal"
 												/>
 											</FormControl>
 											<FormMessage />
@@ -609,21 +632,14 @@ export function SupplierOfferingsDialog({
 									name="taxPercentage"
 									render={({ field }) => (
 										<FormItem className="min-h-19">
+											<FormLabel htmlFor="supplier-service-tax">
+												GST %
+											</FormLabel>
 											<FormControl>
-												<FloatingLabelInput
+												<GstSelect
 													id="supplier-service-tax"
-													label="Tax %"
-													type="number"
-													name={field.name}
-													value={field.value ?? ""}
-													onBlur={field.onBlur}
-													ref={field.ref}
-													onChange={(event) => {
-														const value = event.target.valueAsNumber;
-														field.onChange(
-															Number.isNaN(value) ? undefined : value,
-														);
-													}}
+													value={field.value}
+													onChange={field.onChange}
 												/>
 											</FormControl>
 											<FormMessage />
@@ -639,18 +655,15 @@ export function SupplierOfferingsDialog({
 											<FormControl>
 												<FloatingLabelInput
 													id="supplier-service-lead"
-													label="Lead time days"
+													label="Lead time days (0-365)"
 													type="number"
+													min={0}
+													max={365}
 													name={field.name}
 													value={field.value ?? ""}
 													onBlur={field.onBlur}
 													ref={field.ref}
-													onChange={(event) => {
-														const value = event.target.valueAsNumber;
-														field.onChange(
-															Number.isNaN(value) ? undefined : value,
-														);
-													}}
+													onChange={numberChange(field)}
 												/>
 											</FormControl>
 											<FormMessage />

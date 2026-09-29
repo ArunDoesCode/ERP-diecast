@@ -1,5 +1,6 @@
 import { type Actor, can } from "../lib/auth-middleware";
 import {
+  BadRequestError,
   ConflictError,
   ForbiddenError,
   InternalServerError,
@@ -7,7 +8,6 @@ import {
 } from "../lib/errors";
 import { assetRepository } from "../repository/assetRepository";
 import type {
-  assetInventoryMovementCreateSchemaType,
   assetInventoryMovementListQuerySchemaType,
   assetItemCreateSchemaType,
   assetItemListQuerySchemaType,
@@ -19,9 +19,12 @@ import type {
   assetMachineCreateSchemaType,
   assetMachineListQuerySchemaType,
   assetMachineUpdateSchemaType,
+  assetManualMovementCreateSchemaType,
+  assetReconciliationQuerySchemaType,
   assetServiceCreateSchemaType,
   assetServiceListQuerySchemaType,
   assetServiceUpdateSchemaType,
+  assetStockListQuerySchemaType,
 } from "../types/asset.types";
 
 type DbUniqueError = {
@@ -40,7 +43,11 @@ function toPaginatedMeta(page: number, pageSize: number, total: number) {
 }
 
 function getConflictError(error: unknown) {
-  const dbError = error as DbUniqueError;
+  // drizzle wraps the driver error: the Postgres error is on `cause`
+  const outer = error as { cause?: unknown };
+  const dbError = (
+    (outer?.cause as DbUniqueError | undefined)?.code ? outer.cause : error
+  ) as DbUniqueError;
 
   if (dbError?.code !== "23505") {
     return undefined;
@@ -56,7 +63,75 @@ function getConflictError(error: unknown) {
     return new ConflictError("Service code already exists");
   }
 
+  if (constraint.includes("locations_one_main_store")) {
+    return new ConflictError("There is already a main store");
+  }
+
+  if (constraint.includes("locations_one_vendor_premise")) {
+    return new ConflictError("This supplier already has a vendor premise");
+  }
+
+  if (constraint.includes("locations_name")) {
+    return new ConflictError("Location name already exists");
+  }
+
+  if (constraint.includes("machines_name")) {
+    return new ConflictError("Machine name already exists");
+  }
+
+  if (constraint.includes("machines_code")) {
+    return new ConflictError("Machine code already exists");
+  }
+
   return new ConflictError("Duplicate value violates a unique constraint");
+}
+
+// BR-INV-12, 13 on the values the location will have.
+async function checkLocationRules(
+  next: {
+    type: "main_store" | "vendor_premise" | "finished_goods" | "scrap_yard";
+    linkedVendorId: number | null;
+  },
+  currentId: number | undefined,
+) {
+  if (next.type === "vendor_premise") {
+    if (next.linkedVendorId === null) {
+      throw new BadRequestError("A vendor premise must link a supplier");
+    }
+    const supplier = await assetRepository.findSupplierForLocation(
+      next.linkedVendorId,
+    );
+    if (!supplier) {
+      throw new BadRequestError("Supplier not found");
+    }
+    if (!supplier.isActive) {
+      throw new BadRequestError("Supplier is inactive");
+    }
+    const others = await assetRepository.countLocations("vendor_premise", {
+      supplierId: next.linkedVendorId,
+      ...(currentId !== undefined ? { excludeId: currentId } : {}),
+    });
+    if (others > 0) {
+      throw new ConflictError("This supplier already has a vendor premise");
+    }
+  } else if (next.linkedVendorId !== null) {
+    throw new BadRequestError("Only a vendor premise can link a supplier");
+  }
+  if (next.type === "main_store") {
+    const others = await assetRepository.countLocations("main_store", {
+      ...(currentId !== undefined ? { excludeId: currentId } : {}),
+    });
+    if (others > 0) {
+      throw new ConflictError("There is already a main store");
+    }
+  }
+}
+
+// BR-INV-07/08: pcs and set take whole numbers only, reorder level included.
+function assertReorderLevelFitsUnit(reorderLevel: number, uom: string) {
+  if ((uom === "pcs" || uom === "set") && !Number.isInteger(reorderLevel)) {
+    throw new BadRequestError(`Items in ${uom} take whole numbers only`);
+  }
 }
 
 export const assetService = {
@@ -69,6 +144,7 @@ export const assetService = {
   },
 
   async createItem(input: assetItemCreateSchemaType, actorId: number) {
+    assertReorderLevelFitsUnit(input.reorderLevel ?? 0, input.uom);
     try {
       const created = await assetRepository.createItem(input, actorId);
       if (!created) {
@@ -84,9 +160,39 @@ export const assetService = {
     }
   },
 
-  async updateItem(id: number, input: assetItemUpdateSchemaType) {
+  async updateItem(
+    id: number,
+    input: assetItemUpdateSchemaType,
+    actorId: number,
+  ) {
     try {
-      const updated = await assetRepository.updateItem(id, input);
+      const updated = await assetRepository.updateItemLocked(
+        id,
+        async (current, isInUse) => {
+          // BR-INV-04: SKU and unit are locked once the item is used anywhere.
+          const skuChanges =
+            input.sku !== undefined && input.sku !== current.sku;
+          const uomChanges =
+            input.uom !== undefined && input.uom !== current.uom;
+          if ((skuChanges || uomChanges) && (await isInUse())) {
+            throw new ConflictError(
+              "SKU and unit can't change once the item is in use",
+              "ITEM_IN_USE",
+            );
+          }
+          if (input.reorderLevel !== undefined || uomChanges) {
+            assertReorderLevelFitsUnit(
+              input.reorderLevel ?? current.reorderLevel,
+              input.uom ?? current.uom,
+            );
+          }
+          return {
+            ...input,
+            lastUpdatedBy: actorId,
+            lastUpdatedAt: new Date(),
+          };
+        },
+      );
       if (!updated) {
         throw new NotFoundError("Item not found");
       }
@@ -103,9 +209,7 @@ export const assetService = {
   async getLastRate(itemId: number, params: assetLastRateQuerySchemaType) {
     const result = await assetRepository.getLastRate(itemId, params.supplierId);
     if (!result) {
-      throw new NotFoundError(
-        "No PO history, supplier catalog price, or item estimate found for this item.",
-      );
+      throw new NotFoundError("Item not found.");
     }
     return result;
   },
@@ -179,34 +283,134 @@ export const assetService = {
     };
   },
 
-  async createLocation(input: assetLocationCreateSchemaType) {
-    const created = await assetRepository.createLocation(input);
-    if (!created) {
-      throw new InternalServerError("Failed to create location");
+  async createLocation(input: assetLocationCreateSchemaType, actorId: number) {
+    await checkLocationRules(
+      { type: input.type, linkedVendorId: input.linkedVendorId ?? null },
+      undefined,
+    );
+    try {
+      const created = await assetRepository.createLocation(
+        {
+          ...input,
+          linkedVendorId: input.linkedVendorId ?? null,
+          // BR-INV-12: vendor_premise is always virtual; client value ignored
+          isVirtual: input.type === "vendor_premise",
+        },
+        actorId,
+      );
+      if (!created) {
+        throw new InternalServerError("Failed to create location");
+      }
+      return created;
+    } catch (error) {
+      throw getConflictError(error) ?? error;
     }
-    return created;
   },
 
-  async updateLocation(id: number, input: assetLocationUpdateSchemaType) {
-    const updated = await assetRepository.updateLocation(id, input);
-    if (!updated) {
-      throw new NotFoundError("Location not found");
-    }
-    return updated;
-  },
-
-  async createInventoryMovement(
-    input: assetInventoryMovementCreateSchemaType,
+  async updateLocation(
+    id: number,
+    input: assetLocationUpdateSchemaType,
     actorId: number,
   ) {
-    const created = await assetRepository.createInventoryMovement(
-      input,
-      actorId,
-    );
-    if (!created) {
-      throw new InternalServerError("Failed to create inventory movement");
+    const current = await assetRepository.findLocationById(id);
+    if (!current) {
+      throw new NotFoundError("Location not found");
     }
-    return created;
+    const type = input.type ?? current.type;
+    const linkedVendorId =
+      input.linkedVendorId !== undefined
+        ? input.linkedVendorId
+        : type === "vendor_premise"
+          ? current.linkedVendorId
+          : null;
+    const typeChanges = type !== current.type;
+    const linkChanges = linkedVendorId !== current.linkedVendorId;
+
+    if (
+      (typeChanges || linkChanges) &&
+      (await assetRepository.locationHasLedgerRows(id))
+    ) {
+      throw new ConflictError(
+        "Type and linked supplier can't change once the location has stock rows",
+        "LOCATION_IN_USE",
+      );
+    }
+    if (typeChanges || linkChanges) {
+      await checkLocationRules({ type, linkedVendorId }, id);
+      if (typeChanges && current.type === "main_store") {
+        const others = await assetRepository.countLocations("main_store", {
+          excludeId: id,
+        });
+        if (others === 0) {
+          throw new ConflictError("There must be exactly one main store");
+        }
+      }
+    }
+    if (input.isActive === false && current.type === "main_store") {
+      // GRN posts to the main store (BR-INV-13): keep one active
+      const otherActive = await assetRepository.countLocations("main_store", {
+        excludeId: id,
+        activeOnly: true,
+      });
+      if (otherActive === 0) {
+        throw new ConflictError("The main store can't be deactivated");
+      }
+    }
+    const { isVirtual: _clientIsVirtual, ...rest } = input;
+    try {
+      const updated = await assetRepository.updateLocation(id, {
+        ...rest,
+        ...(typeChanges || linkChanges ? { linkedVendorId } : {}),
+        // derived, never taken from the client (CR-23)
+        ...(type === "vendor_premise"
+          ? { isVirtual: true }
+          : typeChanges
+            ? { isVirtual: false }
+            : {}),
+        lastUpdatedBy: actorId,
+        lastUpdatedAt: new Date(),
+      });
+      if (!updated) {
+        throw new NotFoundError("Location not found");
+      }
+      return updated;
+    } catch (error) {
+      throw getConflictError(error) ?? error;
+    }
+  },
+
+  // Manual stock-take / opening stock only (BR-GRN-43, BR-INV-21..23).
+  // Document types are posted from their source document.
+  async createInventoryMovement(
+    input: assetManualMovementCreateSchemaType,
+    actorId: number,
+  ) {
+    if (
+      input.referenceType !== "stock_adjustment" &&
+      input.referenceType !== "opening_stock"
+    ) {
+      throw new BadRequestError(
+        `Type ${input.referenceType} is posted from its source document, not by hand.`,
+      );
+    }
+    return assetRepository.manualMovement(input, actorId);
+  },
+
+  async inventoryStock(params: assetStockListQuerySchemaType) {
+    const { rows, total } = await assetRepository.listStock(params);
+    return {
+      data: rows,
+      meta: toPaginatedMeta(params.page, params.pageSize, total),
+    };
+  },
+
+  async inventoryReconciliation(params: assetReconciliationQuerySchemaType) {
+    const { rows, total } =
+      await assetRepository.inventoryReconciliation(params);
+    return {
+      data: rows,
+      meta: toPaginatedMeta(params.page, params.pageSize, total),
+    };
   },
 
   async listMachines(params: assetMachineListQuerySchemaType, actor: Actor) {
@@ -225,11 +429,15 @@ export const assetService = {
   },
 
   async createMachine(input: assetMachineCreateSchemaType, actorId: number) {
-    const created = await assetRepository.createMachine(input, actorId);
-    if (!created) {
-      throw new InternalServerError("Failed to create machine");
+    try {
+      const created = await assetRepository.createMachine(input, actorId);
+      if (!created) {
+        throw new InternalServerError("Failed to create machine");
+      }
+      return created;
+    } catch (error) {
+      throw getConflictError(error) ?? error;
     }
-    return created;
   },
 
   async updateMachine(
@@ -237,16 +445,20 @@ export const assetService = {
     input: assetMachineUpdateSchemaType,
     actorId: number,
   ) {
-    const updated = await assetRepository.updateMachine(id, {
-      ...input,
-      lastUpdatedBy: actorId,
-      lastUpdatedAt: new Date(),
-    });
+    try {
+      const updated = await assetRepository.updateMachine(id, {
+        ...input,
+        lastUpdatedBy: actorId,
+        lastUpdatedAt: new Date(),
+      });
 
-    if (!updated) {
-      throw new NotFoundError("Machine not found");
+      if (!updated) {
+        throw new NotFoundError("Machine not found");
+      }
+
+      return updated;
+    } catch (error) {
+      throw getConflictError(error) ?? error;
     }
-
-    return updated;
   },
 };
