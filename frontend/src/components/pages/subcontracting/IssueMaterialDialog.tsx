@@ -20,7 +20,10 @@ import type { ScoLine } from "@/types/subcontracting";
 type LineDraft = { qty: string; heat: string };
 
 function todayIso() {
-	return new Date().toISOString().slice(0, 10);
+	// Local calendar date (not UTC) so "today" is right early morning in IST.
+	const now = new Date();
+	const pad = (n: number) => String(n).padStart(2, "0");
+	return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
 function remaining(line: ScoLine) {
@@ -143,6 +146,7 @@ export function IssueMaterialDialog({
 						<Input
 							id="challan-date"
 							type="date"
+							max={todayIso()}
 							value={challanDate}
 							onChange={(event) => setChallanDate(event.target.value)}
 						/>
