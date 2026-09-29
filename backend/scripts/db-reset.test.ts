@@ -41,14 +41,39 @@ let sql: ReturnType<typeof postgres>;
 
 type Run = { code: number; out: string };
 
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+
+/**
+ * Isolation guard (F-TEST-10): the script under test wipes a schema. It must never be pointed at the
+ * shared test DB (or any DB but the scratch one). Any local target other than SCRATCH throws before
+ * a process is spawned; remote / unparsable URLs are only used by refusal-path tests.
+ */
+function assertScratchOnly(dbUrl: string) {
+  let u: URL;
+  try {
+    u = new URL(dbUrl);
+  } catch {
+    return; // unparsable: the script must refuse it (BR-KD-33)
+  }
+  if (!LOCAL_HOSTS.has(u.hostname)) return; // remote: must be refused / cannot reach a local DB
+  const db = u.pathname.replace(/^\//, "");
+  if (db !== SCRATCH) {
+    throw new Error(
+      `db-reset.test: refusing to run db:reset against local database "${db}"; only "${SCRATCH}" is allowed`,
+    );
+  }
+}
+
 async function run(
   args: string[] = [],
   env: Record<string, string | undefined> = {},
   dbUrl = scratchUrl,
 ): Promise<Run> {
+  assertScratchOnly(dbUrl);
   const base: Record<string, string | undefined> = {
     ...process.env,
     DATABASE_URL: dbUrl,
+    DATABASE_URL_TEST: undefined, // the script must not be able to fall back to the shared test DB
     SEED_USER_PASSWORD: SEED_PASSWORD,
     DB_RESET_CONFIRM: undefined,
     BOOTSTRAP_ADMIN_PASSWORD: undefined,
@@ -114,6 +139,9 @@ async function docNumbers() {
 }
 
 beforeAll(async () => {
+  if (new URL(baseUrl).pathname.replace(/^\//, "") === SCRATCH) {
+    throw new Error("scratch DB name must differ from the shared test DB");
+  }
   const admin = postgres(withDb(baseUrl, "postgres"), { max: 1 });
   await admin.unsafe(`DROP DATABASE IF EXISTS ${SCRATCH} WITH (FORCE)`);
   await admin.unsafe(`CREATE DATABASE ${SCRATCH}`);

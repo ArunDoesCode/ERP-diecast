@@ -349,14 +349,17 @@ afterAll(cleanup);
 const cancel = (
   tag: string | null,
   id: number | string,
-  reason: unknown = "duplicate request",
-) =>
-  call(
+  ...rest: [reason?: unknown]
+) => {
+  // no third argument -> a valid default reason; explicit undefined -> no reason sent at all
+  const reason = rest.length === 0 ? "duplicate request" : rest[0];
+  return call(
     tag,
     "DELETE",
     `/api/pr/deletepr/${id}`,
     reason === undefined ? undefined : { reason },
   );
+};
 
 describe("BR-PR-43 / BR-KD-01 / BR-KD-02 one cancel path, soft cancel", () => {
   test("BR-PR-43 bad id -> 400 INVALID_PR_ID", async () => {
