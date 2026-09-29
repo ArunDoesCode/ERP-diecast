@@ -7,7 +7,7 @@
   "slices": ["S1","S2","S3","S4"],
   "currentSlice": "S2",
   "iteration": 0,
-  "nextSeq": 10,
+  "nextSeq": 11,
   "pr": null,
   "lastProcessedCommentAt": null,
   "envFile": "/Users/turbo_fltr/.claude/diecast-env/main-test.env"
