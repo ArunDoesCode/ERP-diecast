@@ -1,6 +1,6 @@
 ---
 module: auth-setup
-spec: docs/specs/auth-setup.md (draft v1)
+spec: docs/specs/auth-setup.md (draft v2)
 last_verified_commit: 0a406f4
 last_verified_on: 2026-09-27
 depends_on: []
@@ -152,42 +152,73 @@ Full shapes: `cd backend && bun run contract:query "<METHOD /path>"`.
 - Auth tests: `backend/src/service/authService.test.ts` (refresh re-reads RBAC, BL-018) and
   `backend/src/app.test.ts` (401/403 mapping). Setup module still has none.
 
-## Known gaps (from spec draft 2026-09-29)
-Spec: `docs/specs/auth-setup.md` v1 (permission keys, roles as data). Gaps against it:
-- **Role lists in routes, twice.** 18 `requireRole(...)` calls in `backend/src/routes/{asset,setup,auth,grn,pr,po,approval,supplier}.ts`,
-  and the same lists again in the `register()` descriptors (`auth: {type:"roles"}`, e.g. `GRN_READ_AUTH` in `routes/grn.ts`).
-  Breaks BR-AUTH-09/10/11. The `AuthRequirement` type in `lib/route-registry.ts` is the natural place for a `permission` key.
-- **Role names in services.** `grnService` `OVER_RECEIPT_OVERRIDE_ROLES`; `approvalService` `isPrivilegedApprovalReader`
-  and the `actorRole !== "super-admin"` check for another employee's pending list; `employeeService`
-  `assertNotLastActiveSuperAdmin` (name `"super-admin"`). Breaks BR-AUTH-11; the last one is BR-AUTH-17 keyed on a name.
-- **Role names in the frontend.** `frontend/src/lib/grn-permissions.ts` (hand copy of backend lists);
-  `role !== "floor_supervisor"` in `PurchaseOrdersView`, `PurchaseOrderDetailView`, `PurchaseOrderTrackingCards`;
-  `isFloorSupervisor` in `PurchaseRequisitionsView`. Breaks BR-AUTH-13. A new role gets wrong buttons silently.
-- **Two unlinked grant systems.** `role_pages` drives only menu + `proxy.ts`; the API uses code lists. A page can be
-  granted while its API returns 403, or the reverse. Likely live case (not run): the PR modal
-  (`PurchaseRequisitionModals.tsx`) calls `useMachinesQuery` (asset router = super-admin/back_office only) for
-  floor_supervisor, who may create PRs. BR-AUTH-15.
-- **`Role` TS union** in `backend/src/lib/token.ts` + `employee.roleName as Role` casts in `authService` — a role created
-  in Setup is unknown to the type system and can never pass any `requireRole`. BR-AUTH-07.
-- **Escalation (BL-024).** `/auth/register` lets owner assign super-admin; register also skips `createdBy`. BR-AUTH-16.
-  Two user-creation paths (`/auth/register`, `/setup/employees`) with different guards — spec Q6.
-- **No audit of grant changes.** `role_pages` has no `createdBy`/timestamps; `roleService`/`permissionService` log nothing. BR-AUTH-20.
-- **Approval chains store role names as text** (`approvalChain[].role`, `approval_requests.current_approver_role` in
-  `02_procurement-approval.ts`). Renaming a role breaks open requests. BR-AUTH-22 blocks rename for now; the real fix
-  (store role id) is an approval-module change.
-- **Grants live in the token for ≤15 min.** Revoking access or deactivating does not stop the current access token. BR-AUTH-12 / Q1.
+## Current RBAC map
+Verified 2026-09-29 (grep on `work/m1`). Spec: `docs/specs/auth-setup.md` v2. Verdict: roles are DB rows, but
+**access is decided by role names written in code**, so a role created in Setup can do nothing.
+| Layer | Where | Data or hard-coded | Gap (spec rule) |
+|---|---|---|---|
+| Token | `lib/token.ts` `Role` union (7 names), `TokenPayload{userId,userName,role,allowedPages}` | hard-coded | new role unknown to types; `roleName as Role` casts in `authService` (BR-07) |
+| API guard | `lib/auth-middleware.ts` `requireRole(...roles)` — 18 calls across `routes/{asset,setup,auth,grn,pr,po,approval,supplier}.ts` | hard-coded | BR-09/10/11 |
+| Route contract | `lib/route-registry.ts` `AuthRequirement = public \| any-authenticated \| {type:"roles"}`; same lists again in descriptors (`GRN_DRAFT_AUTH`, `GRN_QA_AUTH`, `GRN_READ_AUTH`… in `routes/grn.ts`) | hard-coded, twice | two copies can drift (BR-10) |
+| Services | `grnService` `OVER_RECEIPT_OVERRIDE_ROLES`; `approvalService` `isPrivilegedApprovalReader` + `actorRole !== "super-admin"`; `employeeService` `assertNotLastActiveSuperAdmin` | hard-coded | BR-11, BR-17 keyed on a name |
+| Screens | `pages` + `role_pages` → `allowedPages` in JWT → `proxy.ts` `isPathAllowed` + `NavSidebar` | data | not linked to API grants (BR-15) |
+| Frontend buttons | `lib/grn-permissions.ts` (5 lists, hand copy of backend); `role !== "floor_supervisor"` in `PurchaseOrdersView`, `PurchaseOrderDetailView` (×2), `PurchaseOrderTrackingCards`; `isFloorSupervisor` in `PurchaseRequisitionsView` → `PurchaseRequisitionModals` | hard-coded | BR-13; `!== "floor_supervisor"` is a deny-list, so qa/dd/new roles see PO buttons, then get 403 |
+| Setup | `/setup/*` = super-admin only (`SETUP_AUTH`); `roleService` protects `isSystem`, blocks delete with employees | mixed | no audit (BR-20), no escalation guard on register (BL-024, BR-16) |
+| Approval | `approvalChain[].role`, `approval_requests.current_approver_role` store role **names** as text | data (by name) | rename breaks open requests (BR-22) |
+| Session | refresh re-reads role + pages (BL-018); access token trusted for ≤15 min | — | revoke/deactivate not immediate (BR-12) |
+Likely live bug (not run): PR modal loads `useMachinesQuery` for fs, but `/asset` is sa/bo only → spec Q9.
 
-### Benchmark notes (how other ERPs do it)
-- **ERPNext:** Role is a record; Role Permission Manager grants per DocType × role a set of rights (read, write, create,
-  submit, cancel, amend, delete, report, export). Role Profiles bundle roles; User Permissions restrict to records.
-- **Odoo:** Groups (`res.groups`) hold users; `ir.model.access` gives CRUD per model per group; record rules add row
-  filters; groups can imply other groups. Menus and views are shown by group, same groups as the API.
-- **SAP B1:** per-user authorization tree (Full / Read-only / None) per form and function; data-ownership
-  authorizations for records; super user flag bypasses all.
-- **Common pattern:** code defines the list of checkable rights; admins only map them to roles. UI and API read
-  the same grants. Checks are deny-by-default.
-- **Adapted here:** fixed `<module>.<action>` keys from code (not per-table CRUD — our routes are actions like
-  `qa_decide`, `bypass`, `correct`), one role per user, no record rules yet, keys seeded to match today exactly.
+## ERP benchmark (with links)
+| ERP | Model | Take for us |
+|---|---|---|
+| ERPNext | Role = record; Role Permission Manager grants per document type × role: read, write, create, submit, cancel, amend, report, export…; field groups by "perm level" 0–9; User Permissions restrict to specific records; Role Profiles bundle roles. [role-based permissions](https://docs.frappe.io/erpnext/user/manual/en/role-based-permissions), [role & role profile](https://docs.frappe.io/erpnext/user/manual/en/role-and-role-profile), [users & permissions](https://docs.frappe.io/erpnext/user/manual/en/users-and-permissions) | admin maps fixed rights to roles; record/field rules are a later layer |
+| Odoo | Groups hold users; `ir.model.access` = CRUD per model per group; `ir.rule` = record filters; groups imply groups (User → Manager); access is the union of groups; menus/views filtered by the same groups. [security reference](https://www.odoo.com/documentation/19.0/developer/reference/backend/security.html), [access rights](https://www.odoo.com/documentation/19.0/applications/general/users/access_rights.html) | UI and API read one grant set; model check + record check both must pass |
+| SAP Business One | General Authorizations tree per form/function: Full / Read-only / None; set per user or user group; new non-superuser has **no** rights; Superuser flag bypasses all; data-ownership rules for records. [How to Define Authorizations 10.0 (PDF)](https://help.sap.com/doc/04688cec5620478ea24be266ce0a1eda/10.0/en-US/c30f04de51bb4a6b810537a8e6a278d1.pdf), [SAP Learning](https://learning.sap.com/courses/implementing-sap-business-one/defining-general-authorizations) | deny by default (BR-24); a bypass flag is a risk → Q4 recommends no bypass |
+| Dynamics 365 F&O | Permissions (menu items, tables) → Privileges (a task, e.g. "cancel payments") → Duties (part of a process) → Roles; users get roles; no role = no access; roles can inherit child roles; segregation-of-duties rules; data security policies. [role-based security](https://learn.microsoft.com/en-us/dynamics365/fin-ops-core/dev-itpro/sysadmin/role-based-security) | our key = D365 "privilege" (a task, not a table); duties/inheritance not needed at our size |
+| NetSuite | Per-permission level None / View / Create / Edit / Full; standard roles can't be edited, you copy ("customize") them; System Notes log every role/permission change with old/new value, plus a login audit trail. [access levels](https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/section_N326341.html), [system notes](https://docs.oracle.com/en/cloud/saas/netsuite/ns-online-help/chapter_158644279544.html) | copy role (BR-25); before/after log (BR-20); login audit = later |
+**Common pattern:** code owns the list of checkable rights; admins only map rights → roles in a screen; checks are
+deny-by-default; UI hides, server decides; every change is logged. **Adapted:** action keys `<module>.<action>` (our
+routes are actions like `qa_decide`, `correct`, not table CRUD), one role per person, no inheritance, no record rules yet.
+
+## Proposed auth layer
+**Backend**
+- Catalog `backend/src/lib/permissions.ts`: `export const PERMISSIONS = { "grn.qa_decide": { module: "grn", label, description }, … } as const`;
+  `type PermissionKey = keyof typeof PERMISSIONS`. The only place keys are born (BR-06).
+- Tables (`01_auth.ts`): `permissions(key PK, module, label, description)` synced from the catalog on startup/seed
+  (insert new, update labels, delete removed + log); `role_permissions(role_id FK cascade, permission_key FK, granted_by, granted_at, PK(role_id, permission_key))`;
+  `pages.permission_key` (FK, not null) replaces `role_pages`; `auth_audit_log(id, at, actor_id, action, role_id, employee_id, before jsonb, after jsonb)` insert-only;
+  `roles` gains `description`, `last_updated_by/at`.
+- `lib/authz.ts`: `loadActor(employeeId)` → `{ employeeId, roleId, roleName, isActive, permissions: Set<PermissionKey> }` from an
+  in-memory cache (Map by employee + by role), cleared by every setup write (one Bun process today; move to a
+  version counter in DB if we ever run two). `can(actor, key)`, `assertCan(actor, key)` → 403 `PERMISSION_DENIED {key}`.
+- Middleware: `requireAuth` verifies the token (401) then sets `c.set("actor", await loadActor(id))`, 401 if inactive (BR-12, 23).
+  `requirePermission(key)` replaces `requireRole`.
+- Route registry: `AuthRequirement = public | any-authenticated | { type: "permission"; key: PermissionKey }`;
+  `register()` mounts the guard **from the descriptor**, so each route states its key once; manifest shows the key.
+- Services take `actor` and call `can()` — `OVER_RECEIPT_OVERRIDE_ROLES` → `grn.over_receipt_override`,
+  `isPrivilegedApprovalReader` → `approval.view_all`, last-admin → count of active holders of `setup.roles.manage`.
+- Token shrinks to `{ userId, userName }`; `/auth/me` and login return `{ role, permissions, screens }`.
+
+**Frontend**
+- `usePermissions()` (from `useMeQuery`), `useCan(key)`, `<Can perm="grn.correct">…</Can>`; `PermissionKey` type from a
+  file generated by `contract:generate` (`.contracts/permissions.json`), checked in CI like `API_ROUTES`.
+- Delete `grn-permissions.ts` lists and all `floor_supervisor` checks; `proxy.ts` + `NavSidebar` use `screens`
+  (BL-037's per-navigation `/auth/me` call becomes intended: it is how BR-12 reaches the UI).
+
+**Admin screen (Setup → Roles)**: role list with user count; role page = checkbox grid grouped by module (label,
+description, key), "Copy role", save shows +/- diff to confirm; "Who has this key"; Employees tab = one role dropdown
+listing only roles the actor may assign (BR-16); read-only "Access log" tab.
+
+**Migration — each step is one commit on the working branch, all in one PR; no step changes behaviour**
+1. Parity test first (test-writer): fixture of seed role × route → allow/deny taken from today's `requireRole` lists (BR-21).
+2. Add catalog, tables, sync, seed grants per the spec table. Nothing reads them yet.
+3. Add `permission` AuthRequirement + `requirePermission`; switch routers one at a time (setup, asset, supplier, pr, po, grn, approval); parity stays green.
+4. Replace the 4 service role-name checks with `can()`.
+5. Per-request actor + cache + invalidation; token shrinks; `/auth/me` returns keys and screens (BR-12, 13).
+6. Frontend `useCan`/`<Can>`; remove role-name checks; sidebar/proxy use `screens`. Print a screen-diff per role vs `role_pages` for sign-off, then drop `role_pages` and the old Permissions tab.
+7. Guardrails + log: BR-16/17/18/19/22/24/25 and `auth_audit_log`; new role editor UI.
+8. Delete `Role` union and `requireRole`; CI test fails on any role-name literal outside seeds (BR-11).
+Size: steps 1–4 ≈ one `/feature`, 5–8 ≈ a second. Out of this layer: approval chains storing role id instead of name (approval spec).
 
 ## History
 | Date | PR / commit | Change |
