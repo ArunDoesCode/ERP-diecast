@@ -354,6 +354,67 @@ export const subcontractingOrderItems = pgTable("subcontracting_order_items", {
   lossQty: integer("loss_qty").default(0).notNull(),
 });
 
+// BR-SCO-07..11, 25: job-work challan = one issue of material to the vendor.
+// Number JWC/<FY>/<seq> (Rule 55: consecutive per FY, max 16 chars, never reused).
+export const scoChallans = pgTable(
+  "sco_challans",
+  {
+    id: serial("id").primaryKey(),
+    challanNumber: text("challan_number").unique().notNull(),
+    scoId: integer("sco_id")
+      .references(() => subcontractingOrders.id)
+      .notNull(),
+    vendorId: integer("vendor_id")
+      .references(() => supplierMaster.id)
+      .notNull(),
+    challanDate: timestamp("challan_date").notNull(),
+    // BR-SCO-10: required for inter-state, unregistered vendor, or value >= Rs 50,000.
+    ewayBillNo: text("eway_bill_no"),
+    // Sum of line qty x unit issue cost, paise.
+    valuePaise: integer("value_paise").notNull(),
+    // BR-SCO-11: challan date + 1 year.
+    returnDueDate: timestamp("return_due_date").notNull(),
+    createdBy: integer("created_by")
+      .references(() => employees.id)
+      .notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    scoIdx: index("idx_sco_challans_sco").on(t.scoId),
+    dueIdx: index("idx_sco_challans_due").on(t.returnDueDate),
+  }),
+);
+
+export const scoChallanLines = pgTable(
+  "sco_challan_lines",
+  {
+    id: serial("id").primaryKey(),
+    challanId: integer("challan_id")
+      .references(() => scoChallans.id)
+      .notNull(),
+    scoItemId: integer("sco_item_id")
+      .references(() => subcontractingOrderItems.id)
+      .notNull(),
+    // Raw item sent (copied from the SCO line, kept for traceability, BR-SCO-25).
+    itemId: integer("item_id")
+      .references(() => itemMaster.id)
+      .notNull(),
+    // Whole pieces > 0.
+    qty: integer("qty").notNull(),
+    // Item's average cost at issue time, paise per piece (BR-SCO-08).
+    unitIssueCostPaise: integer("unit_issue_cost_paise").notNull(),
+    heatNumber: text("heat_number"),
+    // Raw item HSN at issue time (BR-SCO-09).
+    hsnCode: text("hsn_code").notNull(),
+    // Qty already settled by receipts (S3, FIFO); 0 <= settledQty <= qty.
+    settledQty: integer("settled_qty").default(0).notNull(),
+  },
+  (t) => ({
+    challanIdx: index("idx_sco_challan_lines_challan").on(t.challanId),
+    scoItemIdx: index("idx_sco_challan_lines_sco_item").on(t.scoItemId),
+  }),
+);
+
 export const grnStatusEnum = pgEnum("grn_status", [
   "draft",
   "pending_qa",

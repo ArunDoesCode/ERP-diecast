@@ -49,3 +49,19 @@ export async function allocateDocumentSequence(
 
   return { periodKey, seq: counterRow.lastSeq };
 }
+
+// BR-SCO-09: financial-year sequence (Apr-Mar), e.g. JWC/27-28/1. Consecutive
+// per FY, never reused. Stub: S2 implementation uses document_number_counters
+// with periodKey = "<yy>-<yy+1>" of the FY that contains `date`.
+export async function allocateFinancialYearSequence(
+  _tx: Tx,
+  _docType: string,
+  _actorId: number,
+  _date: Date = new Date(),
+): Promise<{ fy: string; seq: number }> {
+  throw new AppError(
+    "Financial-year numbering not implemented",
+    501,
+    "NOT_IMPLEMENTED",
+  );
+}

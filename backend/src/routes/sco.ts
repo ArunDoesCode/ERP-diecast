@@ -1,5 +1,7 @@
 import { Hono } from "hono";
+import { z } from "zod";
 
+import { scoChallanController } from "../controller/scoChallanController";
 import { scoController } from "../controller/scoController";
 import { asyncHandler } from "../lib/async-handler";
 import { requirePermission } from "../lib/auth-middleware";
@@ -14,6 +16,13 @@ import {
   scoResponseSchema,
   updateScoSchema,
 } from "../types/sco.types";
+import {
+  challanDetailsSchema,
+  challanPrintSchema,
+  challanResponseSchema,
+  createChallanSchema,
+  openChallanListQuerySchema,
+} from "../types/scoChallan.types";
 import { END_POINTS } from "./end-points";
 
 const SCO_ROUTES = END_POINTS.sco;
@@ -123,6 +132,74 @@ register({
   auth: { type: "permission", key: "sco.manage" },
   request: { body: cancelScoSchema },
   responses: { "200": successResponse(scoDetailsSchema) },
+});
+
+// --- S2: challan (issue material), BR-SCO-07..11, 24, 25 ---
+
+scoRouter.post(
+  SCO_ROUTES.createChallan,
+  requirePermission("sco.issue_receive"),
+  asyncHandler(scoChallanController.create),
+);
+register({
+  method: "POST",
+  path: `${SCO_BASE_PATH}${SCO_ROUTES.createChallan}`,
+  tags: ["sco"],
+  summary:
+    "Issue material on an approved/material_issued SCO: creates a job-work challan JWC/<FY>/<seq> and posts store -> vendor location (BR-SCO-07..10). Path :id = SCO id.",
+  auth: { type: "permission", key: "sco.issue_receive" },
+  request: { body: createChallanSchema },
+  responses: { "201": successResponse(challanDetailsSchema) },
+});
+
+scoRouter.get(
+  SCO_ROUTES.listChallans,
+  requirePermission("sco.view"),
+  asyncHandler(scoChallanController.listBySco),
+);
+register({
+  method: "GET",
+  path: `${SCO_BASE_PATH}${SCO_ROUTES.listChallans}`,
+  tags: ["sco"],
+  summary:
+    "List all challans of one SCO (newest first) with days left to the return due date (BR-SCO-11). Not paginated: an SCO has few challans.",
+  auth: { type: "permission", key: "sco.view" },
+  responses: { "200": successResponse(z.array(challanResponseSchema)) },
+});
+
+scoRouter.get(
+  SCO_ROUTES.openChallans,
+  requirePermission("sco.view"),
+  asyncHandler(scoChallanController.listOpen),
+);
+register({
+  method: "GET",
+  path: `${SCO_BASE_PATH}${SCO_ROUTES.openChallans}`,
+  tags: ["sco"],
+  summary:
+    "Open challans (material not fully settled) across SCOs, paginated, with days left and dueStatus ok/warning/overdue (BR-SCO-11). Filters: vendorId, scoId, dueStatus.",
+  auth: { type: "permission", key: "sco.view" },
+  request: { query: openChallanListQuerySchema },
+  responses: { "200": paginatedResponse(challanResponseSchema) },
+  pagination: {
+    sortableFields: ["id", "challanNumber", "challanDate", "returnDueDate"],
+    searchable: false,
+  },
+});
+
+scoRouter.get(
+  SCO_ROUTES.challanDetails,
+  requirePermission("sco.view"),
+  asyncHandler(scoChallanController.details),
+);
+register({
+  method: "GET",
+  path: `${SCO_BASE_PATH}${SCO_ROUTES.challanDetails}`,
+  tags: ["sco"],
+  summary:
+    "Challan with lines plus print data: company settings, vendor (gstin null = unregistered), HSN per line, declaration text (BR-SCO-09, Rule 55).",
+  auth: { type: "permission", key: "sco.view" },
+  responses: { "200": successResponse(challanPrintSchema) },
 });
 
 export { scoRouter as scoRoutes };

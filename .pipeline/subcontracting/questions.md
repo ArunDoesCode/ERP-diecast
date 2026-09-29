@@ -5,3 +5,4 @@
 | 1 | Where do plant name/address/GSTIN/state live (BR-SCO-09, 10)? | Arun | New one-row `company_settings` table, owner edits | spec v2 changelog, BR-SCO-09 |
 | 2 | Where does HSN on the challan come from? | Arun | `hsn_code` on `item_master` | spec v2 changelog, BR-SCO-09 |
 | 3 | Missing plant details / HSN at challan time? | Arun | Block challan, 400 | spec v2 changelog, BR-SCO-09 |
+| 4 | Challan date / heat number optional inputs? | coordinator (spec silent, BR-SCO-08 'heat number copied') | yes: date defaults today, heat defaults to SCO line batch | spec changelog |

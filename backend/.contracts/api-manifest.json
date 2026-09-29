@@ -3003,6 +3003,172 @@
       }
     },
     {
+      "id": "POST /api/sco/:id/challans",
+      "method": "POST",
+      "path": "/api/sco/:id/challans",
+      "tags": [
+        "sco"
+      ],
+      "summary": "Issue material on an approved/material_issued SCO: creates a job-work challan JWC/<FY>/<seq> and posts store -> vendor location (BR-SCO-07..10). Path :id = SCO id.",
+      "auth": {
+        "type": "permission",
+        "key": "sco.issue_receive"
+      },
+      "request": {
+        "body": {
+          "challanDate": "unrepresentable.optional",
+          "ewayBillNo": "string.nonempty.optional",
+          "lines": "array<object>.required"
+        }
+      },
+      "responses": {
+        "201": {
+          "success": "boolean.required",
+          "data": {
+            "challan": {
+              "id": "unrepresentable.required",
+              "challanNumber": "string.required",
+              "scoId": "unrepresentable.required",
+              "vendorId": "unrepresentable.required",
+              "challanDate": "unrepresentable.required",
+              "ewayBillNo": "string.nullable.required",
+              "valuePaise": "unrepresentable.required",
+              "returnDueDate": "unrepresentable.required",
+              "createdBy": "unrepresentable.required",
+              "createdAt": "unrepresentable.required",
+              "scoNumber": "string.required",
+              "vendorName": "string.required",
+              "daysLeft": "integer.required",
+              "dueStatus": "enum:ok,warning,overdue.required",
+              "createdByName": "string.nullable.required"
+            },
+            "lines": "array<object>.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "GET /api/sco/:id/challans",
+      "method": "GET",
+      "path": "/api/sco/:id/challans",
+      "tags": [
+        "sco"
+      ],
+      "summary": "List all challans of one SCO (newest first) with days left to the return due date (BR-SCO-11). Not paginated: an SCO has few challans.",
+      "auth": {
+        "type": "permission",
+        "key": "sco.view"
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required"
+        }
+      }
+    },
+    {
+      "id": "GET /api/sco/challans/open",
+      "method": "GET",
+      "path": "/api/sco/challans/open",
+      "tags": [
+        "sco"
+      ],
+      "summary": "Open challans (material not fully settled) across SCOs, paginated, with days left and dueStatus ok/warning/overdue (BR-SCO-11). Filters: vendorId, scoId, dueStatus.",
+      "auth": {
+        "type": "permission",
+        "key": "sco.view"
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "sortBy": "enum:id,challanNumber,challanDate,returnDueDate.required",
+          "sortDir": "enum:asc,desc.required",
+          "vendorId": "integer.positive.optional",
+          "scoId": "integer.positive.optional",
+          "dueStatus": "enum:ok,warning,overdue.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "id",
+          "challanNumber",
+          "challanDate",
+          "returnDueDate"
+        ],
+        "searchable": false
+      }
+    },
+    {
+      "id": "GET /api/sco/challans/:challanId",
+      "method": "GET",
+      "path": "/api/sco/challans/:challanId",
+      "tags": [
+        "sco"
+      ],
+      "summary": "Challan with lines plus print data: company settings, vendor (gstin null = unregistered), HSN per line, declaration text (BR-SCO-09, Rule 55).",
+      "auth": {
+        "type": "permission",
+        "key": "sco.view"
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "challan": {
+              "id": "unrepresentable.required",
+              "challanNumber": "string.required",
+              "scoId": "unrepresentable.required",
+              "vendorId": "unrepresentable.required",
+              "challanDate": "unrepresentable.required",
+              "ewayBillNo": "string.nullable.required",
+              "valuePaise": "unrepresentable.required",
+              "returnDueDate": "unrepresentable.required",
+              "createdBy": "unrepresentable.required",
+              "createdAt": "unrepresentable.required",
+              "scoNumber": "string.required",
+              "vendorName": "string.required",
+              "daysLeft": "integer.required",
+              "dueStatus": "enum:ok,warning,overdue.required",
+              "createdByName": "string.nullable.required"
+            },
+            "lines": "array<object>.required",
+            "company": {
+              "id": "unrepresentable.required",
+              "name": "string.required",
+              "address": "string.required",
+              "gstin": "string.required",
+              "stateCode": "string.required",
+              "updatedBy": "unrepresentable.nullable.required",
+              "updatedAt": "unrepresentable.required"
+            },
+            "vendor": {
+              "id": "integer.required",
+              "name": "string.required",
+              "address": "string.nullable.required",
+              "gstin": "string.nullable.required",
+              "stateCode": "string.nullable.required"
+            },
+            "declaration": "string.required"
+          }
+        }
+      }
+    },
+    {
       "id": "GET /api/setup/modules",
       "method": "GET",
       "path": "/api/setup/modules",

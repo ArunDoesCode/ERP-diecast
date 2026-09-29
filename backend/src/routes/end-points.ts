@@ -116,6 +116,10 @@ export const END_POINTS = {
     update: "/updatesco",
     submit: "/:id/submit",
     cancel: "/:id/cancel",
+    createChallan: "/:id/challans",
+    listChallans: "/:id/challans",
+    openChallans: "/challans/open",
+    challanDetails: "/challans/:challanId",
   },
   company: {
     settings: "/settings",

@@ -61,3 +61,49 @@ Existing body plus `hsnCode?: string | null` (1-20 chars; null clears). Item res
 - Error codes: 400 `SUPPLIER_INACTIVE`, `SCO_VENDOR_TYPE_INVALID`, `SCO_SAME_ITEM`, `SCO_RETURN_DATE_INVALID`, `SCO_SERVICE_NOT_OFFERED`, `ITEM_INACTIVE`; 409 `SCO_NOT_DRAFT`, `DOC_LOCKED_IN_APPROVAL`, `SCO_INVALID_TRANSITION`, `SCO_HAS_ISSUE`, `APPROVAL_ALREADY_OPEN`.
 - Approval: SCO amount = totalAmountPaise (incl. GST), category `subcontracting`; sent back / withdraw -> `draft`.
 - New permission key `company.manage` (owner seed only); new screen `/subcontracting` (key `sco.view`).
+
+---
+
+# Contract — subcontracting S2 (challan = issue material)
+
+Status: CONTRACT ONLY. Handlers return 501 `NOT_IMPLEMENTED` until S2 backend lands. Qty whole pcs, money paise, dates ISO.
+Challan number `JWC/<FY>/<seq>` (FY Apr-Mar, e.g. `27-28`, <=16 chars). Return due date = challan date + 1 year.
+
+## Endpoints (all under `/api/sco`)
+| Method | Path | Key | Notes |
+|---|---|---|---|
+| POST | /sco/:id/challans | `sco.issue_receive` | `:id` = SCO id. 201 |
+| GET | /sco/:id/challans | `sco.view` | challans of one SCO, newest first, not paginated |
+| GET | /sco/challans/open | `sco.view` | paginated, open challans across SCOs |
+| GET | /sco/challans/:challanId | `sco.view` | challan + print data |
+
+## Shapes
+Challan = id, challanNumber, scoId, vendorId, challanDate, ewayBillNo|null, valuePaise, returnDueDate, createdBy, createdAt
++ `scoNumber`, `vendorName`, `createdByName|null`, `daysLeft` (int, whole days to due date, negative = overdue),
+`dueStatus` in `ok` (>60 days) | `warning` (0..60 days) | `overdue` (past due).
+ChallanLine = id, challanId, scoItemId, itemId, qty, unitIssueCostPaise, heatNumber|null, hsnCode, settledQty
++ `itemSku`, `itemName`, `lineValuePaise` (qty x unitIssueCostPaise).
+
+## POST /sco/:id/challans -> 201 `data: { challan, lines }`
+Body: `{ challanDate?: ISO date (default now; decides FY), ewayBillNo?: string (1-50), lines: [ { scoItemId, qty (int >=1), heatNumber? (default = SCO line rawItemBatch) } ] }` (lines >= 1).
+Errors: 400 (validation; qty > send qty - issued; plant settings or raw item HSN missing; EWB missing when inter-state / vendor unregistered / value >= 50,000 paise*100 i.e. Rs 50,000 = 5,000,000 paise), 403, 404 (SCO / scoItemId not on this SCO),
+409 (SCO not approved/material_issued; store stock short; concurrent challan lost the SCO lock, BR-SCO-24).
+Effect: two `sco_issue` ledger rows per line (store -qty, vendor location +qty, average cost, heat), `issuedQty` += qty, SCO -> `material_issued`.
+
+## GET /sco/:id/challans -> `data: Challan[]`. 404 if SCO missing.
+
+## GET /sco/challans/open
+Query: `page`(1) `pageSize`(10, max 100) `sortBy` in `id|challanNumber|challanDate|returnDueDate` (returnDueDate), `sortDir` asc|desc (asc),
+`vendorId`, `scoId`, `dueStatus` ok|warning|overdue. Open = any line with settledQty < qty.
+Response `data: Challan[]`, `meta {page,pageSize,total,totalPages}`.
+
+## GET /sco/challans/:challanId -> `data: { challan, lines, company, vendor, declaration }`
+`company` = company_settings row (id, name, address, gstin, stateCode, updatedBy, updatedAt).
+`vendor` = `{ id, name, address|null, gstin|null (null => print "unregistered"), stateCode|null }`.
+`declaration` = fixed text "sent for job work u/s 143, no tax charged". 404 if missing.
+
+## Notes
+- New tables `sco_challans`, `sco_challan_lines`. Receipt<->challan settlement table deferred to S3 (`settledQty` column is ready).
+- Vendor location: existing `uq_locations_one_vendor_premise` already makes one-per-vendor unique; implementation must create with `onConflictDoNothing` then re-select.
+- Route order: `/challans/open` is registered before `/challans/:challanId`.
+- Assumption to confirm: `challanDate` and per-line `heatNumber` are optional inputs (spec only says date and heat copied).
