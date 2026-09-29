@@ -1,0 +1,12 @@
+{
+  "feature": "m1-stock",
+  "branch": "work/m1-stock",
+  "base": "work/m1",
+  "phase": "plan",
+  "modules": ["grn", "grn-stock", "inventory", "suppliers", "subcontracting"],
+  "current": "grn",
+  "iteration": 0,
+  "pr": null,
+  "envFile": "/Users/turbo_fltr/.claude/diecast-env/stock-test.env",
+  "testDb": "diecast_stock_test"
+}
