@@ -4,7 +4,7 @@
   "base": "work/m1",
   "phase": "done-not-pushed",
   "modules": ["grn", "grn-stock", "inventory", "suppliers", "subcontracting"],
-  "current": "inventory",
+  "current": "suppliers",
   "iteration": 0,
   "pr": null,
   "envFile": "/Users/turbo_fltr/.claude/diecast-env/stock-test.env",
