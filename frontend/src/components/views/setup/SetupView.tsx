@@ -23,13 +23,15 @@ type SetupEntity = "employee" | "role" | "page";
 const SetupView = () => {
 	const canManageRoles = useCan("setup.roles.manage");
 	const canManageEmployees = useCan("setup.employees.manage");
-	const [tab, setTab] = useQueryState("tab", {
-		defaultValue: canManageEmployees
-			? "employees"
-			: canManageRoles
-				? "roles"
-				: "pages",
-	});
+	const allowedTabs = [
+		...(canManageEmployees ? ["employees"] : []),
+		...(canManageRoles
+			? ["roles", "screens", "access-log", "pages", "permissions"]
+			: []),
+	];
+	const defaultTab = allowedTabs[0] ?? "";
+	const [rawTab, setTab] = useQueryState("tab", { defaultValue: defaultTab });
+	const tab = allowedTabs.includes(rawTab) ? rawTab : defaultTab;
 	const [modal, setModal] = useState<SetupModalState>({ open: false });
 
 	function openCreate(entity: SetupEntity) {
@@ -69,8 +71,10 @@ const SetupView = () => {
 					{canManageRoles && (
 						<TabsTrigger value="access-log">Access log</TabsTrigger>
 					)}
-					<TabsTrigger value="pages">Pages</TabsTrigger>
-					<TabsTrigger value="permissions">Permissions</TabsTrigger>
+					{canManageRoles && <TabsTrigger value="pages">Pages</TabsTrigger>}
+					{canManageRoles && (
+						<TabsTrigger value="permissions">Permissions</TabsTrigger>
+					)}
 				</TabsList>
 				{canManageEmployees && (
 					<TabsContent value="employees">
@@ -98,15 +102,19 @@ const SetupView = () => {
 						<AccessLogTab />
 					</TabsContent>
 				)}
-				<TabsContent value="pages">
-					<PagesTab
-						onCreatePage={() => openCreate("page")}
-						onEditPage={openEditPage}
-					/>
-				</TabsContent>
-				<TabsContent value="permissions">
-					<PermissionsTab />
-				</TabsContent>
+				{canManageRoles && (
+					<TabsContent value="pages">
+						<PagesTab
+							onCreatePage={() => openCreate("page")}
+							onEditPage={openEditPage}
+						/>
+					</TabsContent>
+				)}
+				{canManageRoles && (
+					<TabsContent value="permissions">
+						<PermissionsTab />
+					</TabsContent>
+				)}
 			</Tabs>
 			<SetupDialog modal={modal} onClose={() => setModal({ open: false })} />
 		</div>

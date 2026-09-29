@@ -8,7 +8,7 @@ export const loginSchema = z.object({
 export type LoginInput = z.infer<typeof loginSchema>;
 
 export type AuthScreen = {
-	key: string | null;
+	key: string;
 	path: string;
 	label: string;
 	menuGroup: string;
@@ -16,9 +16,9 @@ export type AuthScreen = {
 };
 
 export type AuthUser = {
-	id: string | number;
+	id: number;
 	name: string;
-	email?: string;
+	email: string | null;
 	role: string;
 	permissions: string[];
 	screens: AuthScreen[];

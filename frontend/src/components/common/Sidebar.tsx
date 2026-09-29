@@ -78,7 +78,9 @@ export function NavSidebar() {
 				) : sidebarGroups.length > 0 ? (
 					sidebarGroups.map((group) => (
 						<SidebarGroup key={group.name}>
-							<SidebarGroupLabel>{group.name}</SidebarGroupLabel>
+							{group.name !== "" && (
+								<SidebarGroupLabel>{group.name}</SidebarGroupLabel>
+							)}
 							<SidebarGroupContent>
 								<SidebarMenu>
 									{group.pages.map((page) => {

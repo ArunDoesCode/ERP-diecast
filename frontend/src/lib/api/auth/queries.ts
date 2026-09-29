@@ -20,6 +20,7 @@ export function useMeQuery(enabled: boolean) {
 		queryKey: authKeys.me(),
 		queryFn: getMe,
 		enabled,
+		staleTime: 5 * 60 * 1000,
 	});
 
 	useEffect(() => {

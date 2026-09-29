@@ -27,24 +27,3 @@ export function clearAccessToken() {
 	// biome-ignore lint/suspicious/noDocumentCookie: cookie mirror must be cleared on logout.
 	document.cookie = "access_token=; path=/; max-age=0; samesite=lax; secure";
 }
-
-export type AccessTokenPayload = {
-	userId: string;
-	userName: string;
-	exp: number;
-};
-
-export function decodeAccessToken(token: string): AccessTokenPayload | null {
-	try {
-		const payloadPart = token.split(".")[1];
-		if (!payloadPart) {
-			return null;
-		}
-
-		const padded = payloadPart.replace(/-/g, "+").replace(/_/g, "/");
-		const decoded = atob(padded);
-		return JSON.parse(decoded) as AccessTokenPayload;
-	} catch {
-		return null;
-	}
-}

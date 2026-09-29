@@ -43,7 +43,11 @@ export function RoleGrantsEditor({ roleId, onClose }: RoleGrantsEditorProps) {
 					<Skeleton className="h-40 w-full" />
 				) : (
 					<GrantsGrid
-						key={`${grants.roleId}-${grants.keys.filter((k) => k.granted).length}`}
+						key={`${grants.roleId}-${grants.keys
+							.filter((k) => k.granted)
+							.map((k) => k.key)
+							.sort()
+							.join(",")}`}
 						grants={grants}
 						onDone={onClose}
 					/>

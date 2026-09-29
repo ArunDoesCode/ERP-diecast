@@ -8,7 +8,7 @@ import {
 	useQueryClient,
 } from "@tanstack/react-query";
 import { toast } from "sonner";
-
+import { authKeys } from "@/lib/api/auth/queries";
 import type {
 	AccessLogListParams,
 	EmployeeInput,
@@ -119,6 +119,7 @@ export function useCreateEmployeeMutation() {
 		mutationFn: (input: EmployeeInput) => createEmployee(input),
 		onSuccess: async () => {
 			await queryClient.invalidateQueries({ queryKey: setupKeys.employees() });
+			await queryClient.invalidateQueries({ queryKey: ACCESS_LOG_KEY });
 			toast.success("Employee created");
 		},
 		onError: (error) => {
@@ -135,6 +136,7 @@ export function useUpdateEmployeeMutation() {
 			updateEmployee(id, input),
 		onSuccess: async () => {
 			await queryClient.invalidateQueries({ queryKey: setupKeys.employees() });
+			await queryClient.invalidateQueries({ queryKey: ACCESS_LOG_KEY });
 			toast.success("Employee updated");
 		},
 		onError: (error) => {
@@ -150,6 +152,7 @@ export function useDeleteEmployeeMutation() {
 		mutationFn: (id: number) => deleteEmployee(id),
 		onSuccess: async () => {
 			await queryClient.invalidateQueries({ queryKey: setupKeys.employees() });
+			await queryClient.invalidateQueries({ queryKey: ACCESS_LOG_KEY });
 			toast.success("Employee deleted");
 		},
 		onError: (error) => {
@@ -165,6 +168,7 @@ export function useGenerateEmployeeQrMutation() {
 		mutationFn: (id: number) => generateEmployeeQr(id),
 		onSuccess: async () => {
 			await queryClient.invalidateQueries({ queryKey: setupKeys.employees() });
+			await queryClient.invalidateQueries({ queryKey: ACCESS_LOG_KEY });
 		},
 		onError: (error) => {
 			toast.error(errorMessage(error, "Failed to generate QR token"));
@@ -210,6 +214,10 @@ export function useCreateRoleMutation() {
 		mutationFn: (input: RoleInput) => createRole(input),
 		onSuccess: async () => {
 			await queryClient.invalidateQueries({ queryKey: setupKeys.roles() });
+			await queryClient.invalidateQueries({ queryKey: ACCESS_LOG_KEY });
+			await queryClient.invalidateQueries({
+				queryKey: setupKeys.assignableRoles(),
+			});
 			toast.success("Role created");
 		},
 		onError: (error) => {
@@ -226,6 +234,10 @@ export function useUpdateRoleMutation() {
 			updateRole(id, input),
 		onSuccess: async () => {
 			await queryClient.invalidateQueries({ queryKey: setupKeys.roles() });
+			await queryClient.invalidateQueries({ queryKey: ACCESS_LOG_KEY });
+			await queryClient.invalidateQueries({
+				queryKey: setupKeys.assignableRoles(),
+			});
 			toast.success("Role updated");
 		},
 		onError: (error) => {
@@ -239,8 +251,13 @@ export function useDeleteRoleMutation() {
 
 	return useMutation({
 		mutationFn: (id: number) => deleteRole(id),
-		onSuccess: async () => {
+		onSuccess: async (_data, id) => {
+			queryClient.removeQueries({ queryKey: setupKeys.roleGrants(id) });
 			await queryClient.invalidateQueries({ queryKey: setupKeys.roles() });
+			await queryClient.invalidateQueries({ queryKey: ACCESS_LOG_KEY });
+			await queryClient.invalidateQueries({
+				queryKey: setupKeys.assignableRoles(),
+			});
 			toast.success("Role deleted");
 		},
 		onError: (error) => {
@@ -385,6 +402,9 @@ export function useCopyRoleMutation() {
 			copyRole(id, input),
 		onSuccess: async () => {
 			await queryClient.invalidateQueries({ queryKey: setupKeys.roles() });
+			await queryClient.invalidateQueries({
+				queryKey: setupKeys.assignableRoles(),
+			});
 			await queryClient.invalidateQueries({ queryKey: ACCESS_LOG_KEY });
 			toast.success("Role copied");
 		},
@@ -415,6 +435,7 @@ export function useUpdateRoleGrantsMutation() {
 			await queryClient.invalidateQueries({ queryKey: setupKeys.roles() });
 			await queryClient.invalidateQueries({ queryKey: setupKeys.screens() });
 			await queryClient.invalidateQueries({ queryKey: ACCESS_LOG_KEY });
+			await queryClient.invalidateQueries({ queryKey: authKeys.me() });
 			toast.success("Access saved");
 		},
 		onError: (error) => {
@@ -454,6 +475,7 @@ export function useUpdateScreenRolesMutation() {
 			await queryClient.invalidateQueries({ queryKey: setupKeys.screens() });
 			await queryClient.invalidateQueries({ queryKey: setupKeys.roles() });
 			await queryClient.invalidateQueries({ queryKey: ACCESS_LOG_KEY });
+			await queryClient.invalidateQueries({ queryKey: authKeys.me() });
 			toast.success("Screen access updated");
 		},
 		onError: (error) => {
@@ -488,6 +510,7 @@ export function useAssignEmployeeRoleMutation() {
 			await queryClient.invalidateQueries({ queryKey: setupKeys.employees() });
 			await queryClient.invalidateQueries({ queryKey: setupKeys.roles() });
 			await queryClient.invalidateQueries({ queryKey: ACCESS_LOG_KEY });
+			await queryClient.invalidateQueries({ queryKey: authKeys.me() });
 			toast.success("Role changed");
 		},
 		onError: (error) => {

@@ -10,6 +10,8 @@ const CODE_MESSAGES: Record<string, string> = {
 		"This is a system role and cannot be changed this way.",
 	ROLE_HAS_EMPLOYEES:
 		"This role still has active employees. Move them to another role first.",
+	ROLE_HAS_INACTIVE_EMPLOYEES:
+		"This role still has inactive employees. Move them to another role first.",
 	ROLE_IN_APPROVAL_CHAIN:
 		"This role is used in an approval chain. Remove it from the chain first.",
 	LAST_ADMIN: "This would leave the system with no active super-admin.",
