@@ -21,9 +21,15 @@ import type { Employee, Page, Role } from "@/types/setup";
 type SetupEntity = "employee" | "role" | "page";
 
 const SetupView = () => {
-	const [tab, setTab] = useQueryState("tab", { defaultValue: "employees" });
 	const canManageRoles = useCan("setup.roles.manage");
 	const canManageEmployees = useCan("setup.employees.manage");
+	const [tab, setTab] = useQueryState("tab", {
+		defaultValue: canManageEmployees
+			? "employees"
+			: canManageRoles
+				? "roles"
+				: "pages",
+	});
 	const [modal, setModal] = useState<SetupModalState>({ open: false });
 
 	function openCreate(entity: SetupEntity) {
