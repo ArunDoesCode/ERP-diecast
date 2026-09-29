@@ -1,11 +1,11 @@
 import {
+  BadRequestError,
   ConflictError,
   InternalServerError,
   NotFoundError,
 } from "../lib/errors";
 import { assetRepository } from "../repository/assetRepository";
 import type {
-  assetInventoryMovementCreateSchemaType,
   assetInventoryMovementListQuerySchemaType,
   assetItemCreateSchemaType,
   assetItemListQuerySchemaType,
@@ -17,6 +17,8 @@ import type {
   assetMachineCreateSchemaType,
   assetMachineListQuerySchemaType,
   assetMachineUpdateSchemaType,
+  assetManualMovementCreateSchemaType,
+  assetReconciliationQuerySchemaType,
   assetServiceCreateSchemaType,
   assetServiceListQuerySchemaType,
   assetServiceUpdateSchemaType,
@@ -193,18 +195,49 @@ export const assetService = {
     return updated;
   },
 
+  // Manual stock-take / opening stock only (BR-GRN-43, 44). Document types are
+  // posted from their source document.
   async createInventoryMovement(
-    input: assetInventoryMovementCreateSchemaType,
+    input: assetManualMovementCreateSchemaType,
     actorId: number,
   ) {
+    if (
+      input.referenceType !== "stock_adjustment" &&
+      input.referenceType !== "opening_stock"
+    ) {
+      throw new BadRequestError(
+        `Type ${input.referenceType} is posted from its source document, not by hand.`,
+      );
+    }
+    const isStockIn = input.quantityChange > 0;
+    if (
+      isStockIn &&
+      (input.unitCostPaise === undefined || input.unitCostPaise <= 0)
+    ) {
+      throw new BadRequestError(
+        "unitCostPaise must be greater than 0 for a manual stock-in.",
+      );
+    }
     const created = await assetRepository.createInventoryMovement(
-      input,
+      {
+        ...input,
+        referenceType: input.referenceType,
+      },
       actorId,
     );
     if (!created) {
       throw new InternalServerError("Failed to create inventory movement");
     }
     return created;
+  },
+
+  async inventoryReconciliation(params: assetReconciliationQuerySchemaType) {
+    const { rows, total } =
+      await assetRepository.inventoryReconciliation(params);
+    return {
+      data: rows,
+      meta: toPaginatedMeta(params.page, params.pageSize, total),
+    };
   },
 
   async listMachines(params: assetMachineListQuerySchemaType) {

@@ -5,7 +5,7 @@ import {
   inventoryLedger,
   itemMaster,
 } from "../db/schemas/02_procurement-catalog";
-import { NotFoundError } from "../lib/errors";
+import { ConflictError, NotFoundError } from "../lib/errors";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -25,6 +25,11 @@ export type PostStockInput = {
   //  - "in": weighted into the average (default for a positive quantity)
   //  - "out_at_cost": value removed at unitCostPaise (GRN correction)
   //  - "none": average untouched (default for a negative quantity)
+  // Value the row at the item's current average instead of unitCostPaise
+  // (manual stock-out, BR-GRN-44).
+  valueAtAverage?: boolean;
+  // Refuse a posting that takes the item+location balance below zero (BR-GRN-33).
+  blockNegative?: boolean;
   averageEffect?: "in" | "out_at_cost" | "none";
 };
 
@@ -70,9 +75,14 @@ export async function postStock(tx: Tx, input: PostStockInput) {
     .limit(1);
 
   const qtyMilli = toMilli(input.quantityChange);
-  const balanceAfter = fromMilli(
-    toMilli(lastRow?.balanceAfter ?? 0) + qtyMilli,
-  );
+  const balanceMilli = toMilli(lastRow?.balanceAfter ?? 0) + qtyMilli;
+  if (input.blockNegative && balanceMilli < 0) {
+    throw new ConflictError("Insufficient stock at this location");
+  }
+  const balanceAfter = fromMilli(balanceMilli);
+  const unitCostPaise = input.valueAtAverage
+    ? item.averageCostPaise
+    : input.unitCostPaise;
 
   const [created] = await tx
     .insert(inventoryLedger)
@@ -86,8 +96,8 @@ export async function postStock(tx: Tx, input: PostStockInput) {
       referenceLineId: input.referenceLineId ?? null,
       quantityChange: fromMilli(qtyMilli),
       balanceAfter,
-      unitCostPaise: input.unitCostPaise,
-      totalValueChangePaise: rowValuePaise(qtyMilli, input.unitCostPaise),
+      unitCostPaise,
+      totalValueChangePaise: rowValuePaise(qtyMilli, unitCostPaise),
       notes: input.notes ?? null,
       createdBy: input.createdBy,
     })

@@ -9,6 +9,7 @@ import {
   ilike,
   lt,
   or,
+  sql,
 } from "drizzle-orm";
 import { db } from "../db/client";
 import {
@@ -23,7 +24,6 @@ import {
 } from "../db/schemas/02_procurement";
 import type { PartialUpdate } from "../lib/types";
 import type {
-  assetInventoryMovementCreateSchemaType,
   assetInventoryMovementListQuerySchemaType,
   assetItemCreateSchemaType,
   assetItemListQuerySchemaType,
@@ -31,6 +31,8 @@ import type {
   assetLocationListQuerySchemaType,
   assetMachineCreateSchemaType,
   assetMachineListQuerySchemaType,
+  assetManualMovementCreateSchemaType,
+  assetReconciliationQuerySchemaType,
   assetServiceCreateSchemaType,
   assetServiceListQuerySchemaType,
 } from "../types/asset.types";
@@ -433,24 +435,89 @@ export const assetRepository = {
     return updated;
   },
 
+  // Manual movement: type `adjustment`, reference id 0. Stock-out is valued at
+  // the current average and may not go below zero at the location (BR-GRN-33,
+  // 44); stock-in feeds the moving average.
   async createInventoryMovement(
-    input: assetInventoryMovementCreateSchemaType,
+    input: Omit<assetManualMovementCreateSchemaType, "referenceType"> & {
+      referenceType: "stock_adjustment" | "opening_stock";
+    },
     actorId: number,
   ) {
+    const isStockIn = input.quantityChange > 0;
     return db.transaction((tx) =>
       postStock(tx, {
         itemId: input.itemId,
         locationId: input.locationId,
         batchNumber: input.batchNumber,
-        transactionType: input.transactionType,
+        transactionType: "adjustment",
         referenceType: input.referenceType,
-        referenceId: input.referenceId,
+        referenceId: 0,
         quantityChange: input.quantityChange,
-        unitCostPaise: input.unitCostPaise,
-        notes: input.notes,
+        unitCostPaise: isStockIn ? (input.unitCostPaise ?? 0) : 0,
+        valueAtAverage: !isStockIn,
+        blockNegative: !isStockIn,
+        notes: input.reason,
         createdBy: actorId,
       }),
     );
+  },
+
+  // Mismatch rows only (BR-GRN-41): item stock vs ledger total, and each
+  // item+location's last balance vs its ledger total. Quantities compared to
+  // half a thousandth to ignore float noise.
+  async inventoryReconciliation(params: assetReconciliationQuerySchemaType) {
+    const dir = params.sortDir === "desc" ? sql`desc` : sql`asc`;
+    const mismatches = sql`
+      select 'item_stock'::text as kind, i.id as item_id, i.sku as item_sku,
+             null::int as location_id, i.current_stock as stored_qty,
+             coalesce(sum(l.quantity_change), 0) as ledger_qty
+      from item_master i
+      left join inventory_ledger l on l.item_id = i.id
+      group by i.id
+      having abs(i.current_stock - coalesce(sum(l.quantity_change), 0)) > 0.0005
+      union all
+      select 'item_location_balance'::text, i.id, i.sku, t.location_id,
+             t.stored_qty, t.ledger_qty
+      from (
+        select item_id, location_id, sum(quantity_change) as ledger_qty,
+               (array_agg(balance_after order by id desc))[1] as stored_qty
+        from inventory_ledger
+        group by item_id, location_id
+      ) t
+      join item_master i on i.id = t.item_id
+      where abs(t.stored_qty - t.ledger_qty) > 0.0005`;
+
+    const [rows, totals] = await Promise.all([
+      db.execute(sql`
+        select * from (${mismatches}) m
+        order by item_id ${dir}, kind, location_id
+        limit ${params.pageSize} offset ${(params.page - 1) * params.pageSize}`),
+      db.execute(sql`select count(*)::int as total from (${mismatches}) m`),
+    ]);
+
+    return {
+      rows: (
+        rows as unknown as Array<{
+          kind: "item_stock" | "item_location_balance";
+          item_id: number;
+          item_sku: string;
+          location_id: number | null;
+          stored_qty: number;
+          ledger_qty: number;
+        }>
+      ).map((r) => ({
+        kind: r.kind,
+        itemId: r.item_id,
+        itemSku: r.item_sku,
+        locationId: r.location_id,
+        storedQty: Number(r.stored_qty),
+        ledgerQty: Number(r.ledger_qty),
+      })),
+      total: Number(
+        (totals as unknown as Array<{ total: number }>)[0]?.total ?? 0,
+      ),
+    };
   },
 
   async listMachines(params: assetMachineListQuerySchemaType) {

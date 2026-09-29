@@ -4,7 +4,6 @@ import { BadRequestError } from "../lib/errors";
 import type { AppEnv } from "../lib/types";
 import { assetService } from "../service/assetService";
 import {
-  assetInventoryMovementCreateSchema,
   assetInventoryMovementListQuerySchema,
   assetItemCreateSchema,
   assetItemListQuerySchema,
@@ -16,6 +15,8 @@ import {
   assetMachineCreateSchema,
   assetMachineListQuerySchema,
   assetMachineUpdateSchema,
+  assetManualMovementCreateSchema,
+  assetReconciliationQuerySchema,
   assetServiceCreateSchema,
   assetServiceListQuerySchema,
   assetServiceUpdateSchema,
@@ -93,15 +94,18 @@ export const assetController = {
   },
 
   async createInventoryMovement(c: Context<AppEnv>) {
-    const body = assetInventoryMovementCreateSchema.parse(await c.req.json());
+    const body = assetManualMovementCreateSchema.parse(await c.req.json());
     const actorId = Number(c.get("user").userId);
     const data = await assetService.createInventoryMovement(body, actorId);
     return c.json({ success: true, data }, 201);
   },
 
-  // Contract stub (m1-stock S5 implements it).
   async inventoryReconciliation(c: Context<AppEnv>) {
-    return c.json({ success: false, message: "Not implemented" }, 501);
+    const query = assetReconciliationQuerySchema.parse(
+      Object.fromEntries(new URL(c.req.url).searchParams),
+    );
+    const { data, meta } = await assetService.inventoryReconciliation(query);
+    return c.json({ success: true, data, meta });
   },
 
   async listLocations(c: Context<AppEnv>) {
