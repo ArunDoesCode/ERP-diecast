@@ -22,7 +22,7 @@
  *    only the price-list step is asserted here.
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { and, eq, inArray, like, or } from "drizzle-orm";
+import { and, asc, eq, inArray, like, or } from "drizzle-orm";
 import { createApp } from "../app";
 import { db } from "../db/client";
 import {
@@ -1358,7 +1358,8 @@ describe("BR-PO-11 cancel", () => {
     const trail = await db
       .select()
       .from(approvalTrails)
-      .where(eq(approvalTrails.requestId, reqId));
+      .where(eq(approvalTrails.requestId, reqId))
+      .orderBy(asc(approvalTrails.id));
     const c = trail.filter((t) => t.action === "cancelled");
     expect(c.length).toBe(1);
     expect(c[0]?.actionBy).toBe(emp.buyer as number);
@@ -1720,6 +1721,23 @@ describe("BR-PO-17 supplier confirmation, reminders, escalations are log rows", 
     expect((await poRow(po.poId)).status).toBe("dispatched");
   });
 
+  test("BR-PO-17 confirm is a log row with who, when, channel and note", async () => {
+    const po = await mkDispatchedPo();
+    const res = await call("buyer2", "POST", `/api/po/${po.poId}/confirm`, {
+      confirmationMethod: "phone",
+      note: "spoke to Ravi",
+    });
+    expect(res.status).toBe(200);
+    const rows = await comms(po.poId);
+    const c = rows.filter((r) => r.type === "confirmation");
+    expect(c.length).toBe(1);
+    expect(c[0]?.sentBy).toBe(emp.buyer2 as number);
+    expect(c[0]?.sentAt).toBeTruthy();
+    expect(c[0]?.channel).toBe("phone");
+    expect(c[0]?.note).toBe("spoke to Ravi");
+    expect((await poRow(po.poId)).status).toBe("dispatched");
+  });
+
   test("BR-PO-17 reminder on partial_received is allowed", async () => {
     const po = await mkDispatchedPo();
     await setPo(po.poId, { status: "partial_received" });
@@ -1994,7 +2012,8 @@ describe("BR-PO-21 who and when on every change", () => {
     const trail = await db
       .select()
       .from(approvalTrails)
-      .where(eq(approvalTrails.requestId, reqId));
+      .where(eq(approvalTrails.requestId, reqId))
+      .orderBy(asc(approvalTrails.id));
     expect(trail.find((t) => t.action === "submitted")?.actionBy).toBe(
       emp.buyer as number,
     );
@@ -2370,5 +2389,89 @@ describe("BR-PR-36 PR header follows its lines after PO changes", () => {
       reason: "supplier stopped",
     });
     expect((await prRow(po.prId)).status).toBe("fully_ordered");
+  });
+});
+
+const cancelLine = (
+  prId: number,
+  lineId: number,
+  reason: unknown = "not needed now",
+  tag = "buyer",
+) => call(tag, "POST", `/api/pr/${prId}/lines/${lineId}/cancel`, { reason });
+
+describe("BR-PR-33 / BR-PR-46 PR line cancel", () => {
+  test("BR-PR-33 a pending line of an approved PR can be cancelled on its own", async () => {
+    const pr = await mkPr({
+      lines: [
+        ["a", 10],
+        ["b", 3],
+      ],
+    });
+    const res = await cancelLine(pr.prId, pr.line.a as number);
+    expect(res.status).toBe(200);
+    expect((await prLine(pr.line.a as number)).status).toBe("cancelled");
+    expect((await prLine(pr.line.b as number)).status).toBe("pending");
+    expect((await prRow(pr.prId)).status).toBe("approved");
+  });
+
+  test("BR-PR-33 an ordered (or po_draft) line -> 409 PR_LINE_ON_LIVE_PO", async () => {
+    const draft = await mkDraftPo();
+    const r1 = await cancelLine(draft.prId, draft.line.a as number);
+    expect(r1.status).toBe(409);
+    expect((await json(r1)).code).toBe("PR_LINE_ON_LIVE_PO");
+    const ordered = await mkApprovedPo();
+    const r2 = await cancelLine(ordered.prId, ordered.line.a as number);
+    expect(r2.status).toBe(409);
+    expect((await json(r2)).code).toBe("PR_LINE_ON_LIVE_PO");
+    expect((await prLine(ordered.line.a as number)).status).toBe("ordered");
+  });
+
+  test("BR-PR-33 a cancelled line never changes again -> 409", async () => {
+    const pr = await mkPr({
+      lines: [
+        ["a", 10],
+        ["b", 3],
+      ],
+    });
+    expect((await cancelLine(pr.prId, pr.line.a as number)).status).toBe(200);
+    expect((await cancelLine(pr.prId, pr.line.a as number)).status).toBe(409);
+  });
+
+  test("BR-PR-33 a closed line can not be cancelled -> 409", async () => {
+    const po = await mkDispatchedPo();
+    await setPo(po.poId, { status: "partial_received" });
+    await setReceived(po.poId, (q) => q * 0.5);
+    await call("buyer", "POST", `/api/po/${po.poId}/short-close`, {
+      reason: "supplier stopped",
+    });
+    expect((await prLine(po.line.a as number)).status).toBe("closed");
+    expect((await cancelLine(po.prId, po.line.a as number)).status).toBe(409);
+    expect((await prLine(po.line.a as number)).status).toBe("closed");
+  });
+
+  test("BR-PR-33 reason shorter than 3 characters -> 400, line untouched", async () => {
+    const pr = await mkPr();
+    expect((await cancelLine(pr.prId, pr.line.a as number, "ab")).status).toBe(
+      400,
+    );
+    expect((await prLine(pr.line.a as number)).status).toBe("pending");
+  });
+
+  test("BR-PR-46 line cancel stores who, when and the reason", async () => {
+    const pr = await mkPr({
+      lines: [
+        ["a", 10],
+        ["b", 3],
+      ],
+    });
+    const before = Date.now() - 5000;
+    const res = await cancelLine(pr.prId, pr.line.a as number, "vendor gone");
+    expect(res.status).toBe(200);
+    const it = (dataOf(await json(res)) as { item: Rec }).item;
+    expect(it.cancelledBy).toBe(emp.buyer as number);
+    expect(new Date(it.cancelledAt as string).getTime()).toBeGreaterThan(
+      before,
+    );
+    expect(it.cancelReason).toBe("vendor gone");
   });
 });

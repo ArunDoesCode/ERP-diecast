@@ -228,3 +228,27 @@ Base `/api`. Envelope `{ success, data }`; lists add `meta`. New handlers return
 - PO defaults (BR-PO-03/04/23, BR-SUP-16): the frontend prefills rate, GST % and payment terms from `GET /api/supplier/:id/listItems` (active price rows) and supplier detail; on create/update the backend fills the same defaults when `unitPricePaise` / `gstPercent` / `paymentTermsDays` are omitted. Both stay editable.
 - Route names confirmed: `GET /api/approval/getApprovalHistory/:docType/:docId`, `POST /api/po/:id/short-close`, `GET /api/po/:id/communications`.
 - Line cancel (BR-PR-33): `POST /api/pr/:id/lines/:lineId/cancel` body `{ reason }` (3–500), key `pr.manage`, requester or super-admin; only a `pending` line while the header is `approved`/`partial_ordered`; header recomputed (BR-PR-36). Built in PO-S1.
+
+## PO-S1/S2 as built (brief 52) — the (B) items are now live
+Envelope `{ success, data }`. All PO routes key `po.manage`; PR line cancel key `pr.manage`. Exact shapes: `backend/.contracts/api-manifest.json` (94 routes).
+
+**PO row** (`po` in create / update / details / list / every action): all stored columns plus `cancelledBy, cancelledByName, cancelledAt, cancelReason, shortClosed, invoicedBy, invoicedAt, closedBy, closedAt, closeNote, revisedDeliveryDate, delayReason, dueDate` (dueDate = revised date else expected date). **Item**: `gstPercent, lineValuePaise, lineTaxPaise` next to `qty, unitPricePaise, uom`.
+
+| Endpoint | Body | Rules / errors |
+|---|---|---|
+| POST `/po/createpo` | `{ supplierId, paymentTermsDays? 0-365, deliveryTerms?, expectedDeliveryDate?, notes?, lines: [{ prItemId, unitPricePaise? >=1, gstPercent? }] }` | 201 `{ po, items }`. Omitted terms = supplier default; omitted rate = last PO rate for that supplier+item, else price list, else item average cost (none >= 1 -> 400 `PO_RATE_REQUIRED`); omitted GST % = active price-list % else 0. Supplier missing 404, inactive 400 `SUPPLIER_INACTIVE`. Expected date before today 400 `PO_DATE_BEFORE_PO_DATE`. Line not pending / PR not approved or partial_ordered 400; race 409 `PO_LINE_ALREADY_DRAFTED`. |
+| PATCH `/po/updatepo` | `{ poId, paymentTermsDays?, deliveryTerms?, notes?, expectedDeliveryDate?, inserts: [{ prItemId, unitPricePaise?, gstPercent? }], updates: [{ id, unitPricePaise?, gstPercent? }], deletes: [{ id }] }` | Header fields are all optional now; at least one change needed. 200 `{ po, items }` (`items` = touched lines). Pending PO 409 `DOC_LOCKED_IN_APPROVAL`; any other non-draft 409 `PO_NOT_EDITABLE`. Removing every line 400 `PO_NEEDS_A_LINE` (nothing saved). Date before PO date 400. Omitted update rate/GST keeps the stored value. |
+| DELETE `/po/deletepo/:id` | `{ reason }` 3-500, always | draft / pending_approval / approved / dispatched only, else 409 `PO_INVALID_TRANSITION`; any GRN (draft or posted) 409 `PO_HAS_GRN`. PR lines -> cancelled (issuedQty back), open approval cancelled (trail actor = canceller), PR header recomputed. |
+| POST `/po/:id/send` | `{ channel, note?, toEmail? }` | approved only (else 400 `PO_INVALID_STATUS`); expected date required 400 `PO_EXPECTED_DATE_REQUIRED`; race loser 409 `PO_STATUS_CHANGED`. |
+| POST `/po/:id/reminder`, `/escalate` (201 log row), `/confirm` (200 po), PATCH `/po/:id/delay` (both fields required) | as before | dispatched / partial_received only, else 400 `PO_INVALID_STATUS`; race 409 `PO_STATUS_CHANGED`. |
+| POST `/po/:id/invoice` | `{ invoiceNumber, invoiceDate, billedAmountPaise, dueDate? }` | fully_received only (400); same number + same supplier 409 `SUPPLIER_INVOICE_DUPLICATE`; PO -> invoiced, `invoicedBy/At` set. |
+| POST `/po/:id/close` | `{ note? }` | fully_received or invoiced (else 400). |
+| POST `/po/:id/short-close` | `{ reason }` 3-500 | partial_received only (else 400). PO -> closed, `shortClosed = true`, reason saved in `closeNote`, `closedBy/At`; PR lines -> closed (issuedQty kept). 200 `po`. |
+| GET `/po/:id/communications` | | array newest first: `id, poId, type po_sent / reminder / escalation, channel, status, toEmail, note, sentBy, sentByName, sentAt`. 404 unknown PO. |
+| GET `/po/getpos?overdue=true` | | dispatched / partial_received, open qty, due date (revised else expected) before today. |
+
+**PR line cancel (new):** `POST /pr/:id/lines/:lineId/cancel` body `{ reason }` 3-500 (validated, not stored). 200 `{ pr, item }` (`pr` = recomputed header, `item` = the line with `status: "cancelled"`). Errors: 404 `PR_LINE_NOT_FOUND` / `PR_NOT_FOUND`; 403 `PR_NOT_REQUESTER`; 409 `PR_LINE_ON_LIVE_PO` (po_draft / ordered); 409 `PR_LINE_NOT_PENDING` (closed / cancelled); 409 `PR_INVALID_TRANSITION` (header not approved / partial_ordered). All lines cancelled -> PR becomes `cancelled`.
+
+**Approval effects (no new routes):** PO approved (last level or auto) -> its PR lines `ordered`. Reject or request-cancel -> PO `cancelled` with `cancelledBy` = the actor, reason = the comment, PR lines `cancelled`. Send back / withdraw -> PO `draft`, PR lines stay `po_draft`. PO is matched on `totalAmountPaise` (incl. GST).
+
+**PR line cancel fields (PO-F1):** the cancel response `item` and PR detail lines carry `cancelledBy`, `cancelledAt`, `cancelReason` — same names as the PR header cancel — stored on the line.
