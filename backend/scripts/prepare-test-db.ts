@@ -24,7 +24,18 @@ try {
     new URL("../src/db/seed_page_access.sql", import.meta.url),
   ).text();
   await sql.unsafe(seed);
-  console.log("Test database ready: schema pushed, page access seeded.");
+  // The shared db client reads DATABASE_URL at import time: point it at the test DB first.
+  process.env.DATABASE_URL = url;
+  const { syncCatalog, seedGrants } = await import(
+    "../src/lib/permissions-sync"
+  );
+  await syncCatalog();
+  await seedGrants();
+  const { disconnectDb } = await import("../src/db/client");
+  await disconnectDb();
+  console.log(
+    "Test database ready: schema pushed, page access seeded, permission catalog synced.",
+  );
 } finally {
   await sql.end({ timeout: 5 });
 }

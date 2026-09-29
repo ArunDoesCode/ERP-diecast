@@ -3,12 +3,15 @@ import { serve } from "@hono/node-server";
 import { createApp } from "./app";
 import { connectDb, disconnectDb } from "./db/client";
 import { env } from "./lib/env";
+import { seedGrants, syncCatalog } from "./lib/permissions-sync";
 
 const app = createApp();
 
 const startServer = async () => {
   await connectDb();
   console.log("Database connected");
+  await syncCatalog();
+  await seedGrants();
 
   serve(
     {
