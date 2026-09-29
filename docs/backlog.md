@@ -10,7 +10,6 @@ Milestones: M3 BOM spec, M4 Sale order, UAT-1 factory. This file keeps only the 
 |---|---|
 | BL-010 | [#15](https://github.com/ArunDoesCode/ERP-diecast/issues/15) |
 | BL-011 | [#16](https://github.com/ArunDoesCode/ERP-diecast/issues/16) |
-| BL-012 | [#17](https://github.com/ArunDoesCode/ERP-diecast/issues/17) |
 | BL-017 | [#18](https://github.com/ArunDoesCode/ERP-diecast/issues/18) |
 | BL-023 | [#19](https://github.com/ArunDoesCode/ERP-diecast/issues/19) |
 | BL-030 | [#20](https://github.com/ArunDoesCode/ERP-diecast/issues/20) |
@@ -61,6 +60,7 @@ Milestones: M3 BOM spec, M4 Sale order, UAT-1 factory. This file keeps only the 
 ## Done
 | ID | Item | PR / commit | Closed |
 |---|---|---|---|
+| BL-012 | Done: repo is public; `main` protected (required checks `backend` + `frontend`, admins may bypass, no required reviews); auto-merge + delete-branch-on-merge on | issue #17 | 2026-09-30 |
 | BL-072 | Decided + fixed: challan date can't be in the future (subcontracting v3, BR-SCO-09) | PR #14 | 2026-09-29 |
 | BL-065 | Fixed: SCO submit locks and re-checks the row (subcontracting BR-SCO-06) | feature/subcontracting | 2026-09-29 |
 | BL-070 | Built subcontracting to spec v2 (S1–S4); SCO parts of BR-INV-05/10, BR-SUP-07 included | feature/subcontracting | 2026-09-29 |

@@ -95,6 +95,10 @@ gets a full re-audit.
 
 ## Day-to-day routine
 
+### Merging (GitHub settings, since 2026-09-30)
+- `main` is protected: a PR can merge only when the `backend` and `frontend` CI checks pass (admins can bypass; no review required).
+- Auto-merge is on: press **Enable auto-merge** on a PR after your manual test — it merges itself when CI is green. Merged branches are deleted automatically.
+
 ### Morning (10 min)
 1. Check GitHub: PRs labelled `agent-pipeline` waiting for you → manual UI test (script is in the PR body).
    Merge, or leave review comments.
