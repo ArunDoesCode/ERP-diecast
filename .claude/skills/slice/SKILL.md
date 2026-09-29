@@ -27,7 +27,7 @@ Delegate to **test-writer** (`subagent_type: test-writer`, never a fork) with th
 template** from `.claude/pipeline/PROTOCOL.md`: spec path + version, BR ids, contract path — nothing from
 this conversation or your own reading of the spec/code. Commit its tests alone as `test(<module>): …`.
 Expect FAIL-EXPECTED for new behaviour. Any FAIL-BUG on existing code is in scope only if it's one of the
-slice's BRs; otherwise log it in `docs/backlog.md`. From here on neither you nor the builder agents edit
+slice's BRs; otherwise open a GitHub issue for it. From here on neither you nor the builder agents edit
 test files (see PROTOCOL.md → Test independence).
 
 ## 3. Green — backend

@@ -1,0 +1,14 @@
+name: Change request or idea
+description: Something not in a frozen spec (goes to the backlog, never straight into a build)
+labels: ["idea"]
+body:
+  - type: textarea
+    id: what
+    attributes: {label: What and why (one or two lines)}
+    validations: {required: true}
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options: ["P1 blocks the current milestone", "P2 needed before UAT", "P3 nice to have"]
+    validations: {required: true}

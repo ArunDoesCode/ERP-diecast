@@ -10,7 +10,7 @@ Knowledge is layered by **how often it's needed**; agents load the smallest laye
 | L2 | package skills (`pagination-contract`, `data-table`, `ui-form-standards` …) | when the task matches | detailed how-to for one kind of work | one topic each |
 | L3 | `docs/modules/<module>.md` (**module map**, as-built) | before touching a module | where the code is, data model, API, flows, module gotchas, tests, history | 60–250 lines |
 | L3 | `docs/specs/<module>.md` (spec, should-be) | before building/changing behaviour | states, rules `BR-*`, acceptance criteria | 150–400 lines |
-| L4 | `docs/decisions.md`, `docs/backlog.md`, `docs/uat-log.md`, `docs/STATUS.md` | when deciding / planning / picking up | why, what's deferred, what's broken, where we are | append-only / tables |
+| L4 | `docs/decisions.md`, GitHub Issues (backlog, UAT bugs), `docs/STATUS.md` | when deciding / planning / picking up | why, what's deferred, what's broken, where we are | append-only / tables |
 | L5 | `.pipeline/<feature>/` | only by the coordinator of that feature | briefs, reports, findings, questions of one run | per run, archived |
 | — | codegraph index (`.codegraph/`) + contract manifest | on demand | exact symbols, call paths, API shapes | generated |
 
@@ -44,8 +44,7 @@ Knowledge is layered by **how often it's needed**; agents load the smallest laye
 - **Spec > 400 lines** → split into sub-feature specs; use `/epic`.
 - **CLAUDE.md over budget** → move detail to a skill or module map, leave a one-line pointer. `/wrap`
   checks budgets.
-- **Backlog > ~150 open** → split per module (`docs/backlog/<module>.md`) with the root file as index; or
-  move to GitHub Issues (labels = module/priority) if you prefer a UI.
+- **Backlog** lives in GitHub Issues (filter by label); no file to split.
 - **`.pipeline/` grows** → merged runs are history; agents only read the current feature's folder. Archive
   older than a milestone into `docs/history/` summaries if the folder gets noisy.
 - **Stale maps** → `/map --stale` lists maps whose paths changed since `last_verified_commit` and refreshes

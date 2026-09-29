@@ -34,7 +34,7 @@ limit hit, (c) the PR is ready. Everything else you decide and record.
 
 ## Phase 1 — Plan
 Context you load yourself (cheap, no exploring): `docs/STATUS.md`, the spec, `docs/modules/<module>.md`
-(+ maps of `depends_on` modules), backlog items for the module, `docs/decisions.md`.
+(+ maps of `depends_on` modules), open issues for the module (`gh issue list --label mod:<module>`), `docs/decisions.md`.
 1. Spawn **explorer** with a **map-first, diff-only** brief: the map's `last_verified_commit` and paths,
    plus the questions the map doesn't answer for these BRs. No map yet → run `/map <module>` first.
 2. Write `plan.md`: slices in order (each 2–6 BRs, demo-able), per slice the backend/frontend work, files
@@ -52,7 +52,7 @@ agents with an information wall between them; you never write tests or productio
    fork) with the **zero-context brief template** from PROTOCOL.md — pointers only (spec path + version, BR
    ids, contract path). Do not add your own summary, interpretation, plan notes or anything from this
    conversation; test-writer reads the spec itself. FAIL-BUG on existing code
-   for in-scope BRs is expected work; out-of-scope FAIL-BUGs → `docs/backlog.md`.
+   for in-scope BRs is expected work; out-of-scope FAIL-BUGs → GitHub issue.
    Commit the tests alone: `test(<id>): BR-… tests (red)`.
 3. In parallel (one message, two Agent calls — disjoint ownership):
    **backend-dev** (implement until slice BR tests green, without touching tests) and **frontend-dev**
@@ -89,12 +89,12 @@ loop:
    - `docs/modules/<module>.md` — apply the dev agents' "Map updates", add gotchas learned in the fix loop
      (recurring findings are the best gotchas), History row, `last_verified_commit` = HEAD.
    - `docs/specs/<module>.md` — Implementation status table (BR → done + test file).
-   - `docs/backlog.md` — new BL items for everything backlogged during triage (with ids).
+   - GitHub issues — one per item backlogged during triage (`gh issue create`, labels, link the PR); list the issue numbers in the PR body. Close issues this PR fixes with `Closes #NN` in the PR body.
    - `docs/decisions.md` — any decision made while answering BLOCKED questions.
    - Cross-cutting convention learned (applies to all backend/frontend code) → the package `CLAUDE.md` or
      matching skill, one line — only if it would have prevented a finding. Respect budgets in `docs/KNOWLEDGE.md`.
    - `docs/STATUS.md` — module row + Active pipelines (phase: pr).
-   Commit: `docs(<id>): module map, spec status, backlog`.
+   Commit: `docs(<id>): module map, spec status`.
 0. **Batch, don't ship each feature.** By default stop here: tell the user the feature is done and
    committed on the working branch, and ask whether to add more items or open the PR now. Push and open a
    PR only when the user says so; one PR then covers every item on the branch (a section per item).

@@ -12,7 +12,7 @@ model: sonnet
 
 Read-only except for `docs/STATUS.md`.
 
-1. Read `docs/STATUS.md` and `docs/backlog.md` (P1 items only).
+1. Read `docs/STATUS.md`, then `gh issue list --label P1 --state open` (P1 items only) and `gh issue list --label uat-bug --state open`.
 2. Specs: for each `docs/specs/*.md` (not `_template`), read the frontmatter `status`/`version`.
 3. Pipelines: `gh pr list --label agent-pipeline --state open --json number,title,headRefName,reviewDecision,statusCheckRollup`
    and for each, `git show origin/<headRefName>:.pipeline/<id>/state.json` (after `git fetch origin`) →
