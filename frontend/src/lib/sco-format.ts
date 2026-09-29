@@ -1,5 +1,5 @@
 import type { StatusBadgeStyle } from "@/lib/pr-status-badge";
-import type { ScoStatus } from "@/types/subcontracting";
+import type { ChallanDueStatus, ScoStatus } from "@/types/subcontracting";
 
 export const SCO_STATUS_LABEL: Record<ScoStatus, string> = {
 	draft: "Draft",
@@ -63,4 +63,25 @@ export function formatScoDate(value?: string | null) {
 		month: "short",
 		year: "numeric",
 	});
+}
+
+export const CHALLAN_DUE_BADGE: Record<ChallanDueStatus, StatusBadgeStyle> = {
+	ok: {
+		variant: "default",
+		className: "border-emerald-200 bg-emerald-100 text-emerald-800",
+	},
+	warning: {
+		variant: "secondary",
+		className: "border-amber-200 bg-amber-100 text-amber-800",
+	},
+	overdue: {
+		variant: "outline",
+		className: "border-rose-300 bg-rose-100 text-rose-800",
+	},
+};
+
+export function formatDaysLeft(daysLeft: number) {
+	if (daysLeft < 0) return `${Math.abs(daysLeft)} days overdue`;
+	if (daysLeft === 0) return "Due today";
+	return `${daysLeft} days left`;
 }

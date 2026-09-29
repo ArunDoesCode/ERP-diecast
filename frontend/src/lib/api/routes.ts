@@ -160,6 +160,10 @@ export const API_ROUTES = {
 		update: `${API_Header.sco}/updatesco`,
 		submit: (scoId: number) => `${API_Header.sco}/${scoId}/submit`,
 		cancel: (scoId: number) => `${API_Header.sco}/${scoId}/cancel`,
+		challans: (scoId: number) => `${API_Header.sco}/${scoId}/challans`,
+		openChallans: `${API_Header.sco}/challans/open`,
+		challanDetail: (challanId: number) =>
+			`${API_Header.sco}/challans/${challanId}`,
 	},
 	company: {
 		settings: `${API_Header.company}/settings`,

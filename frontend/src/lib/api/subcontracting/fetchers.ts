@@ -1,9 +1,15 @@
 import { api } from "@/lib/api/client";
 import { API_ROUTES } from "@/lib/api/routes";
 import type {
+	ChallanCreatePayload,
+	ChallanCreateResult,
+	ChallanDetailResult,
+	ChallanListResult,
 	CompanySettings,
 	CompanySettingsPayload,
 	CompanySettingsResult,
+	OpenChallanParams,
+	OpenChallanResult,
 	ScoCancelPayload,
 	ScoCreatePayload,
 	ScoDetailPayload,
@@ -71,5 +77,28 @@ export function saveCompanySettings(payload: CompanySettingsPayload) {
 	return api.patch<ApiResult<CompanySettings>, CompanySettingsPayload>(
 		API_ROUTES.company.settings,
 		payload,
+	);
+}
+
+export function issueChallan(scoId: number, payload: ChallanCreatePayload) {
+	return api.post<ChallanCreateResult, ChallanCreatePayload>(
+		API_ROUTES.subcontracting.challans(scoId),
+		payload,
+	);
+}
+
+export function getScoChallans(scoId: number) {
+	return api.get<ChallanListResult>(API_ROUTES.subcontracting.challans(scoId));
+}
+
+export function getOpenChallans(params?: OpenChallanParams) {
+	return api.get<OpenChallanResult>(
+		`${API_ROUTES.subcontracting.openChallans}${toQueryString(params)}`,
+	);
+}
+
+export function getChallanById(challanId: number) {
+	return api.get<ChallanDetailResult>(
+		API_ROUTES.subcontracting.challanDetail(challanId),
 	);
 }

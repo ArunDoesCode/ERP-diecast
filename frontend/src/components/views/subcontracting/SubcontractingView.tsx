@@ -55,6 +55,9 @@ export function SubcontractingView() {
 					</p>
 				</div>
 				<div className="flex gap-2">
+					<Button type="button" size="sm" variant="outline" asChild>
+						<Link href="/subcontracting/challans">Open challans</Link>
+					</Button>
 					{canEditCompany ? (
 						<Button type="button" size="sm" variant="outline" asChild>
 							<Link href="/subcontracting/settings">

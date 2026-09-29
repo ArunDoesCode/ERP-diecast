@@ -174,3 +174,92 @@ export const companySettingsSchema = z.object({
 
 export type CompanySettingsInput = z.input<typeof companySettingsSchema>;
 export type CompanySettingsPayload = z.output<typeof companySettingsSchema>;
+
+// ---- S2: challan (issue material) ----
+
+export type ChallanDueStatus = "ok" | "warning" | "overdue";
+
+export interface Challan {
+	id: number;
+	challanNumber: string;
+	scoId: number;
+	vendorId: number;
+	challanDate: string;
+	ewayBillNo: string | null;
+	valuePaise: number;
+	returnDueDate: string;
+	createdBy: number;
+	createdAt: string;
+	scoNumber: string;
+	vendorName: string;
+	createdByName: string | null;
+	/** Whole days to the due date; negative = overdue. */
+	daysLeft: number;
+	dueStatus: ChallanDueStatus;
+}
+
+export interface ChallanLine {
+	id: number;
+	challanId: number;
+	scoItemId: number;
+	itemId: number;
+	qty: number;
+	unitIssueCostPaise: number;
+	heatNumber: string | null;
+	hsnCode: string;
+	settledQty: number;
+	itemSku: string;
+	itemName: string;
+	lineValuePaise: number;
+}
+
+export interface ChallanCreatePayload {
+	challanDate?: string;
+	ewayBillNo?: string;
+	lines: Array<{ scoItemId: number; qty: number; heatNumber?: string }>;
+}
+
+export type ChallanCreateResult = ApiResult<{
+	challan: Challan;
+	lines: ChallanLine[];
+}>;
+
+export type ChallanListResult = ApiResult<Challan[]>;
+
+export type OpenChallanSortField =
+	| "id"
+	| "challanNumber"
+	| "challanDate"
+	| "returnDueDate";
+
+export type OpenChallanParams = {
+	page?: number;
+	pageSize?: number;
+	sortBy?: OpenChallanSortField;
+	sortDir?: "asc" | "desc";
+	vendorId?: number;
+	scoId?: number;
+	dueStatus?: ChallanDueStatus;
+};
+
+export type OpenChallanResult = {
+	success: true;
+	data: Challan[];
+	meta: PaginationMeta;
+};
+
+export interface ChallanDetailPayload {
+	challan: Challan;
+	lines: ChallanLine[];
+	company: CompanySettings | null;
+	vendor: {
+		id: number;
+		name: string;
+		address: string | null;
+		gstin: string | null;
+		stateCode: string | null;
+	};
+	declaration: string;
+}
+
+export type ChallanDetailResult = ApiResult<ChallanDetailPayload>;

@@ -10,7 +10,9 @@ import { toast } from "sonner";
 
 import { ApiClientError } from "@/lib/api/client";
 import type {
+	ChallanCreatePayload,
 	CompanySettingsPayload,
+	OpenChallanParams,
 	ScoCreatePayload,
 	ScoListParams,
 	ScoUpdatePayload,
@@ -19,9 +21,13 @@ import type {
 import {
 	cancelSco,
 	createSco,
+	getChallanById,
 	getCompanySettings,
+	getOpenChallans,
 	getScoById,
+	getScoChallans,
 	getScos,
+	issueChallan,
 	saveCompanySettings,
 	submitSco,
 	updateSco,
@@ -34,6 +40,13 @@ export const scoKeys = {
 			: (["subcontracting", "list"] as const),
 	detail: (scoId: number) => ["subcontracting", "detail", scoId] as const,
 	companySettings: () => ["company", "settings"] as const,
+	challans: (scoId: number) => ["subcontracting", "challans", scoId] as const,
+	openChallans: (params?: OpenChallanParams) =>
+		params
+			? (["subcontracting", "open-challans", params] as const)
+			: (["subcontracting", "open-challans"] as const),
+	challanDetail: (challanId: number) =>
+		["subcontracting", "challan", challanId] as const,
 };
 
 // The backend message is already user-facing for 400/409, so show it as-is.
@@ -180,6 +193,58 @@ export function useSaveCompanySettingsMutation() {
 		},
 		onError: (error) => {
 			toast.error(errorMessage(error, "Failed to save company details"));
+		},
+	});
+}
+
+export function useScoChallansQuery(scoId: number) {
+	return useQuery({
+		queryKey: scoKeys.challans(scoId),
+		queryFn: () => getScoChallans(scoId),
+		enabled: Number.isFinite(scoId) && scoId > 0,
+	});
+}
+
+export function useOpenChallansQuery(params: OpenChallanParams) {
+	return useQuery({
+		queryKey: scoKeys.openChallans(params),
+		queryFn: () => getOpenChallans(params),
+		placeholderData: keepPreviousData,
+	});
+}
+
+export function useChallanDetailQuery(challanId: number) {
+	return useQuery({
+		queryKey: scoKeys.challanDetail(challanId),
+		queryFn: () => getChallanById(challanId),
+		enabled: Number.isFinite(challanId) && challanId > 0,
+	});
+}
+
+export function useIssueChallanMutation(scoId: number) {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: (payload: ChallanCreatePayload) => issueChallan(scoId, payload),
+		onSuccess: async (result) => {
+			if (!result.success) {
+				toast.error(result.message || "Failed to issue material");
+				return;
+			}
+			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: scoKeys.list() }),
+				queryClient.invalidateQueries({ queryKey: scoKeys.detail(scoId) }),
+				queryClient.invalidateQueries({ queryKey: scoKeys.challans(scoId) }),
+				queryClient.invalidateQueries({ queryKey: scoKeys.openChallans() }),
+				queryClient.invalidateQueries({ queryKey: ["inventory"] }),
+			]);
+			toast.success(
+				result.message ||
+					`Challan ${result.data.challan.challanNumber} created`,
+			);
+		},
+		onError: (error) => {
+			toast.error(errorMessage(error, "Failed to issue material"));
 		},
 	});
 }

@@ -7,6 +7,8 @@ import { useState } from "react";
 import { ApprovalHistoryPanel } from "@/components/pages/approval/ApprovalHistoryPanel";
 import { formatPaise } from "@/components/pages/inventory/inventory-format";
 import { CancelScoAlert } from "@/components/pages/subcontracting/CancelScoAlert";
+import { IssueMaterialDialog } from "@/components/pages/subcontracting/IssueMaterialDialog";
+import { ScoChallansCard } from "@/components/pages/subcontracting/ScoChallansCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,8 +41,15 @@ const CANCELLABLE: ReadonlySet<ScoStatus> = new Set([
 	"approved",
 ]);
 
+// Material can be issued once approved, and again while partly issued (BR-SCO-07).
+const CAN_ISSUE_STATUS: ReadonlySet<ScoStatus> = new Set([
+	"approved",
+	"material_issued",
+]);
+
 export function ScoDetailView({ scoId }: { scoId: number }) {
 	const canManage = useCan("sco.manage");
+	const canIssue = useCan("sco.issue_receive");
 	const userId = useAuthSessionStore((state) => state.userId);
 	const query = useScoDetailQuery(scoId);
 	const submitMutation = useSubmitScoMutation();
@@ -102,9 +111,16 @@ export function ScoDetailView({ scoId }: { scoId: number }) {
 					</div>
 					<p className="text-xs text-muted-foreground">{sco.vendorName}</p>
 				</div>
-				{canManage ? (
+				{canManage || canIssue ? (
 					<div className="flex flex-wrap gap-2">
-						{isDraft ? (
+						{canIssue && CAN_ISSUE_STATUS.has(sco.status) ? (
+							<IssueMaterialDialog
+								scoId={sco.id}
+								scoNumber={sco.scoNumber}
+								items={items}
+							/>
+						) : null}
+						{canManage && isDraft ? (
 							<>
 								<Button type="button" size="sm" variant="outline" asChild>
 									<Link href={`/subcontracting/${sco.id}/edit`}>Edit</Link>
@@ -123,7 +139,7 @@ export function ScoDetailView({ scoId }: { scoId: number }) {
 								) : null}
 							</>
 						) : null}
-						{CANCELLABLE.has(sco.status) ? (
+						{canManage && CANCELLABLE.has(sco.status) ? (
 							<CancelScoAlert scoId={sco.id} scoNumber={sco.scoNumber} />
 						) : null}
 					</div>
@@ -180,6 +196,7 @@ export function ScoDetailView({ scoId }: { scoId: number }) {
 								<TableHead>Finished item</TableHead>
 								<TableHead>Service</TableHead>
 								<TableHead className="text-right">Send</TableHead>
+								<TableHead className="text-right">Issued</TableHead>
 								<TableHead className="text-right">Return</TableHead>
 								<TableHead className="text-right">Price</TableHead>
 								<TableHead className="text-right">GST</TableHead>
@@ -204,6 +221,7 @@ export function ScoDetailView({ scoId }: { scoId: number }) {
 									<TableCell className="text-right">
 										{line.rawQtyToIssue}
 									</TableCell>
+									<TableCell className="text-right">{line.issuedQty}</TableCell>
 									<TableCell className="text-right">
 										{line.expectedReturnQty}
 									</TableCell>
@@ -223,6 +241,8 @@ export function ScoDetailView({ scoId }: { scoId: number }) {
 					</Table>
 				</CardContent>
 			</Card>
+
+			<ScoChallansCard scoId={sco.id} />
 
 			<div className="space-y-2">
 				<Button
