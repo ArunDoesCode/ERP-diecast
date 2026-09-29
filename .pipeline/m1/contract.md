@@ -252,3 +252,8 @@ Envelope `{ success, data }`. All PO routes key `po.manage`; PR line cancel key 
 **Approval effects (no new routes):** PO approved (last level or auto) -> its PR lines `ordered`. Reject or request-cancel -> PO `cancelled` with `cancelledBy` = the actor, reason = the comment, PR lines `cancelled`. Send back / withdraw -> PO `draft`, PR lines stay `po_draft`. PO is matched on `totalAmountPaise` (incl. GST).
 
 **PR line cancel fields (PO-F1):** the cancel response `item` and PR detail lines carry `cancelledBy`, `cancelledAt`, `cancelReason` — same names as the PR header cancel — stored on the line.
+
+## S7 (after merge da516f2)
+- `/auth/me` and login `user` add `isSuperAdmin: boolean` (FE-SA). Nothing else in the shape changes.
+- New stock-branch routes: `GET /asset/inventory/stock`, `GET /asset/inventory/reconciliation` → `inventory.view`; `GET /supplier/:id/history` → `supplier.view`. `GET /asset/locations` stays `asset.manage` (auth-setup table). `GET /asset/machines` stays any signed-in user, service allows `asset.manage` or `pr.link_machine` (BR-AUTH-26).
+- Removed: `role_pages` table and its routes, `Role` union in `lib/token.ts`, `requireRole`, `{type:"roles"}` auth requirement.
