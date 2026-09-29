@@ -251,6 +251,42 @@ function manual(role: Role, body: Record<string, unknown>) {
   return http("POST", "/api/asset/inventory/movements", role, body);
 }
 
+function stockTake(
+  role: Role,
+  itemId: number,
+  locationId: number,
+  countedQty: number,
+  extra: Record<string, unknown> = {},
+) {
+  return manual(role, {
+    itemId,
+    locationId,
+    referenceType: "stock_adjustment",
+    countedQty,
+    reason: "stock-take",
+    ...extra,
+  });
+}
+
+function openingStock(
+  role: Role,
+  itemId: number,
+  locationId: number,
+  qty: number,
+  unitCostPaise = 100,
+  extra: Record<string, unknown> = {},
+) {
+  return manual(role, {
+    itemId,
+    locationId,
+    referenceType: "opening_stock",
+    qty,
+    unitCostPaise,
+    reason: "opening",
+    ...extra,
+  });
+}
+
 // ---------- setup / teardown ----------
 
 beforeAll(async () => {
@@ -598,13 +634,8 @@ describe("BR-GRN-32 correction ledger row", () => {
     await accept(a.grnId, a.lineId, 100);
     await accept(b.grnId, b.lineId, 100);
     expect((await item(itemId)).averageCostPaise).toBe(15500);
-    const out = await manual("owner", {
-      itemId,
-      locationId: mainStoreId,
-      referenceType: "stock_adjustment",
-      quantityChange: -100,
-      reason: "issued",
-    });
+    // count 100 of the 200 -> posts -100
+    const out = await stockTake("owner", itemId, mainStoreId, 100);
     expect([200, 201]).toContain(out.status);
     // (100*15500 - 60*30000) / 40 < 0
     await correct(b.grnId, b.lineId, 60);
@@ -629,13 +660,8 @@ describe("BR-GRN-33 no negative balance", () => {
   test("BR-GRN-33 received 980, 900 issued (balance 80), correct 100 -> 409, nothing posted", async () => {
     const s = await setupLine({ qty: 980, arrived: 980, rate: 21000 });
     await accept(s.grnId, s.lineId, 980);
-    const out = await manual("owner", {
-      itemId: s.itemId,
-      locationId: mainStoreId,
-      referenceType: "stock_adjustment",
-      quantityChange: -900,
-      reason: "issued to floor",
-    });
+    // count 80 of 980 -> posts -900
+    const out = await stockTake("owner", s.itemId, mainStoreId, 80);
     expect([200, 201]).toContain(out.status);
     const before = await ledger(s.itemId);
     const stockBefore = (await item(s.itemId)).currentStock;
@@ -652,51 +678,26 @@ describe("BR-GRN-33 no negative balance", () => {
     expect(corr).toHaveLength(0);
   });
 
-  test("BR-GRN-33 manual stock-out above the location balance -> 409 Insufficient stock, nothing posted", async () => {
+  test("BR-GRN-33 stock-take can never take a balance below zero: negative counted qty -> 400, nothing posted", async () => {
     const itemId = await makeItem("neg");
     const loc = await makeLocation("scrap_yard");
-    const inn = await manual("owner", {
-      itemId,
-      locationId: loc,
-      referenceType: "opening_stock",
-      quantityChange: 10,
-      unitCostPaise: 100,
-      reason: "opening",
-    });
+    const inn = await openingStock("owner", itemId, loc, 10);
     expect([200, 201]).toContain(inn.status);
-    const res = await manual("owner", {
-      itemId,
-      locationId: loc,
-      referenceType: "stock_adjustment",
-      quantityChange: -11,
-      reason: "stock-take",
-    });
-    expect(res.status).toBe(409);
+    const res = await stockTake("owner", itemId, loc, -1);
+    expect(res.status).toBe(400);
     expect(await ledger(itemId)).toHaveLength(1);
     expect((await item(itemId)).currentStock).toBe(10);
   });
 
-  test("BR-GRN-33 manual stock-out at a location with no stock, while another location has stock -> 409", async () => {
+  test("BR-GRN-33 stock-take is per location: counted 0 at an empty location while another holds stock -> 400 no difference, nothing posted", async () => {
     const itemId = await makeItem("negloc");
     const full = await makeLocation("scrap_yard");
     const empty = await makeLocation("finished_goods");
-    await manual("owner", {
-      itemId,
-      locationId: full,
-      referenceType: "opening_stock",
-      quantityChange: 50,
-      unitCostPaise: 100,
-      reason: "opening",
-    });
-    const res = await manual("owner", {
-      itemId,
-      locationId: empty,
-      referenceType: "stock_adjustment",
-      quantityChange: -1,
-      reason: "stock-take",
-    });
-    expect(res.status).toBe(409);
+    await openingStock("owner", itemId, full, 50);
+    const res = await stockTake("owner", itemId, empty, 0);
+    expect(res.status).toBe(400);
     expect(await ledger(itemId)).toHaveLength(1);
+    expect((await item(itemId)).currentStock).toBe(50);
   });
 });
 
@@ -716,21 +717,9 @@ describe("BR-GRN-37 item stock = ledger total", () => {
     const loc = await makeLocation("scrap_yard");
     const s = await setupLine({ itemId, qty: 100, arrived: 100, rate: 1000 });
     await accept(s.grnId, s.lineId, 100);
-    await manual("owner", {
-      itemId,
-      locationId: loc,
-      referenceType: "opening_stock",
-      quantityChange: 25,
-      unitCostPaise: 1000,
-      reason: "opening at yard",
-    });
-    await manual("back_office", {
-      itemId,
-      locationId: mainStoreId,
-      referenceType: "stock_adjustment",
-      quantityChange: -7,
-      reason: "stock-take",
-    });
+    await openingStock("owner", itemId, loc, 25, 1000);
+    // main store holds 100; count 93 -> posts -7
+    await stockTake("back_office", itemId, mainStoreId, 93);
     const rows = await ledger(itemId);
     const total = rows.reduce((a, r) => a + r.quantityChange, 0);
     expect(total).toBe(118);
@@ -797,13 +786,7 @@ describe("BR-GRN-38 moving average on stock in", () => {
   test("BR-GRN-39 any other stock out (manual) leaves the average unchanged", async () => {
     const s = await setupLine({ qty: 100, arrived: 100, rate: 3000 });
     await accept(s.grnId, s.lineId, 100);
-    await manual("owner", {
-      itemId: s.itemId,
-      locationId: mainStoreId,
-      referenceType: "stock_adjustment",
-      quantityChange: -10,
-      reason: "stock-take",
-    });
+    await stockTake("owner", s.itemId, mainStoreId, 90);
     const it = await item(s.itemId);
     expect(it.currentStock).toBe(90);
     expect(it.averageCostPaise).toBe(3000);
@@ -872,12 +855,7 @@ describe("BR-GRN-40 stock and average not settable via item API", () => {
 
   test("BR-GRN-40 opening stock goes in as a manual adjustment of type opening_stock with qty and rate", async () => {
     const itemId = await makeItem("open");
-    const res = await manual("owner", {
-      itemId,
-      locationId: mainStoreId,
-      referenceType: "opening_stock",
-      quantityChange: 50,
-      unitCostPaise: 1200,
+    const res = await openingStock("owner", itemId, mainStoreId, 50, 1200, {
       reason: "opening balance",
     });
     expect([200, 201]).toContain(res.status);
@@ -929,21 +907,9 @@ describe("BR-GRN-41 reconciliation", () => {
     await accept(a.grnId, a.lineId, 90, 10);
     await bypass(b.grnId, b.lineId);
     await correct(a.grnId, a.lineId, 15);
-    await manual("owner", {
-      itemId,
-      locationId: loc,
-      referenceType: "opening_stock",
-      quantityChange: 12.5,
-      unitCostPaise: 900,
-      reason: "opening",
-    });
-    await manual("owner", {
-      itemId,
-      locationId: mainStoreId,
-      referenceType: "stock_adjustment",
-      quantityChange: -4,
-      reason: "stock-take",
-    });
+    await openingStock("owner", itemId, loc, 12.5, 900);
+    // main store: 90 + 50 - 15 = 125; count 121 -> posts -4
+    await stockTake("owner", itemId, mainStoreId, 121);
     expect(await reconRowsFor([itemId])).toEqual([]);
   });
 
@@ -981,20 +947,14 @@ describe("BR-GRN-41 reconciliation", () => {
 // ---------- BR-GRN-42 ----------
 
 describe("BR-GRN-42 postings for one item are serialised", () => {
-  test("BR-GRN-42 new item, two simultaneous +10 at a new location -> balances 10 and 20, stock 20", async () => {
+  test("BR-GRN-42 new item, two simultaneous accepts of 10 (first posting at the location) -> balances 10 and 20, stock 20", async () => {
     const itemId = await makeItem("conc2");
-    const loc = await makeLocation("scrap_yard");
-    const post = () =>
-      manual("owner", {
-        itemId,
-        locationId: loc,
-        referenceType: "opening_stock",
-        quantityChange: 10,
-        unitCostPaise: 100,
-        reason: "concurrent",
-      });
-    const results = await Promise.all([post(), post()]);
-    for (const r of results) expect([200, 201]).toContain(r.status);
+    const a = await setupLine({ itemId, qty: 10, arrived: 10, rate: 100 });
+    const b = await setupLine({ itemId, qty: 10, arrived: 10, rate: 100 });
+    await Promise.all([
+      accept(a.grnId, a.lineId, 10),
+      accept(b.grnId, b.lineId, 10),
+    ]);
     const rows = await ledger(itemId);
     expect(rows.map((r) => r.balanceAfter).sort((x, y) => x - y)).toEqual([
       10, 20,
@@ -1002,19 +962,13 @@ describe("BR-GRN-42 postings for one item are serialised", () => {
     expect((await item(itemId)).currentStock).toBe(20);
   });
 
-  test("BR-GRN-42 five simultaneous postings give distinct running balances 10..50", async () => {
+  test("BR-GRN-42 five simultaneous accepts give distinct running balances 10..50", async () => {
     const itemId = await makeItem("conc5");
-    const loc = await makeLocation("finished_goods");
-    const post = () =>
-      manual("owner", {
-        itemId,
-        locationId: loc,
-        referenceType: "opening_stock",
-        quantityChange: 10,
-        unitCostPaise: 100,
-        reason: "concurrent",
-      });
-    await Promise.all([post(), post(), post(), post(), post()]);
+    const lines = [];
+    for (let n = 0; n < 5; n++) {
+      lines.push(await setupLine({ itemId, qty: 10, arrived: 10, rate: 100 }));
+    }
+    await Promise.all(lines.map((l) => accept(l.grnId, l.lineId, 10)));
     const rows = await ledger(itemId);
     expect(rows.map((r) => r.balanceAfter).sort((x, y) => x - y)).toEqual([
       10, 20, 30, 40, 50,
@@ -1022,22 +976,16 @@ describe("BR-GRN-42 postings for one item are serialised", () => {
     expect((await item(itemId)).currentStock).toBe(50);
   });
 
-  test("BR-GRN-42 concurrent accept and manual stock-in on the same item both land, stock = ledger total", async () => {
+  test("BR-GRN-42 concurrent accept and opening stock (other location) on the same item both land, stock = ledger total", async () => {
     const itemId = await makeItem("concmix");
+    const loc = await makeLocation("scrap_yard");
     const s = await setupLine({ itemId, qty: 100, arrived: 100, rate: 1000 });
     const [a, m] = await Promise.all([
       accept(s.grnId, s.lineId, 100).then(
         () => "ok",
         () => "fail",
       ),
-      manual("owner", {
-        itemId,
-        locationId: mainStoreId,
-        referenceType: "opening_stock",
-        quantityChange: 30,
-        unitCostPaise: 1000,
-        reason: "concurrent",
-      }),
+      openingStock("owner", itemId, loc, 30, 1000),
     ]);
     expect(a).toBe("ok");
     expect([200, 201]).toContain(m.status);
@@ -1046,8 +994,24 @@ describe("BR-GRN-42 postings for one item are serialised", () => {
     expect(total).toBe(130);
     expect((await item(itemId)).currentStock).toBe(130);
     expect(rows.map((r) => r.balanceAfter).sort((x, y) => x - y)).toEqual([
-      30, 130,
+      30, 100,
     ]);
+  });
+
+  test("BR-GRN-42 + BR-INV-23 two simultaneous opening stocks for the same new item+location -> one succeeds, the other 409, balance 10", async () => {
+    const itemId = await makeItem("concopen");
+    const loc = await makeLocation("scrap_yard");
+    const results = await Promise.all([
+      openingStock("owner", itemId, loc, 10),
+      openingStock("owner", itemId, loc, 10),
+    ]);
+    const statuses = results.map((r) => r.status).sort();
+    expect([200, 201]).toContain(statuses[0] as number);
+    expect(statuses[1]).toBe(409);
+    const rows = await ledger(itemId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.balanceAfter).toBe(10);
+    expect((await item(itemId)).currentStock).toBe(10);
   });
 });
 
@@ -1073,7 +1037,7 @@ describe("BR-GRN-43 manual movements: allowed types and roles", () => {
         itemId,
         locationId: mainStoreId,
         referenceType,
-        quantityChange: 5,
+        countedQty: 5,
         unitCostPaise: 100,
         reason: "try",
       });
@@ -1089,7 +1053,7 @@ describe("BR-GRN-43 manual movements: allowed types and roles", () => {
       itemId,
       locationId: mainStoreId,
       referenceType: "stock_adjustment",
-      quantityChange: 5,
+      countedQty: 5,
       unitCostPaise: 100,
     });
     expect(res.status).toBe(400);
@@ -1102,7 +1066,7 @@ describe("BR-GRN-43 manual movements: allowed types and roles", () => {
       itemId,
       locationId: mainStoreId,
       referenceType: "stock_adjustment",
-      quantityChange: 5,
+      countedQty: 5,
       unitCostPaise: 100,
       reason: "   ",
     });
@@ -1115,7 +1079,7 @@ describe("BR-GRN-43 manual movements: allowed types and roles", () => {
       itemId,
       locationId: mainStoreId,
       referenceType: "stock_adjustment",
-      quantityChange: 5,
+      countedQty: 5,
       unitCostPaise: 100,
       reason: "try",
     });
@@ -1129,7 +1093,7 @@ describe("BR-GRN-43 manual movements: allowed types and roles", () => {
       itemId,
       locationId: mainStoreId,
       referenceType: "stock_adjustment",
-      quantityChange: 5,
+      countedQty: 5,
       unitCostPaise: 100,
       reason: "try",
     });
@@ -1142,7 +1106,7 @@ describe("BR-GRN-43 manual movements: allowed types and roles", () => {
       itemId,
       locationId: mainStoreId,
       referenceType: "stock_adjustment",
-      quantityChange: 5,
+      countedQty: 5,
       unitCostPaise: 100,
       reason: "stock-take found extra",
     });
@@ -1155,19 +1119,12 @@ describe("BR-GRN-43 manual movements: allowed types and roles", () => {
   });
 
   test("BR-GRN-43 back_office and super-admin may post", async () => {
-    const itemId = await makeItem("bo");
     for (const role of ["back_office", "super-admin"] as Role[]) {
-      const res = await manual(role, {
-        itemId,
-        locationId: mainStoreId,
-        referenceType: "opening_stock",
-        quantityChange: 1,
-        unitCostPaise: 100,
-        reason: "opening",
-      });
+      const itemId = await makeItem(`bo_${role}`);
+      const res = await openingStock(role, itemId, mainStoreId, 1);
       expect([200, 201]).toContain(res.status);
+      expect(await ledger(itemId)).toHaveLength(1);
     }
-    expect(await ledger(itemId)).toHaveLength(2);
   });
 
   test("BR-GRN-43 unauthenticated -> 401", async () => {
@@ -1185,14 +1142,7 @@ describe("BR-GRN-43 manual movements: allowed types and roles", () => {
 describe("BR-GRN-44 manual cost rules", () => {
   test("BR-GRN-44 manual stock-in with cost 0 -> 400", async () => {
     const itemId = await makeItem("cost0");
-    const res = await manual("owner", {
-      itemId,
-      locationId: mainStoreId,
-      referenceType: "opening_stock",
-      quantityChange: 5,
-      unitCostPaise: 0,
-      reason: "opening",
-    });
+    const res = await openingStock("owner", itemId, mainStoreId, 5, 0);
     expect(res.status).toBe(400);
     expect(await ledger(itemId)).toHaveLength(0);
   });
@@ -1203,7 +1153,7 @@ describe("BR-GRN-44 manual cost rules", () => {
       itemId,
       locationId: mainStoreId,
       referenceType: "stock_adjustment",
-      quantityChange: 5,
+      countedQty: 5,
       reason: "found",
     });
     expect(res.status).toBe(400);
@@ -1213,13 +1163,9 @@ describe("BR-GRN-44 manual cost rules", () => {
   test("BR-GRN-44 manual stock-out sent with cost 1 is valued at the current average", async () => {
     const s = await setupLine({ qty: 10, arrived: 10, rate: 2500 });
     await accept(s.grnId, s.lineId, 10);
-    const res = await manual("owner", {
-      itemId: s.itemId,
-      locationId: mainStoreId,
-      referenceType: "stock_adjustment",
-      quantityChange: -2,
+    // balance 10, counted 8 -> -2, cost sent 1
+    const res = await stockTake("owner", s.itemId, mainStoreId, 8, {
       unitCostPaise: 1,
-      reason: "stock-take",
     });
     expect([200, 201]).toContain(res.status);
     const rows = await ledger(s.itemId);
@@ -1232,13 +1178,7 @@ describe("BR-GRN-44 manual cost rules", () => {
   test("BR-GRN-44 manual stock-out with no cost sent is also valued at the current average", async () => {
     const s = await setupLine({ qty: 10, arrived: 10, rate: 2500 });
     await accept(s.grnId, s.lineId, 10);
-    const res = await manual("owner", {
-      itemId: s.itemId,
-      locationId: mainStoreId,
-      referenceType: "stock_adjustment",
-      quantityChange: -1,
-      reason: "stock-take",
-    });
+    const res = await stockTake("owner", s.itemId, mainStoreId, 9);
     expect([200, 201]).toContain(res.status);
     const rows = await ledger(s.itemId);
     expect(rows[rows.length - 1]?.unitCostPaise).toBe(2500);
@@ -1247,14 +1187,154 @@ describe("BR-GRN-44 manual cost rules", () => {
   test("BR-GRN-44 manual stock-in at a cost feeds the moving average (BR-GRN-38)", async () => {
     const s = await setupLine({ qty: 100, arrived: 100, rate: 1000 });
     await accept(s.grnId, s.lineId, 100);
-    await manual("owner", {
-      itemId: s.itemId,
-      locationId: mainStoreId,
-      referenceType: "stock_adjustment",
-      quantityChange: 100,
+    await stockTake("owner", s.itemId, mainStoreId, 200, {
       unitCostPaise: 2000,
-      reason: "found stock",
     });
     expect((await item(s.itemId)).averageCostPaise).toBe(1500);
+  });
+});
+
+// ---------- BR-INV-22 stock-take ----------
+
+describe("BR-INV-22 stock-take posts counted minus current balance at the location", () => {
+  test("BR-INV-22 balance 480, counted 470 -> one adjustment row of -10 at the average cost", async () => {
+    const s = await setupLine({ qty: 480, arrived: 480, rate: 2500 });
+    await accept(s.grnId, s.lineId, 480);
+    const res = await stockTake("owner", s.itemId, mainStoreId, 470);
+    expect([200, 201]).toContain(res.status);
+    const rows = await ledger(s.itemId);
+    expect(rows).toHaveLength(2);
+    const last = rows[1];
+    expect(last?.transactionType).toBe("adjustment");
+    expect(last?.referenceType).toBe("stock_adjustment");
+    expect(last?.quantityChange).toBe(-10);
+    expect(last?.unitCostPaise).toBe(2500);
+    expect(last?.locationId).toBe(mainStoreId);
+    expect(last?.balanceAfter).toBe(470);
+    expect((await item(s.itemId)).currentStock).toBe(470);
+  });
+
+  test("BR-INV-22 counted equals balance -> 400 no difference, nothing posted", async () => {
+    const s = await setupLine({ qty: 480, arrived: 480, rate: 2500 });
+    await accept(s.grnId, s.lineId, 480);
+    const res = await stockTake("owner", s.itemId, mainStoreId, 480);
+    expect(res.status).toBe(400);
+    expect(res.json?.message?.toLowerCase()).toContain("no difference");
+    expect(await ledger(s.itemId)).toHaveLength(1);
+  });
+
+  test("BR-INV-22 counted above balance -> posts the positive difference at the sent cost", async () => {
+    const s = await setupLine({ qty: 100, arrived: 100, rate: 1000 });
+    await accept(s.grnId, s.lineId, 100);
+    const res = await stockTake("owner", s.itemId, mainStoreId, 125.5, {
+      unitCostPaise: 1000,
+    });
+    expect([200, 201]).toContain(res.status);
+    const last = (await ledger(s.itemId)).at(-1);
+    expect(last?.quantityChange).toBe(25.5);
+    expect(last?.unitCostPaise).toBe(1000);
+    expect(last?.balanceAfter).toBe(125.5);
+  });
+
+  test("BR-INV-22 the difference uses the balance at that location, not the item total", async () => {
+    const itemId = await makeItem("perloc");
+    const loc = await makeLocation("scrap_yard");
+    const s = await setupLine({ itemId, qty: 100, arrived: 100, rate: 1000 });
+    await accept(s.grnId, s.lineId, 100);
+    await openingStock("owner", itemId, loc, 25);
+    const res = await stockTake("owner", itemId, loc, 20);
+    expect([200, 201]).toContain(res.status);
+    const last = (await ledger(itemId)).at(-1);
+    expect(last?.locationId).toBe(loc);
+    expect(last?.quantityChange).toBe(-5);
+    expect(last?.balanceAfter).toBe(20);
+    expect((await item(itemId)).currentStock).toBe(120);
+  });
+
+  test("BR-INV-22 counted 0 with balance > 0 posts the full stock-out", async () => {
+    const s = await setupLine({ qty: 10, arrived: 10, rate: 1000 });
+    await accept(s.grnId, s.lineId, 10);
+    const res = await stockTake("owner", s.itemId, mainStoreId, 0);
+    expect([200, 201]).toContain(res.status);
+    expect((await ledger(s.itemId)).at(-1)?.quantityChange).toBe(-10);
+    expect((await item(s.itemId)).currentStock).toBe(0);
+  });
+
+  test("BR-INV-22 stock-take on an item+location with no ledger rows, counted 0 -> 400 no difference", async () => {
+    const itemId = await makeItem("emptytake");
+    const res = await stockTake("owner", itemId, mainStoreId, 0);
+    expect(res.status).toBe(400);
+    expect(await ledger(itemId)).toHaveLength(0);
+  });
+
+  test("BR-INV-22 sending quantityChange (old shape) is not accepted -> 400", async () => {
+    const itemId = await makeItem("oldshape");
+    const res = await manual("owner", {
+      itemId,
+      locationId: mainStoreId,
+      referenceType: "stock_adjustment",
+      quantityChange: 5,
+      unitCostPaise: 100,
+      reason: "old",
+    });
+    expect(res.status).toBe(400);
+    expect(await ledger(itemId)).toHaveLength(0);
+  });
+});
+
+// ---------- BR-INV-23 opening stock ----------
+
+describe("BR-INV-23 opening stock only for an item+location with no ledger rows", () => {
+  test("BR-INV-23 item with a GRN posted at main store, opening stock there -> 409, nothing posted", async () => {
+    const s = await setupLine({ qty: 100, arrived: 100, rate: 1000 });
+    await accept(s.grnId, s.lineId, 100);
+    const res = await openingStock("owner", s.itemId, mainStoreId, 5);
+    expect(res.status).toBe(409);
+    expect(await ledger(s.itemId)).toHaveLength(1);
+    expect((await item(s.itemId)).currentStock).toBe(100);
+  });
+
+  test("BR-INV-23 second opening stock at the same item+location -> 409", async () => {
+    const itemId = await makeItem("open2");
+    const loc = await makeLocation("scrap_yard");
+    const first = await openingStock("owner", itemId, loc, 10);
+    expect([200, 201]).toContain(first.status);
+    const second = await openingStock("owner", itemId, loc, 10);
+    expect(second.status).toBe(409);
+    expect(await ledger(itemId)).toHaveLength(1);
+  });
+
+  test("BR-INV-23 opening stock at another location of an item that already has stock elsewhere is allowed", async () => {
+    const itemId = await makeItem("openother");
+    const loc = await makeLocation("scrap_yard");
+    const s = await setupLine({ itemId, qty: 100, arrived: 100, rate: 1000 });
+    await accept(s.grnId, s.lineId, 100);
+    const res = await openingStock("owner", itemId, loc, 7, 900);
+    expect([200, 201]).toContain(res.status);
+    const last = (await ledger(itemId)).at(-1);
+    expect(last?.referenceType).toBe("opening_stock");
+    expect(last?.locationId).toBe(loc);
+    expect(last?.quantityChange).toBe(7);
+    expect((await item(itemId)).currentStock).toBe(107);
+  });
+
+  test("BR-INV-23 opening stock qty 0 -> 400", async () => {
+    const itemId = await makeItem("open0");
+    const res = await openingStock("owner", itemId, mainStoreId, 0);
+    expect(res.status).toBe(400);
+    expect(await ledger(itemId)).toHaveLength(0);
+  });
+
+  test("BR-INV-23 opening stock without unitCostPaise -> 400", async () => {
+    const itemId = await makeItem("opennocost");
+    const res = await manual("owner", {
+      itemId,
+      locationId: mainStoreId,
+      referenceType: "opening_stock",
+      qty: 5,
+      reason: "opening",
+    });
+    expect(res.status).toBe(400);
+    expect(await ledger(itemId)).toHaveLength(0);
   });
 });
