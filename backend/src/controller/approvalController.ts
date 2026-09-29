@@ -25,7 +25,7 @@ function parseActor(c: Context<AppEnv>) {
 
   return {
     actorId,
-    actorRole: user.role,
+    actor: c.get("actor"),
   };
 }
 
@@ -64,9 +64,9 @@ export const approvalController = {
 
   async submitRequest(c: Context<AppEnv>) {
     const body = submitApprovalRequestSchema.parse(await c.req.json());
-    const { actorId } = parseActor(c);
+    const { actorId, actor } = parseActor(c);
 
-    const data = await approvalService.submitRequest(body, actorId);
+    const data = await approvalService.submitRequest(body, actorId, actor);
     return c.json({ success: true, data }, 201);
   },
 
@@ -120,6 +120,16 @@ export const approvalController = {
 
     const actor = parseActor(c);
     const data = await approvalService.getCurrentApprovalByDoc(params, actor);
+    return c.json({ success: true, data });
+  },
+
+  async getApprovalHistory(c: Context<AppEnv>) {
+    const params = approvalDocLookupParamSchema.parse({
+      docType: c.req.param("docType"),
+      docId: c.req.param("docId"),
+    });
+    const actor = parseActor(c);
+    const data = await approvalService.getApprovalHistory(params, actor);
     return c.json({ success: true, data });
   },
 };

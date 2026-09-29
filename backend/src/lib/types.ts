@@ -1,8 +1,10 @@
+import type { Actor } from "./auth-middleware";
 import type { TokenPayload } from "./token";
 
 export type AppEnv = {
   Variables: {
     user: TokenPayload;
+    actor: Actor;
   };
 };
 

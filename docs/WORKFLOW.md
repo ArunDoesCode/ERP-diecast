@@ -132,19 +132,22 @@ cd backend
 docker compose up -d                       # dev Postgres :5432 "diecast" + test Postgres :5433 "diecast_test" (in-memory)
 cp .env.example .env                       # set DATABASE_URL=postgres://postgres:postgres@localhost:5432/diecast
                                            # (DATABASE_URL_TEST is prefilled) and two different ≥32-char secrets (no "replace")
-bun install && bun run db:push             # create schema (dev DB)
-bun run db:test:prepare                    # schema + page-access seed into the test DB (re-run after container restart)
-psql "$DATABASE_URL" -f src/db/seed_page_access.sql   # roles, pages, role→page access
-bun run db:seed:approval-policies          # approval policy rules
+bun install
+SEED_USER_PASSWORD='choose-8+chars' bun run db:reset   # wipes the dev DB (public schema), schema + roles + permissions
+                                           # + admin@diecast.local + approval policies + demo data (PRs, POs, GRNs)
+                                           # add --no-fixtures for an empty system (admin only); local hosts only
+bun run db:test:prepare                    # schema + seed into the test DB (re-run after container restart)
 bun run dev                                # API on :4000
 
 cd ../frontend
 # .env: NEXT_PUBLIC_API_URL=http://localhost:4000/api
 bun install && bun run dev                 # UI on :3000
 ```
-**First user:** `POST /api/auth/register` requires an existing `super-admin`/`owner`, so on an empty DB insert
-the first admin employee manually (password hashed with `Bun.password.hash`). A `bootstrap-admin` script is on
-the backlog; ask Claude to write it as your first M0 task.
+**Logins after `db:reset`:** `admin@diecast.local` (super-admin) and `owner@`, `back_office@`, `floor_supervisor@`,
+`qa_inspector@`, `die_designer@diecast.local` — all with the `SEED_USER_PASSWORD` you gave. `db:reset` never runs
+with `NODE_ENV=production` and refuses non-local hosts unless `--allow-remote` and `DB_RESET_CONFIRM=<db name>`.
+For a real first admin without demo data use `bun run bootstrap-admin` (`BOOTSTRAP_ADMIN_NAME/_EMAIL/_PASSWORD`,
+min 8). Exit 2 = already bootstrapped, 3 = roles not seeded (run `db:reset --no-fixtures`).
 
 ### B. Automated checks you can run now
 ```bash

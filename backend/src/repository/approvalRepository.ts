@@ -9,6 +9,7 @@ import {
   inArray,
   isNull,
   lte,
+  notExists,
   or,
   sql,
 } from "drizzle-orm";
@@ -22,12 +23,16 @@ import {
   approvalTrails,
 } from "../db/schemas/02_procurement-approval";
 import {
+  prPoItemLinks,
+  purchaseOrderItems,
   purchaseOrders,
+  purchaseRequestItems,
   purchaseRequests,
   subcontractingOrders,
 } from "../db/schemas/02_procurement-purchasing";
 import { supplierMaster } from "../db/schemas/02_procurement-suppliers";
 import { employees } from "../db/schemas/03_hcm";
+import { fallbackPolicyName } from "../lib/approval-fallback";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -90,7 +95,6 @@ type PolicyListParams = {
 type PolicyMatchInput = {
   docType: ApprovalDocType;
   subDocType: PolicySelect["subDocType"];
-  isSaleOrderLinked: boolean | null;
   amountPaise: number;
 };
 
@@ -170,7 +174,6 @@ const policyColumns = {
   priority: approvalPolicies.priority,
   docType: approvalPolicies.docType,
   subDocType: approvalPolicies.subDocType,
-  isSaleOrderLinked: approvalPolicies.isSaleOrderLinked,
   minAmountPaise: approvalPolicies.minAmountPaise,
   maxAmountPaise: approvalPolicies.maxAmountPaise,
   autoApprove: approvalPolicies.autoApprove,
@@ -274,7 +277,7 @@ export const approvalRepository = {
 
   async findPolicyById(id: number) {
     const [row] = await db
-      .select()
+      .select(policyColumns)
       .from(approvalPolicies)
       .where(eq(approvalPolicies.id, id))
       .limit(1);
@@ -298,7 +301,7 @@ export const approvalRepository = {
       .update(approvalPolicies)
       .set(data)
       .where(eq(approvalPolicies.id, id))
-      .returning();
+      .returning(policyColumns);
 
     return row;
   },
@@ -309,16 +312,8 @@ export const approvalRepository = {
       eq(approvalPolicies.subDocType, input.subDocType),
     );
 
-    const saleOrderFilter =
-      input.isSaleOrderLinked === null
-        ? isNull(approvalPolicies.isSaleOrderLinked)
-        : or(
-            isNull(approvalPolicies.isSaleOrderLinked),
-            eq(approvalPolicies.isSaleOrderLinked, input.isSaleOrderLinked),
-          );
-
-    // Specificity ranking (doc section 4, step 3): an exact category match
-    // always outranks an "any" category match, regardless of priority number.
+    // Specificity ranking (BR-APR-19): an exact category match always outranks
+    // an "any" category match, regardless of priority number.
     const specificityTier = sql<number>`
       case
         when ${approvalPolicies.subDocType} != 'any'
@@ -338,7 +333,6 @@ export const approvalRepository = {
           eq(approvalPolicies.isActive, true),
           eq(approvalPolicies.docType, input.docType),
           subDocTypeFilter,
-          saleOrderFilter,
           or(
             isNull(approvalPolicies.minAmountPaise),
             lte(approvalPolicies.minAmountPaise, input.amountPaise),
@@ -359,45 +353,25 @@ export const approvalRepository = {
     return row;
   },
 
-  async findOrCreateFallbackPolicy(docType: ApprovalDocType, actorId: number) {
-    const fallbackName = `Fallback owner chain (${docType})`;
-
-    const [existing] = await db
+  /**
+   * BR-APR-22: the built-in fallback (one owner step) is an inactive record
+   * kept in seed data, so it never competes as a candidate. Read-only here.
+   */
+  async findFallbackPolicy(docType: ApprovalDocType) {
+    const [row] = await db
       .select(policyColumns)
       .from(approvalPolicies)
       .where(
         and(
-          eq(approvalPolicies.name, fallbackName),
+          eq(approvalPolicies.name, fallbackPolicyName(docType)),
           eq(approvalPolicies.docType, docType),
+          eq(approvalPolicies.isActive, false),
         ),
       )
+      .orderBy(asc(approvalPolicies.id))
       .limit(1);
 
-    if (existing) {
-      return existing;
-    }
-
-    const [created] = await db
-      .insert(approvalPolicies)
-      .values({
-        name: fallbackName,
-        description: "System fallback when no active policy matches",
-        isActive: false,
-        priority: 9999,
-        docType,
-        subDocType: "any",
-        isSaleOrderLinked: null,
-        minAmountPaise: null,
-        maxAmountPaise: null,
-        autoApprove: false,
-        approvalLevels: 1,
-        approvalChain: [{ level: 1, approverType: "role", role: "owner" }],
-        createdBy: actorId,
-        lastUpdatedBy: actorId,
-      })
-      .returning(policyColumns);
-
-    return created;
+    return row;
   },
 
   async findEmployeeWithRoleById(employeeId: number) {
@@ -531,6 +505,67 @@ export const approvalRepository = {
       .orderBy(asc(approvalTrails.actionAt), asc(approvalTrails.id));
   },
 
+  /** BR-APR-33: has this employee already approved a level of the request? */
+  async hasEmployeeApproved(requestId: number, employeeId: number, tx?: Tx) {
+    const executor = tx ?? db;
+    const [row] = await executor
+      .select({ id: approvalTrails.id })
+      .from(approvalTrails)
+      .where(
+        and(
+          eq(approvalTrails.requestId, requestId),
+          eq(approvalTrails.action, "approved"),
+          eq(approvalTrails.actionBy, employeeId),
+        ),
+      )
+      .limit(1);
+
+    return row !== undefined;
+  },
+
+  /** BR-APR-54: every request of a document, newest first, trails oldest first. */
+  async listRequestsWithTrailByDoc(docType: ApprovalDocType, docId: number) {
+    const requests = await db
+      .select({ ...requestColumns, policyName: approvalPolicies.name })
+      .from(approvalRequests)
+      .innerJoin(
+        approvalPolicies,
+        eq(approvalPolicies.id, approvalRequests.policyId),
+      )
+      .where(
+        and(
+          eq(approvalRequests.docType, docType),
+          eq(approvalRequests.docId, docId),
+        ),
+      )
+      .orderBy(desc(approvalRequests.id));
+
+    if (requests.length === 0) {
+      return [];
+    }
+
+    const trailRows = await db
+      .select({ ...trailColumns, actorName: employees.name })
+      .from(approvalTrails)
+      .innerJoin(employees, eq(employees.id, approvalTrails.actionBy))
+      .where(
+        inArray(
+          approvalTrails.requestId,
+          requests.map((request) => request.id),
+        ),
+      )
+      .orderBy(asc(approvalTrails.actionAt), asc(approvalTrails.id));
+
+    const summaries = await fetchDocSummaries(docType, [docId]);
+    const docSummary = summaries.get(docId) ?? fallbackDocSummary(docId);
+
+    return requests.map((request) => ({
+      ...request,
+      docSummary,
+      trail: trailRows.filter((trail) => trail.requestId === request.id),
+    }));
+  },
+
   async listPendingRequests(params: {
     actorRole: string;
     employeeId: number;
@@ -555,6 +590,19 @@ export const approvalRepository = {
         eq(approvalRequests.currentApproverEmployeeId, params.employeeId),
       ),
       params.docType ? eq(approvalRequests.docType, params.docType) : undefined,
+      // BR-APR-33: hide requests this employee already approved a level of.
+      notExists(
+        db
+          .select({ one: sql`1` })
+          .from(approvalTrails)
+          .where(
+            and(
+              eq(approvalTrails.requestId, approvalRequests.id),
+              eq(approvalTrails.action, "approved"),
+              eq(approvalTrails.actionBy, params.employeeId),
+            ),
+          ),
+      ),
     ].filter((filter) => filter !== undefined);
 
     const whereClause = and(...filters);
@@ -721,13 +769,35 @@ export const approvalRepository = {
     return row;
   },
 
+  /** Common PR type of the PO's source lines; none or mixed = "any" (BR-APR-21). */
+  async findPoCategory(poId: number): Promise<PolicySelect["subDocType"]> {
+    const rows = await db
+      .selectDistinct({ type: purchaseRequests.type })
+      .from(purchaseOrderItems)
+      .innerJoin(
+        prPoItemLinks,
+        eq(prPoItemLinks.poItemId, purchaseOrderItems.id),
+      )
+      .innerJoin(
+        purchaseRequestItems,
+        eq(purchaseRequestItems.id, prPoItemLinks.prItemId),
+      )
+      .innerJoin(
+        purchaseRequests,
+        eq(purchaseRequests.id, purchaseRequestItems.prId),
+      )
+      .where(eq(purchaseOrderItems.poId, poId));
+
+    const [only] = rows;
+    return rows.length === 1 && only ? only.type : "any";
+  },
+
   async findDocumentContext(docType: ApprovalDocType, docId: number) {
     if (docType === "pr") {
       const [row] = await db
         .select({
           id: purchaseRequests.id,
           type: purchaseRequests.type,
-          saleOrderId: purchaseRequests.saleOrderId,
           amountPaise: purchaseRequests.estimatedAmountPaise,
           status: purchaseRequests.status,
           createdBy: purchaseRequests.requestedBy,
@@ -744,7 +814,6 @@ export const approvalRepository = {
         docType,
         docId: row.id,
         subDocType: row.type,
-        isSaleOrderLinked: row.saleOrderId !== null,
         amountPaise: row.amountPaise,
         status: row.status,
         createdBy: row.createdBy,
@@ -770,8 +839,8 @@ export const approvalRepository = {
       return {
         docType,
         docId: row.id,
-        subDocType: "any" as const,
-        isSaleOrderLinked: null,
+        // BR-APR-21: the common type of the source PRs, mixed = any.
+        subDocType: await this.findPoCategory(row.id),
         amountPaise: row.amountPaise ?? 0,
         status: row.status,
         createdBy: row.createdBy,
@@ -796,7 +865,6 @@ export const approvalRepository = {
       docType,
       docId: row.id,
       subDocType: "any" as const,
-      isSaleOrderLinked: null,
       amountPaise: 0,
       status: row.status,
       createdBy: row.createdBy,
@@ -807,8 +875,9 @@ export const approvalRepository = {
     docType: ApprovalDocType,
     docId: number,
     reason?: string,
+    options: { actorId?: number; notes?: string; tx?: Tx } = {},
   ) {
-    return db.transaction(async (tx) => {
+    const run = async (tx: Tx) => {
       const openRequest = await this.findPendingRequestByDoc(
         docType,
         docId,
@@ -821,7 +890,12 @@ export const approvalRepository = {
       const [updatedRequest] = await tx
         .update(approvalRequests)
         .set({ status: "cancelled", completedAt: new Date() })
-        .where(eq(approvalRequests.id, openRequest.id))
+        .where(
+          and(
+            eq(approvalRequests.id, openRequest.id),
+            eq(approvalRequests.status, "pending_approval"),
+          ),
+        )
         .returning(requestColumns);
 
       if (!updatedRequest) {
@@ -834,13 +908,16 @@ export const approvalRepository = {
         docId,
         level: updatedRequest.currentLevel,
         action: "cancelled",
-        actionBy: updatedRequest.requestedBy,
-        notes: reason
-          ? `Approval cancelled because source document was cancelled: ${reason}`
-          : "Approval cancelled because source document was cancelled",
+        actionBy: options.actorId ?? updatedRequest.requestedBy,
+        notes:
+          options.notes ??
+          (reason
+            ? `Approval cancelled because source document was cancelled: ${reason}`
+            : "Approval cancelled because source document was cancelled"),
       });
 
       return updatedRequest;
-    });
+    };
+    return options.tx ? run(options.tx) : db.transaction(run);
   },
 };

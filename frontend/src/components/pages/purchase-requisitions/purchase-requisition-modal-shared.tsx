@@ -3,6 +3,14 @@ import type { ReactNode } from "react";
 import { type Control, useWatch } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import {
+	FormControl,
+	FormField,
+	FormItem,
+	FormLabel,
+	FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import {
 	Table,
 	TableBody,
 	TableCell,
@@ -10,9 +18,10 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import type {
-	PRCreateFormInput,
-	PREditFormInput,
+import {
+	type PRCreateFormInput,
+	type PREditFormInput,
+	todayIso,
 } from "@/types/purchase-requisitions";
 
 export type FormStep = "details" | "items";
@@ -20,6 +29,7 @@ export type FormStep = "details" | "items";
 export type ItemsFormShape = {
 	items: Array<{
 		uom?: string;
+		expectedDate?: string;
 	}>;
 };
 
@@ -48,6 +58,45 @@ export function ItemUomCell({
 	);
 }
 
+export function ItemDateCell({
+	control,
+	index,
+	id,
+	disabled,
+}: {
+	control: Control<ItemsFormShape>;
+	index: number;
+	id: string;
+	disabled?: boolean;
+}) {
+	return (
+		<TableCell>
+			<FormField
+				control={control}
+				name={`items.${index}.expectedDate`}
+				render={({ field }) => (
+					<FormItem>
+						<FormLabel className="sr-only" htmlFor={id}>
+							Required by
+						</FormLabel>
+						<FormControl>
+							<Input
+								id={id}
+								type="date"
+								min={todayIso()}
+								disabled={disabled}
+								{...field}
+								value={field.value ?? ""}
+							/>
+						</FormControl>
+						<FormMessage />
+					</FormItem>
+				)}
+			/>
+		</TableCell>
+	);
+}
+
 export function createDefaults(): PRCreateFormInput {
 	return {
 		type: "stock_reorder",
@@ -65,7 +114,6 @@ export function createDefaults(): PRCreateFormInput {
 
 export function toEditDefaults(detail: {
 	prId: number;
-	status: PREditFormInput["status"];
 	notes?: string | null;
 	items: Array<{
 		id: number;
@@ -77,7 +125,6 @@ export function toEditDefaults(detail: {
 }): PREditFormInput {
 	return {
 		prId: detail.prId,
-		status: detail.status,
 		notes: detail.notes ?? "",
 		items:
 			detail.items.length > 0
@@ -162,6 +209,7 @@ export function ItemRowsTable({
 							<TableHead className="w-72">Item</TableHead>
 							<TableHead className="w-32">Requested Qty</TableHead>
 							<TableHead className="w-32">UOM</TableHead>
+							<TableHead className="w-44">Required by</TableHead>
 							<TableHead className="w-20 text-right">Action</TableHead>
 						</TableRow>
 					</TableHeader>

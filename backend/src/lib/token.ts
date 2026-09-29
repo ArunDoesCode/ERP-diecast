@@ -2,26 +2,17 @@ import { jwtVerify, SignJWT } from "jose";
 
 import { env } from "./env";
 
-export type Role =
-  | "owner"
-  | "back_office"
-  | "floor_supervisor"
-  | "qa_inspector"
-  | "die_designer"
-  | "operator"
-  | "super-admin";
-
 export type TokenPayload = {
   userId: number | string;
   userName: string;
-  role: Role;
-  allowedPages: string[];
 };
 
 const accessSecret = new TextEncoder().encode(env.ACCESS_TOKEN_SECRET);
 const refreshSecret = new TextEncoder().encode(env.REFRESH_TOKEN_SECRET);
 
-export async function signAccessToken(payload: TokenPayload) {
+export async function signAccessToken(
+  payload: TokenPayload & Record<string, unknown>,
+) {
   return new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256", typ: "JWT" })
     .setIssuedAt()
@@ -32,6 +23,7 @@ export async function signAccessToken(payload: TokenPayload) {
 export async function signRefreshToken(payload: TokenPayload) {
   return new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+    .setJti(crypto.randomUUID())
     .setIssuedAt()
     .setExpirationTime(`${env.REFRESH_TOKEN_TTL_SECONDS}s`)
     .sign(refreshSecret);

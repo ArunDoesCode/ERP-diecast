@@ -9,16 +9,68 @@ export interface Role {
 	id: number;
 	name: string;
 	isSystem: boolean;
+	isSuperAdmin?: boolean;
+	keyCount?: number;
+	employeeCount?: number;
 }
 
-export interface Page {
-	id: number;
+// ---- S6: role grants / screens / access log ----
+
+export interface GrantKey {
 	key: string;
+	module: string;
 	label: string;
-	path: string;
-	sortOrder: number;
-	moduleId: number | null;
+	description: string | null;
+	grantable: boolean;
+	granted: boolean;
 }
+
+export interface RoleGrants {
+	roleId: number;
+	roleName: string;
+	isSystem: boolean;
+	isSuperAdmin: boolean;
+	readOnly: boolean;
+	keys: GrantKey[];
+}
+
+export type RoleGrantsDiff = { added: string[]; removed: string[] };
+
+export interface Screen {
+	key: string;
+	path: string;
+	permissionKey: string | null;
+	label: string;
+	sortOrder: number;
+	menuGroup: string | null;
+	roleIds: number[];
+}
+
+export type ScreenUpdateInput = {
+	label?: string;
+	sortOrder?: number;
+	menuGroup?: string;
+};
+
+export type ScreenRolesDiff = { added: number[]; removed: number[] };
+
+export interface AssignableRole {
+	id: number;
+	name: string;
+}
+
+export interface AccessLogEntry {
+	id: number;
+	at: string;
+	actorId: number | null;
+	actorName: string | null;
+	action: string;
+	target: string;
+	before: unknown;
+	after: unknown;
+}
+
+export type AccessLogSortField = "at" | "action" | "actorId";
 
 export interface Employee {
 	id: number;
@@ -30,11 +82,6 @@ export interface Employee {
 	roleId: number;
 	dailyRatePaise: number;
 	isActive: boolean;
-}
-
-export interface RolePage {
-	roleId: number;
-	pageId: number;
 }
 
 // ---- list pagination ----
@@ -49,8 +96,6 @@ export type EmployeeSortField =
 
 export type RoleSortField = "name";
 
-export type PageSortField = "label" | "path" | "moduleId" | "sortOrder";
-
 export type ListParams<TSortField extends string> = {
 	page?: number;
 	pageSize?: number;
@@ -60,7 +105,7 @@ export type ListParams<TSortField extends string> = {
 
 export type EmployeeListParams = ListParams<EmployeeSortField>;
 export type RoleListParams = ListParams<RoleSortField>;
-export type PageListParams = ListParams<PageSortField>;
+export type AccessLogListParams = ListParams<AccessLogSortField>;
 
 // GET /setup/employees/search — name search, page-based infinite scroll
 export type EmployeeSearchParams = {
@@ -116,19 +161,3 @@ export const roleSchema = z.object({
 	name: z.string().min(1, "Name is required"),
 });
 export type RoleInput = z.infer<typeof roleSchema>;
-
-export const pageSchema = z.object({
-	key: z.string().min(1, "Key is required"),
-	label: z.string().min(1, "Label is required"),
-	path: z.string().min(1, "Path is required"),
-	sortOrder: z.coerce.number().int().default(0),
-	moduleId: z.coerce.number().int().nullable(),
-});
-export type PageInput = z.infer<typeof pageSchema>;
-
-// keyed by moduleId (string-keyed object, not moduleName — names can be renamed via
-// PageForm/PagesTab, ids are stable); submitted for one Role at a time.
-export type RolePermissionDiff = Record<
-	string,
-	{ added: number[]; deleted: number[] }
->;

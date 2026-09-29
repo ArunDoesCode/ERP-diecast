@@ -1,6 +1,6 @@
 import { api } from "@/lib/api/client";
 import { API_ROUTES } from "@/lib/api/routes";
-import type { LoginInput } from "@/types/auth";
+import type { AuthUser, LoginInput } from "@/types/auth";
 
 export type LoginResponse =
 	| {
@@ -8,12 +8,7 @@ export type LoginResponse =
 			message?: string;
 			data: {
 				accessToken: string;
-				user: {
-					id: string;
-					email: string;
-					role: string;
-					allowedPages: string[];
-				};
+				user: AuthUser;
 			};
 	  }
 	| {
@@ -24,12 +19,7 @@ export type LoginResponse =
 
 export type MeResponse = {
 	success: true;
-	data: {
-		userId: string;
-		userName: string;
-		role: string;
-		allowedPages: string[];
-	};
+	data: AuthUser;
 };
 
 export function login(input: LoginInput) {

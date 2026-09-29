@@ -8,14 +8,16 @@ import {
 } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { ApiClientError } from "@/lib/api/client";
+import { prErrorMessage } from "@/lib/api/purchase-requisitions/error-messages";
 import type {
 	PRCreatePayload,
+	PRDeletePayload,
 	PRUpdatePayload,
 	PurchaseRequisitionListParams,
 } from "@/types/purchase-requisitions";
 
 import {
+	cancelPurchaseRequisitionLine,
 	createPurchaseRequisition,
 	deletePurchaseRequisition,
 	getPurchaseRequisitionById,
@@ -31,9 +33,7 @@ export const purchaseRequisitionKeys = {
 	detail: (prId: number) => ["purchase-requisitions", "detail", prId] as const,
 };
 
-function errorMessage(error: unknown, fallback: string) {
-	return error instanceof ApiClientError ? error.message : fallback;
-}
+const errorMessage = prErrorMessage;
 
 function normalize(value?: string | null) {
 	const trimmed = value?.trim();
@@ -114,13 +114,12 @@ export function useUpdatePurchaseRequisitionMutation() {
 export function useDeletePurchaseRequisitionMutation() {
 	const queryClient = useQueryClient();
 
+	// No error toast: the cancel dialog stays open and shows the message inline.
 	return useMutation({
-		mutationFn: (prId: number) => deletePurchaseRequisition({ prId }),
-		onSuccess: async (result, prId) => {
-			if (!result.success) {
-				toast.error(result.message || "Failed to cancel PR");
-				return;
-			}
+		mutationFn: (payload: PRDeletePayload) =>
+			deletePurchaseRequisition(payload),
+		onSuccess: async (result, { prId }) => {
+			if (!result.success) return;
 
 			await Promise.all([
 				queryClient.invalidateQueries({
@@ -129,11 +128,9 @@ export function useDeletePurchaseRequisitionMutation() {
 				queryClient.invalidateQueries({
 					queryKey: purchaseRequisitionKeys.detail(prId),
 				}),
+				queryClient.invalidateQueries({ queryKey: ["approval"] }),
 			]);
 			toast.success(result.message || "PR cancelled");
-		},
-		onError: (error) => {
-			toast.error(errorMessage(error, "Failed to cancel PR"));
 		},
 	});
 }
@@ -167,17 +164,19 @@ export function toPRUpdatePayload(input: {
 	type: PRUpdatePayload["type"];
 	saleOrderId: PRUpdatePayload["saleOrderId"];
 	assetId: PRUpdatePayload["assetId"];
-	status: PRUpdatePayload["status"];
+	originalAssetId: PRUpdatePayload["assetId"];
 	notes?: string;
 	originalItems: Array<{
 		id: number;
 		itemId: number;
 		requestedQty: number;
+		expectedDate?: string;
 	}>;
 	items: Array<{
 		id?: number;
 		itemId?: number;
 		requestedQty?: number;
+		expectedDate?: string;
 	}>;
 }): PRUpdatePayload {
 	const originalById = new Map(
@@ -194,6 +193,7 @@ export function toPRUpdatePayload(input: {
 				inserts.push({
 					itemId: item.itemId,
 					requestedQty: item.requestedQty,
+					expectedDate: normalize(item.expectedDate),
 				});
 			}
 			continue;
@@ -218,7 +218,17 @@ export function toPRUpdatePayload(input: {
 			update.requestedQty = item.requestedQty;
 		}
 
-		if (update.itemId != null || update.requestedQty != null) {
+		const newDate = normalize(item.expectedDate);
+		const oldDate = normalize(original.expectedDate?.slice(0, 10));
+		if (newDate && newDate !== oldDate) {
+			update.expectedDate = newDate;
+		}
+
+		if (
+			update.itemId != null ||
+			update.requestedQty != null ||
+			update.expectedDate != null
+		) {
 			updates.push(update);
 		}
 	}
@@ -231,11 +241,43 @@ export function toPRUpdatePayload(input: {
 		prId: input.prId,
 		type: input.type,
 		saleOrderId: input.saleOrderId,
-		assetId: input.assetId,
-		status: input.status,
+		// Only send assetId when it changed (backend re-checks pr.link_machine).
+		...(input.assetId !== input.originalAssetId
+			? { assetId: input.assetId }
+			: {}),
 		notes: normalize(input.notes),
 		inserts,
 		updates,
 		deletes,
 	};
+}
+
+export function useCancelPurchaseRequisitionLineMutation() {
+	const queryClient = useQueryClient();
+
+	// No toast on error: the dialog stays open and shows the message inline.
+	return useMutation({
+		mutationFn: (variables: { prId: number; lineId: number; reason: string }) =>
+			cancelPurchaseRequisitionLine(
+				variables.prId,
+				variables.lineId,
+				variables.reason,
+			),
+		onSuccess: async (result, { prId }) => {
+			if (!result.success) return;
+
+			await Promise.all([
+				queryClient.invalidateQueries({
+					queryKey: purchaseRequisitionKeys.cards(),
+				}),
+				queryClient.invalidateQueries({
+					queryKey: purchaseRequisitionKeys.detail(prId),
+				}),
+				queryClient.invalidateQueries({ queryKey: ["approval", "pending"] }),
+				queryClient.invalidateQueries({ queryKey: ["approval", "history"] }),
+				queryClient.invalidateQueries({ queryKey: ["purchase-orders"] }),
+			]);
+			toast.success("Line cancelled");
+		},
+	});
 }

@@ -25,6 +25,15 @@ export type prItemStatusSchemaType = z.infer<typeof prItemStatusSchema>;
 export const prSchema = createSelectSchema(purchaseRequests);
 export type prSchemaType = z.infer<typeof prSchema>;
 
+// DELETE /pr/deletepr/:id body (BR-PR-41): reason trimmed, 3-500 characters.
+export const cancelPrSchema = z.object({
+  reason: z.string().trim().min(3).max(500),
+});
+export type cancelPrSchemaType = z.infer<typeof cancelPrSchema>;
+
+// DELETE /pr/deletepr/:id response payload (BR-PR-46).
+export const prCancelResultSchema = z.object({ pr: prSchema });
+
 // Response shape for a stored purchase request item row (write-side projection).
 export const prItemSchema = createSelectSchema(purchaseRequestItems).pick({
   id: true,
@@ -37,13 +46,25 @@ export const prItemSchema = createSelectSchema(purchaseRequestItems).pick({
 });
 export type prItemSchemaType = z.infer<typeof prItemSchema>;
 
+// POST /pr/:id/lines/:lineId/cancel response payload (BR-PR-33, 36):
+// the recomputed header and the cancelled line.
+export const prLineCancelResultSchema = z.object({
+  pr: prSchema,
+  item: prItemSchema.extend({ status: prItemStatusSchema }),
+});
+
 // PR item row joined with item master fields, as returned by getDetails.
 export const prItemDetailSchema = prItemSchema.extend({
   status: prItemStatusSchema,
+  cancelReason: z.string().nullable(),
+  cancelledBy: z.number().int().nullable(),
+  cancelledAt: z.coerce.date().nullable(),
   itemSku: z.string(),
   itemName: z.string(),
   itemCategory: z.string(),
   estRatePaise: z.number().int().nonnegative(),
+  /** BR-PR-14: average cost is 0, so estRatePaise is the item's standard rate. */
+  noCostHistory: z.boolean(),
   linkedPoId: z.number().int().nullable(),
   linkedPoNumber: z.string().nullable(),
   defaultSupplierId: z.number().int().nullable(),
@@ -66,7 +87,10 @@ export type prLinkedPoSchemaType = z.infer<typeof prLinkedPoSchema>;
 
 // GET /pr/getprdetails/:id response payload.
 export const prDetailsSchema = z.object({
-  pr: prSchema.extend({ requestedByName: z.string() }),
+  pr: prSchema.extend({
+    requestedByName: z.string(),
+    cancelledByName: z.string().nullable(),
+  }),
   items: z.array(prItemDetailSchema),
   linkedPos: z.array(prLinkedPoSchema),
 });
@@ -80,19 +104,32 @@ export const prUpdateResultSchema = z.object({
 });
 export type prUpdateResultSchemaType = z.infer<typeof prUpdateResultSchema>;
 
+// BR-PR-08: quantity > 0 with at most 3 decimals.
+const prQtySchema = z
+  .number()
+  .positive()
+  .refine((v) => Math.abs(v * 1000 - Math.round(v * 1000)) < 1e-6, {
+    message: "requestedQty allows at most 3 decimals",
+  });
+
+// BR-PR-08: optional required-by date per line.
+const prExpectedDateSchema = z.coerce.date().optional();
+
 export const createPrItemSchema = createInsertSchema(purchaseRequestItems, {
   itemId: z.number().int().positive(),
-  requestedQty: z.number().int().positive(),
+  requestedQty: prQtySchema,
+  expectedDate: prExpectedDateSchema,
 }).pick({
   itemId: true,
   requestedQty: true,
+  expectedDate: true,
 });
 export type createPrItemSchemaType = z.infer<typeof createPrItemSchema>;
 
 const prCreateBaseSchema = createInsertSchema(purchaseRequests, {
   saleOrderId: z.number().int().positive().optional(),
   assetId: z.number().int().positive().optional(),
-  notes: z.string().min(1),
+  notes: z.string().min(1).max(2000),
 });
 
 export const createPrSchema = prCreateBaseSchema
@@ -125,18 +162,24 @@ export const updatePrUpdateItemSchema = createUpdateSchema(
   purchaseRequestItems,
   {
     itemId: z.number().int().positive(),
-    requestedQty: z.number().int().positive(),
+    requestedQty: prQtySchema,
+    expectedDate: prExpectedDateSchema,
   },
 )
   .pick({
     itemId: true,
     requestedQty: true,
+    expectedDate: true,
   })
   .extend({
     id: z.number().int().positive(),
   })
   .superRefine((data, ctx) => {
-    if (data.itemId === undefined && data.requestedQty === undefined) {
+    if (
+      data.itemId === undefined &&
+      data.requestedQty === undefined &&
+      data.expectedDate === undefined
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "At least one field must be provided for item update",
@@ -149,9 +192,9 @@ export const updatePrDeleteItemSchema = z.object({
 });
 
 const prUpdateBaseSchema = createUpdateSchema(purchaseRequests, {
-  saleOrderId: z.number().int().positive().nullable(),
-  assetId: z.number().int().positive().nullable(),
-  notes: z.string().min(1),
+  saleOrderId: z.number().int().positive().nullable().optional(),
+  assetId: z.number().int().positive().nullable().optional(),
+  notes: z.string().min(1).max(2000).optional(),
 });
 
 export const updatePrSchema = prUpdateBaseSchema
@@ -160,7 +203,6 @@ export const updatePrSchema = prUpdateBaseSchema
     saleOrderId: true,
     assetId: true,
     notes: true,
-    status: true,
   })
   .extend({
     prId: z.number().int().positive(),
@@ -183,7 +225,6 @@ export const updatePrSchema = prUpdateBaseSchema
       data.saleOrderId !== undefined ||
       data.assetId !== undefined ||
       data.notes !== undefined ||
-      data.status !== undefined ||
       data.inserts.length > 0 ||
       data.updates.length > 0 ||
       data.deletes.length > 0;

@@ -10,6 +10,8 @@ import {
   sql,
 } from "drizzle-orm";
 
+import { alias } from "drizzle-orm/pg-core";
+
 import { db } from "../db/client";
 import {
   itemMaster,
@@ -39,9 +41,14 @@ const purchaseRequestColumns = {
   totalApprovalLevels: purchaseRequests.totalApprovalLevels,
   notes: purchaseRequests.notes,
   estimatedAmountPaise: purchaseRequests.estimatedAmountPaise,
+  cancelledBy: purchaseRequests.cancelledBy,
+  cancelledAt: purchaseRequests.cancelledAt,
+  cancelReason: purchaseRequests.cancelReason,
   createdAt: purchaseRequests.createdAt,
   updatedAt: purchaseRequests.updatedAt,
 };
+
+const cancellerEmployees = alias(employees, "canceller_employees");
 
 const purchaseRequestItemWriteColumns = {
   id: purchaseRequestItems.id,
@@ -53,13 +60,22 @@ const purchaseRequestItemWriteColumns = {
   expectedDate: purchaseRequestItems.expectedDate,
 };
 
+/** BR-PR-11/14: line rate = average cost, or the standard rate while average cost is 0. */
+const effectiveRatePaise = sql<number>`case when ${itemMaster.averageCostPaise} > 0 then ${itemMaster.averageCostPaise} else ${itemMaster.standardRatePaise} end`;
+
 const purchaseRequestItemDetailColumns = {
   ...purchaseRequestItemWriteColumns,
   status: purchaseRequestItems.status,
+  cancelReason: purchaseRequestItems.cancelReason,
+  cancelledBy: purchaseRequestItems.cancelledBy,
+  cancelledAt: purchaseRequestItems.cancelledAt,
   itemSku: itemMaster.sku,
   itemName: itemMaster.name,
   itemCategory: itemMaster.category,
-  estRatePaise: itemMaster.averageCostPaise,
+  estRatePaise: effectiveRatePaise.mapWith(Number),
+  noCostHistory: sql<boolean>`${itemMaster.averageCostPaise} = 0`.mapWith(
+    Boolean,
+  ),
 };
 
 type PurchaseRequestInsert = typeof purchaseRequests.$inferInsert;
@@ -73,7 +89,7 @@ export type CreatePrData = Pick<
 
 export type CreatePrItemData = Pick<
   PurchaseRequestItemInsert,
-  "itemId" | "requestedQty" | "uom"
+  "itemId" | "requestedQty" | "uom" | "expectedDate"
 >;
 
 export type CreateOrUpdatePrItemData = Pick<
@@ -114,7 +130,7 @@ async function calculateEstimatedAmountPaiseByItems(
   const itemRows = await tx
     .select({
       id: itemMaster.id,
-      averageCostPaise: itemMaster.averageCostPaise,
+      averageCostPaise: effectiveRatePaise.mapWith(Number),
     })
     .from(itemMaster)
     .where(inArray(itemMaster.id, uniqueItemIds));
@@ -147,7 +163,7 @@ async function calculateEstimatedAmountPaiseByItems(
 
 type ItemMasterLookupRow = Pick<
   typeof itemMaster.$inferSelect,
-  "id" | "uom" | "averageCostPaise"
+  "id" | "uom" | "averageCostPaise" | "isActive"
 >;
 
 const prSortColumns = {
@@ -243,9 +259,14 @@ export const prRepository = {
         .select({
           ...purchaseRequestColumns,
           requestedByName: employees.name,
+          cancelledByName: cancellerEmployees.name,
         })
         .from(purchaseRequests)
         .innerJoin(employees, eq(employees.id, purchaseRequests.requestedBy))
+        .leftJoin(
+          cancellerEmployees,
+          eq(cancellerEmployees.id, purchaseRequests.cancelledBy),
+        )
         .where(eq(purchaseRequests.id, prId))
         .limit(1),
       db
@@ -367,9 +388,13 @@ export const prRepository = {
         id: itemMaster.id,
         uom: itemMaster.uom,
         averageCostPaise: itemMaster.averageCostPaise,
+        isActive: itemMaster.isActive,
       })
       .from(itemMaster)
-      .where(inArray(itemMaster.id, itemIds));
+      // BR-INV-05: inactive items can't go on a new PR line
+      .where(
+        and(inArray(itemMaster.id, itemIds), eq(itemMaster.isActive, true)),
+      );
 
     return new Map(rows.map((row) => [row.id, row]));
   },
@@ -419,6 +444,7 @@ export const prRepository = {
             itemId: item.itemId,
             requestedQty: item.requestedQty,
             uom: item.uom,
+            expectedDate: item.expectedDate,
           })),
         )
 
@@ -501,7 +527,7 @@ export const prRepository = {
     const costRows = await executor
       .select({
         requestedQty: purchaseRequestItems.requestedQty,
-        averageCostPaise: itemMaster.averageCostPaise,
+        averageCostPaise: effectiveRatePaise.mapWith(Number),
       })
       .from(purchaseRequestItems)
       .innerJoin(itemMaster, eq(itemMaster.id, purchaseRequestItems.itemId))
@@ -524,13 +550,92 @@ export const prRepository = {
     return row;
   },
 
-  async setStatusCancelled(prId: number) {
-    const [row] = await db
+  // Row lock for edit/submit/cancel (BR-PR-47): read the PR under FOR UPDATE.
+  async findPrByIdForUpdate(prId: number, tx: Tx) {
+    await tx.execute(
+      sql`select ${purchaseRequests.id} from ${purchaseRequests} where ${purchaseRequests.id} = ${prId} for update`,
+    );
+    return this.findPrById(prId, tx);
+  },
+
+  // CRP-2 lock order: PR headers first (ascending id), then lines. Used before
+  // any code that locks PR lines on behalf of a PO.
+  async lockHeadersInOrder(prIds: number[], tx: Tx) {
+    if (prIds.length === 0) return;
+    await tx
+      .select({ id: purchaseRequests.id })
+      .from(purchaseRequests)
+      .where(inArray(purchaseRequests.id, [...new Set(prIds)]))
+      .orderBy(asc(purchaseRequests.id))
+      .for("update");
+  },
+
+  // Lines of the PR that sit on a PO (po_draft/ordered/closed) with the live PO numbers (BR-PR-39).
+  async findOrderedLinesWithLivePos(prId: number, tx: Tx) {
+    const lines = await tx
+      .select({ id: purchaseRequestItems.id })
+      .from(purchaseRequestItems)
+      .where(
+        and(
+          eq(purchaseRequestItems.prId, prId),
+          inArray(purchaseRequestItems.status, [
+            "po_draft",
+            "ordered",
+            "closed",
+          ]),
+        ),
+      );
+    if (lines.length === 0) return { lineCount: 0, poNumbers: [] as string[] };
+    const pos = await tx
+      .selectDistinct({ poNumber: purchaseOrders.poNumber })
+      .from(prPoItemLinks)
+      .innerJoin(
+        purchaseOrderItems,
+        eq(purchaseOrderItems.id, prPoItemLinks.poItemId),
+      )
+      .innerJoin(purchaseOrders, eq(purchaseOrders.id, purchaseOrderItems.poId))
+      .where(
+        and(
+          inArray(
+            prPoItemLinks.prItemId,
+            lines.map((l) => l.id),
+          ),
+          sql`${purchaseOrders.status} <> 'cancelled'`,
+        ),
+      );
+    return {
+      lineCount: lines.length,
+      poNumbers: pos.map((p) => p.poNumber),
+    };
+  },
+
+  // Soft cancel: header + pending lines -> cancelled, who/when/why saved (BR-PR-39, 41, 46).
+  async cancelPr(
+    prId: number,
+    input: { actorId: number; reason: string },
+    tx: Tx,
+  ) {
+    const now = new Date();
+    const [row] = await tx
       .update(purchaseRequests)
-      .set({ status: "cancelled", updatedAt: new Date() })
+      .set({
+        status: "cancelled",
+        cancelledBy: input.actorId,
+        cancelledAt: now,
+        cancelReason: input.reason,
+        updatedAt: now,
+      })
       .where(eq(purchaseRequests.id, prId))
       .returning(purchaseRequestColumns);
-
+    await tx
+      .update(purchaseRequestItems)
+      .set({ status: "cancelled" })
+      .where(
+        and(
+          eq(purchaseRequestItems.prId, prId),
+          eq(purchaseRequestItems.status, "pending"),
+        ),
+      );
     return row;
   },
 
@@ -538,8 +643,25 @@ export const prRepository = {
   // bypasses prService.assertValidStatusTransition, same rationale as the
   // existing approval-mirror writes in approvalRepository (poService is the
   // caller, after PO create/update/cancel touches PR items).
+  // BR-PR-36: worked out over the non-cancelled lines, and only for a PR that
+  // is approved / partial_ordered / fully_ordered (never draft, pending_approval,
+  // rejected or cancelled). Every line cancelled -> the PR is cancelled. That
+  // auto-cancel sets no cancelledBy (the actor is on the line / PO / trail that
+  // cancelled the last line); cancelReason is "All lines cancelled".
   async recomputeHeaderStatusFromItems(prId: number, tx?: Tx) {
     const executor = tx ?? db;
+    const [header] = await executor
+      .select({ status: purchaseRequests.status })
+      .from(purchaseRequests)
+      .where(eq(purchaseRequests.id, prId))
+      .limit(1);
+    if (
+      !header ||
+      !["approved", "partial_ordered", "fully_ordered"].includes(header.status)
+    ) {
+      return undefined;
+    }
+
     const items = await executor
       .select({ status: purchaseRequestItems.status })
       .from(purchaseRequestItems)
@@ -549,8 +671,25 @@ export const prRepository = {
       return undefined;
     }
 
-    const allPending = items.every((item) => item.status === "pending");
-    const allOrdered = items.every((item) =>
+    const live = items.filter((item) => item.status !== "cancelled");
+    const now = new Date();
+
+    if (live.length === 0) {
+      const [cancelled] = await executor
+        .update(purchaseRequests)
+        .set({
+          status: "cancelled",
+          cancelledAt: now,
+          cancelReason: "All lines cancelled",
+          updatedAt: now,
+        })
+        .where(eq(purchaseRequests.id, prId))
+        .returning(purchaseRequestColumns);
+      return cancelled;
+    }
+
+    const allPending = live.every((item) => item.status === "pending");
+    const allOrdered = live.every((item) =>
       ["po_draft", "ordered", "closed"].includes(item.status),
     );
 
@@ -562,10 +701,38 @@ export const prRepository = {
 
     const [row] = await executor
       .update(purchaseRequests)
-      .set({ status: nextStatus, updatedAt: new Date() })
+      .set({ status: nextStatus, updatedAt: now })
       .where(eq(purchaseRequests.id, prId))
       .returning(purchaseRequestColumns);
 
+    return row;
+  },
+
+  // BR-PR-33: lock one PR line. Always take the PR header lock first (CRP-2).
+  async findItemByIdForUpdate(itemId: number, tx: Tx) {
+    const [row] = await tx
+      .select()
+      .from(purchaseRequestItems)
+      .where(eq(purchaseRequestItems.id, itemId))
+      .for("update");
+    return row;
+  },
+
+  async cancelItem(
+    itemId: number,
+    audit: { reason: string; actorId: number },
+    tx: Tx,
+  ) {
+    const [row] = await tx
+      .update(purchaseRequestItems)
+      .set({
+        status: "cancelled",
+        cancelReason: audit.reason,
+        cancelledBy: audit.actorId,
+        cancelledAt: new Date(),
+      })
+      .where(eq(purchaseRequestItems.id, itemId))
+      .returning();
     return row;
   },
 };

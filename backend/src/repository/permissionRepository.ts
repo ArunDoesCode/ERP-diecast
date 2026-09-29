@@ -1,47 +1,82 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 
 import { db } from "../db/client";
-import { rolePages } from "../db/schemas/01_auth";
-
-const rolePageColumns = {
-  id: rolePages.id,
-  roleId: rolePages.roleId,
-  pageId: rolePages.pageId,
-};
+import { permissions, rolePermissions } from "../db/schemas/01_auth";
+import type { DbExecutor } from "./executor";
 
 export const permissionRepository = {
-  async listAll() {
-    return db.select(rolePageColumns).from(rolePages);
-  },
+  // --- key-based grants (S6, BR-AUTH-07) ---
 
-  async listByRoleId(roleId: number) {
+  /** The whole synced key catalog. */
+  async listCatalog() {
     return db
-      .select(rolePageColumns)
-      .from(rolePages)
-      .where(eq(rolePages.roleId, roleId));
+      .select({
+        key: permissions.key,
+        module: permissions.module,
+        label: permissions.label,
+        description: permissions.description,
+        grantable: permissions.grantable,
+      })
+      .from(permissions)
+      .orderBy(asc(permissions.module), asc(permissions.key));
   },
 
-  async applyDiff(roleId: number, added: number[], deleted: number[]) {
-    await db.transaction(async (tx) => {
-      if (added.length > 0) {
-        await tx
-          .insert(rolePages)
-          .values(added.map((pageId) => ({ roleId, pageId })))
-          .onConflictDoNothing({
-            target: [rolePages.roleId, rolePages.pageId],
-          });
-      }
+  async listKeysByRoleId(roleId: number, exec: DbExecutor = db) {
+    const rows = await exec
+      .select({ key: rolePermissions.permissionKey })
+      .from(rolePermissions)
+      .where(eq(rolePermissions.roleId, roleId));
+    return rows.map((r) => r.key).sort();
+  },
 
-      if (deleted.length > 0) {
-        await tx
-          .delete(rolePages)
-          .where(
-            and(
-              eq(rolePages.roleId, roleId),
-              inArray(rolePages.pageId, deleted),
-            ),
-          );
-      }
-    });
+  /** Every (role, key) pair; used to compare a role's keys with the caller's. */
+  async listAllRoleKeys() {
+    return db
+      .select({
+        roleId: rolePermissions.roleId,
+        key: rolePermissions.permissionKey,
+      })
+      .from(rolePermissions);
+  },
+
+  /** Role ids holding any of the given keys. */
+  async listRoleKeysByKeys(keys: string[]) {
+    if (keys.length === 0) return [];
+    return db
+      .select({
+        roleId: rolePermissions.roleId,
+        key: rolePermissions.permissionKey,
+      })
+      .from(rolePermissions)
+      .where(inArray(rolePermissions.permissionKey, keys));
+  },
+
+  async addKeys(
+    exec: DbExecutor,
+    roleId: number,
+    keys: string[],
+    grantedBy: number,
+  ) {
+    if (keys.length === 0) return;
+    await exec
+      .insert(rolePermissions)
+      .values(
+        keys.map((permissionKey) => ({ roleId, permissionKey, grantedBy })),
+      )
+      .onConflictDoNothing({
+        target: [rolePermissions.roleId, rolePermissions.permissionKey],
+      });
+  },
+
+  async removeKeys(exec: DbExecutor, roleId: number, keys: string[]) {
+    if (keys.length === 0) return;
+    await exec
+      .delete(rolePermissions)
+      .where(
+        and(
+          eq(rolePermissions.roleId, roleId),
+          inArray(rolePermissions.permissionKey, keys),
+        ),
+      );
   },
 };

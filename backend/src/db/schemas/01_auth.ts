@@ -1,7 +1,11 @@
 import {
+  type AnyPgColumn,
   boolean,
+  index,
   integer,
+  jsonb,
   pgTable,
+  primaryKey,
   serial,
   text,
   timestamp,
@@ -13,7 +17,10 @@ export const roles = pgTable("roles", {
   id: serial("id").primaryKey(),
   name: text("name").notNull().unique(),
   isSystem: boolean("is_system").notNull().default(false), // seed Owner, BackOffice, super-admin as true
-  createdBy: integer("created_by").references((): any => employees.id),
+  // set null: removing an employee row must not be blocked by roles they created (the access log keeps who)
+  createdBy: integer("created_by").references((): AnyPgColumn => employees.id, {
+    onDelete: "set null",
+  }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -22,30 +29,60 @@ export const modules = pgTable("modules", {
   name: text("name").notNull().unique(),
 });
 
-export const pages = pgTable("pages", {
-  id: serial("id").primaryKey(),
-  key: text("key").notNull().unique(),
+// Permission keys are defined in code (lib/permissions.ts) and synced here.
+export const permissions = pgTable("permissions", {
+  key: text("key").primaryKey(),
+  module: text("module").notNull(),
   label: text("label").notNull(),
-  path: text("path").notNull(),
-  sortOrder: integer("sort_order").notNull().default(0),
-  moduleId: integer("module_id").references(() => modules.id),
-  createdBy: integer("created_by").references((): any => employees.id),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  description: text("description").notNull(),
+  grantable: boolean("grantable").notNull().default(true),
 });
 
-export const rolePages = pgTable(
-  "role_pages",
+export const rolePermissions = pgTable(
+  "role_permissions",
   {
-    id: serial("id").primaryKey(),
     roleId: integer("role_id")
       .notNull()
       .references(() => roles.id, { onDelete: "cascade" }),
-    pageId: integer("page_id")
+    permissionKey: text("permission_key")
       .notNull()
-      .references(() => pages.id, { onDelete: "cascade" }),
+      .references(() => permissions.key, { onDelete: "cascade" }),
+    grantedBy: integer("granted_by").references(
+      (): AnyPgColumn => employees.id,
+      { onDelete: "set null" },
+    ),
+    grantedAt: timestamp("granted_at").defaultNow().notNull(),
   },
-  (table) => [
-    unique("role_pages_role_id_page_id_unique").on(table.roleId, table.pageId),
+  (table) => [primaryKey({ columns: [table.roleId, table.permissionKey] })],
+);
+
+// Screens are defined in code: code owns key/path/permissionKey, the UI owns label/sortOrder/menuGroup.
+export const screens = pgTable("screens", {
+  key: text("key").primaryKey(),
+  path: text("path").notNull(),
+  permissionKey: text("permission_key").references(() => permissions.key, {
+    onDelete: "set null",
+  }), // null = any signed-in user
+  label: text("label").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  menuGroup: text("menu_group").notNull(),
+});
+
+// Insert-only access log (BR-AUTH-20). No update/delete code paths may exist.
+export const authAuditLog = pgTable(
+  "auth_audit_log",
+  {
+    id: serial("id").primaryKey(),
+    actorId: integer("actor_id").references((): AnyPgColumn => employees.id),
+    action: text("action").notNull(),
+    target: text("target").notNull(),
+    before: jsonb("before"),
+    after: jsonb("after"),
+    at: timestamp("at").defaultNow().notNull(),
+  },
+  (t) => [
+    index("auth_audit_log_at_id_idx").on(t.at.desc(), t.id.desc()),
+    index("auth_audit_log_actor_id_idx").on(t.actorId),
   ],
 );
 

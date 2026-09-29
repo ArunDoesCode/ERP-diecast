@@ -9,27 +9,46 @@ import {
   ilike,
   inArray,
   or,
+  sql,
 } from "drizzle-orm";
 
 import { db } from "../db/client";
 import {
   itemMaster,
   serviceMaster,
+  supplierHistory,
   supplierItems,
   supplierMaster,
   supplierServices,
 } from "../db/schemas/02_procurement";
+import { employees } from "../db/schemas/03_hcm";
 import { AppError } from "../lib/errors";
 import type { PartialUpdate } from "../lib/types";
 import type {
-  supplierCreateSchemaType,
+  supplierHistoryQuerySchemaType,
   supplierItemCreateSchemaType,
   supplierItemListQuerySchemaType,
-  supplierItemLookupQuerySchemaType,
   supplierListQuerySchemaType,
   supplierServiceCreateSchemaType,
   supplierServiceListQuerySchemaType,
 } from "../types/supplier.types";
+
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+type Executor = typeof db | Tx;
+
+export type SupplierHistoryInsert = {
+  supplierId: number;
+  entity: "supplier" | "item" | "service";
+  entityId: number;
+  field: string;
+  oldValue: string | null;
+  newValue: string | null;
+  changedBy: number;
+};
+
+function escapeLike(value: string) {
+  return value.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+}
 
 const supplierColumns = getTableColumns(supplierMaster);
 
@@ -37,7 +56,10 @@ const supplierItemColumns = getTableColumns(supplierItems);
 
 const supplierServiceColumns = getTableColumns(supplierServices);
 
-type SupplierCreateData = Omit<supplierCreateSchemaType, "supplierItems">;
+type SupplierCreateData = Omit<
+  typeof supplierMaster.$inferInsert,
+  "id" | "createdBy" | "createdAt"
+>;
 
 type SupplierMasterUpdateData = PartialUpdate<
   Omit<typeof supplierMaster.$inferInsert, "id" | "createdBy" | "createdAt">
@@ -72,13 +94,6 @@ const supplierSortColumns = {
   isActive: supplierMaster.isActive,
   createdAt: supplierMaster.createdAt,
 } as const;
-
-const itemLookupColumns = {
-  itemId: itemMaster.id,
-  itemName: itemMaster.name,
-  uom: itemMaster.uom,
-  sku: itemMaster.sku,
-};
 
 const supplierDetailItemColumns = {
   id: supplierItems.id,
@@ -120,18 +135,19 @@ export const supplierRepository = {
     const sortColumn =
       params.sortBy && params.sortBy in supplierSortColumns
         ? supplierSortColumns[params.sortBy as keyof typeof supplierSortColumns]
-        : supplierMaster.id;
+        : supplierMaster.name; // BR-SUP-23: sorted by name unless chosen
     const orderFn = params.sortDir === "desc" ? desc : asc;
 
     const q = params.q?.trim();
-    const pattern = q ? `%${q}%` : undefined;
+    const pattern = q ? `%${escapeLike(q)}%` : undefined;
 
-    const whereClause = pattern
+    const searchClause = pattern
       ? or(
           ilike(supplierMaster.name, pattern),
           ilike(supplierMaster.contactPerson, pattern),
           ilike(supplierMaster.email, pattern),
           ilike(supplierMaster.phone, pattern),
+          ilike(supplierMaster.gstNumber, pattern),
           exists(
             db
               .select({ id: supplierItems.id })
@@ -146,36 +162,37 @@ export const supplierRepository = {
           ),
         )
       : undefined;
+    const statusClause =
+      params.status === "active"
+        ? eq(supplierMaster.isActive, true)
+        : params.status === "inactive"
+          ? eq(supplierMaster.isActive, false)
+          : undefined;
+    const whereClause = and(searchClause, statusClause);
 
-    const [rows, [totalRow]] = whereClause
-      ? await Promise.all([
-          db
-            .select(supplierColumns)
-            .from(supplierMaster)
-            .where(whereClause)
-            .orderBy(orderFn(sortColumn), asc(supplierMaster.id))
-            .limit(params.pageSize)
-            .offset((params.page - 1) * params.pageSize),
-          db.select({ value: count() }).from(supplierMaster).where(whereClause),
-        ])
-      : await Promise.all([
-          db
-            .select(supplierColumns)
-            .from(supplierMaster)
-            .orderBy(orderFn(sortColumn), asc(supplierMaster.id))
-            .limit(params.pageSize)
-            .offset((params.page - 1) * params.pageSize),
-          db.select({ value: count() }).from(supplierMaster),
-        ]);
+    const [rows, [totalRow]] = await Promise.all([
+      db
+        .select(supplierColumns)
+        .from(supplierMaster)
+        .where(whereClause)
+        .orderBy(orderFn(sortColumn), asc(supplierMaster.id))
+        .limit(params.pageSize)
+        .offset((params.page - 1) * params.pageSize),
+      db.select({ value: count() }).from(supplierMaster).where(whereClause),
+    ]);
 
     return { rows, total: totalRow?.value ?? 0 };
   },
 
-  async findExistingItemIds(itemIds: number[]) {
+  async findExistingItemIds(itemIds: number[], activeOnly = false) {
     const rows = await db
       .select({ id: itemMaster.id })
       .from(itemMaster)
-      .where(inArray(itemMaster.id, itemIds));
+      .where(
+        activeOnly
+          ? and(inArray(itemMaster.id, itemIds), eq(itemMaster.isActive, true))
+          : inArray(itemMaster.id, itemIds),
+      );
     return new Set(rows.map((row) => row.id));
   },
 
@@ -187,44 +204,12 @@ export const supplierRepository = {
     return new Set(rows.map((row) => row.id));
   },
 
-  async listItems(params: supplierItemLookupQuerySchemaType) {
-    const q = params.q?.trim();
-    const pattern = q ? `%${q}%` : undefined;
-
-    const whereClause = pattern
-      ? or(ilike(itemMaster.name, pattern), ilike(itemMaster.sku, pattern))
-      : undefined;
-
-    const [rows, [totalRow]] = whereClause
-      ? await Promise.all([
-          db
-            .select(itemLookupColumns)
-            .from(itemMaster)
-            .where(whereClause)
-            .orderBy(asc(itemMaster.name), asc(itemMaster.id))
-            .limit(params.pageSize)
-            .offset((params.page - 1) * params.pageSize),
-          db.select({ value: count() }).from(itemMaster).where(whereClause),
-        ])
-      : await Promise.all([
-          db
-            .select(itemLookupColumns)
-            .from(itemMaster)
-            .orderBy(asc(itemMaster.name), asc(itemMaster.id))
-            .limit(params.pageSize)
-            .offset((params.page - 1) * params.pageSize),
-          db.select({ value: count() }).from(itemMaster),
-        ]);
-
-    return { rows, total: totalRow?.value ?? 0 };
-  },
-
   async listSupplierItems(
     supplierId: number,
     params: supplierItemListQuerySchemaType,
   ) {
     const q = params.q?.trim();
-    const pattern = q ? `%${q}%` : undefined;
+    const pattern = q ? `%${escapeLike(q)}%` : undefined;
 
     const whereClause = and(
       eq(supplierItems.supplierId, supplierId),
@@ -266,7 +251,7 @@ export const supplierRepository = {
     params: supplierServiceListQuerySchemaType,
   ) {
     const q = params.q?.trim();
-    const pattern = q ? `%${q}%` : undefined;
+    const pattern = q ? `%${escapeLike(q)}%` : undefined;
 
     const whereClause = and(
       eq(supplierServices.supplierId, supplierId),
@@ -390,48 +375,16 @@ export const supplierRepository = {
     });
   },
 
-  async updateMaster(id: number, data: SupplierMasterUpdateData) {
-    const [row] = await db
+  async updateMaster(
+    id: number,
+    data: SupplierMasterUpdateData,
+    ex: Executor = db,
+  ) {
+    const [row] = await ex
       .update(supplierMaster)
       .set(data)
       .where(eq(supplierMaster.id, id))
       .returning(supplierColumns);
-    return row;
-  },
-
-  async updateItemBySupplierItemsId(
-    supplierId: number,
-    supplierItemsId: number,
-    data: SupplierItemUpdateData,
-  ) {
-    const [row] = await db
-      .update(supplierItems)
-      .set(data)
-      .where(
-        and(
-          eq(supplierItems.supplierId, supplierId),
-          eq(supplierItems.id, supplierItemsId),
-        ),
-      )
-      .returning(supplierItemColumns);
-    return row;
-  },
-
-  async updateItemByItemId(
-    supplierId: number,
-    itemId: number,
-    data: SupplierItemUpdateData,
-  ) {
-    const [row] = await db
-      .update(supplierItems)
-      .set(data)
-      .where(
-        and(
-          eq(supplierItems.supplierId, supplierId),
-          eq(supplierItems.itemId, itemId),
-        ),
-      )
-      .returning(supplierItemColumns);
     return row;
   },
 
@@ -455,44 +408,6 @@ export const supplierRepository = {
     return created;
   },
 
-  async editSupplierItemBySupplierItemsId(
-    supplierId: number,
-    supplierItemsId: number,
-    data: SupplierItemEditData,
-  ) {
-    const [row] = await db
-      .update(supplierItems)
-      .set(data)
-      .where(
-        and(
-          eq(supplierItems.supplierId, supplierId),
-          eq(supplierItems.id, supplierItemsId),
-        ),
-      )
-      .returning(supplierItemColumns);
-
-    return row;
-  },
-
-  async editSupplierItemByItemId(
-    supplierId: number,
-    itemId: number,
-    data: SupplierItemEditData,
-  ) {
-    const [row] = await db
-      .update(supplierItems)
-      .set(data)
-      .where(
-        and(
-          eq(supplierItems.supplierId, supplierId),
-          eq(supplierItems.itemId, itemId),
-        ),
-      )
-      .returning(supplierItemColumns);
-
-    return row;
-  },
-
   async createSupplierServices(
     supplierId: number,
     rows: SupplierServiceCreateData[],
@@ -513,41 +428,172 @@ export const supplierRepository = {
     return created;
   },
 
-  async editSupplierServiceBySupplierServiceId(
-    supplierId: number,
-    supplierServiceId: number,
-    data: SupplierServiceEditData,
-  ) {
-    const [row] = await db
-      .update(supplierServices)
-      .set(data)
-      .where(
-        and(
-          eq(supplierServices.supplierId, supplierId),
-          eq(supplierServices.id, supplierServiceId),
-        ),
-      )
-      .returning(supplierServiceColumns);
+  async transaction<T>(fn: (tx: Tx) => Promise<T>) {
+    return db.transaction(fn);
+  },
 
+  async findMasterForUpdate(id: number, ex: Executor = db) {
+    const [row] = await ex
+      .select(supplierColumns)
+      .from(supplierMaster)
+      .where(eq(supplierMaster.id, id))
+      .for("update")
+      .limit(1);
     return row;
   },
 
-  async editSupplierServiceByServiceId(
+  async insertHistory(rows: SupplierHistoryInsert[], ex: Executor = db) {
+    if (rows.length === 0) return;
+    await ex.insert(supplierHistory).values(rows);
+  },
+
+  // Price-list row of this supplier by row id or item id, with the item's own unit (BR-SUP-14).
+  async findItemRow(
     supplierId: number,
-    serviceId: number,
-    data: SupplierServiceEditData,
+    selector: {
+      supplierItemsId?: number | undefined;
+      itemId?: number | undefined;
+    },
+    ex: Executor = db,
   ) {
-    const [row] = await db
-      .update(supplierServices)
-      .set(data)
+    const [row] = await ex
+      .select({ ...supplierItemColumns, itemUom: itemMaster.uom })
+      .from(supplierItems)
+      .innerJoin(itemMaster, eq(itemMaster.id, supplierItems.itemId))
+      .where(
+        and(
+          eq(supplierItems.supplierId, supplierId),
+          selector.supplierItemsId !== undefined
+            ? eq(supplierItems.id, selector.supplierItemsId)
+            : eq(supplierItems.itemId, selector.itemId ?? -1),
+        ),
+      )
+      .for("update", { of: supplierItems })
+      .limit(1);
+    return row;
+  },
+
+  async findServiceRow(
+    supplierId: number,
+    selector: {
+      supplierServiceId?: number | undefined;
+      serviceId?: number | undefined;
+    },
+    ex: Executor = db,
+  ) {
+    const [row] = await ex
+      .select(supplierServiceColumns)
+      .from(supplierServices)
       .where(
         and(
           eq(supplierServices.supplierId, supplierId),
-          eq(supplierServices.serviceId, serviceId),
+          selector.supplierServiceId !== undefined
+            ? eq(supplierServices.id, selector.supplierServiceId)
+            : eq(supplierServices.serviceId, selector.serviceId ?? -1),
         ),
       )
-      .returning(supplierServiceColumns);
-
+      .for("update")
+      .limit(1);
     return row;
+  },
+
+  async updateItemRow(
+    rowId: number,
+    data: SupplierItemEditData,
+    ex: Executor = db,
+  ) {
+    const [row] = await ex
+      .update(supplierItems)
+      .set(data)
+      .where(eq(supplierItems.id, rowId))
+      .returning(supplierItemColumns);
+    return row;
+  },
+
+  async updateServiceRow(
+    rowId: number,
+    data: SupplierServiceEditData,
+    ex: Executor = db,
+  ) {
+    const [row] = await ex
+      .update(supplierServices)
+      .set(data)
+      .where(eq(supplierServices.id, rowId))
+      .returning(supplierServiceColumns);
+    return row;
+  },
+
+  // Lock every target row up front, ordered by id, so two batches cannot deadlock (PERF-40).
+  async lockItemRowsOrdered(supplierId: number, ex: Executor = db) {
+    await ex
+      .select({ id: supplierItems.id })
+      .from(supplierItems)
+      .where(eq(supplierItems.supplierId, supplierId))
+      .orderBy(asc(supplierItems.id))
+      .for("update");
+  },
+
+  async lockServiceRowsOrdered(supplierId: number, ex: Executor = db) {
+    await ex
+      .select({ id: supplierServices.id })
+      .from(supplierServices)
+      .where(eq(supplierServices.supplierId, supplierId))
+      .orderBy(asc(supplierServices.id))
+      .for("update");
+  },
+
+  async findItemUoms(itemIds: number[]) {
+    const rows = await db
+      .select({ id: itemMaster.id, uom: itemMaster.uom })
+      .from(itemMaster)
+      .where(inArray(itemMaster.id, itemIds));
+    return new Map(rows.map((row) => [row.id, row.uom]));
+  },
+
+  async listHistory(
+    supplierId: number,
+    params: supplierHistoryQuerySchemaType,
+  ) {
+    const whereClause = and(
+      eq(supplierHistory.supplierId, supplierId),
+      params.entity ? eq(supplierHistory.entity, params.entity) : undefined,
+    );
+    const [rows, [totalRow]] = await Promise.all([
+      db
+        .select({
+          ...getTableColumns(supplierHistory),
+          changedByName: employees.name,
+          entityLabel: sql<
+            string | null
+          >`coalesce(${itemMaster.sku}, ${serviceMaster.code})`,
+        })
+        .from(supplierHistory)
+        .leftJoin(employees, eq(employees.id, supplierHistory.changedBy))
+        .leftJoin(
+          supplierItems,
+          and(
+            eq(supplierHistory.entity, "item"),
+            eq(supplierItems.id, supplierHistory.entityId),
+          ),
+        )
+        .leftJoin(itemMaster, eq(itemMaster.id, supplierItems.itemId))
+        .leftJoin(
+          supplierServices,
+          and(
+            eq(supplierHistory.entity, "service"),
+            eq(supplierServices.id, supplierHistory.entityId),
+          ),
+        )
+        .leftJoin(
+          serviceMaster,
+          eq(serviceMaster.id, supplierServices.serviceId),
+        )
+        .where(whereClause)
+        .orderBy(desc(supplierHistory.changedAt), desc(supplierHistory.id))
+        .limit(params.pageSize)
+        .offset((params.page - 1) * params.pageSize),
+      db.select({ value: count() }).from(supplierHistory).where(whereClause),
+    ]);
+    return { rows, total: totalRow?.value ?? 0 };
   },
 };

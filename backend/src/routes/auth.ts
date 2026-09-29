@@ -3,69 +3,37 @@ import { z } from "zod";
 
 import { authController } from "../controller/authController";
 import { asyncHandler } from "../lib/async-handler";
-import { requireAuth, requireRole } from "../lib/auth-middleware";
+import { requireAuth } from "../lib/auth-middleware";
 import { rateLimiter } from "../lib/rate-limiter";
 import { successResponseWithMessage } from "../lib/response-schemas";
 import { register } from "../lib/route-registry";
 import type { AppEnv } from "../lib/types";
-import { loginSchema, registerSchema } from "../types/auth.types";
+import { loginSchema } from "../types/auth.types";
 import { END_POINTS } from "./end-points";
 
 const AUTH_ROUTES = END_POINTS.auth;
 const AUTH_BASE_PATH = "/api/auth";
 
-// Mirrors src/lib/token.ts TokenPayload — the JWT payload shape returned by
-// `me` (c.get("user")), not the DB employee row.
-const tokenPayloadSchema = z.object({
-  userId: z.union([z.number(), z.string()]),
-  userName: z.string(),
-  role: z.enum([
-    "owner",
-    "back_office",
-    "floor_supervisor",
-    "qa_inspector",
-    "die_designer",
-    "operator",
-    "super-admin",
-  ]),
-  allowedPages: z.array(z.string()),
-});
-
-// authService.login's returned `user` field — a summary shape distinct from
-// both the DB employee row and the JWT TokenPayload.
-const loginUserSummarySchema = z.object({
+// `me` and login `user` (BR-AUTH-13): role name is display only; access is by `permissions`.
+const sessionUserSchema = z.object({
   id: z.number(),
   name: z.string(),
   email: z.string().nullable(),
   role: z.string(),
-  allowedPages: z.array(z.string()),
+  isSuperAdmin: z.boolean(),
+  permissions: z.array(z.string()),
+  screens: z.array(
+    z.object({
+      key: z.string(),
+      path: z.string(),
+      label: z.string(),
+      menuGroup: z.string(),
+      sortOrder: z.number(),
+    }),
+  ),
 });
 
 const authRouter = new Hono<AppEnv>();
-
-authRouter.post(
-  AUTH_ROUTES.register,
-  requireAuth,
-  requireRole("super-admin", "owner"),
-  asyncHandler(authController.register),
-);
-register({
-  method: "POST",
-  path: `${AUTH_BASE_PATH}${AUTH_ROUTES.register}`,
-  tags: ["auth"],
-  summary: "Register a new desk-worker employee (email/password login).",
-  auth: { type: "roles", roles: ["super-admin", "owner"] },
-  request: { body: registerSchema },
-  responses: {
-    "201": successResponseWithMessage(
-      z.object({
-        id: z.number(),
-        name: z.string(),
-        email: z.string().nullable(),
-      }),
-    ),
-  },
-});
 
 authRouter.post(
   AUTH_ROUTES.login,
@@ -86,7 +54,7 @@ register({
       message: z.string(),
       data: z.object({
         accessToken: z.string(),
-        user: loginUserSummarySchema,
+        user: sessionUserSchema,
       }),
     }),
   },
@@ -124,7 +92,7 @@ register({
   summary: "Return the authenticated user's own profile.",
   auth: { type: "any-authenticated" },
   responses: {
-    "200": successResponseWithMessage(tokenPayloadSchema),
+    "200": successResponseWithMessage(sessionUserSchema),
   },
 });
 

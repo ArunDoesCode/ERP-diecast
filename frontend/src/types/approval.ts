@@ -8,7 +8,8 @@ export type ApprovalRequestAction =
 	| "approve"
 	| "reject"
 	| "sent_back"
-	| "cancel";
+	| "cancel"
+	| "withdraw";
 
 export type ApprovalRequestStatus =
 	| "pending_approval"
@@ -71,7 +72,6 @@ export type ApprovalPolicySummary = {
 	priority: number;
 	docType: ApprovalDocType;
 	subDocType: ApprovalPolicyPrType;
-	isSaleOrderLinked: boolean | null;
 	minAmountPaise: number | null;
 	maxAmountPaise: number | null;
 	autoApprove: boolean;
@@ -107,7 +107,7 @@ export type ApprovalPolicyCreateInput = {
 	minAmountPaise?: number;
 	maxAmountPaise?: number;
 	autoApprove?: boolean;
-	approvalChain: ApprovalPolicyChainLevelInput[];
+	approvalChain?: ApprovalPolicyChainLevelInput[];
 };
 
 export type ApprovalPolicyListParams = {
@@ -196,40 +196,54 @@ export type ApprovalTrailEntry = {
 	notes: string | null;
 };
 
+export type ApprovalHistoryEntry = ApprovalRequestSummary & {
+	trail: ApprovalTrailEntry[];
+};
+
 export type ApprovalCurrentByDocResponse = ApprovalRequestSummary | null;
 
-export const approvalPolicyFormSchema = z.object({
-	name: z.string().min(1, "Policy name is required"),
-	description: z.string().optional().default(""),
-	isActive: z.boolean().default(true),
-	priority: z.coerce.number().int().min(1, "Priority must be greater than 0"),
-	docType: z.enum(["pr", "po", "sco"]),
-	subDocType: z
-		.enum([
-			"any",
-			"sale_order",
-			"stock_reorder",
-			"maintenance",
-			"tooling",
-			"subcontracting",
-			"misc",
-		])
-		.or(z.literal(""))
-		.default(""),
-	// isSaleOrderLinked: z.enum(["any", "yes", "no"]).default("any"),
-	minAmountPaise: z.string().optional().default(""),
-	maxAmountPaise: z.string().optional().default(""),
-	autoApprove: z.boolean().default(false),
-	approvalChain: z
-		.array(
-			z.object({
-				approverType: z.enum(["role", "specific"]),
-				role: z.string().default(""),
-				employeeId: z.number().nullable().default(null),
-				employeeSearch: z.string().default(""),
-			}),
-		)
-		.min(1),
-});
+export const approvalPolicyFormSchema = z
+	.object({
+		name: z.string().min(1, "Policy name is required"),
+		description: z.string().optional().default(""),
+		isActive: z.boolean().default(true),
+		priority: z.coerce.number().int().min(1, "Priority must be greater than 0"),
+		docType: z.enum(["pr", "po", "sco"]),
+		subDocType: z
+			.enum([
+				"any",
+				"sale_order",
+				"stock_reorder",
+				"maintenance",
+				"tooling",
+				"subcontracting",
+				"misc",
+			])
+			.or(z.literal(""))
+			.default(""),
+		minAmountPaise: z.string().optional().default(""),
+		maxAmountPaise: z.string().optional().default(""),
+		autoApprove: z.boolean().default(false),
+		approvalChain: z
+			.array(
+				z.object({
+					approverType: z.enum(["role", "specific"]),
+					role: z.string().default(""),
+					employeeId: z.number().nullable().default(null),
+					employeeSearch: z.string().default(""),
+				}),
+			)
+			.default([]),
+	})
+	.superRefine((value, ctx) => {
+		// Auto-approve makes the chain optional; otherwise at least one step.
+		if (!value.autoApprove && value.approvalChain.length < 1) {
+			ctx.addIssue({
+				code: "custom",
+				path: ["approvalChain"],
+				message: "Add at least one approval step",
+			});
+		}
+	});
 
 export type ApprovalPolicyFormInput = z.infer<typeof approvalPolicyFormSchema>;

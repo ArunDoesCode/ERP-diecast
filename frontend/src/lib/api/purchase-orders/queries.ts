@@ -18,6 +18,7 @@ import type {
 	POCreatePayload,
 	POUpdatePayload,
 	PurchaseOrderListParams,
+	ShortClosePoPayload,
 	UpdatePoDelayPayload,
 } from "@/types/purchase-orders";
 
@@ -29,10 +30,12 @@ import {
 	escalatePurchaseOrder,
 	getItemLastRate,
 	getPurchaseOrderById,
+	getPurchaseOrderCommunications,
 	getPurchaseOrders,
 	markPurchaseOrderInvoiced,
 	sendPurchaseOrder,
 	sendPurchaseOrderReminder,
+	shortClosePurchaseOrder,
 	updatePurchaseOrder,
 	updatePurchaseOrderDelay,
 } from "./fetchers";
@@ -43,12 +46,25 @@ export const purchaseOrderKeys = {
 			? (["purchase-orders", "cards", params] as const)
 			: (["purchase-orders", "cards"] as const),
 	detail: (poId: number) => ["purchase-orders", "detail", poId] as const,
+	communications: (poId: number) =>
+		["purchase-orders", "communications", poId] as const,
 	lastRate: (itemId: number, supplierId: number) =>
 		["purchase-orders", "last-rate", itemId, supplierId] as const,
 };
 
+const PO_ERROR_MESSAGES: Record<string, string> = {
+	PO_NOT_EDITABLE: "Only a draft PO can be edited.",
+	DOC_LOCKED_IN_APPROVAL:
+		"This PO is waiting for approval and cannot be changed. Withdraw it first.",
+	PO_LINE_ALREADY_DRAFTED: "One of those PR lines is already on another PO.",
+};
+
 function errorMessage(error: unknown, fallback: string) {
-	return error instanceof ApiClientError ? error.message : fallback;
+	if (!(error instanceof ApiClientError)) return fallback;
+	if (error.code && PO_ERROR_MESSAGES[error.code]) {
+		return PO_ERROR_MESSAGES[error.code];
+	}
+	return error.message;
 }
 
 function normalize(value?: string | null) {
@@ -68,6 +84,14 @@ export function usePurchaseOrderDetailQuery(poId: number, enabled: boolean) {
 	return useQuery({
 		queryKey: purchaseOrderKeys.detail(poId),
 		queryFn: () => getPurchaseOrderById(poId),
+		enabled: enabled && Number.isFinite(poId) && poId > 0,
+	});
+}
+
+export function usePoCommunicationsQuery(poId: number, enabled: boolean) {
+	return useQuery({
+		queryKey: purchaseOrderKeys.communications(poId),
+		queryFn: () => getPurchaseOrderCommunications(poId),
 		enabled: enabled && Number.isFinite(poId) && poId > 0,
 	});
 }
@@ -128,6 +152,11 @@ function invalidatePOAndPR(
 	prId?: number,
 ) {
 	return Promise.all([
+		queryClient.invalidateQueries({
+			queryKey: purchaseOrderKeys.communications(poId),
+		}),
+		queryClient.invalidateQueries({ queryKey: ["approval", "pending"] }),
+		queryClient.invalidateQueries({ queryKey: ["approval", "history"] }),
 		queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.cards() }),
 		queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.detail(poId) }),
 		queryClient.invalidateQueries({
@@ -178,7 +207,7 @@ export function useCancelPurchaseOrderMutation() {
 	const queryClient = useQueryClient();
 
 	return useMutation({
-		mutationFn: (variables: { poId: number; prId?: number; reason?: string }) =>
+		mutationFn: (variables: { poId: number; prId?: number; reason: string }) =>
 			cancelPurchaseOrder(variables.poId, variables.reason),
 		onSuccess: async (result, variables) => {
 			if (!result.success) {
@@ -233,9 +262,14 @@ export function useSendPoReminderMutation() {
 				return;
 			}
 
-			await queryClient.invalidateQueries({
-				queryKey: purchaseOrderKeys.detail(variables.poId),
-			});
+			await Promise.all([
+				queryClient.invalidateQueries({
+					queryKey: purchaseOrderKeys.detail(variables.poId),
+				}),
+				queryClient.invalidateQueries({
+					queryKey: purchaseOrderKeys.communications(variables.poId),
+				}),
+			]);
 			toast.success(
 				result.message || `Reminder logged via ${result.data.channel}`,
 			);
@@ -260,9 +294,14 @@ export function useEscalatePoMutation() {
 				return;
 			}
 
-			await queryClient.invalidateQueries({
-				queryKey: purchaseOrderKeys.detail(variables.poId),
-			});
+			await Promise.all([
+				queryClient.invalidateQueries({
+					queryKey: purchaseOrderKeys.detail(variables.poId),
+				}),
+				queryClient.invalidateQueries({
+					queryKey: purchaseOrderKeys.communications(variables.poId),
+				}),
+			]);
 			toast.success(
 				result.message || `Escalation logged via ${result.data.channel}`,
 			);
@@ -385,6 +424,27 @@ export function useClosePoMutation() {
 	});
 }
 
+export function useShortClosePoMutation() {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: (variables: { poId: number; payload: ShortClosePoPayload }) =>
+			shortClosePurchaseOrder(variables.poId, variables.payload),
+		onSuccess: async (result, variables) => {
+			if (!result.success) {
+				toast.error(result.message || "Failed to short-close PO");
+				return;
+			}
+
+			await invalidatePOAndPR(queryClient, variables.poId);
+			toast.success(result.message || `${result.data.poNumber} short-closed`);
+		},
+		onError: (error) => {
+			toast.error(errorMessage(error, "Failed to short-close PO"));
+		},
+	});
+}
+
 export function toPOCreatePayload(input: {
 	supplierId: number;
 	paymentTermsDays?: number | null;
@@ -394,6 +454,7 @@ export function toPOCreatePayload(input: {
 	lines: Array<{
 		prItemId: number;
 		unitPriceRupees: number;
+		gstPercent?: number;
 	}>;
 }): POCreatePayload {
 	return {
@@ -405,6 +466,7 @@ export function toPOCreatePayload(input: {
 		lines: input.lines.map((line) => ({
 			prItemId: line.prItemId,
 			unitPricePaise: Math.round(line.unitPriceRupees * 100),
+			gstPercent: line.gstPercent,
 		})),
 	};
 }

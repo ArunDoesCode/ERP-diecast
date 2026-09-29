@@ -13,6 +13,7 @@ import { useMemo, useState } from "react";
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
 import { DataTable } from "@/components/common/DataTable";
 import { DataTableColumnHeader } from "@/components/common/DataTableColumnHeader";
+import { EmployeeRoleDialog } from "@/components/pages/setup/employees/EmployeeRoleDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -52,6 +53,8 @@ export function EmployeeTable({ onEditEmployee }: EmployeeTableProps) {
 	const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(
 		null,
 	);
+
+	const [employeeForRole, setEmployeeForRole] = useState<Employee | null>(null);
 
 	const employees = employeesQuery.data?.data ?? [];
 	const meta = employeesQuery.data?.meta;
@@ -121,6 +124,9 @@ export function EmployeeTable({ onEditEmployee }: EmployeeTableProps) {
 								<DropdownMenuItem onSelect={() => onEditEmployee(employee)}>
 									Edit
 								</DropdownMenuItem>
+								<DropdownMenuItem onSelect={() => setEmployeeForRole(employee)}>
+									Change role
+								</DropdownMenuItem>
 								<DropdownMenuItem
 									variant="destructive"
 									onSelect={() => setEmployeeToDelete(employee)}
@@ -154,6 +160,11 @@ export function EmployeeTable({ onEditEmployee }: EmployeeTableProps) {
 	return (
 		<>
 			<DataTable table={table} isLoading={employeesQuery.isLoading} />
+
+			<EmployeeRoleDialog
+				employee={employeeForRole}
+				onClose={() => setEmployeeForRole(null)}
+			/>
 
 			<ConfirmDeleteDialog
 				open={employeeToDelete !== null}

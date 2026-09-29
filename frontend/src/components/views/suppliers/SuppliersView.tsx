@@ -20,12 +20,16 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { useCan } from "@/hooks/use-can";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import {
 	useSupplierLookupQuery,
 	useSuppliersQuery,
 } from "@/lib/api/suppliers/queries";
-import type { SupplierSortField } from "@/types/suppliers";
+import type {
+	SupplierSortField,
+	SupplierStatusFilter,
+} from "@/types/suppliers";
 
 const SORT_FIELDS: Array<{ label: string; value: SupplierSortField }> = [
 	{ label: "Name", value: "name" },
@@ -37,6 +41,7 @@ const SORT_FIELDS: Array<{ label: string; value: SupplierSortField }> = [
 
 export function SuppliersView() {
 	const router = useRouter();
+	const canManage = useCan("supplier.manage");
 
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(10);
@@ -44,6 +49,7 @@ export function SuppliersView() {
 	const [comboboxSearch, setComboboxSearch] = useState("");
 	const [sortBy, setSortBy] = useState<SupplierSortField>("name");
 	const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+	const [status, setStatus] = useState<SupplierStatusFilter>("all");
 	const [createOpen, setCreateOpen] = useState(false);
 
 	const debouncedSearch = useDebouncedValue(search, 400);
@@ -53,6 +59,7 @@ export function SuppliersView() {
 		page,
 		pageSize,
 		q: debouncedSearch,
+		status,
 		sortBy,
 		sortDir,
 	});
@@ -120,12 +127,30 @@ export function SuppliersView() {
 								setSearch(event.target.value);
 								setPage(1);
 							}}
-							placeholder="Search suppliers"
+							placeholder="Search name, contact, email, phone, GSTIN or item SKU"
+							aria-label="Search suppliers"
 							className="pl-7"
 						/>
 					</div>
 
 					<div className="flex items-center gap-2">
+						<Select
+							value={status}
+							onValueChange={(value) => {
+								setStatus(value as SupplierStatusFilter);
+								setPage(1);
+							}}
+						>
+							<SelectTrigger className="w-32" aria-label="Filter by status">
+								<SelectValue placeholder="Status" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value="all">All</SelectItem>
+								<SelectItem value="active">Active</SelectItem>
+								<SelectItem value="inactive">Inactive</SelectItem>
+							</SelectContent>
+						</Select>
+
 						<Select
 							value={sortBy}
 							onValueChange={(value) => {
@@ -163,10 +188,12 @@ export function SuppliersView() {
 					</div>
 				</div>
 
-				<Button onClick={() => setCreateOpen(true)}>
-					<IconPlus className="size-3.5" />
-					Create supplier
-				</Button>
+				{canManage ? (
+					<Button onClick={() => setCreateOpen(true)}>
+						<IconPlus className="size-3.5" />
+						Create supplier
+					</Button>
+				) : null}
 			</div>
 
 			<SuppliersCards

@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { IconArrowLeft } from "@tabler/icons-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { type Resolver, useFieldArray, useForm } from "react-hook-form";
 
 import { SetupBackButton } from "@/components/pages/setup/shared/SetupBackButton";
@@ -32,6 +32,9 @@ export function ApprovalPoliciesView() {
 	const [selectedPolicyId, setSelectedPolicyId] = useState<number | null>(null);
 
 	const [formMode, setFormMode] = useState<PolicyFormMode | null>(null);
+	// BR-APR-59: seed the edit form once per opened policy, so a background
+	// refetch never wipes what the user has typed.
+	const seededForRef = useRef<number | null>(null);
 
 	const rolesQuery = useRolesQuery();
 	const createPolicyMutation = useCreateApprovalPolicyMutation();
@@ -64,10 +67,12 @@ export function ApprovalPoliciesView() {
 	}
 
 	function handleEditClick(id: number) {
+		seededForRef.current = null;
 		setSelectedPolicyId(id);
 	}
 
 	function closeForm() {
+		seededForRef.current = null;
 		setFormMode(null);
 		setSelectedPolicyId(null);
 		policyForm.reset(createDefaultFormValues());
@@ -113,21 +118,25 @@ export function ApprovalPoliciesView() {
 		}
 	}
 
-	// Wait for the policy details to load before opening the edit form
+	// BR-APR-57: open the edit form only after fresh details have loaded.
 	useEffect(() => {
 		if (
 			selectedPolicyId !== null &&
+			seededForRef.current !== selectedPolicyId &&
 			policy &&
 			policy.id === selectedPolicyId &&
-			!policyDetailsQuery.isLoading
+			policyDetailsQuery.isSuccess &&
+			!policyDetailsQuery.isFetching
 		) {
+			seededForRef.current = selectedPolicyId;
 			setFormMode("edit");
 			policyForm.reset(mapPolicyToFormValues(policy));
 		}
 	}, [
 		selectedPolicyId,
 		policy,
-		policyDetailsQuery.isLoading,
+		policyDetailsQuery.isSuccess,
+		policyDetailsQuery.isFetching,
 		policyForm.reset,
 	]);
 

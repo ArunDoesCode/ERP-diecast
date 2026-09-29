@@ -23,6 +23,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
 	useEscalatePoMutation,
 	useMarkPoSentMutation,
+	usePurchaseOrderDetailQuery,
 	useSendPoReminderMutation,
 } from "@/lib/api/purchase-orders/queries";
 import {
@@ -99,6 +100,17 @@ export function LogPoCommunicationDialog({
 
 	const copy = MODE_COPY[mode];
 
+	// BR-PO-18: expected delivery date is required before send.
+	const detailQuery = usePurchaseOrderDetailQuery(
+		poId,
+		open && mode === "send",
+	);
+	const expectedDate = detailQuery.data?.success
+		? detailQuery.data.data.po.expectedDeliveryDate
+		: undefined;
+	const missingExpectedDate =
+		mode === "send" && detailQuery.data?.success === true && !expectedDate;
+
 	function reset() {
 		setChannel("email");
 		setNote("");
@@ -170,6 +182,14 @@ export function LogPoCommunicationDialog({
 				</DialogHeader>
 
 				<div className="space-y-4 px-6 py-5">
+					{missingExpectedDate ? (
+						<p
+							role="alert"
+							className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+						>
+							This PO has no expected delivery date, so it cannot be sent.
+						</p>
+					) : null}
 					<div>
 						<label
 							htmlFor="po-log-communication-channel"
@@ -244,7 +264,9 @@ export function LogPoCommunicationDialog({
 					<Button
 						type="button"
 						disabled={
-							mutation.isPending || (channel === "email" && !toEmail.trim())
+							mutation.isPending ||
+							missingExpectedDate ||
+							(channel === "email" && !toEmail.trim())
 						}
 						onClick={onSubmit}
 					>

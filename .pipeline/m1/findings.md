@@ -1,0 +1,85 @@
+# Findings — m1
+
+| id | source | file:line | issue | decision | status |
+|---|---|---|---|---|---|
+| TEST-1 | test-writer 02 | backend/src/lib/rate-limiter.ts | 11th login → 403 RATE_LIMITED, BR-AUTH-04 needs 429 | fix now | fixed |
+| TEST-2 | test-writer 02 | backend/src/lib/token.ts, authService | refresh JWT has no unique id → same-second duplicate token (500 on token_hash) and reused token still valid, BR-AUTH-05 | fix now | fixed |
+| F-TEST-4 | backend-dev 06 | backend/src/lib/permissions-sync.test.ts (+1 other test file) | biome format errors in test files | fix now (test-writer) | fixed |
+| F-TEST-5 | backend-dev 09 | backend/src/routes/auth.test.ts (BR-AUTH-23 control), backend/src/app.test.ts (403 test) | sign token for non-existent userId 1 and expect 403 / code FORBIDDEN; spec: role comes from DB (BR-AUTH-12), inactive/missing → 401, denial code PERMISSION_DENIED (BR-AUTH-09) | fix now (test-writer) | fixed |
+| F-TEST-6 | backend-dev 09 | backend/src/lib/permissions.test.ts:42, permissions-matrix.test.ts GET /api/asset/machines | expect pr.link_machine = fs only; spec v7 seeds ow, bo, fs | fix now (test-writer) | fixed |
+| F-FE-1 | backend-dev 09 | frontend/src/lib/api/routes.ts:17 | auth.register still listed; route retired (spec Q6/Q10) → BL-008 contract test fails | fix now (frontend-dev) | fixed |
+| F-TEST-7 | backend-dev 13 | backend/src/routes/pr-machine.test.ts ("holder … saves a PR with a machine") | reads body.data.id; POST /api/pr/createpr returns data.pr.id (see backend/.contracts/api-manifest.json) | fix now (test-writer) | fixed |
+| F-APR-1 | backend-dev 13 | backend/src/repository/approvalRepository.ts:394 | fallback approval chain hard-codes role "owner"; BR-AUTH-11 allows role names only in seed data → move the default chain into seed data | backlog to approval module (this batch) | fixed (dd24280, BR-AUTH-11 scan green) |
+| F-PR-1 | backend-dev 13 | backend/src/types/pr.types.ts updatePrSchema | saleOrderId/assetId/notes were wrongly required on PATCH → made optional | accepted (bug fix) | fixed |
+| TEST-8 | test-writer 16 | DELETE /setup/roles/:id | 500 FK violation when only inactive employees hold the role → 409 ROLE_HAS_INACTIVE_EMPLOYEES (spec v8) | fix now (backend-dev S6) | fixed (suite green) |
+| F-TEST-9 | stop hook | backend/src/routes/role-admin.test.ts:171 | typecheck: string | null not assignable to string (screen menuGroup is nullable: "" = no group, questions.md #14) | fix after S6 build (test-writer) | resolved (menuGroup stays NOT NULL, "" = no group) |
+| SEC-1 | security 28 | backend/src/service/employeeService.ts update | non-super-admin with setup.employees.manage can edit a super-admin (password) → takeover; BR-AUTH-16 (spec v9) | fix now (test first) | fixed |
+| SEC-2 | security 28 | employeeService.ts remove | can deactivate super-admin / higher-role employees; BR-AUTH-16 v9 | fix now (test first) | fixed |
+| SEC-3 | security 28 | employeeService.ts regenerateQr | no target check, no audit, raw token; BR-AUTH-16/20 v9 | fix now (test first) | fixed |
+| SEC-4 | security 28 | employeeService.ts create/update/regenerateQr | employee changes not audited; BR-AUTH-20 v9 | fix now (test first) | fixed |
+| SEC-5 | security 28 | employeeService.ts update; authService.ts | password/method change + deactivation don't revoke refresh tokens; BR-AUTH-05 v9 | fix now (test first) | fixed |
+| SEC-6/CR-1 | security 28 + code 27 | employeeService.ts assertNotLastActiveAdmin | last-admin check outside write tx → zero super-admins under race; BR-AUTH-17 v9 | fix now (test first) | fixed |
+| CR-2 | code 27 | authService.ts:92-98 | refresh rotation not atomic → concurrent reuse; BR-AUTH-05 v9 | fix now (test first) | fixed |
+| SPEC-1 | spec 30 | backend tests | BR-AUTH-13 untested | fix now (test-writer) | fixed |
+| SPEC-4 | spec 30 | backend tests | ROLE_HAS_INACTIVE_EMPLOYEES untested (BR-AUTH-19 v8) | fix now (test-writer) | fixed |
+| SPEC-3 | spec 30 | spec | undocumented codes | fixed in spec v9 | fixed |
+| CR-3 | code 27 | frontend setup/auth queries | own permissions stale after grant/role change | fix now (frontend) | fixed |
+| CR-9..11, CR-13..15, PERF-10 | code 27, perf 29 | frontend | grants editor key, invalidations, dead code/types, tab gating, empty group header, missing error message, /auth/me staleTime | fix now (frontend) | fixed |
+| CR-4, CR-5, CR-7, CR-8, CR-12, CR-15 | code 27 | backend role/auth/approval services | guards inside tx, required name, explicit email, required actor, stale comment, inactive-employees doc | fix now (backend) | fixed except CR-8 (with PR-S2) |
+| PERF-1, PERF-2, PERF-4, PERF-5 | perf 29 | backend schema/services | index employees.role_id, auth_audit_log(at,id)+actor_id; batch setScreenRoles; row lock in grant tx | fix now (backend) | fixed |
+| CR-6, PERF-3, PERF-6..9, PERF-11, PERF-12, SEC-8 | code 27, perf 29, security 28 | various | minor structure/perf; multi-instance cache note | backlog | backlog |
+| SPEC-2 | spec 30 | approvalRepository.ts:394 | = F-APR-1 | approval module | fixed (dd24280) |
+| SPEC-5, SEC-9 | spec 30, security 28 | legacy role_pages routes | S7 | S7 | fixed (dd24280) |
+| SPEC-6 | spec 30 | authService.refresh | harmless | reject (no spec rule, no risk) | rejected |
+| F-TEST-10 | backend-dev 25 | backend/scripts/db-reset.test.ts | running the full suite while db:reset is unbuilt/red wipes the shared diecast_test seed → 40 unrelated failures; db:reset tests must only ever target their own scratch DB (known-defects BR-KD-30 guard + test isolation) | fix now (test-writer) | fixed |
+| F-TEST-11 | backend-dev 25 | backend/src/routes/pr-cancel.test.ts "BR-PR-41 missing reason on an approved PR" | helper default param turns undefined into a valid reason → test can never pass; send no reason (null / no body) | fix now (test-writer) | fixed |
+| TEST-36-W | coordinator | backend/src/routes/pr-lifecycle.test.ts withdraw test | uses action "cancel"; contract PR-S2 says action "withdraw" | fix now (test-writer) | fixed |
+| SEC-10 | security 37 | backend/src/service/authService.ts refresh | ms race: refresh concurrent with password reset keeps a session | backlog (accept window) | backlog |
+| SEC-11 | security 37 | employeeService.regenerateQr | QR credential issued to password-method employee; QR login not built (BL-017) | backlog (fix with BL-017) | backlog |
+| F-TEST-12 | backend-dev 38 | backend/src/routes/pr-machine.test.ts "updating a PR to add a machine" | edited by a non-requester; BR-PR-17 = requester or super-admin only → fixture must have the requester edit | fix now (test-writer) | fixed (suite green) |
+| CR-8-T | backend-dev 35 | backend/src/repository/approvalRepository.test.ts:173 | calls submitRequest with 2 args; CR-8 makes the actor required → pass an actor | fix now (test-writer), then backend one-liner | fixed (suite green) |
+| CR-8-L | coordinator | backend/src/service/approvalService.ts:415-417 | biome format error after CR-8 commit (lint fails) | fix now (backend-dev) | fixed |
+| FE-SA | frontend-dev 40 | /auth/me + PR screens | no super-admin flag in UI → super-admin cannot edit PRs from the UI (backend allows, BR-PR-17) | S7: /auth/me returns isSuperAdmin; PR edit uses it | fixed (0dd880a/b6198e2 + dd24280) |
+| FE-INACTIVE | frontend-dev 40 | PR item picker (useAssetItemsLookupQuery) | unverified that lookup excludes inactive items (backend rejects PR_INVALID_ITEM) | check after stock merge | fixed (b6198e2) |
+| DBR-1 | backend-dev 44 | backend/scripts/db-reset*.ts fixtures | 13 "db:reset with fixtures" tests now fail (were green at 24c5dd9) — likely new rules (required approval comments, requester-only submit, PR create rules) broke fixture flows | fix with APR build (backend-dev), confirm with test-runner | fixed (4568e50) |
+| FE-HIST | frontend-dev 49 | frontend ApprovalHistoryPanel | trail action "cancelled" is written for both withdraw and document cancel; panel labels it "Withdrawn" → show "Cancelled" + notes | fix in next frontend pass | fixed (already in panel) |
+| F-TEST-14 | stop hook | backend/src/repository/approvalRepository.test.ts:173, backend/src/types/approval.types.test.ts:33 | still use isSaleOrderLinked; BR-APR-15 drops it from matching and from the policy API | fix now (test-writer) | fixed |
+| F-TEST-15 | backend-dev 48 | backend/src/routes/approval-requests.test.ts act helper | default param notes="TEST_aprreq note" swallows undefined → BR-APR-37 omitted-comment cases can never pass | fix now (test-writer) | fixed |
+| APR-SCOPE | backend-dev 48 | backend/scripts/prepare-test-db.ts | edited outside scope to seed inactive fallback policies (needed for BR-APR-22 on fresh DBs) | accepted | fixed |
+| F-TEST-16 | backend-dev 52 | backend/src/routes/po-lifecycle.test.ts BR-PO-21 trail test | reads approval_trails with no ORDER BY → flaky | fix now (test-writer) | fixed |
+| PO-F1 | backend-dev 52 | PR line cancel | reason validated but not stored; BR-PR-46 needs who/when (+ reason) on every status change → add cancel reason/by/at to PR lines | fix now (backend-dev) | fixed |
+| PO-F2 | backend-dev 52 | PO supplier confirmation | kept as PO columns, not a log row; BR-PO-17 says confirmation/reminder/escalation are log rows → add "confirmation" log type | fix now (backend-dev) | fixed |
+| SPEC-P1 | spec 59 + code 56 CRP-3 | approvalService actOnRequest `cancel` | unspecced action half-cancels PRs | fix now: remove (approval v2) — test first | fixed (f1c9812/9c2998e) |
+| CRP-1 | code 56 | frontend PR edit + backend updatePrSchema | edit sends status → always 400 | fix now (frontend + backend, PR v2) | fixed (f1c9812/9c2998e) |
+| CRP-2 | code 56 + perf 58 PERF-01/02 | prService.cancelLine, poRepository join lock | lock order deadlock | fix now — test first | fixed (f1c9812/9c2998e) |
+| CRP-4 | code 56 | prService link_machine check; PR edit payload | unchanged assetId → 403 | fix now (PR v2) — test first | fixed (f1c9812/9c2998e) |
+| SPEC-P4 | spec 59 | approvalRepository policyColumns | isSaleOrderLinked still returned | fix now (approval v2) — test first | fixed (f1c9812/9c2998e) |
+| SPEC-P2, SPEC-P7, PERF-12, CRP-n | spec 59, perf 58, code 56 | frontend PO/PR | cancel dialog wording, reason required type, narrow invalidation, response types | fix now (frontend) | fixed (f1c9812/9c2998e) |
+| SEC-P1, SEC-P2 | security 57 | scripts/db-reset.ts | local guard by name/port + rotate warning (known-defects v3) | fix now — test first | fixed (f1c9812/9c2998e) |
+| SEC-P3 | security 57 | approvalService.submitRequest | submit needs doc key (approval v2) | fix now — test first | fixed (f1c9812/9c2998e) |
+| SEC-P4 | security 57 | pr.types notes, prService saleOrderId | notes ≤2000, sale order exists (PR v2) | fix now — test first | fixed (f1c9812/9c2998e) |
+| CRP-8/SPEC-P5 | code 56, spec 59 | poService confirmSupplier | confirmation method enum (PO v2) | fix now — test first | fixed (f1c9812/9c2998e) |
+| CRP-6, CRP-7, CRP-10, PERF-04, PERF-06, PERF-07, PERF-08 | code 56, perf 58 | backend PR/PO | typed errors, shared reason parser (400 on bad JSON), dead code, batch PR-line updates, indexes | fix now (backend) | fixed (f1c9812/9c2998e) |
+| SPEC-P3 | spec 59 | frontend | BR-APR-57..60, UI half of BR-PR-39, BR-KD-16 untested | manual UI checklist in the PR | fixed (manual-ui-checklist.md) |
+| SPEC-P6, SPEC-P9 | spec 59 | specs | undocumented codes; BR-PR-46 via PO record | fixed in spec changelogs (PR v2, PO v2, approval v2) | fixed |
+| SPEC-P8 | spec 59 | reports | contamination line missing in 3 reports | noted: briefs are pointer-only template calls, recorded in the coordinator transcript | rejected |
+| CRP-5, CRP-9, PERF-03, PERF-05, PERF-09, PERF-10, PERF-11, SPEC-P10 | code 56, perf 58, spec 59 | various | repo layering, SCO submit lock (M2), minor batching, trigram search, rate suggestion (after merge) | backlog / after merge | backlog |
+| FE-LABEL | frontend-dev 61 | PurchaseOrderTrackingCards | shows raw confirmation method (in_person) | fix in final UI pass | fixed (b6198e2) |
+| F-TEST-17 | backend-dev 62 | backend/src/repository/approvalRepository.test.ts:187 | requestor fixture role has no pr.manage; approval v2 (BR-APR-24) submit needs the doc key → 403 | fix now (test-writer) | fixed |
+| MRG-T1 | coordinator (merge da516f2) | backend/src/service/{inventoryMasters,supplierService,inventoryStock,grnService,stockPosting}.test.ts | stock-branch tests set up fixtures as role-in-token users; on the permission layer they get 403 `asset.manage` / `supplier.manage` (≈200 failures); stockPosting.test.ts:165,175 pass a role string where grnService now takes an `Actor` (typecheck) | fix now (test-writer): fixtures via real employees + seed roles, per auth-setup BR-AUTH-12, 21 | fixed (c1a1553) |
+| MRG-T2 | coordinator | tests for BR-PR-14, BR-PO-10 | gaps noted in pr-lifecycle.test.ts:13 and po-lifecycle.test.ts:15 — standard rate column and GRN posting now exist | fix now (test-writer), red first | fixed (c1a1553) |
+| MRG-B1 | coordinator | backend/scripts/db-reset-fixtures.ts | fixture items have no standard rate (BR-INV-03 required, BR-KD-44) → reset fails; 14 db-reset tests red | fix now (backend-dev) | fixed (4568e50) |
+| MRG-B2 | coordinator | backend/src/service/prService.ts | BR-PR-14 not built: estimate falls back to item standard rate + `noCostHistory` flag | fix now (backend-dev), after MRG-T2 red | fixed (4568e50) |
+| MRG-F1 | coordinator | frontend/src/lib/api/suppliers/permissions.ts | role-name list (`SUPPLIER_MANAGE_ROLES`) from stock branch; BR-AUTH-11, 14 → `useCan("supplier.manage")` | fix now (frontend-dev, S7) | fixed (0dd880a) |
+| MRG-T3 | test-writer 64 | backend/src/routes/permissions-matrix.test.ts (BR-AUTH-21 rows `/setup/pages` GET/POST/PATCH/DELETE, `GET /setup/permissions`, `POST /setup/roles/:roleId/permissions`) | routes removed in S7; auth-setup BR-AUTH-15 retires page grants → drop these parity rows (assert 404 or remove) | fix now (test-writer) | fixed (test-writer 64) |
+| MRG-T4 | backend-dev 65 | backend/scripts/db-reset.test.ts:688 (BR-KD-46 "fixtures never set stock or average cost") | expects current_stock/average_cost 0; BL-014 fixed so GRN fixtures post real stock. known-defects v4 BR-KD-46: currentStock = ledger balance per item | fix now (test-writer) | fixed (test-writer 64) |
+| SPEC-M1, CR-M1 | spec 70, code 67 | frontend/src/types/purchase-requisitions.ts:101 + PR screens | BR-PR-14 `noCostHistory` never read → "estimate uses standard rate" note missing | fix now (frontend-dev) | fixed (eea4fb1) |
+| SEC-13 | security 68 | backend/src/routes/asset.ts:44-49 | `GET /asset/machines` guarded only in service | fix now (backend-dev): `requireAnyPermission("asset.manage","pr.link_machine")` on route + registry | fixed (6d5a301) |
+| PERF-M1 | perf 69 | 02_procurement-purchasing.ts `grns` | no index on `grns.po_id` (PO edit/cancel scan under PO lock) | fix now (backend-dev): `idx_grns_po_id` | fixed (6d5a301) |
+| SPEC-M2, CR-M2 | spec 70, code 67 | backend/src/routes/grn.ts:5, supplier.ts:5 | unused `requireAuth` import | fix now (backend-dev) | fixed (6d5a301) |
+| CR-M3 | code 67 | backend/src/repository/prRepository.ts:394, prService.ts:48 | stale merge comment; inactive-item check done twice | fix now (backend-dev): keep one | fixed (6d5a301) |
+| SPEC-M3 | spec 70 | backend/src/db/schemas/02_procurement-approval.ts:22 | role names in a code comment (example) | fix now (backend-dev): neutral example | fixed (6d5a301) |
+| SEC-12 | security 68 | role_pages table | removed from schema, no drop migration (deploys use push) | backlog (with BL-011) | backlog |
+| PERF-M2 | perf 69 | grnRepository.ts:541-573 | leading-wildcard ilike on grn_number | backlog (with PERF-05) | backlog |
+| LOC-1 | docs 72 (BL-069) | backend/src/routes/asset.ts listLocations; frontend InventoryMovementsManager.tsx:183 | owner (inventory.adjust, no asset.manage) gets 403 on the stock-take location picker; merge da516f2 set asset.manage | fix now: auth-setup v10 — test-writer red test, then backend-dev `requireAnyPermission("asset.manage","inventory.view")` | fixed (cc28d80) |
+| CI-1 | CI run 36597364415 (PR #13) | backend/src/routes/approval-requests.test.ts (8 PO tests: BR-APR-35, 39, 43 x2, 47 x2, 48, 61) | tests assume their own PO policy is the only candidate. CI builds the test DB with `db:reset --no-fixtures`, which seeds the baseline policies (scripts/seed-approval-policies.ts); "PO - Small Order (<Rs 25k)" (subDocType any + amount bound, specificity tier 3, BR-APR-19) outranks the test policy (tier 4), routes to back_office, no back_office employee -> 400 APPROVAL_NO_ELIGIBLE_APPROVER. Local `db:test:prepare` seeds no policies, so it passed locally | fix now (test-writer): tests must not depend on which baseline policies exist (e.g. deactivate competing active PO policies for the suite and restore after, or give the test policy a scope that outranks per BR-APR-19) | fixed (test-writer; 1155/0 on CI-like DB) |

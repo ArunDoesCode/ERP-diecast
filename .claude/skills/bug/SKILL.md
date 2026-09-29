@@ -31,3 +31,5 @@ description: >
 7. **Log** — if this bug pattern could recur (e.g. path param vs body, stale enum after rename), add an entry
    to `frontend/docs/gotchas.md` or `docs/decisions.md`. Update `docs/uat-log.md` row to `fixed` with commit.
    S1/S2 during UAT: fix now. S3/S4 during UAT: log and batch weekly.
+8. **Ship with the batch** — all commits go on the working branch (root `CLAUDE.md` → Git). No new branch,
+   no push, no PR for one bug; it goes out in the next batch PR (push earlier only for S1 when the user asks).

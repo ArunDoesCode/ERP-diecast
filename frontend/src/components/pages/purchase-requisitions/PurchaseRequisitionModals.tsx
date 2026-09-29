@@ -20,9 +20,15 @@ import {
 	SearchableSelect,
 	type SearchableSelectOption,
 } from "@/components/common/SearchableSelect";
+import { ApprovalHistoryPanel } from "@/components/pages/approval/ApprovalHistoryPanel";
+import {
+	CancelPurchaseRequisitionDialog,
+	getCancelBlockedReason,
+} from "@/components/pages/purchase-requisitions/CancelPurchaseRequisitionDialog";
 import {
 	createDefaults,
 	type FormStep,
+	ItemDateCell,
 	ItemRowsTable,
 	type ItemsFormShape,
 	ItemUomCell,
@@ -54,7 +60,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { TableCell } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { useSubmitApprovalRequestMutation } from "@/lib/api/approval/queries";
+import {
+	useActOnApprovalRequestMutation,
+	useCurrentApprovalByDocQuery,
+	useSubmitApprovalRequestMutation,
+} from "@/lib/api/approval/queries";
 import { useMachinesQuery } from "@/lib/api/asset/queries";
 import {
 	purchaseRequisitionKeys,
@@ -69,6 +79,7 @@ import {
 	getPRStatusBadgeStyle,
 	humanizeStatusLabel,
 } from "@/lib/pr-status-badge";
+import { useAuthSessionStore } from "@/lib/store/auth-session-store";
 import {
 	type PRCreateFormInput,
 	type PREditFormInput,
@@ -80,11 +91,11 @@ import {
 export function CreatePurchaseRequisitionModal({
 	open,
 	onOpenChange,
-	isFloorSupervisor,
+	canLinkMachine,
 }: {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
-	isFloorSupervisor: boolean;
+	canLinkMachine: boolean;
 }) {
 	const createMutation = useCreatePurchaseRequisitionMutation();
 	const [activeStep, setActiveStep] = useState<FormStep>("details");
@@ -147,11 +158,12 @@ export function CreatePurchaseRequisitionModal({
 			toPRCreatePayload({
 				type: values.type,
 				notes: values.notes,
-				assetId: isFloorSupervisor ? values.assetId : undefined,
+				assetId: canLinkMachine ? values.assetId : undefined,
 				items: values.items.map((item) => ({
 					itemId: item.itemId,
 					requestedQty: item.requestedQty,
 					uom: item.uom,
+					expectedDate: item.expectedDate,
 				})),
 			}),
 			{
@@ -226,7 +238,7 @@ export function CreatePurchaseRequisitionModal({
 											)}
 										/>
 
-										{isFloorSupervisor ? (
+										{canLinkMachine ? (
 											<FormField
 												control={form.control}
 												name="assetId"
@@ -285,6 +297,7 @@ export function CreatePurchaseRequisitionModal({
 												itemId: undefined as unknown as number,
 												requestedQty: 1,
 												uom: "",
+												expectedDate: "",
 											})
 										}
 										renderFields={(index) => (
@@ -353,6 +366,8 @@ export function CreatePurchaseRequisitionModal({
 																		id={`create-item-qty-${index}`}
 																		label="Qty"
 																		type="number"
+																		step="0.001"
+																		min="0"
 																		name={field.name}
 																		value={
 																			typeof field.value === "number" &&
@@ -380,6 +395,13 @@ export function CreatePurchaseRequisitionModal({
 														form.control as unknown as Control<ItemsFormShape>
 													}
 													index={index}
+												/>
+												<ItemDateCell
+													control={
+														form.control as unknown as Control<ItemsFormShape>
+													}
+													index={index}
+													id={`create-item-date-${index}`}
 												/>
 
 												<TableCell className="text-right">
@@ -426,17 +448,18 @@ export function EditPurchaseRequisitionModal({
 	prId,
 	open,
 	onOpenChange,
-	isFloorSupervisor,
+	canLinkMachine,
 }: {
 	prId: number | null;
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
-	isFloorSupervisor: boolean;
+	canLinkMachine: boolean;
 }) {
 	const queryClient = useQueryClient();
 	const [activeStep, setActiveStep] = useState<FormStep>("details");
 	const [submitAction, setSubmitAction] = useState<"save" | "submit">("save");
 	const [itemLookupSearch, setItemLookupSearch] = useState("");
+	const [cancelOpen, setCancelOpen] = useState(false);
 
 	const detailQuery = usePurchaseRequisitionDetailQuery(
 		prId ?? 0,
@@ -448,10 +471,32 @@ export function EditPurchaseRequisitionModal({
 
 	const detail = detailQuery.data?.success ? detailQuery.data.data : null;
 	const pr = detail?.pr;
-	const canEdit = pr?.status === "draft";
+	const currentUserId = useAuthSessionStore((state) => state.userId);
+	const isSuperAdmin = useAuthSessionStore((state) => state.isSuperAdmin);
+	const isRequester =
+		pr != null &&
+		currentUserId != null &&
+		String(pr.requestedBy) === currentUserId;
+	// BR-PR-17: edit/cancel by the requester or super-admin; submit/withdraw stay the requester's.
+	const canOwn = isRequester || isSuperAdmin;
+	const canEdit = pr?.status === "draft" && canOwn;
+	const canWithdraw = pr?.status === "pending_approval" && isRequester;
+	const currentApprovalQuery = useCurrentApprovalByDocQuery(
+		canWithdraw ? "pr" : undefined,
+		canWithdraw ? pr?.id : undefined,
+	);
+	const openRequestId = currentApprovalQuery.data?.success
+		? (currentApprovalQuery.data.data?.id ?? null)
+		: null;
+	const actMutation = useActOnApprovalRequestMutation();
 	const isMutating =
-		updateMutation.isPending || submitApprovalMutation.isPending;
+		updateMutation.isPending ||
+		submitApprovalMutation.isPending ||
+		actMutation.isPending;
 	const statusBadgeStyle = getPRStatusBadgeStyle(pr?.status);
+	const cancelBlockedReason = pr
+		? getCancelBlockedReason(pr.status, detail?.items ?? [])
+		: null;
 	const itemOptions = useMemo(() => {
 		const fetched =
 			itemLookupQuery.data?.pages.flatMap((page) =>
@@ -480,7 +525,6 @@ export function EditPurchaseRequisitionModal({
 		) as unknown as Resolver<PREditFormInput>,
 		defaultValues: {
 			prId: prId ?? 0,
-			status: "draft",
 			notes: "",
 			items: [
 				{
@@ -515,7 +559,6 @@ export function EditPurchaseRequisitionModal({
 		form.reset(
 			toEditDefaults({
 				prId: pr.id,
-				status: pr.status,
 				notes: pr.notes,
 				items: detail.items,
 			}),
@@ -527,6 +570,18 @@ export function EditPurchaseRequisitionModal({
 		if (activeStep === "details") {
 			setActiveStep("items");
 		}
+	}
+
+	function onWithdraw() {
+		if (openRequestId == null) return;
+		actMutation.mutate(
+			{ id: openRequestId, input: { action: "withdraw" } },
+			{
+				onSuccess: (result) => {
+					if (result.success) onOpenChange(false);
+				},
+			},
+		);
 	}
 
 	function getSubmitAction(event?: BaseSyntheticEvent): "save" | "submit" {
@@ -552,18 +607,20 @@ export function EditPurchaseRequisitionModal({
 				type: pr?.type ?? "stock_reorder",
 				saleOrderId: pr?.saleOrderId ?? null,
 				assetId: pr?.assetId ?? null,
-				status: values.status,
+				originalAssetId: pr?.assetId ?? null,
 				notes: values.notes,
 				originalItems:
 					detail?.items.map((item) => ({
 						id: item.id,
 						itemId: item.itemId,
 						requestedQty: item.requestedQty,
+						expectedDate: item.expectedDate ?? undefined,
 					})) ?? [],
 				items: values.items.map((item) => ({
 					id: item.id,
 					itemId: item.itemId,
 					requestedQty: item.requestedQty,
+					expectedDate: item.expectedDate,
 				})),
 			}),
 			{
@@ -595,37 +652,6 @@ export function EditPurchaseRequisitionModal({
 		);
 	}
 
-	function onCancelPR() {
-		if (!pr || !detail || pr.status === "cancelled") return;
-
-		updateMutation.mutate(
-			toPRUpdatePayload({
-				prId: pr.id,
-				type: pr.type,
-				saleOrderId: pr.saleOrderId,
-				assetId: pr.assetId,
-				status: "cancelled",
-				notes: pr.notes ?? undefined,
-				originalItems: detail.items.map((item) => ({
-					id: item.id,
-					itemId: item.itemId,
-					requestedQty: item.requestedQty,
-				})),
-				items: detail.items.map((item) => ({
-					id: item.id,
-					itemId: item.itemId,
-					requestedQty: item.requestedQty,
-				})),
-			}),
-			{
-				onSuccess: (result) => {
-					if (!result.success) return;
-					onOpenChange(false);
-				},
-			},
-		);
-	}
-
 	if (!open) return null;
 
 	return (
@@ -638,7 +664,9 @@ export function EditPurchaseRequisitionModal({
 							<DialogDescription>
 								{canEdit
 									? "Draft PR can be edited or submitted for approval."
-									: "PR is not in draft. Fields are read-only."}
+									: pr && !canOwn
+										? "Only the requester can edit this PR. Fields are read-only."
+										: "PR is not in draft. Fields are read-only."}
 							</DialogDescription>
 						</DialogHeader>
 
@@ -659,9 +687,28 @@ export function EditPurchaseRequisitionModal({
 							{detail && pr ? (
 								<>
 									<div className="flex items-center justify-between">
-										<p className="text-sm text-muted-foreground">
-											PR: {pr.prNumber}
-										</p>
+										<div className="text-sm text-muted-foreground">
+											<p>PR: {pr.prNumber}</p>
+											<p>
+												Estimate: ₹
+												{(pr.estimatedAmountPaise / 100).toLocaleString(
+													"en-IN",
+													{ minimumFractionDigits: 2 },
+												)}
+											</p>
+											{detail.items.some((item) => item.noCostHistory) ? (
+												<p className="text-xs">
+													Estimate uses standard rate for:{" "}
+													{detail.items
+														.filter((item) => item.noCostHistory)
+														.map(
+															(item) => item.itemName ?? `Item ${item.itemId}`,
+														)
+														.join(", ")}{" "}
+													(no cost history yet).
+												</p>
+											) : null}
+										</div>
 										<Badge
 											variant={statusBadgeStyle.variant}
 											className={statusBadgeStyle.className}
@@ -669,6 +716,20 @@ export function EditPurchaseRequisitionModal({
 											{humanizeStatusLabel(pr.status)}
 										</Badge>
 									</div>
+
+									{pr.status === "cancelled" ? (
+										<div className="rounded-md border p-3 text-sm">
+											<p>
+												Cancelled by {pr.cancelledByName ?? "unknown"}
+												{pr.cancelledAt
+													? ` on ${new Date(pr.cancelledAt).toLocaleString()}`
+													: ""}
+											</p>
+											<p className="text-muted-foreground">
+												Reason: {pr.cancelReason ?? "-"}
+											</p>
+										</div>
+									) : null}
 
 									<Tabs
 										value={activeStep}
@@ -699,7 +760,7 @@ export function EditPurchaseRequisitionModal({
 													</FormControl>
 												</FormItem>
 
-												{isFloorSupervisor ? (
+												{canLinkMachine ? (
 													<FormItem className="min-h-19">
 														<FormLabel>Machine</FormLabel>
 														<FormControl>
@@ -820,6 +881,8 @@ export function EditPurchaseRequisitionModal({
 																				id={`edit-item-qty-${index}`}
 																				label="Qty"
 																				type="number"
+																				step="0.001"
+																				min="0"
 																				name={field.name}
 																				value={
 																					typeof field.value === "number" &&
@@ -852,6 +915,14 @@ export function EditPurchaseRequisitionModal({
 															}
 															index={index}
 														/>
+														<ItemDateCell
+															control={
+																form.control as unknown as Control<ItemsFormShape>
+															}
+															index={index}
+															id={`edit-item-date-${index}`}
+															disabled={!canEdit}
+														/>
 
 														<TableCell className="text-right">
 															<Button
@@ -873,23 +944,46 @@ export function EditPurchaseRequisitionModal({
 									</form>
 								</>
 							) : null}
+							{pr ? (
+								<div className="px-6 pb-4">
+									<ApprovalHistoryPanel docType="pr" docId={pr.id} />
+								</div>
+							) : null}
 						</div>
 
 						<DialogFooter className="border-t px-6 py-4 sm:justify-between">
 							<div>
-								{detail && pr?.status !== "cancelled" ? (
-									<Button
-										type="button"
-										variant="destructive"
-										disabled={isMutating}
-										onClick={onCancelPR}
-									>
-										{updateMutation.isPending ? "Cancelling..." : "Cancel PR"}
-									</Button>
+								{detail && pr && pr.status !== "cancelled" && canOwn ? (
+									<div className="flex flex-col items-start gap-1">
+										<Button
+											type="button"
+											variant="destructive"
+											disabled={isMutating || cancelBlockedReason != null}
+											onClick={() => setCancelOpen(true)}
+										>
+											Cancel PR
+										</Button>
+										{cancelBlockedReason ? (
+											<p className="text-xs text-muted-foreground">
+												{cancelBlockedReason}
+											</p>
+										) : null}
+									</div>
 								) : null}
 							</div>
 
 							<div className="flex items-center gap-2">
+								{canWithdraw ? (
+									<Button
+										type="button"
+										variant="outline"
+										disabled={isMutating || openRequestId == null}
+										onClick={onWithdraw}
+									>
+										{actMutation.isPending ? "Withdrawing..." : "Withdraw"}
+									</Button>
+								) : null}
+
 								{detail && activeStep !== "items" ? (
 									<Button type="button" onClick={goNext}>
 										Next
@@ -909,22 +1003,33 @@ export function EditPurchaseRequisitionModal({
 												? "Saving..."
 												: "Save changes"}
 										</Button>
-										<Button
-											type="submit"
-											form="edit-pr-form"
-											value="submit"
-											disabled={isMutating}
-										>
-											{submitApprovalMutation.isPending &&
-											submitAction === "submit"
-												? "Submitting..."
-												: "Submit for approval"}
-										</Button>
+										{isRequester ? (
+											<Button
+												type="submit"
+												form="edit-pr-form"
+												value="submit"
+												disabled={isMutating}
+											>
+												{submitApprovalMutation.isPending &&
+												submitAction === "submit"
+													? "Submitting..."
+													: "Submit for approval"}
+											</Button>
+										) : null}
 									</>
 								) : null}
 							</div>
 						</DialogFooter>
 					</div>
+					{pr ? (
+						<CancelPurchaseRequisitionDialog
+							prId={pr.id}
+							prNumber={pr.prNumber}
+							open={cancelOpen}
+							onOpenChange={setCancelOpen}
+							onCancelled={() => onOpenChange(false)}
+						/>
+					) : null}
 				</DialogContent>
 			</Form>
 		</Dialog>

@@ -28,5 +28,5 @@ Read-only except for `docs/STATUS.md`.
    - Stale maps (suggest `/map --stale`).
    - **Next action** — one concrete command (e.g. `/feature grn --resume`, `/spec purchase-order`).
 
-If `docs/STATUS.md` changed and you're on `main`, don't commit; tell the user it'll go into the next PR
-(or commit it on the current feature branch if a pipeline is active in this worktree).
+Commit `docs/STATUS.md` on the working branch (`work/<theme>`, root `CLAUDE.md` → Git). Never push or open a
+PR just for STATUS — it rides with the next batch PR. If you're on `main`, leave it uncommitted and say so.

@@ -3,7 +3,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useMemo } from "react";
 import { type Resolver, useForm } from "react-hook-form";
-import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -32,31 +31,14 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import {
+	isValidGstin,
+	panFromGstin,
 	type SupplierMasterInput,
 	supplierMasterSchema,
 	supplierTypeValues,
 } from "@/types/suppliers";
 
-const NO_TYPE_VALUE = "__none__";
-
-const createSupplierFormSchema = supplierMasterSchema.extend({
-	type: z.enum(supplierTypeValues, {
-		error: "Supplier type is required",
-	}),
-	gstNumber: z.string().trim().min(1, "GST number is required"),
-	panNumber: z.string().trim().min(1, "PAN number is required"),
-	contactPerson: z.string().trim().min(1, "Contact person is required"),
-	email: z
-		.string()
-		.trim()
-		.min(1, "Email is required")
-		.email("Enter a valid email"),
-	phone: z.string().trim().min(1, "Phone is required"),
-	address: z.string().trim().min(1, "Address is required"),
-});
-
 type SupplierMasterModalProps = {
-	mode: "create" | "edit";
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	title: string;
@@ -68,7 +50,6 @@ type SupplierMasterModalProps = {
 };
 
 export function SupplierMasterModal({
-	mode,
 	open,
 	onOpenChange,
 	title,
@@ -81,9 +62,9 @@ export function SupplierMasterModal({
 	const resolver = useMemo(
 		() =>
 			zodResolver(
-				mode === "create" ? createSupplierFormSchema : supplierMasterSchema,
+				supplierMasterSchema,
 			) as unknown as Resolver<SupplierMasterInput>,
-		[mode],
+		[],
 	);
 
 	const form = useForm<SupplierMasterInput>({
@@ -152,6 +133,7 @@ export function SupplierMasterModal({
 															{...field}
 															id="supplier-name"
 															label="Supplier name"
+															maxLength={200}
 														/>
 													</FormControl>
 													<FormMessage />
@@ -169,20 +151,13 @@ export function SupplierMasterModal({
 													</FormLabel>
 													<FormControl>
 														<Select
-															value={field.value ?? NO_TYPE_VALUE}
-															onValueChange={(value) =>
-																field.onChange(
-																	value === NO_TYPE_VALUE ? undefined : value,
-																)
-															}
+															value={field.value ?? "raw_material"}
+															onValueChange={field.onChange}
 														>
 															<SelectTrigger className="h-12 w-full rounded-lg px-3 text-base md:text-sm">
 																<SelectValue placeholder="Select supplier type" />
 															</SelectTrigger>
 															<SelectContent>
-																<SelectItem value={NO_TYPE_VALUE}>
-																	None
-																</SelectItem>
 																{supplierTypeValues.map((value) => (
 																	<SelectItem key={value} value={value}>
 																		{value}
@@ -211,8 +186,24 @@ export function SupplierMasterModal({
 													<FormControl>
 														<FloatingLabelInput
 															{...field}
+															value={field.value ?? ""}
 															id="supplier-gst"
-															label="GST number"
+															label="GST number (optional)"
+															maxLength={15}
+															onChange={(event) => {
+																const gst = event.target.value.toUpperCase();
+																field.onChange(gst);
+																if (isValidGstin(gst)) {
+																	form.setValue(
+																		"panNumber",
+																		panFromGstin(gst),
+																		{
+																			shouldDirty: true,
+																			shouldValidate: true,
+																		},
+																	);
+																}
+															}}
 														/>
 													</FormControl>
 													<FormMessage />
@@ -227,8 +218,13 @@ export function SupplierMasterModal({
 													<FormControl>
 														<FloatingLabelInput
 															{...field}
+															value={field.value ?? ""}
 															id="supplier-pan"
-															label="PAN number"
+															label="PAN number (optional, filled from GST)"
+															maxLength={10}
+															onChange={(event) =>
+																field.onChange(event.target.value.toUpperCase())
+															}
 														/>
 													</FormControl>
 													<FormMessage />
@@ -251,8 +247,10 @@ export function SupplierMasterModal({
 													<FormControl>
 														<FloatingLabelInput
 															{...field}
+															value={field.value ?? ""}
 															id="supplier-contact"
-															label="Contact person"
+															label="Contact person (optional)"
+															maxLength={200}
 														/>
 													</FormControl>
 													<FormMessage />
@@ -267,8 +265,10 @@ export function SupplierMasterModal({
 													<FormControl>
 														<FloatingLabelInput
 															{...field}
+															value={field.value ?? ""}
 															id="supplier-phone"
-															label="Phone"
+															label="Phone (optional)"
+															maxLength={30}
 														/>
 													</FormControl>
 													<FormMessage />
@@ -283,8 +283,10 @@ export function SupplierMasterModal({
 													<FormControl>
 														<FloatingLabelInput
 															{...field}
+															value={field.value ?? ""}
 															id="supplier-email"
-															label="Email"
+															label="Email (optional)"
+															maxLength={254}
 															type="email"
 														/>
 													</FormControl>
@@ -300,8 +302,10 @@ export function SupplierMasterModal({
 													<FormControl>
 														<FloatingLabelInput
 															{...field}
+															value={field.value ?? ""}
 															id="supplier-address"
-															label="Address"
+															label="Address (optional)"
+															maxLength={500}
 														/>
 													</FormControl>
 													<FormMessage />
@@ -324,8 +328,10 @@ export function SupplierMasterModal({
 													<FormControl>
 														<FloatingLabelInput
 															id="supplier-payment"
-															label="Default payment terms (days)"
+															label="Default payment terms (days, 0-365)"
 															type="number"
+															min={0}
+															max={365}
 															inputMode="numeric"
 															name={field.name}
 															value={field.value ?? ""}

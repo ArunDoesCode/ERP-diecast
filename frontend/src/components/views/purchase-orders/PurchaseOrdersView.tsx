@@ -19,13 +19,12 @@ import {
 	type POQueueSearchField,
 	usePOQueueControls,
 } from "@/components/views/purchase-orders/use-po-queue-controls";
+import { useCan } from "@/hooks/use-can";
 import { usePurchaseRequisitionsQuery } from "@/lib/api/purchase-requisitions/queries";
-import { useAuthSessionStore } from "@/lib/store/auth-session-store";
 import { type PRType, prTypeValues } from "@/types/purchase-requisitions";
 
 export function PurchaseOrdersView() {
-	const role = useAuthSessionStore((state) => state.role);
-	const canSeeTracking = role !== "floor_supervisor";
+	const canSeeTracking = useCan("po.manage");
 
 	const {
 		onPRNumberChange,

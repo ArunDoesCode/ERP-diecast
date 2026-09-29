@@ -23,7 +23,7 @@ import type {
 
 export type PendingApprovalAction = Extract<
 	ApprovalRequestAction,
-	"approve" | "reject" | "sent_back"
+	"approve" | "reject" | "sent_back" | "withdraw"
 >;
 
 const ACTION_CONFIG: Record<
@@ -49,6 +49,11 @@ const ACTION_CONFIG: Record<
 		icon: IconArrowBackUp,
 		variant: "outline",
 	},
+	withdraw: {
+		label: "Withdraw",
+		icon: IconArrowBackUp,
+		variant: "outline",
+	},
 };
 
 const SKELETON_CARDS = 6;
@@ -58,6 +63,7 @@ type ApprovalCardsProps = {
 	isLoading: boolean;
 	actingRequest: { id: number; action: PendingApprovalAction } | null;
 	isActing: boolean;
+	currentUserId: number;
 	onAction: (
 		request: ApprovalRequestSummary,
 		action: PendingApprovalAction,
@@ -112,6 +118,7 @@ export function ApprovalCards({
 	isLoading,
 	actingRequest,
 	isActing,
+	currentUserId,
 	onAction,
 }: ApprovalCardsProps) {
 	if (isLoading) return <ApprovalCardsSkeleton />;
@@ -167,31 +174,38 @@ export function ApprovalCards({
 					</CardContent>
 
 					<CardFooter className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-						{Object.entries(ACTION_CONFIG).map(([action, config]) => {
-							const Icon = config.icon;
-							const isThisAction =
-								actingRequest?.id === approval.id &&
-								actingRequest.action === action;
+						{Object.entries(ACTION_CONFIG)
+							// Withdraw is for the requester only (BR-APR-39).
+							.filter(
+								([action]) =>
+									action !== "withdraw" ||
+									approval.requestedBy === currentUserId,
+							)
+							.map(([action, config]) => {
+								const Icon = config.icon;
+								const isThisAction =
+									actingRequest?.id === approval.id &&
+									actingRequest.action === action;
 
-							return (
-								<Button
-									key={action}
-									type="button"
-									variant={config.variant}
-									disabled={isActing}
-									onClick={() =>
-										onAction(approval, action as PendingApprovalAction)
-									}
-								>
-									{isThisAction ? (
-										<IconRefresh className="size-3.5 animate-spin" />
-									) : (
-										<Icon className="size-3.5" />
-									)}
-									{config.label}
-								</Button>
-							);
-						})}
+								return (
+									<Button
+										key={action}
+										type="button"
+										variant={config.variant}
+										disabled={isActing}
+										onClick={() =>
+											onAction(approval, action as PendingApprovalAction)
+										}
+									>
+										{isThisAction ? (
+											<IconRefresh className="size-3.5 animate-spin" />
+										) : (
+											<Icon className="size-3.5" />
+										)}
+										{config.label}
+									</Button>
+								);
+							})}
 					</CardFooter>
 				</Card>
 			))}

@@ -24,8 +24,8 @@ import {
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
+	useAssignableRolesQuery,
 	useCreateEmployeeMutation,
-	useRolesQuery,
 	useUpdateEmployeeMutation,
 } from "@/lib/api/setup/queries";
 import { type EmployeeInput, employeeSchema } from "@/types/setup";
@@ -47,7 +47,7 @@ export function EmployeeForm({
 	onDirtyChange,
 	onDone,
 }: EmployeeFormProps) {
-	const rolesQuery = useRolesQuery();
+	const rolesQuery = useAssignableRolesQuery();
 	const createEmployeeMutation = useCreateEmployeeMutation();
 	const updateEmployeeMutation = useUpdateEmployeeMutation();
 
@@ -170,6 +170,7 @@ export function EmployeeForm({
 							<FormLabel>Role</FormLabel>
 							<Select
 								value={field.value ? String(field.value) : ""}
+								disabled={mode === "edit"}
 								onValueChange={(value) => field.onChange(Number(value))}
 							>
 								<FormControl>
@@ -185,6 +186,11 @@ export function EmployeeForm({
 									))}
 								</SelectContent>
 							</Select>
+							{mode === "edit" && (
+								<p className="text-xs text-muted-foreground">
+									Use "Change role" in the employee list to change the role.
+								</p>
+							)}
 							<FormMessage />
 						</FormItem>
 					)}

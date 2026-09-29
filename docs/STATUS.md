@@ -3,54 +3,46 @@
 > Single entry point for "where are we and what's next". Updated by `/feature` (at phase changes and in
 > every PR), `/watch-prs` (merges), `/status` (on demand) and `/wrap`. Humans: read this, then run `/status`.
 
-**Updated:** 2026-09-29 · **Milestone:** M0 workflow infra → M1 procurement hardening
-**Next action:** answer the "Questions for you" tables (7 each) in `grn`+`grn-stock`, `approval`+`approval-policies`,
-`purchase-requisition`, `known-defects` → `/freeze <module>`. Open P1 defects: BL-024 (owner can register
-super-admin), BL-025..BL-027 (from spec drafts).
+**Updated:** 2026-09-29 · **Milestone:** M1 procurement hardening — built on `work/m1`, PR open
+**Next action:** merge the m1 PR (`work/m1` → `main`), then `/feature subcontracting` on a fresh
+branch from `main` (BL-070).
 
 ## Modules
-| Module | Spec | Map | Code | Tests | Open PR | Next step |
-|---|---|---|---|---|---|---|
-| auth-setup | stub draft v0 | [map](modules/auth-setup.md) | full | route-registry, app.test, authService.test | — | stub spec (BR-AUTH-01/02) → `/spec auth-setup` |
-| approval | draft v0 (+ approval-policies, 7 Qs) | [map](modules/approval.md) | full (₹/paise form bug BL-025) | approvalRepository.test, approval.types.test, approvalService.test | — | answer Qs → `/freeze approval` |
-| purchase-requisition | draft v0 (7 Qs) + known-defects draft (7 Qs) | [map](modules/purchase-requisition.md) | full (BL-001, BL-026) | none | — | answer Qs → `/freeze purchase-requisition` |
-| purchase-order | none | [map](modules/purchase-order.md) | full | none | — | spec in M1 |
-| grn | draft v0 (+ grn-stock, 7 Qs) | [map](modules/grn.md) | full (double-post race BL-027) | none | — | answer Qs → `/freeze grn` |
-| inventory | in grn spec | [map](modules/inventory.md) | full (stock/avg cost stale BL-014) | none | — | covered by grn spec |
-| suppliers | none | [map](modules/suppliers.md) | full | none | — | spec in M1 |
-| subcontracting | none | — | schema only | none | — | M2 |
-| bom | none | — | none | none | — | M3 (after UAT-1 starts) |
-| sale-order | none | — | none | none | — | M4 |
+| Module | Spec | Map | Code | Next step |
+|---|---|---|---|---|
+| auth-setup | frozen v10 | [map](modules/auth-setup.md) | full — permission layer S1–S7 built on work/m1 | merge m1 PR |
+| known-defects | frozen v4 | (PR / auth maps) | full — BL-001/004/005 fixed (`bootstrap-admin`, `db:reset`) | merge m1 PR |
+| purchase-requisition | frozen v2 | [map](modules/purchase-requisition.md) | full — built on work/m1 | merge m1 PR |
+| approval + approval-policies | frozen v2 / v1 | [map](modules/approval.md) | full — built on work/m1 (SCO plumbing only) | merge m1 PR |
+| purchase-order | frozen v2 | [map](modules/purchase-order.md) | full — built on work/m1 | merge m1 PR |
+| grn + grn-stock | frozen v1 / v1 | [map](modules/grn.md) | full — built on work/m1-stock, merged da516f2 | merge m1 PR |
+| inventory | frozen v1 | [map](modules/inventory.md) | full — merged da516f2 | merge m1 PR |
+| suppliers | frozen v1 | [map](modules/suppliers.md) | full — merged da516f2 | merge m1 PR |
+| subcontracting | frozen v1 | [map](modules/subcontracting.md) | schema only — **not built** | `/feature subcontracting` (next batch, BL-070) |
+| bom | none | — | none | M3 (after UAT-1 starts) |
+| sale-order | none | — | none | M4 |
 
-Legend — Spec: none / draft / frozen vN · Code: none / schema only / partial / full
+Legend — Code: none / schema only / partial / full. Tests per module: see each map's **Tests** table.
 
 ## Active pipelines
 | Feature | Branch | Phase | PR | Waiting on |
 |---|---|---|---|---|
-| agent-scope docs | feature/agent-scope | PR open, CI green | [#10](../../pull/10) | you to merge |
+| m1 (auth-setup, known-defects, PR, approval, PO + merged stock modules) | work/m1 | reviewed, all checks green, docs done | open | your review + merge |
 
 ## Waiting on you
-- [ ] Merge PR #10 (docs-only: required Scope block in subagent briefs, model-alias note)
-- [ ] One-time local setup from PR #4:
-  add `DATABASE_URL_TEST` to `backend/.env` (see `.env.example`), `docker compose up -d`, `bun run db:test:prepare`
-- [ ] Answer the "Questions for you" tables (7 each) in grn(+grn-stock), purchase-requisition, approval(+approval-policies)
-- [ ] Answer `known-defects` spec: 7 questions → `/freeze known-defects`
-- [ ] BL-012 blocked: branch protection needs GitHub Pro or a public repo (API 403) — decide: upgrade / keep private + discipline
-- [ ] Remaining infra/debt needing a call: BL-010 Playwright (after specs freeze), BL-011 migrations (after
-  known-defects' `db:reset` merges), BL-031 supplier batch limits
-- [ ] Maps `auth-setup` and `approval` are stale (BL-018/BL-022 fixes touched their code after
-  `last_verified_commit`) — `/map --stale` when convenient
+- [ ] Review + merge the m1 PR. Run the manual UI checklist in it (includes SPEC-P3: approval
+  policy form BR-APR-57..60, UI half of BR-PR-39, BR-KD-16 — no automated test).
+- [ ] Old local test DB: drop `pages` and `role_pages` (or recreate the DB) before `bun run db:test:prepare`.
+  Dev DB needs `db:push` after the merge.
+- [ ] BL-012 blocked: branch protection needs GitHub Pro or a public repo — decide: upgrade / keep private.
+- [ ] BL-011 migrations before UAT-1 (also drops `pages`/`role_pages`, BL-056).
 
 ## Recently done
-- 2026-09-29 — PR #9 merged: draft specs rewritten in slim format (~1,500 → 537 lines; grn+grn-stock,
-  approval+approval-policies, purchase-requisition, known-defects; ≤7 questions each, rule ids kept)
-- 2026-09-27 — PR #8 merged: plain-language rule for all agents + slim spec template
-- 2026-09-27 — PR #7 merged: backlog/STATUS refresh after PR #6
-- 2026-09-27 — PR #6 merged: BL-018/BL-022 regression tests redone by test-writer (spec stub `auth-setup.md` BR-AUTH-01/02)
-- 2026-09-27 — PR #4 merged: BL-006 test DB, BL-007 createApp, BL-008 committed manifest + route contract test,
-  BL-009 hooks, BL-013 CLAUDE.md drift, BL-018 refresh re-reads RBAC, BL-020 no-change, BL-021 audit statuses,
-  BL-022 approval PATCH fix; draft specs grn/approval/purchase-requisition; new items BL-025..BL-037
-- 2026-09-27 — PR #5 merged: known-defects spec draft (BL-001/004/005), BL-024 privilege escalation logged
-- 2026-09-27 — PR #2 merged: test independence enforced in the agent pipeline
-- 2026-09-27 — PR #1 merged: workflow setup + CI green (approval subDocType, lint, seed)
-- 2026-09-27 — spec-first + autonomous pipeline tooling, CI, module maps for 7 existing modules
+- 2026-09-29 — work/m1 (not yet merged): permission layer S1–S7 (role lists and `role_pages` gone,
+  `isSuperAdmin` on `/auth/me`), bootstrap-admin + db:reset, PR / approval / PO built to frozen specs,
+  work/m1-stock merged (grn, inventory, suppliers), review findings fixed (incl. BL-069 owner stock-take locations); backlog BL-056..070 added,
+  10 old items closed; decisions D-012..D-016
+- 2026-09-29 — PR #11 merged: dev handbook · PR #10 merged: Scope block in subagent briefs
+- 2026-09-29 — PR #9 merged: draft specs rewritten in slim format
+- 2026-09-27 — PRs #1–#8 merged: workflow setup, CI, test DB (BL-006), createApp, contract manifest, hooks,
+  spec-first pipeline tooling, module maps

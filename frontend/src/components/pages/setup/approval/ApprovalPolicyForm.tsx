@@ -164,7 +164,10 @@ export function ApprovalPolicyForm({
 											disabled={mode === "edit"}
 										>
 											<FormControl>
-												<SelectTrigger className="w-full">
+												<SelectTrigger
+													id="approval-policy-doc-type"
+													className="w-full"
+												>
 													<SelectValue placeholder="Doc type" />
 												</SelectTrigger>
 											</FormControl>
@@ -198,7 +201,10 @@ export function ApprovalPolicyForm({
 											}
 										>
 											<FormControl>
-												<SelectTrigger className="w-full">
+												<SelectTrigger
+													id="approval-policy-sub-doc-type"
+													className="w-full"
+												>
 													<SelectValue placeholder="Sub Doc Type (optional)" />
 												</SelectTrigger>
 											</FormControl>
@@ -220,28 +226,6 @@ export function ApprovalPolicyForm({
 									</FormItem>
 								)}
 							/>
-							{/* sale order linked dropdown */}
-							{/* <FormField
-								control={form.control}
-								name="isSaleOrderLinked"
-								render={({ field }) => (
-									<FormItem className="min-h-19">
-										<Select value={field.value} onValueChange={field.onChange}>
-											<FormControl>
-												<SelectTrigger className="w-full">
-													<SelectValue placeholder="SO linked" />
-												</SelectTrigger>
-											</FormControl>
-											<SelectContent>
-												<SelectItem value="any">Any</SelectItem>
-												<SelectItem value="yes">Yes</SelectItem>
-												<SelectItem value="no">No</SelectItem>
-											</SelectContent>
-										</Select>
-										<FormMessage />
-									</FormItem>
-								)}
-							/> */}
 							{/* minAmountPaise */}
 							<FormField
 								control={form.control}
@@ -254,6 +238,7 @@ export function ApprovalPolicyForm({
 												label="Min amount (₹)"
 												type="number"
 												min={0}
+												step="0.01"
 												{...field}
 											/>
 										</FormControl>
@@ -273,6 +258,7 @@ export function ApprovalPolicyForm({
 												label="Max amount (₹)"
 												type="number"
 												min={0}
+												step="0.01"
 												{...field}
 											/>
 										</FormControl>

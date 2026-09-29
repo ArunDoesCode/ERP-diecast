@@ -6,7 +6,6 @@
  */
 export const END_POINTS = {
   auth: {
-    register: "/register",
     login: "/login",
     refresh: "/refresh",
     logout: "/logout",
@@ -25,6 +24,8 @@ export const END_POINTS = {
     updateService: "/services/:id",
     listInventoryMovements: "/inventory/movements",
     createInventoryMovements: "/inventory/movements",
+    inventoryReconciliation: "/inventory/reconciliation",
+    inventoryStock: "/inventory/stock",
     listLocations: "/locations",
     createLocation: "/locations",
     updateLocation: "/locations/:id",
@@ -40,22 +41,25 @@ export const END_POINTS = {
       update: "/employees/:id",
       remove: "/employees/:id",
       generateQr: "/employees/:id/qr",
+      assignableRoles: "/employees/assignable-roles",
+      assignRole: "/employees/:id/role",
     },
     roles: {
       list: "/roles",
       create: "/roles",
       update: "/roles/:id",
       remove: "/roles/:id",
+      copy: "/roles/:id/copy",
+      getGrants: "/roles/:id/grants",
+      setGrants: "/roles/:id/grants",
     },
-    pages: {
-      list: "/pages",
-      create: "/pages",
-      update: "/pages/:id",
-      remove: "/pages/:id",
+    screens: {
+      list: "/screens",
+      update: "/screens/:key",
+      setRoles: "/screens/:key/roles",
     },
-    permissions: {
-      list: "/permissions",
-      updateForRole: "/roles/:roleId/permissions",
+    accessLog: {
+      list: "/access-log",
     },
   },
   supplier: {
@@ -69,6 +73,7 @@ export const END_POINTS = {
     listServices: "/:supplierId/listServices",
     createService: "/:supplierId/createService",
     editService: "/:supplierId/editService",
+    history: "/:supplierId/history",
   },
   pr: {
     list: "/getprs",
@@ -76,6 +81,7 @@ export const END_POINTS = {
     create: "/createpr",
     update: "/updatepr",
     remove: "/deletepr/:id",
+    cancelLine: "/:id/lines/:lineId/cancel",
   },
   po: {
     list: "/getpos",
@@ -90,6 +96,8 @@ export const END_POINTS = {
     confirm: "/:id/confirm",
     invoice: "/:id/invoice",
     close: "/:id/close",
+    shortClose: "/:id/short-close",
+    communications: "/:id/communications",
   },
   grn: {
     list: "/getgrns",
@@ -112,5 +120,6 @@ export const END_POINTS = {
     actOnRequest: "/actOnRequest/:id",
     getMyPendingApprovals: "/getMyPendingApprovals",
     getCurrentApprovalByDoc: "/getCurrentApprovalByDoc/:docType/:docId",
+    getApprovalHistory: "/getApprovalHistory/:docType/:docId",
   },
 } as const;

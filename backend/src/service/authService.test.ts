@@ -14,11 +14,11 @@
  */
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
+import { createApp } from "../app";
 import { db } from "../db/client";
 import { roles } from "../db/schemas/01_auth";
 import { employees } from "../db/schemas/03_hcm";
-import { verifyAccessToken } from "../lib/token";
-import { authRepository } from "../repository/authRepository";
+import { invalidateActor } from "../lib/auth-middleware";
 import { authService } from "./authService";
 
 const EMAIL = "test_bl018_refresh@diecast.test";
@@ -71,15 +71,19 @@ describe("authService.refresh — BR-AUTH-01: role/pages come from the DB, not t
       .set({ roleId: ownerRoleId })
       .where(eq(employees.id, employeeId));
 
-    const refreshed = await authService.refresh(login.refreshToken);
-    const payload = await verifyAccessToken(refreshed.accessToken);
+    invalidateActor(employeeId);
 
-    expect(payload.role).toBe("owner");
-    expect(payload.allowedPages).toEqual(
-      await authRepository.getPagesByRoleId(ownerRoleId),
-    );
-    // Never the previous token's role.
-    expect(payload.role).not.toBe("back_office");
+    const refreshed = await authService.refresh(login.refreshToken);
+    const me = await createApp().request("/api/auth/me", {
+      headers: { Authorization: `Bearer ${refreshed.accessToken}` },
+    });
+    const data = (
+      (await me.json()) as { data: { role: string; permissions: string[] } }
+    ).data;
+
+    // Spec v6 BR-AUTH-01: current DB record, shown by /auth/me (role and its keys).
+    expect(data.role).toBe("owner");
+    expect(data.permissions.length).toBeGreaterThan(0);
   });
 });
 

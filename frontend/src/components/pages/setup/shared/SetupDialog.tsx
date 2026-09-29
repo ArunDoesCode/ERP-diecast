@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
 import { EmployeeForm } from "@/components/pages/setup/employees/EmployeeForm";
-import { PageForm } from "@/components/pages/setup/pages/PageForm";
 import { RoleForm } from "@/components/pages/setup/roles/RoleForm";
 import {
 	Dialog,
@@ -12,23 +11,14 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import type {
-	Employee,
-	EmployeeInput,
-	Page,
-	PageInput,
-	Role,
-	RoleInput,
-} from "@/types/setup";
+import type { Employee, EmployeeInput, Role, RoleInput } from "@/types/setup";
 
 export type SetupModalState =
 	| { open: false }
 	| { open: true; entity: "employee"; mode: "create" }
 	| { open: true; entity: "employee"; mode: "edit"; data: Employee }
 	| { open: true; entity: "role"; mode: "create" }
-	| { open: true; entity: "role"; mode: "edit"; data: Role }
-	| { open: true; entity: "page"; mode: "create" }
-	| { open: true; entity: "page"; mode: "edit"; data: Page };
+	| { open: true; entity: "role"; mode: "edit"; data: Role };
 
 type SetupDialogProps = {
 	modal: SetupModalState;
@@ -51,20 +41,9 @@ function toRoleInput(role: Role): RoleInput {
 	return { name: role.name };
 }
 
-function toPageInput(page: Page): PageInput {
-	return {
-		key: page.key,
-		label: page.label,
-		path: page.path,
-		sortOrder: page.sortOrder,
-		moduleId: page.moduleId,
-	};
-}
-
-const ENTITY_LABEL: Record<"employee" | "role" | "page", string> = {
+const ENTITY_LABEL: Record<"employee" | "role", string> = {
 	employee: "Employee",
 	role: "Role",
-	page: "Page",
 };
 
 export function SetupDialog({ modal, onClose }: SetupDialogProps) {
@@ -139,21 +118,6 @@ export function SetupDialog({ modal, onClose }: SetupDialogProps) {
 										isSystem={
 											modal.mode === "edit" ? modal.data.isSystem : false
 										}
-										onDirtyChange={setIsDirty}
-										onDone={onClose}
-									/>
-								)}
-
-								{modal.entity === "page" && (
-									<PageForm
-										key={`page-${modal.mode}-${modal.mode === "edit" ? modal.data.id : "new"}`}
-										mode={modal.mode}
-										defaultValues={
-											modal.mode === "edit"
-												? toPageInput(modal.data)
-												: undefined
-										}
-										pageId={modal.mode === "edit" ? modal.data.id : undefined}
 										onDirtyChange={setIsDirty}
 										onDone={onClose}
 									/>

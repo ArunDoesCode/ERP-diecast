@@ -19,7 +19,7 @@ import { employees } from "./03_hcm";
 export type ApprovalChainStep = {
   level: number;
   approverType: "role" | "specific";
-  role?: string | undefined; // e.g. "store_manager", "production_head", "owner"
+  role?: string | undefined; // role name, e.g. "store_manager"
   employeeId?: number | undefined; // specific person (for owner in small factories)
 };
 
@@ -147,6 +147,7 @@ export const approvalRequests = pgTable(
     uniqueOpenRequestPerDoc: uniqueIndex("uq_open_approval_request_per_doc")
       .on(table.docType, table.docId)
       .where(sql`${table.status} = 'pending_approval'`),
+    docIdx: index("idx_approval_requests_doc").on(table.docType, table.docId),
     statusRoleIdx: index("idx_approval_requests_status_role").on(
       table.status,
       table.currentApproverRole,

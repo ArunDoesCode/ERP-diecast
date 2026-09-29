@@ -16,14 +16,14 @@ type CreateSupplierModalProps = {
 function defaultValues(): SupplierMasterInput {
 	return {
 		name: "",
-		type: undefined,
+		type: "raw_material",
 		gstNumber: "",
 		panNumber: "",
 		contactPerson: "",
 		email: "",
 		phone: "",
 		address: "",
-		defaultPaymentTermsDays: undefined,
+		defaultPaymentTermsDays: 0,
 		isActive: true,
 	};
 }
@@ -36,11 +36,10 @@ export function CreateSupplierModal({
 
 	return (
 		<SupplierMasterModal
-			mode="create"
 			open={open}
 			onOpenChange={onOpenChange}
 			title="Create supplier"
-			description="Add supplier master details only. Items and services are managed from the supplier detail page."
+			description="Only the name is required. Items and services are managed from the supplier detail page."
 			submitLabel="Create supplier"
 			defaultValues={defaultValues()}
 			isSubmitting={createMutation.isPending}

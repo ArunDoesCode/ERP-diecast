@@ -5,15 +5,20 @@ import type {
 	AssetItemOption,
 	AssetLookupParams,
 	AssetServiceOption,
+	BatchEditResponse,
 	PaginatedResponse,
 	Supplier,
 	SupplierCreatePayload,
 	SupplierDetailPayload,
+	SupplierHistoryParams,
+	SupplierHistoryRow,
+	SupplierItem,
 	SupplierItemCreatePayload,
 	SupplierItemEditPayload,
 	SupplierListParams,
 	SupplierMasterUpdatePayload,
 	SupplierOfferingListParams,
+	SupplierService,
 	SupplierServiceCreatePayload,
 	SupplierServiceEditPayload,
 } from "@/types/suppliers";
@@ -82,20 +87,10 @@ export function editSupplierItem(
 	supplierId: number,
 	payload: SupplierItemEditPayload | SupplierItemEditPayload[],
 ) {
-	return api.patch<
-		ApiResult<
-			| SupplierDetailPayload["supplierItems"][number]
-			| {
-					data: Array<{
-						index: number;
-						success: boolean;
-						data?: SupplierDetailPayload["supplierItems"][number];
-						error?: string;
-					}>;
-			  }
-		>,
-		typeof payload
-	>(API_ROUTES.suppliers.editItem(supplierId), payload);
+	return api.patch<BatchEditResponse<SupplierItem>, typeof payload>(
+		API_ROUTES.suppliers.editItem(supplierId),
+		payload,
+	);
 }
 
 export function getSupplierServices(
@@ -121,25 +116,24 @@ export function editSupplierService(
 	supplierId: number,
 	payload: SupplierServiceEditPayload | SupplierServiceEditPayload[],
 ) {
-	return api.patch<
-		ApiResult<
-			| SupplierDetailPayload["supplierServices"][number]
-			| {
-					data: Array<{
-						index: number;
-						success: boolean;
-						data?: SupplierDetailPayload["supplierServices"][number];
-						error?: string;
-					}>;
-			  }
-		>,
-		typeof payload
-	>(API_ROUTES.suppliers.editService(supplierId), payload);
+	return api.patch<BatchEditResponse<SupplierService>, typeof payload>(
+		API_ROUTES.suppliers.editService(supplierId),
+		payload,
+	);
+}
+
+export function getSupplierHistory(
+	supplierId: number,
+	params?: SupplierHistoryParams,
+) {
+	return api.get<PaginatedResponse<SupplierHistoryRow>>(
+		`${API_ROUTES.suppliers.history(supplierId)}${toQueryString(params)}`,
+	);
 }
 
 export function getAssetItems(params?: AssetLookupParams) {
 	return api.get<PaginatedResponse<AssetItemOption>>(
-		`${API_ROUTES.assets.items}${toQueryString(params)}`,
+		`${API_ROUTES.assets.items}${toQueryString({ ...params, isActive: true })}`,
 	);
 }
 

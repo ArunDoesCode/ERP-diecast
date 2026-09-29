@@ -1,45 +1,16 @@
 import { and, eq, gt } from "drizzle-orm";
 
 import { db } from "../db/client";
-import { pages, refreshTokens, rolePages, roles } from "../db/schemas/01_auth";
+import {
+  refreshTokens,
+  rolePermissions,
+  roles,
+  screens,
+} from "../db/schemas/01_auth";
 import { employees } from "../db/schemas/03_hcm";
-
-type CreateEmployeeInput = {
-  name: string;
-  email: string;
-  phone?: string;
-  roleId: number;
-  passwordHash: string;
-};
+import type { DbExecutor } from "./executor";
 
 export const authRepository = {
-  async getRoleByName(roleName: string) {
-    const [role] = await db
-      .select()
-      .from(roles)
-      .where(eq(roles.name, roleName))
-      .limit(1);
-    return role;
-  },
-
-  async getEmployeeByEmail(email: string) {
-    const [employee] = await db
-      .select({ id: employees.id })
-      .from(employees)
-      .where(eq(employees.email, email))
-      .limit(1);
-    return employee;
-  },
-
-  async createEmployee(data: CreateEmployeeInput) {
-    const [employee] = await db.insert(employees).values(data).returning({
-      id: employees.id,
-      name: employees.name,
-      email: employees.email,
-    });
-    return employee;
-  },
-
   async getEmployeeWithRoleByEmail(email: string) {
     const [row] = await db
       .select({
@@ -72,14 +43,45 @@ export const authRepository = {
     return row;
   },
 
-  async getPagesByRoleId(roleId: number) {
-    const pageRows = await db
-      .select({ key: pages.key })
-      .from(pages)
-      .innerJoin(rolePages, eq(rolePages.pageId, pages.id))
-      .where(eq(rolePages.roleId, roleId))
-      .orderBy(pages.sortOrder);
-    return pageRows.map((p) => p.key);
+  /** Employee + role regardless of active flag (BR-AUTH-12 decides in the caller). */
+  async getEmployeeRoleById(id: number) {
+    const [row] = await db
+      .select({
+        id: employees.id,
+        name: employees.name,
+        email: employees.email,
+        isActive: employees.isActive,
+        roleId: employees.roleId,
+        roleName: roles.name,
+        roleIsSystem: roles.isSystem,
+      })
+      .from(employees)
+      .innerJoin(roles, eq(roles.id, employees.roleId))
+      .where(eq(employees.id, id))
+      .limit(1);
+    return row;
+  },
+
+  async getPermissionKeysByRoleId(roleId: number) {
+    const rows = await db
+      .select({ key: rolePermissions.permissionKey })
+      .from(rolePermissions)
+      .where(eq(rolePermissions.roleId, roleId));
+    return rows.map((r) => r.key);
+  },
+
+  async listScreens() {
+    return db
+      .select({
+        key: screens.key,
+        path: screens.path,
+        label: screens.label,
+        menuGroup: screens.menuGroup,
+        sortOrder: screens.sortOrder,
+        permissionKey: screens.permissionKey,
+      })
+      .from(screens)
+      .orderBy(screens.sortOrder, screens.key);
   },
 
   async storeRefreshToken(data: {
@@ -90,22 +92,31 @@ export const authRepository = {
     await db.insert(refreshTokens).values(data);
   },
 
-  async getRefreshTokenByHash(tokenHash: string) {
-    const [token] = await db
-      .select()
-      .from(refreshTokens)
+  /**
+   * Atomic single-use gate for rotation (BR-AUTH-05): returns the row only to
+   * the one caller whose DELETE actually removed it.
+   */
+  async consumeRefreshToken(tokenHash: string) {
+    const [row] = await db
+      .delete(refreshTokens)
       .where(
         and(
           eq(refreshTokens.tokenHash, tokenHash),
           gt(refreshTokens.expiresAt, new Date()),
         ),
       )
-      .limit(1);
-    return token;
+      .returning({ id: refreshTokens.id });
+    return row;
   },
 
-  async deleteRefreshToken(tokenId: number) {
-    await db.delete(refreshTokens).where(eq(refreshTokens.id, tokenId));
+  /** Revokes every session of one employee (password / method change, deactivation). */
+  async deleteRefreshTokensByEmployee(
+    employeeId: number,
+    exec: DbExecutor = db,
+  ) {
+    await exec
+      .delete(refreshTokens)
+      .where(eq(refreshTokens.employeeId, employeeId));
   },
 
   async deleteRefreshTokenByHash(tokenHash: string) {

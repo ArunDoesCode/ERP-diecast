@@ -20,6 +20,8 @@ import type {
 	AssetServiceCreatePayload,
 	AssetServiceListParams,
 	AssetServiceUpdatePayload,
+	AssetStockListParams,
+	AssetStockRow,
 	Ok,
 	PaginatedResponse,
 } from "@/types/asset";
@@ -92,6 +94,12 @@ export function createMovement(payload: AssetMovementCreatePayload) {
 	return api.post<Ok<AssetMovement>, AssetMovementCreatePayload>(
 		API_ROUTES.assets.inventory.movements.create,
 		payload,
+	);
+}
+
+export function getStock(params?: AssetStockListParams) {
+	return api.get<PaginatedResponse<AssetStockRow>>(
+		`${API_ROUTES.assets.inventory.stock}${toQueryString(params)}`,
 	);
 }
 

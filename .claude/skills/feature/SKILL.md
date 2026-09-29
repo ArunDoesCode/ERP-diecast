@@ -21,10 +21,11 @@ limit hit, (c) the PR is ready. Everything else you decide and record.
 ## Phase 0 — Preflight
 1. Spec gate: `docs/specs/<module>.md` has `status: frozen`. If not → stop: "run `/spec` then `/freeze`".
 2. `gh auth status` works, `git status` clean on the base. Base = `--base` or `main`.
-3. Feature id: `<module>` or `<module>-<sub>`. Branch: `feature/<id>` (sub-features of an epic:
-   `feature/<epic>--<sub>` with base `epic/<epic>`).
-4. Worktree: `git worktree add -b feature/<id> .claude/worktrees/<id> <base>` then EnterWorktree with that
-   path (on `--resume`: EnterWorktree the existing path; recreate from the remote branch if missing).
+3. Feature id: `<module>` or `<module>-<sub>` (used for `.pipeline/<id>/` and commit scopes only).
+4. Branch + worktree: use the **working branch** in the shared worktree (root `CLAUDE.md` → Git):
+   EnterWorktree `path=.claude/worktrees/bl-006-test-db`; if its branch is `work/<theme>`, build on it.
+   Only if no working branch exists, create `work/<theme>` there from fresh `origin/main`. Never create a
+   per-feature branch or worktree. Epic sub-features are the one exception (`feature/<epic>--<sub>`).
 5. Infra: `cd backend && docker compose up -d && bun run db:push && bun run db:test:prepare`.
 6. Create `.pipeline/<id>/` (state.json, plan.md, findings.md, questions.md). On `--resume` read them and
    continue from `state.json.phase` — never re-plan or re-explore a resumed run.
@@ -94,8 +95,11 @@ loop:
      matching skill, one line — only if it would have prevented a finding. Respect budgets in `docs/KNOWLEDGE.md`.
    - `docs/STATUS.md` — module row + Active pipelines (phase: pr).
    Commit: `docs(<id>): module map, spec status, backlog`.
-1. `git push -u origin feature/<id>`.
-2. `gh pr create --base <base> --head feature/<id> --label agent-pipeline --title "<id>: <summary>"` with body:
+0. **Batch, don't ship each feature.** By default stop here: tell the user the feature is done and
+   committed on the working branch, and ask whether to add more items or open the PR now. Push and open a
+   PR only when the user says so; one PR then covers every item on the branch (a section per item).
+1. `git push -u origin <working branch>`.
+2. `gh pr create --base <base> --head <working branch> --label agent-pipeline --title "<theme>: <summary>"` with body:
    - Spec + version, BR coverage table (BR | enforced at | test)
    - What changed (backend / frontend), contract changes (from `contract.md`)
    - Audit summary: security / performance / code review — fixed, backlogged, rejected (with reason)
@@ -128,6 +132,7 @@ loop:
    what changed (written by test-writer, checklist mode). Update `lastProcessedCommentAt`.
 
 ## After merge (detected by /watch-prs)
-Docs already merged with the PR (Phase 4 step 0). Remove the worktree (`git worktree remove`), note the merge
-in `docs/STATUS.md` "Recently done" (it rides along in the next PR — don't commit to `main`), and if part of
-an epic, hand back to `/epic` for the next sub-feature.
+Docs already merged with the PR (Phase 4 step 0). Keep the worktree: switch it to a new working branch from
+fresh `origin/main` (`git switch -c work/<next-theme> origin/main`) and delete the merged branch locally.
+Note the merge in `docs/STATUS.md` "Recently done" as the first commit of the new branch (never its own PR).
+If part of an epic, hand back to `/epic` for the next sub-feature.

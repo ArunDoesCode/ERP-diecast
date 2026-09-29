@@ -1,4 +1,4 @@
-import { createSelectSchema, createUpdateSchema } from "drizzle-zod";
+import { createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 import {
   poCommunicationChannelEnum,
@@ -16,6 +16,37 @@ export type poStatusSchemaType = z.infer<typeof poStatusSchema>;
 export const poSchema = createSelectSchema(purchaseOrders);
 export type poSchemaType = z.infer<typeof poSchema>;
 
+// BR-SUP-13 / BR-PO-04: allowed GST % values.
+export const gstPercentSchema = z.union([
+  z.literal(0),
+  z.literal(0.1),
+  z.literal(0.25),
+  z.literal(1.5),
+  z.literal(3),
+  z.literal(5),
+  z.literal(12),
+  z.literal(18),
+  z.literal(28),
+  z.literal(40),
+]);
+export type gstPercentSchemaType = z.infer<typeof gstPercentSchema>;
+
+// PO row as returned: the stored columns (cancel / short-close / invoice who and
+// when, BR-PO-11, 13, 21) plus the canceller's name and the due date (BR-PO-19).
+export const poResponseSchema = poSchema.extend({
+  cancelledByName: z.string().nullable(),
+  // BR-PO-19: revisedDeliveryDate if set, else expectedDeliveryDate.
+  dueDate: z.date().nullable(),
+});
+export type poResponseSchemaType = z.infer<typeof poResponseSchema>;
+
+// Per-line GST fields (BR-PO-04).
+export const poItemGstSchema = z.object({
+  gstPercent: gstPercentSchema,
+  lineValuePaise: z.number().int(),
+  lineTaxPaise: z.number().int(),
+});
+
 // Response shape for a stored purchase order item row (write-side projection).
 export const poItemSchema = createSelectSchema(purchaseOrderItems).pick({
   id: true,
@@ -30,18 +61,20 @@ export type poItemSchemaType = z.infer<typeof poItemSchema>;
 
 // PO item row joined with item master + originating PR fields, as returned
 // by getDetails, for traceability back to the source PR line.
-export const poItemDetailSchema = poItemSchema.extend({
-  itemSku: z.string(),
-  itemName: z.string(),
-  itemCategory: z.string(),
-  prItemId: z.number().int().nullable(),
-  prNumber: z.string().nullable(),
-});
+export const poItemDetailSchema = poItemSchema
+  .extend(poItemGstSchema.shape)
+  .extend({
+    itemSku: z.string(),
+    itemName: z.string(),
+    itemCategory: z.string(),
+    prItemId: z.number().int().nullable(),
+    prNumber: z.string().nullable(),
+  });
 export type poItemDetailSchemaType = z.infer<typeof poItemDetailSchema>;
 
 // GET /po/getpodetails/:id response payload.
 export const poDetailsSchema = z.object({
-  po: poSchema,
+  po: poResponseSchema,
   items: z.array(poItemDetailSchema),
 });
 export type poDetailsSchemaType = z.infer<typeof poDetailsSchema>;
@@ -49,14 +82,15 @@ export type poDetailsSchemaType = z.infer<typeof poDetailsSchema>;
 // PATCH /po/updatepo response payload — po plus only the items touched by
 // this update (inserts/updates), not the full item list.
 export const poUpdateResultSchema = z.object({
-  po: poSchema,
-  items: z.array(poItemSchema),
+  po: poResponseSchema,
+  items: z.array(poItemSchema.extend(poItemGstSchema.shape)),
 });
 export type poUpdateResultSchemaType = z.infer<typeof poUpdateResultSchema>;
 
 export const createPoSchema = z.object({
   supplierId: z.number().int().positive(),
-  paymentTermsDays: z.number().int().min(0).optional(),
+  // BR-PO-23: whole days 0-365; omitted = copy the supplier's default terms.
+  paymentTermsDays: z.number().int().min(0).max(365).optional(),
   deliveryTerms: z.string().max(500).optional(),
   expectedDeliveryDate: z.coerce.date().optional(),
   notes: z.string().max(2000).optional(),
@@ -64,7 +98,11 @@ export const createPoSchema = z.object({
     .array(
       z.object({
         prItemId: z.number().int().positive(),
-        unitPricePaise: z.number().int().nonnegative(),
+        // BR-PO-03: paise, >= 1. Omitted = the supplier price suggestion
+        // (last PO rate, else price list, else average cost); editable in draft.
+        unitPricePaise: z.number().int().min(1).optional(),
+        // BR-PO-04: omitted = supplier's active price-list GST % (else 0).
+        gstPercent: gstPercentSchema.optional(),
       }),
     )
     .min(1),
@@ -74,7 +112,8 @@ export type createPoSchemaType = z.infer<typeof createPoSchema>;
 // A new line added on update — pulls in a not-yet-drafted PR item.
 export const updatePoInsertItemSchema = z.object({
   prItemId: z.number().int().positive(),
-  unitPricePaise: z.number().int().nonnegative(),
+  unitPricePaise: z.number().int().min(1).optional(),
+  gstPercent: gstPercentSchema.optional(),
 });
 export type updatePoInsertItemSchemaType = z.infer<
   typeof updatePoInsertItemSchema
@@ -84,7 +123,8 @@ export type updatePoInsertItemSchemaType = z.infer<
 // remaining PR-item quantity at draft time).
 export const updatePoUpdateItemSchema = z.object({
   id: z.number().int().positive(),
-  unitPricePaise: z.number().int().nonnegative(),
+  unitPricePaise: z.number().int().min(1).optional(),
+  gstPercent: gstPercentSchema.optional(),
 });
 export type updatePoUpdateItemSchemaType = z.infer<
   typeof updatePoUpdateItemSchema
@@ -94,19 +134,12 @@ export const updatePoDeleteItemSchema = z.object({
   id: z.number().int().positive(),
 });
 
-const poUpdateBaseSchema = createUpdateSchema(purchaseOrders, {
-  paymentTermsDays: z.number().int().min(0).nullable(),
-  deliveryTerms: z.string().max(500).nullable(),
-  notes: z.string().max(2000).nullable(),
-  expectedDeliveryDate: z.coerce.date().nullable(),
-});
-
-export const updatePoSchema = poUpdateBaseSchema
-  .pick({
-    paymentTermsDays: true,
-    deliveryTerms: true,
-    notes: true,
-    expectedDeliveryDate: true,
+export const updatePoSchema = z
+  .object({
+    paymentTermsDays: z.number().int().min(0).max(365).optional(),
+    deliveryTerms: z.string().max(500).nullish(),
+    notes: z.string().max(2000).nullish(),
+    expectedDeliveryDate: z.coerce.date().nullish(),
   })
   .extend({
     poId: z.number().int().positive(),
@@ -175,11 +208,10 @@ export const poListQuerySchema = z
 
 export type poListQuerySchemaType = z.infer<typeof poListQuerySchema>;
 
-// DELETE /po/deletepo/:id body. `reason` is required by poService.cancel
-// whenever the PO's current status isn't `draft` — the schema can't see the
-// PO's status, so that conditional check lives in the service layer.
+// Cancel body (DELETE /po/deletepo/:id). BR-PO-11: reason is required for
+// every status (draft included), trimmed 3-500 chars, else 400.
 export const cancelPoSchema = z.object({
-  reason: z.string().min(1).max(500).optional(),
+  reason: z.string().trim().min(3).max(500),
 });
 export type cancelPoSchemaType = z.infer<typeof cancelPoSchema>;
 
@@ -230,16 +262,17 @@ export type logPoCommunicationSchemaType = z.infer<
 
 // PATCH /po/:id/delay — expectedDeliveryDate itself is never overwritten;
 // this only records the supplier's revised promise + why.
+// BR-PO-16: both required; only on dispatched / partial_received.
 export const updatePoDelaySchema = z.object({
-  revisedDeliveryDate: z.coerce.date().optional(),
-  delayReason: z.string().max(1000).optional(),
+  revisedDeliveryDate: z.coerce.date(),
+  delayReason: z.string().trim().min(1).max(1000),
 });
 export type updatePoDelaySchemaType = z.infer<typeof updatePoDelaySchema>;
 
 // POST /po/:id/confirm — supplier confirmation of the PO, never blocks a
 // status transition.
 export const confirmPoSchema = z.object({
-  confirmationMethod: z.string().min(1).max(200),
+  confirmationMethod: poCommunicationChannelSchema,
   note: z.string().max(1000).optional(),
 });
 export type confirmPoSchemaType = z.infer<typeof confirmPoSchema>;
@@ -248,7 +281,7 @@ export type confirmPoSchemaType = z.infer<typeof confirmPoSchema>;
 // PO and moves it to `invoiced`. Full 3-way-match/payment workflow is a
 // future AP feature; this only creates the supplierInvoices row.
 export const markPoInvoicedSchema = z.object({
-  invoiceNumber: z.string().min(1).max(100),
+  invoiceNumber: z.string().trim().min(1).max(100),
   invoiceDate: z.coerce.date(),
   billedAmountPaise: z.number().int().nonnegative(),
   dueDate: z.coerce.date().optional(),
@@ -261,3 +294,18 @@ export const closePoSchema = z.object({
   note: z.string().max(1000).optional(),
 });
 export type closePoSchemaType = z.infer<typeof closePoSchema>;
+
+// POST /po/:id/short-close (BR-PO-13): partial_received -> closed as a whole;
+// open qty dropped, PR lines -> closed. Reason trimmed 3-500 chars, else 400.
+export const shortClosePoSchema = z.object({
+  reason: z.string().trim().min(3).max(500),
+});
+export type shortClosePoSchemaType = z.infer<typeof shortClosePoSchema>;
+
+// GET /po/:id/communications (BR-PO-08, 17, 21): the PO log, newest first.
+export const poCommunicationDetailSchema = poCommunicationSchema.extend({
+  sentByName: z.string().nullable(),
+});
+export type poCommunicationDetailSchemaType = z.infer<
+  typeof poCommunicationDetailSchema
+>;

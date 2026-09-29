@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 import {
+	ApprovalActionDialog,
+	type InboxAction,
+} from "@/components/pages/approval/ApprovalActionDialog";
+import {
 	ApprovalCards,
 	ApprovalCardsSkeleton,
 	type PendingApprovalAction,
@@ -46,6 +50,11 @@ function ApprovalList({ employeeId }: ApprovalListProps) {
 		id: number;
 		action: PendingApprovalAction;
 	} | null>(null);
+	// Request waiting for its comment dialog (BR-APR-37).
+	const [dialogRequest, setDialogRequest] = useState<{
+		approval: ApprovalRequestSummary;
+		action: InboxAction;
+	} | null>(null);
 
 	const approvalsQuery = useMyPendingApprovalsQuery({
 		page,
@@ -64,10 +73,17 @@ function ApprovalList({ employeeId }: ApprovalListProps) {
 		approval: ApprovalRequestSummary,
 		action: PendingApprovalAction,
 	) {
+		setDialogRequest({ approval, action });
+	}
+
+	function confirmAction(notes: string) {
+		if (!dialogRequest) return;
+		const { approval, action } = dialogRequest;
 		setActingRequest({ id: approval.id, action });
 		actionMutation.mutate(
-			{ id: approval.id, input: { action } },
+			{ id: approval.id, input: { action, notes: notes || undefined } },
 			{
+				onSuccess: () => setDialogRequest(null),
 				onSettled: () => {
 					setActingRequest(null);
 				},
@@ -162,7 +178,21 @@ function ApprovalList({ employeeId }: ApprovalListProps) {
 				isLoading={approvalsQuery.isLoading}
 				actingRequest={actingRequest}
 				isActing={actionMutation.isPending}
+				currentUserId={employeeId}
 				onAction={actOnRequest}
+			/>
+
+			<ApprovalActionDialog
+				key={
+					dialogRequest
+						? `${dialogRequest.approval.id}-${dialogRequest.action}`
+						: "closed"
+				}
+				action={dialogRequest?.action ?? null}
+				docNumber={dialogRequest?.approval.docSummary.docNumber ?? ""}
+				isPending={actionMutation.isPending}
+				onConfirm={confirmAction}
+				onClose={() => setDialogRequest(null)}
 			/>
 
 			<ApprovalPagination

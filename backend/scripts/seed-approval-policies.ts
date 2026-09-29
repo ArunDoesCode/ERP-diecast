@@ -8,11 +8,12 @@
  *
  * Usage: `bun run db:seed:approval-policies`
  */
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db, disconnectDb } from "../src/db/client";
 import { roles } from "../src/db/schemas/01_auth";
 import { approvalPolicies } from "../src/db/schemas/02_procurement-approval";
 import { employees } from "../src/db/schemas/03_hcm";
+import { fallbackPolicyName } from "../src/lib/approval-fallback";
 import { createApprovalPolicySchema } from "../src/types/approval.types";
 
 const POLICIES: ReadonlyArray<
@@ -51,8 +52,7 @@ const POLICIES: ReadonlyArray<
     isActive: true,
     priority: 3,
     docType: "pr",
-    subDocType: "any",
-    isSaleOrderLinked: true,
+    subDocType: "sale_order",
     maxAmountPaise: 5_000_000,
     autoApprove: false,
     approvalChain: [{ level: 1, approverType: "role", role: "back_office" }],
@@ -64,8 +64,7 @@ const POLICIES: ReadonlyArray<
     isActive: true,
     priority: 4,
     docType: "pr",
-    subDocType: "any",
-    isSaleOrderLinked: true,
+    subDocType: "sale_order",
     minAmountPaise: 5_000_000,
     autoApprove: false,
     approvalChain: [
@@ -233,39 +232,60 @@ const POLICIES: ReadonlyArray<
       { level: 2, approverType: "role", role: "owner" },
     ],
   },
-
-  // ─── Fallbacks (priority 99, catch-all) ─────────────────────────────────
-  {
-    name: "PR Fallback - Owner Review",
-    description: "Fallback policy for any unmatched PR - routes to owner",
-    isActive: true,
-    priority: 99,
-    docType: "pr",
-    subDocType: "any",
-    autoApprove: false,
-    approvalChain: [{ level: 1, approverType: "role", role: "owner" }],
-  },
-  {
-    name: "PO Fallback - Owner Review",
-    description: "Fallback policy for any unmatched PO - routes to owner",
-    isActive: true,
-    priority: 99,
-    docType: "po",
-    subDocType: "any",
-    autoApprove: false,
-    approvalChain: [{ level: 1, approverType: "role", role: "owner" }],
-  },
-  {
-    name: "SCO Fallback - Owner Review",
-    description: "Fallback policy for any unmatched SCO - routes to owner",
-    isActive: true,
-    priority: 99,
-    docType: "sco",
-    subDocType: "any",
-    autoApprove: false,
-    approvalChain: [{ level: 1, approverType: "role", role: "owner" }],
-  },
 ].map((policy) => createApprovalPolicySchema.parse(policy));
+
+const FALLBACK_DOC_TYPES = ["pr", "po", "sco"] as const;
+
+/**
+ * BR-APR-22 / F-APR-1: the built-in fallback (one level, role owner) is seed data.
+ * One inactive record per doc type so it never competes as a candidate; the service
+ * only reads it (by `fallbackPolicyName`). Idempotent; `createdBy` may be null.
+ */
+export async function seedFallbackPolicies(actorId: number | null) {
+  for (const docType of FALLBACK_DOC_TYPES) {
+    const values = {
+      name: fallbackPolicyName(docType),
+      description: "Built-in fallback when no active policy matches (inactive)",
+      isActive: false,
+      priority: 9999,
+      docType,
+      subDocType: "any" as const,
+      minAmountPaise: null,
+      maxAmountPaise: null,
+      autoApprove: false,
+      approvalLevels: 1,
+      approvalChain: [
+        { level: 1, approverType: "role" as const, role: "owner" },
+      ],
+      createdBy: actorId,
+      lastUpdatedBy: actorId,
+    };
+    const [existing] = await db
+      .select({ id: approvalPolicies.id })
+      .from(approvalPolicies)
+      .where(
+        and(
+          eq(approvalPolicies.name, values.name),
+          eq(approvalPolicies.docType, docType),
+          eq(approvalPolicies.isActive, false),
+        ),
+      )
+      .limit(1);
+
+    if (existing) {
+      await db
+        .update(approvalPolicies)
+        .set({
+          approvalLevels: values.approvalLevels,
+          approvalChain: values.approvalChain,
+          lastUpdatedAt: new Date(),
+        })
+        .where(eq(approvalPolicies.id, existing.id));
+    } else {
+      await db.insert(approvalPolicies).values(values);
+    }
+  }
+}
 
 async function findSeedActorId(): Promise<number> {
   const [row] = await db
@@ -295,7 +315,6 @@ async function main() {
       priority: policy.priority,
       docType: policy.docType,
       subDocType: policy.subDocType,
-      isSaleOrderLinked: policy.isSaleOrderLinked ?? null,
       minAmountPaise: policy.minAmountPaise ?? null,
       maxAmountPaise: policy.maxAmountPaise ?? null,
       autoApprove: policy.autoApprove ?? false,
@@ -321,7 +340,6 @@ async function main() {
           name: values.name,
           description: values.description,
           isActive: values.isActive,
-          isSaleOrderLinked: values.isSaleOrderLinked,
           minAmountPaise: values.minAmountPaise,
           maxAmountPaise: values.maxAmountPaise,
           autoApprove: values.autoApprove,
@@ -335,12 +353,18 @@ async function main() {
     console.log(`Seeded: ${values.name}`);
   }
 
-  console.log(`Done — ${POLICIES.length} approval policies seeded.`);
+  await seedFallbackPolicies(actorId);
+
+  console.log(
+    `Done — ${POLICIES.length} approval policies and ${FALLBACK_DOC_TYPES.length} fallbacks seeded.`,
+  );
 }
 
-main()
-  .catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-  })
-  .finally(() => disconnectDb());
+if (import.meta.main) {
+  main()
+    .catch((error) => {
+      console.error(error);
+      process.exitCode = 1;
+    })
+    .finally(() => disconnectDb());
+}

@@ -11,7 +11,6 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import {
 	Select,
 	SelectContent,
@@ -23,11 +22,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { useConfirmPoMutation } from "@/lib/api/purchase-orders/queries";
 
 const CONFIRMATION_METHOD_OPTIONS = [
-	{ value: "phone call", label: "Phone call" },
-	{ value: "email reply", label: "Email reply" },
+	{ value: "phone", label: "Phone call" },
+	{ value: "email", label: "Email" },
 	{ value: "whatsapp", label: "WhatsApp" },
-	{ value: "in person", label: "In person" },
-	{ value: "other", label: "Other" },
+	{ value: "in_person", label: "In person" },
 ];
 
 export function ConfirmPoDialog({
@@ -43,16 +41,14 @@ export function ConfirmPoDialog({
 	onOpenChange: (open: boolean) => void;
 	onConfirmed: () => void;
 }) {
-	const [method, setMethod] = useState("phone call");
-	const [customMethod, setCustomMethod] = useState("");
+	const [method, setMethod] = useState("phone");
 	const [note, setNote] = useState("");
 	const mutation = useConfirmPoMutation();
 
-	const confirmationMethod = method === "other" ? customMethod.trim() : method;
+	const confirmationMethod = method;
 
 	function reset() {
-		setMethod("phone call");
-		setCustomMethod("");
+		setMethod("phone");
 		setNote("");
 	}
 
@@ -115,23 +111,6 @@ export function ConfirmPoDialog({
 							</SelectContent>
 						</Select>
 					</div>
-
-					{method === "other" ? (
-						<div>
-							<label
-								htmlFor="po-confirm-method-detail"
-								className="mb-1 block text-xs font-medium"
-							>
-								Method detail
-							</label>
-							<Input
-								id="po-confirm-method-detail"
-								value={customMethod}
-								onChange={(event) => setCustomMethod(event.target.value)}
-								placeholder="How was it confirmed?"
-							/>
-						</div>
-					) : null}
 
 					<div>
 						<label

@@ -1,8 +1,23 @@
-import { and, asc, count, desc, eq, ilike, inArray, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  ne,
+  sql,
+} from "drizzle-orm";
 
 import { db } from "../db/client";
-import { itemMaster, locations } from "../db/schemas/02_procurement-catalog";
 import {
+  inventoryLedger,
+  itemMaster,
+  locations,
+} from "../db/schemas/02_procurement-catalog";
+import {
+  grnCorrections,
   grnItems,
   grns,
   purchaseOrderItems,
@@ -43,6 +58,7 @@ const grnItemColumns = {
   qaBypassReason: grnItems.qaBypassReason,
   qaBypassedBy: grnItems.qaBypassedBy,
   challanPhotoUrl: grnItems.challanPhotoUrl,
+  batchNumber: grnItems.batchNumber,
 };
 
 const grnItemDetailColumns = {
@@ -77,6 +93,7 @@ export type CreateGrnData = Pick<
 export type CreateGrnLineData = {
   poItemId: number;
   arrivedQty: number;
+  batchNumber?: string | null;
 };
 
 export type UpdateGrnHeaderData = Partial<
@@ -103,8 +120,8 @@ export const grnRepository = {
   // GRN header has no locationId column (deliberate — see build plan).
   // Every GRN posts to the first `main_store` location; throws if none is
   // configured rather than silently defaulting to null.
-  async findDefaultReceivingLocationId() {
-    const [row] = await db
+  async findDefaultReceivingLocationId(tx?: Tx) {
+    const [row] = await (tx ?? db)
       .select({ id: locations.id })
       .from(locations)
       .where(eq(locations.type, "main_store"))
@@ -146,6 +163,7 @@ export const grnRepository = {
         itemId: purchaseOrderItems.itemId,
         qty: purchaseOrderItems.qty,
         receivedQty: purchaseOrderItems.receivedQty,
+        uom: purchaseOrderItems.uom,
       })
       .from(purchaseOrderItems)
       .where(
@@ -156,8 +174,68 @@ export const grnRepository = {
       );
   },
 
+  // Unit of each line of a GRN (from its PO line), keyed by GRN line id.
+  async findLineUoms(grnId: number) {
+    const rows = await db
+      .select({ id: grnItems.id, uom: purchaseOrderItems.uom })
+      .from(grnItems)
+      .innerJoin(
+        purchaseOrderItems,
+        eq(purchaseOrderItems.id, grnItems.poItemId),
+      )
+      .where(eq(grnItems.grnId, grnId));
+    return new Map(rows.map((r) => [r.id, r.uom]));
+  },
+
+  // BR-GRN-05: same challan from the same supplier only once.
+  async findByChallan(
+    supplierId: number,
+    challanNo: string,
+    excludeGrnId?: number,
+  ) {
+    const [row] = await db
+      .select({ id: grns.id })
+      .from(grns)
+      .where(
+        and(
+          eq(grns.supplierId, supplierId),
+          eq(grns.challanNo, challanNo),
+          excludeGrnId !== undefined ? ne(grns.id, excludeGrnId) : undefined,
+        ),
+      )
+      .limit(1);
+    return row;
+  },
+
+  // Lock order for every GRN write: GRN header, then PO row, then the line +
+  // PO line (findGrnItemForUpdate), then the item (postStock).
+  async lockGrn(grnId: number, tx: Tx) {
+    const [row] = await tx
+      .select({
+        id: grns.id,
+        status: grns.status,
+        poId: grns.poId,
+        supplierId: grns.supplierId,
+      })
+      .from(grns)
+      .where(eq(grns.id, grnId))
+      .limit(1)
+      .for("update");
+    return row;
+  },
+
+  async lockPo(poId: number, tx: Tx) {
+    await tx
+      .select({ id: purchaseOrders.id })
+      .from(purchaseOrders)
+      .where(eq(purchaseOrders.id, poId))
+      .limit(1)
+      .for("update");
+  },
+
   async createWithItems(data: CreateGrnData, lines: CreateGrnLineData[]) {
     return db.transaction(async (tx) => {
+      // BR-GRN-04: the number comes from a never-rolled-back counter
       const { periodKey, seq } = await allocateDocumentSequence(
         tx,
         "grn",
@@ -193,6 +271,7 @@ export const grnRepository = {
             grnId: createdGrn.id,
             poItemId: line.poItemId,
             receivedQty: line.arrivedQty,
+            batchNumber: line.batchNumber ?? null,
             acceptedQty: 0,
             rejectedQty: 0,
             qaStatus: "pending",
@@ -225,9 +304,11 @@ export const grnRepository = {
 
   // Scoped by grnId (joined via WHERE) so a line belonging to a different
   // GRN can never be read/mutated by a request targeting this GRN.
+  // With `tx`, the line and its PO line are row-locked (FOR UPDATE) so one
+  // decision per line and the PO received-qty check are race-free.
   async findGrnItemForUpdate(grnId: number, lineId: number, tx?: Tx) {
     const executor = tx ?? db;
-    const [row] = await executor
+    const query = executor
       .select({
         ...grnItemColumns,
         poId: purchaseOrderItems.poId,
@@ -244,6 +325,15 @@ export const grnRepository = {
       .where(and(eq(grnItems.id, lineId), eq(grnItems.grnId, grnId)))
       .limit(1);
 
+    const [row] = tx ? await query.for("update") : await query;
+    return row;
+  },
+
+  async insertCorrection(
+    data: { grnItemId: number; qty: number; reason: string; createdBy: number },
+    tx: Tx,
+  ) {
+    const [row] = await tx.insert(grnCorrections).values(data).returning();
     return row;
   },
 
@@ -257,6 +347,11 @@ export const grnRepository = {
       isQaBypassed: boolean;
       qaBypassReason: string | null;
       qaBypassedBy: number | null;
+      batchNumber: string | null;
+      qaBypassedAt: Date;
+      overReceiptExcessQty: number;
+      overReceiptReason: string;
+      overReceiptBy: number;
     }>,
     tx?: Tx,
   ) {
@@ -327,27 +422,30 @@ export const grnRepository = {
     grnId: number,
     lineId: number,
     arrivedQty: number,
+    batchNumber: string | null | undefined,
     tx?: Tx,
   ) {
     const executor = tx ?? db;
     const [row] = await executor
       .update(grnItems)
-      .set({ receivedQty: arrivedQty })
+      .set({
+        receivedQty: arrivedQty,
+        // undefined leaves it alone, null clears it
+        ...(batchNumber !== undefined ? { batchNumber } : {}),
+      })
       .where(and(eq(grnItems.id, lineId), eq(grnItems.grnId, grnId)))
       .returning(grnItemColumns);
 
     return row;
   },
 
-  async deleteGrnWithItems(grnId: number) {
-    return db.transaction(async (tx) => {
-      await tx.delete(grnItems).where(eq(grnItems.grnId, grnId));
-      const deletedRows = await tx
-        .delete(grns)
-        .where(eq(grns.id, grnId))
-        .returning({ id: grns.id });
-      return deletedRows[0];
-    });
+  async deleteGrnWithItems(grnId: number, tx: Tx) {
+    await tx.delete(grnItems).where(eq(grnItems.grnId, grnId));
+    const deletedRows = await tx
+      .delete(grns)
+      .where(eq(grns.id, grnId))
+      .returning({ id: grns.id });
+    return deletedRows[0];
   },
 
   async getDetails(grnId: number) {
@@ -370,7 +468,66 @@ export const grnRepository = {
       return undefined;
     }
 
-    return { grn, items };
+    const corrected = await db
+      .select({
+        grnItemId: grnCorrections.grnItemId,
+        total: sql<number>`sum(${grnCorrections.qty})`,
+      })
+      .from(grnCorrections)
+      .where(
+        inArray(
+          grnCorrections.grnItemId,
+          items.map((i) => i.id),
+        ),
+      )
+      .groupBy(grnCorrections.grnItemId);
+    const correctedById = new Map(
+      corrected.map((r) => [r.grnItemId, Number(r.total)]),
+    );
+
+    return {
+      grn,
+      items: items.map((item) => {
+        const correctedQty = correctedById.get(item.id) ?? 0;
+        return {
+          ...item,
+          correctedQty,
+          // thousandths keep the subtraction exact (BR-GRN-35)
+          netAcceptedQty:
+            (Math.round(item.acceptedQty * 1000) -
+              Math.round(correctedQty * 1000)) /
+            1000,
+        };
+      }),
+    };
+  },
+
+  async sumCorrections(grnItemId: number, tx: Tx) {
+    const [row] = await tx
+      .select({ total: sql<number>`coalesce(sum(${grnCorrections.qty}), 0)` })
+      .from(grnCorrections)
+      .where(eq(grnCorrections.grnItemId, grnItemId));
+    return Number(row?.total ?? 0);
+  },
+
+  // Where and at what cost the line was posted (BR-GRN-32): its own grn /
+  // grn_bypass ledger row.
+  async findPostedRow(grnItemId: number, tx: Tx) {
+    const [row] = await tx
+      .select({
+        locationId: inventoryLedger.locationId,
+        unitCostPaise: inventoryLedger.unitCostPaise,
+      })
+      .from(inventoryLedger)
+      .where(
+        and(
+          eq(inventoryLedger.referenceLineId, grnItemId),
+          inArray(inventoryLedger.referenceType, ["grn", "grn_bypass"]),
+        ),
+      )
+      .orderBy(asc(inventoryLedger.id))
+      .limit(1);
+    return row;
   },
 
   async list(params: grnListQuerySchemaType) {

@@ -1,10 +1,10 @@
 import type { Context } from "hono";
 
 import { BadRequestError, UnauthorizedError } from "../lib/errors";
+import { parseCancelReason } from "../lib/http";
 import type { AppEnv } from "../lib/types";
 import { poService } from "../service/poService";
 import {
-  cancelPoSchema,
   closePoSchema,
   confirmPoSchema,
   createPoSchema,
@@ -12,6 +12,7 @@ import {
   markPoInvoicedSchema,
   markPoSentSchema,
   poListQuerySchema,
+  shortClosePoSchema,
   updatePoDelaySchema,
   updatePoSchema,
 } from "../types/po.types";
@@ -62,12 +63,10 @@ export const poController = {
       throw new BadRequestError("Invalid PO id");
     }
 
-    // Body is optional — a draft discard sends none. Only parse it if the
-    // client actually sent one.
-    const rawBody = await c.req.text();
-    const { reason } = cancelPoSchema.parse(rawBody ? JSON.parse(rawBody) : {});
+    // BR-PO-11: the reason is required for every status, draft included.
+    const reason = await parseCancelReason(c, "PO_CANCEL_REASON_REQUIRED");
 
-    const data = await poService.cancel(id, reason);
+    const data = await poService.cancel(id, reason, parseActorId(c));
     return c.json({ success: true, data });
   },
 
@@ -137,7 +136,7 @@ export const poController = {
     }
 
     const body = markPoInvoicedSchema.parse(await c.req.json());
-    const data = await poService.markInvoiced(id, body);
+    const data = await poService.markInvoiced(id, body, parseActorId(c));
     return c.json({ success: true, data });
   },
 
@@ -150,6 +149,27 @@ export const poController = {
     const body = closePoSchema.parse(await c.req.json());
     const actorId = parseActorId(c);
     const data = await poService.close(id, body, actorId);
+    return c.json({ success: true, data });
+  },
+
+  async shortClose(c: Context<AppEnv>) {
+    const id = Number(c.req.param("id"));
+    if (!Number.isInteger(id) || id <= 0) {
+      throw new BadRequestError("Invalid PO id");
+    }
+
+    const body = shortClosePoSchema.parse(await c.req.json());
+    const data = await poService.shortClose(id, body, parseActorId(c));
+    return c.json({ success: true, data });
+  },
+
+  async communications(c: Context<AppEnv>) {
+    const id = Number(c.req.param("id"));
+    if (!Number.isInteger(id) || id <= 0) {
+      throw new BadRequestError("Invalid PO id");
+    }
+
+    const data = await poService.communications(id);
     return c.json({ success: true, data });
   },
 };

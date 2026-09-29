@@ -30,9 +30,11 @@ rules nobody wrote down. Your job is to surface those rules *before* code exists
    - Existing routes/services for the module if any (`backend/src/routes/end-points.ts`, `backend/src/service/`).
      For existing code, write the spec **retroactively**: describe what the code does, then flag where it
      looks wrong or incomplete.
-2. **Benchmark** — briefly research how ERPNext/Odoo/SAP B1 model this process (states, tolerances,
-   partial handling, reversals, reports). Summarise in 5–10 bullets; don't copy, adapt to a small Indian
-   die-casting plant (GST, paise, challans, job work under Sec 143 where relevant).
+2. **Benchmark on the web — mandatory.** Use WebSearch/WebFetch (never memory alone) to read the official
+   docs of at least 3 mature ERPs (ERPNext, Odoo, SAP Business One; add Dynamics 365 / NetSuite when useful)
+   on how they model this process (states, tolerances, partial handling, reversals, permissions, reports).
+   Summarise in 5–10 bullets **with source links**; don't copy, adapt to a small Indian die-casting plant
+   (GST, paise, challans, job work under Sec 143 where relevant). Notes + links go in the module map.
 3. **Interview** — use AskUserQuestion, max 4 questions per round, each with concrete options and your
    recommended default first. Prefer questions that decide rules ("Can a GRN exceed PO qty? a) never b) up to
    tolerance % c) with approval"). Stop when every rule has an answer or is parked as an Open Question.

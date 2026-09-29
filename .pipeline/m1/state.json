@@ -1,0 +1,11 @@
+{
+  "feature": "m1",
+  "branch": "work/m1",
+  "base": "main",
+  "phase": "preflight",
+  "modules": ["auth-setup", "known-defects", "purchase-requisition", "approval", "approval-policies", "purchase-order", "grn", "grn-stock", "inventory", "suppliers", "subcontracting"],
+  "current": "auth-setup",
+  "iteration": 0,
+  "pr": null,
+  "envFile": "/Users/turbo_fltr/.claude/jobs/9a7e37ce/tmp/diecast-test.env"
+}

@@ -12,16 +12,10 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { useGrnQaDecisionMutation } from "@/lib/api/grn/queries";
-import { isExemptFromOverReceiptGuard } from "@/lib/grn-permissions";
+import { useCan } from "@/hooks/use-can";
+import { useGrnQaDecisionMutation, usePoItemUoms } from "@/lib/api/grn/queries";
+import { qtyStep } from "@/lib/grn-units";
 import type { GrnItemDetail } from "@/types/grn";
 
 const OVER_RECEIPT_MULTIPLIER = 1.05;
@@ -30,35 +24,41 @@ export function GrnQaDecisionModal({
 	grnId,
 	poId,
 	line,
-	role,
 	open,
 	onOpenChange,
 }: {
 	grnId: number;
 	poId: number;
 	line: GrnItemDetail;
-	role?: string | null;
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 }) {
-	const [decision, setDecision] = useState<"accept" | "reject">("accept");
 	const [acceptedQty, setAcceptedQty] = useState(String(line.receivedQty));
 	const [rejectedQty, setRejectedQty] = useState("0");
+	const [batchNumber, setBatchNumber] = useState(line.batchNumber ?? "");
 	const [remarks, setRemarks] = useState("");
 	const [certificateUrl, setCertificateUrl] = useState("");
+	const [overrideReason, setOverrideReason] = useState("");
+	const uoms = usePoItemUoms(poId, open);
+	const uom = line.poItemId != null ? uoms.get(line.poItemId) : undefined;
 	const mutation = useGrnQaDecisionMutation();
 
-	const isOverReceipt =
-		decision === "accept" &&
-		Number(acceptedQty || 0) > line.orderedQty * OVER_RECEIPT_MULTIPLIER;
-	const isExempt = isExemptFromOverReceiptGuard(role);
+	const accepted = Number(acceptedQty || 0);
+	const rejected = Number(rejectedQty || 0);
+	// Compare in thousandths so 3-decimal quantities add up exactly.
+	const sumMatches =
+		Math.round((accepted + rejected) * 1000) ===
+		Math.round(line.receivedQty * 1000);
+	const isOverReceipt = accepted > line.orderedQty * OVER_RECEIPT_MULTIPLIER;
+	const canOverride = useCan("grn.over_receipt_override");
 
 	function reset() {
-		setDecision("accept");
 		setAcceptedQty(String(line.receivedQty));
 		setRejectedQty("0");
+		setBatchNumber(line.batchNumber ?? "");
 		setRemarks("");
 		setCertificateUrl("");
+		setOverrideReason("");
 	}
 
 	function onSubmit() {
@@ -68,13 +68,15 @@ export function GrnQaDecisionModal({
 				lineId: line.id,
 				poId,
 				payload: {
-					decision,
-					acceptedQty:
-						decision === "accept" ? Number(acceptedQty || 0) : undefined,
-					rejectedQty:
-						decision === "reject" ? Number(rejectedQty || 0) : undefined,
+					acceptedQty: accepted,
+					rejectedQty: rejected,
+					batchNumber: batchNumber.trim() || undefined,
 					remarks: remarks.trim() || undefined,
 					certificateUrl: certificateUrl.trim() || undefined,
+					overrideReason:
+						isOverReceipt && canOverride
+							? overrideReason.trim() || undefined
+							: undefined,
 				},
 			},
 			{
@@ -105,30 +107,7 @@ export function GrnQaDecisionModal({
 				</DialogHeader>
 
 				<div className="space-y-4 px-6 py-5">
-					<div>
-						<label
-							htmlFor="grn-qa-decision"
-							className="mb-1 block text-xs font-medium"
-						>
-							Decision
-						</label>
-						<Select
-							value={decision}
-							onValueChange={(value) =>
-								setDecision(value as "accept" | "reject")
-							}
-						>
-							<SelectTrigger id="grn-qa-decision" className="w-full">
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent>
-								<SelectItem value="accept">Accept</SelectItem>
-								<SelectItem value="reject">Reject</SelectItem>
-							</SelectContent>
-						</Select>
-					</div>
-
-					{decision === "accept" ? (
+					<div className="grid grid-cols-2 gap-3">
 						<div>
 							<label
 								htmlFor="grn-qa-accepted-qty"
@@ -140,11 +119,11 @@ export function GrnQaDecisionModal({
 								id="grn-qa-accepted-qty"
 								type="number"
 								min={0}
+								step={qtyStep(uom)}
 								value={acceptedQty}
 								onChange={(event) => setAcceptedQty(event.target.value)}
 							/>
 						</div>
-					) : (
 						<div>
 							<label
 								htmlFor="grn-qa-rejected-qty"
@@ -156,18 +135,59 @@ export function GrnQaDecisionModal({
 								id="grn-qa-rejected-qty"
 								type="number"
 								min={0}
+								step={qtyStep(uom)}
 								value={rejectedQty}
 								onChange={(event) => setRejectedQty(event.target.value)}
 							/>
 						</div>
-					)}
+					</div>
+					{!sumMatches ? (
+						<p className="text-xs text-destructive">
+							Accepted + rejected must equal the arrived qty ({line.receivedQty}
+							).
+						</p>
+					) : null}
+
+					<div>
+						<label
+							htmlFor="grn-qa-batch-number"
+							className="mb-1 block text-xs font-medium"
+						>
+							Batch / heat no
+						</label>
+						<Input
+							id="grn-qa-batch-number"
+							value={batchNumber}
+							onChange={(event) => setBatchNumber(event.target.value)}
+							placeholder="Optional"
+						/>
+					</div>
 
 					{isOverReceipt ? (
-						<p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-							{isExempt
-								? "This exceeds 105% of the ordered qty. Your role can still submit — the backend will not block this."
-								: "This exceeds 105% of the ordered qty. Only owner/back office roles can push this through if the server blocks it."}
-						</p>
+						canOverride ? (
+							<div>
+								<p className="mb-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+									This exceeds 105% of the ordered qty. Give a reason to
+									override.
+								</p>
+								<label
+									htmlFor="grn-qa-override-reason"
+									className="mb-1 block text-xs font-medium"
+								>
+									Over-receipt override reason
+								</label>
+								<Textarea
+									id="grn-qa-override-reason"
+									value={overrideReason}
+									onChange={(event) => setOverrideReason(event.target.value)}
+								/>
+							</div>
+						) : (
+							<p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+								This exceeds 105% of the ordered qty. You cannot override it;
+								ask the owner or back office.
+							</p>
+						)
 					) : null}
 
 					<div>
@@ -211,7 +231,12 @@ export function GrnQaDecisionModal({
 					</Button>
 					<Button
 						type="button"
-						disabled={mutation.isPending}
+						disabled={
+							mutation.isPending ||
+							!sumMatches ||
+							accepted + rejected <= 0 ||
+							(isOverReceipt && canOverride && !overrideReason.trim())
+						}
 						onClick={onSubmit}
 					>
 						Submit decision

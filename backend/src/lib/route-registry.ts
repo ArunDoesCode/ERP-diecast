@@ -1,10 +1,16 @@
 import type { ZodType } from "zod";
-import type { Role } from "./token";
+import type { PermissionKey } from "./permissions";
 
 export type AuthRequirement =
   | { type: "public" }
   | { type: "any-authenticated" }
-  | { type: "roles"; roles: Role[] };
+  /** BR-AUTH-09/10: exactly one key; super-admin bypasses (BR-AUTH-18). */
+  | {
+      type: "permission";
+      key: PermissionKey;
+      /** Extra keys that also admit the caller (e.g. `.manage` admits a `.view` route). */
+      alsoKeys?: PermissionKey[];
+    };
 
 export type RouteDescriptor = {
   method: "GET" | "POST" | "PATCH" | "DELETE";

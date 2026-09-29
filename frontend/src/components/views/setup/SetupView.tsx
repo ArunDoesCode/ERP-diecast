@@ -3,22 +3,31 @@
 import Link from "next/link";
 import { useQueryState } from "nuqs";
 import { useState } from "react";
+import { AccessLogTab } from "@/components/pages/setup/access-log/AccessLogTab";
 import { EmployeesTab } from "@/components/pages/setup/employees/EmployeesTab";
-import { PagesTab } from "@/components/pages/setup/pages/PagesTab";
-import { PermissionsTab } from "@/components/pages/setup/permissions/PermissionsTab";
 import { RolesTab } from "@/components/pages/setup/roles/RolesTab";
+import { ScreensTab } from "@/components/pages/setup/screens/ScreensTab";
 import {
 	SetupDialog,
 	type SetupModalState,
 } from "@/components/pages/setup/shared/SetupDialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { Employee, Page, Role } from "@/types/setup";
+import { useCan } from "@/hooks/use-can";
+import type { Employee, Role } from "@/types/setup";
 
-type SetupEntity = "employee" | "role" | "page";
+type SetupEntity = "employee" | "role";
 
 const SetupView = () => {
-	const [tab, setTab] = useQueryState("tab", { defaultValue: "employees" });
+	const canManageRoles = useCan("setup.roles.manage");
+	const canManageEmployees = useCan("setup.employees.manage");
+	const allowedTabs = [
+		...(canManageEmployees ? ["employees"] : []),
+		...(canManageRoles ? ["roles", "screens", "access-log"] : []),
+	];
+	const defaultTab = allowedTabs[0] ?? "";
+	const [rawTab, setTab] = useQueryState("tab", { defaultValue: defaultTab });
+	const tab = allowedTabs.includes(rawTab) ? rawTab : defaultTab;
 	const [modal, setModal] = useState<SetupModalState>({ open: false });
 
 	function openCreate(entity: SetupEntity) {
@@ -31,10 +40,6 @@ const SetupView = () => {
 
 	function openEditRole(role: Role) {
 		setModal({ open: true, entity: "role", mode: "edit", data: role });
-	}
-
-	function openEditPage(page: Page) {
-		setModal({ open: true, entity: "page", mode: "edit", data: page });
 	}
 
 	return (
@@ -50,32 +55,41 @@ const SetupView = () => {
 
 			<Tabs value={tab} onValueChange={setTab}>
 				<TabsList>
-					<TabsTrigger value="employees">Employees</TabsTrigger>
-					<TabsTrigger value="roles">Roles</TabsTrigger>
-					<TabsTrigger value="pages">Pages</TabsTrigger>
-					<TabsTrigger value="permissions">Permissions</TabsTrigger>
+					{canManageEmployees && (
+						<TabsTrigger value="employees">Employees</TabsTrigger>
+					)}
+					{canManageRoles && <TabsTrigger value="roles">Roles</TabsTrigger>}
+					{canManageRoles && <TabsTrigger value="screens">Screens</TabsTrigger>}
+					{canManageRoles && (
+						<TabsTrigger value="access-log">Access log</TabsTrigger>
+					)}
 				</TabsList>
-				<TabsContent value="employees">
-					<EmployeesTab
-						onCreateEmployee={() => openCreate("employee")}
-						onEditEmployee={openEditEmployee}
-					/>
-				</TabsContent>
-				<TabsContent value="roles">
-					<RolesTab
-						onCreateRole={() => openCreate("role")}
-						onEditRole={openEditRole}
-					/>
-				</TabsContent>
-				<TabsContent value="pages">
-					<PagesTab
-						onCreatePage={() => openCreate("page")}
-						onEditPage={openEditPage}
-					/>
-				</TabsContent>
-				<TabsContent value="permissions">
-					<PermissionsTab />
-				</TabsContent>
+				{canManageEmployees && (
+					<TabsContent value="employees">
+						<EmployeesTab
+							onCreateEmployee={() => openCreate("employee")}
+							onEditEmployee={openEditEmployee}
+						/>
+					</TabsContent>
+				)}
+				{canManageRoles && (
+					<TabsContent value="roles">
+						<RolesTab
+							onCreateRole={() => openCreate("role")}
+							onEditRole={openEditRole}
+						/>
+					</TabsContent>
+				)}
+				{canManageRoles && (
+					<TabsContent value="screens">
+						<ScreensTab />
+					</TabsContent>
+				)}
+				{canManageRoles && (
+					<TabsContent value="access-log">
+						<AccessLogTab />
+					</TabsContent>
+				)}
 			</Tabs>
 			<SetupDialog modal={modal} onClose={() => setModal({ open: false })} />
 		</div>

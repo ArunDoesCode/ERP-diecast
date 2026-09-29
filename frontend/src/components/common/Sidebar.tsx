@@ -18,7 +18,7 @@ import {
 	SidebarRail,
 } from "@/components/ui/sidebar";
 import { useLogoutMutation, useMeQuery } from "@/lib/api/auth/queries";
-import { formatPageTitle, normalizeAllowedPath } from "@/lib/path-utils";
+import { normalizeAllowedPath } from "@/lib/path-utils";
 import { useAuthSessionStore } from "@/lib/store/auth-session-store";
 import { Button } from "../ui/button";
 import { ModeToggle } from "../ui/mode-toggle";
@@ -30,19 +30,31 @@ export function NavSidebar() {
 
 	const token = useAuthSessionStore((state) => state.token);
 	const role = useAuthSessionStore((state) => state.role);
-	const allowedPages = useAuthSessionStore((state) => state.allowedPages);
+	const screens = useAuthSessionStore((state) => state.screens);
 	const hasHydrated = useAuthSessionStore((state) => state.hasHydrated);
 
 	useMeQuery(Boolean(token) && hasHydrated);
 
-	const sidebarPages = allowedPages
-		.map((path) => normalizeAllowedPath(path))
-		.filter(Boolean)
-		.filter((path, index, paths) => paths.indexOf(path) === index)
-		.map((path) => ({
-			path,
-			title: formatPageTitle(path),
-		}));
+	const sidebarPages = [...screens]
+		.sort((a, b) => a.sortOrder - b.sortOrder)
+		.map((screen) => ({
+			path: normalizeAllowedPath(screen.path),
+			title: screen.label,
+			group: screen.menuGroup,
+		}))
+		.filter((page) => page.path)
+		.filter(
+			(page, index, pages) =>
+				pages.findIndex((other) => other.path === page.path) === index,
+		);
+	const sidebarGroups = sidebarPages.reduce<
+		{ name: string; pages: typeof sidebarPages }[]
+	>((groups, page) => {
+		const existing = groups.find((group) => group.name === page.group);
+		if (existing) existing.pages.push(page);
+		else groups.push({ name: page.group, pages: [page] });
+		return groups;
+	}, []);
 
 	return (
 		<Sidebar variant="inset" className="w-60">
@@ -63,33 +75,37 @@ export function NavSidebar() {
 							</p>
 						</SidebarGroupContent>
 					</SidebarGroup>
-				) : sidebarPages.length > 0 ? (
-					<SidebarGroup>
-						<SidebarGroupLabel>Navigation</SidebarGroupLabel>
-						<SidebarGroupContent>
-							<SidebarMenu>
-								{sidebarPages.map((page) => {
-									const isActive =
-										pathname === page.path ||
-										pathname.startsWith(`${page.path}/`);
+				) : sidebarGroups.length > 0 ? (
+					sidebarGroups.map((group) => (
+						<SidebarGroup key={group.name}>
+							{group.name !== "" && (
+								<SidebarGroupLabel>{group.name}</SidebarGroupLabel>
+							)}
+							<SidebarGroupContent>
+								<SidebarMenu>
+									{group.pages.map((page) => {
+										const isActive =
+											pathname === page.path ||
+											pathname.startsWith(`${page.path}/`);
 
-									return (
-										<SidebarMenuItem key={page.path}>
-											<SidebarMenuButton
-												asChild
-												isActive={isActive}
-												tooltip={page.title}
-											>
-												<Link href={page.path}>
-													<span>{page.title}</span>
-												</Link>
-											</SidebarMenuButton>
-										</SidebarMenuItem>
-									);
-								})}
-							</SidebarMenu>
-						</SidebarGroupContent>
-					</SidebarGroup>
+										return (
+											<SidebarMenuItem key={page.path}>
+												<SidebarMenuButton
+													asChild
+													isActive={isActive}
+													tooltip={page.title}
+												>
+													<Link href={page.path}>
+														<span>{page.title}</span>
+													</Link>
+												</SidebarMenuButton>
+											</SidebarMenuItem>
+										);
+									})}
+								</SidebarMenu>
+							</SidebarGroupContent>
+						</SidebarGroup>
+					))
 				) : (
 					<SidebarGroup>
 						<SidebarGroupLabel>Navigation</SidebarGroupLabel>

@@ -1,120 +1,102 @@
 ---
 module: purchase-requisition
-spec: none yet
-last_verified_commit: 0a406f4
-last_verified_on: 2026-09-27
-depends_on: [approval, inventory]
+spec: docs/specs/purchase-requisition.md (frozen)
+last_verified_commit: eea4fb1
+last_verified_on: 2026-09-29
+depends_on: [approval, inventory, purchase-order, auth-setup]
 ---
 
 # Purchase Requisition (PR) — as-built map
 
 > What the code **is** (the spec says what it **should be**). Agents read this before touching the module
 > and only explore code changed since `last_verified_commit`
-> (`git diff 0a406f4..HEAD --stat -- backend/src/routes/pr.ts backend/src/controller/prController.ts backend/src/service/prService.ts backend/src/repository/prRepository.ts backend/src/types/pr.types.ts frontend/src/app/\(protected\)/purchase-requisitions frontend/src/components/views/purchase-requisitions frontend/src/components/pages/purchase-requisitions frontend/src/lib/api/purchase-requisitions`).
+> (`git diff eea4fb1..HEAD --stat -- backend/src/routes/pr.ts backend/src/controller/prController.ts backend/src/service/prService.ts backend/src/repository/prRepository.ts backend/src/types/pr.types.ts backend/src/db/schemas/02_procurement-purchasing.ts frontend/src/app/\(protected\)/purchase-requisitions frontend/src/components/views/purchase-requisitions frontend/src/components/pages/purchase-requisitions frontend/src/lib/api/purchase-requisitions`).
 > Use symbol names, not line numbers — lines rot.
 
 ## Summary
-PR is the intake document for procurement: a requester picks a type, optional sale-order/asset link,
-and a list of catalog items with requested quantities. It moves through a status machine
-(`draft → pending_approval → approved → partial_ordered/fully_ordered`) driven partly by the shared
-approval module and partly by the PO module (draft/close a PO flips linked PR item statuses back).
-Full CRUD + list + cancel is implemented end-to-end (backend + frontend); line-level PR→PO traceability
-(`pr_po_item_links`) is implemented and surfaced on the PR detail page. Maturity: full for create/edit/cancel/
-list/detail; the estimated-amount rollup and default-supplier suggestion are working conveniences, not
-core to the workflow.
+PR is the intake document for procurement: a requester picks a type, an optional sale-order / machine link,
+notes and catalog item lines. Built end to end (backend + frontend): create, edit (draft only), submit,
+withdraw, cancel (whole PR), cancel one line, list, detail. Approval is the shared approval module; the PO
+module moves the lines (`pending → po_draft → ordered → closed / cancelled`) and the header follows.
+Maturity: full for M1 scope (BR-PR-01..47). Users: requester (edit/cancel own PR), super-admin (all).
 
 ## Code locations
 | Layer | Path | Key symbols |
 |---|---|---|
 | schema | `backend/src/db/schemas/02_procurement-purchasing.ts` | `purchaseRequests`, `purchaseRequestItems`, `prTypeEnum`, `prStatusEnum`, `prItemStatusEnum`, `prPoItemLinks` |
-| types | `backend/src/types/pr.types.ts` | `createPrSchema`, `updatePrSchema`, `prListQuerySchema`, `prSchema`, `prDetailsSchema`, `prUpdateResultSchema` |
-| repository | `backend/src/repository/prRepository.ts` | `prRepository.{list,findPrById,findPrDetailsById,createWithItems,updatePrById,updatePrItemById,createPrItem,deletePrItemsByIds,recalculateEstimatedAmountByPrId,setStatusCancelled,recomputeHeaderStatusFromItems}` |
-| service | `backend/src/service/prService.ts` | `prService.{list,getDetails,create,update,cancel}`, `PR_STATUS_TRANSITIONS`, `assertValidStatusTransition` |
-| controller | `backend/src/controller/prController.ts` | `prController.{list,details,create,update,remove}` |
-| routes | `backend/src/routes/pr.ts` + `END_POINTS.pr` in `end-points.ts` | mounted at `/api/pr` |
-| frontend api | `frontend/src/lib/api/purchase-requisitions/{fetchers,queries}.ts` | `getPurchaseRequisitions`, `getPurchaseRequisitionById`, `createPurchaseRequisition`, `updatePurchaseRequisition`, `deletePurchaseRequisition`, `usePurchaseRequisitionsQuery`, `usePurchaseRequisitionDetailQuery`, `useCreatePurchaseRequisitionMutation`, `useUpdatePurchaseRequisitionMutation`, `useDeletePurchaseRequisitionMutation`, `toPRCreatePayload`, `toPRUpdatePayload` |
-| frontend ui | `frontend/src/app/(protected)/purchase-requisitions/page.tsx`, `components/views/purchase-requisitions/PurchaseRequisitionsView.tsx`, `components/pages/purchase-requisitions/{PurchaseRequisitionsCards,PurchaseRequisitionModals,PurchaseRequisitionsPagination,purchase-requisition-modal-shared}.tsx` | `PurchaseRequisitionsView`, `CreatePurchaseRequisitionModal`, `EditPurchaseRequisitionModal` (both lazy-loaded via `next/dynamic`) |
+| types | `backend/src/types/pr.types.ts` | `createPrSchema`, `updatePrSchema`, `cancelPrSchema`, `prListQuerySchema`, `prSchema`, `prItemDetailSchema`, `prDetailsSchema`, `prUpdateResultSchema`, `prCancelResultSchema`, `prLineCancelResultSchema` |
+| repository | `backend/src/repository/prRepository.ts` | `prRepository.{list,findPrById,findPrByIdForUpdate,lockHeadersInOrder,findPrItemsByPrId,findPrDetailsById,findMachineById,findItemMasterByIds,createWithItems,updatePrById,updatePrItemById,createPrItem,deletePrItemsByIds,recalculateEstimatedAmountByPrId,findOrderedLinesWithLivePos,cancelPr,findItemByIdForUpdate,cancelItem,recomputeHeaderStatusFromItems}` |
+| service | `backend/src/service/prService.ts` | `prService.{list,getDetails,create,update,cancel,cancelLine}` |
+| controller | `backend/src/controller/prController.ts` | `prController.{list,details,create,update,remove,cancelLine}` |
+| routes | `backend/src/routes/pr.ts` + `END_POINTS.pr` in `end-points.ts` | mounted at `/api/pr`; all routes `requirePermission("pr.manage")` |
+| frontend api | `frontend/src/lib/api/purchase-requisitions/{fetchers,queries,error-messages}.ts` | `getPurchaseRequisitions`, `getPurchaseRequisitionById`, `createPurchaseRequisition`, `updatePurchaseRequisition`, `deletePurchaseRequisition` (id in path, `{reason}` body), `cancelPurchaseRequisitionLine`, matching `use…Query/Mutation` hooks, `toPRCreatePayload`, `toPRUpdatePayload`, `PR_ERROR_MESSAGES`, `prErrorMessage` |
+| frontend ui | `frontend/src/app/(protected)/purchase-requisitions/page.tsx`, `components/views/purchase-requisitions/{PurchaseRequisitionsView,use-pr-list-controls}`, `components/pages/purchase-requisitions/{PurchaseRequisitionsCards,PurchaseRequisitionModals,PurchaseRequisitionsPagination,CancelPurchaseRequisitionDialog,CancelPrLineDialog,purchase-requisition-modal-shared}.tsx` | `PurchaseRequisitionsView`, `CreatePurchaseRequisitionModal`, `EditPurchaseRequisitionModal` (holds submit / withdraw / approval actions) |
 
-There is no PR detail *page* route today (no `purchase-requisitions/[id]/page.tsx`) — the detail schema/query/`prDetailsSchema` exist and are exercised through `EditPurchaseRequisitionModal`, not a standalone route.
+No PR detail *page* route (no `purchase-requisitions/[id]/page.tsx`): detail is shown inside `EditPurchaseRequisitionModal`.
 
 ## Data model
-- `purchase_requests`: `prNumber` (unique, `PR-{periodKey}-{seq}`), `type` (`prTypeEnum`: sale_order, stock_reorder, maintenance, tooling, subcontracting, misc), `saleOrderId` (nullable, no FK enforced), `assetId` (nullable, required when `type = maintenance`), `status` (`prStatusEnum`), `requestedBy`/`approvedBy` (FK employees), `currentApprovalLevel`/`totalApprovalLevels` (mirrored from the approval module), `estimatedAmountPaise` (derived, recalculated on every item mutation from `itemMaster.averageCostPaise`), `createdAt`/`updatedAt`.
-- `prStatusEnum` values: `draft, pending_approval, approved, rejected, partial_ordered, fully_ordered, cancelled`.
-- `purchase_request_items`: `prId`, `itemId` (FK `itemMaster`), `requestedQty`, `issuedQty` (bumped by PO drafting, never by the PR module itself), `uom` (always derived server-side from `itemMaster.uom`, never trusted from the client), `expectedDate`, `status` (`prItemStatusEnum`: pending, po_draft, ordered, closed, cancelled).
-- `pr_po_item_links`: many-to-many resolution table (`prItemId`, `poItemId`, `linkedQty`) — one PR item can spawn lines across multiple POs over time (as `issuedQty` is drawn down), and PR detail/PO detail both join through it for traceability.
-- No direct FK from `purchase_requests` to `sale_order`/`asset` tables is enforced beyond `assetId` being checked at runtime against `machines` (see Invariants).
+- `purchase_requests`: `prNumber` (`PR-{periodKey}-{seq}`), `type` (sale_order, stock_reorder, maintenance, tooling, subcontracting, misc), `saleOrderId` (no FK, not checked), `assetId` (machine; required for `maintenance`), `status`, `requestedBy`, `approvedBy`, `currentApprovalLevel`/`totalApprovalLevels` (approval mirror), `notes`, `estimatedAmountPaise`, `cancelledBy`, `cancelledAt`, `cancelReason`, `createdAt`/`updatedAt`.
+- `prStatusEnum`: `draft, pending_approval, approved, rejected, partial_ordered, fully_ordered, cancelled`.
+- `purchase_request_items`: `prId`, `itemId`, `requestedQty` (3 decimals), `issuedQty` (moved by PO code), `uom` (from item master), `expectedDate`, `status` (`prItemStatusEnum`: pending, po_draft, ordered, closed, cancelled), line cancel audit `cancelReason`/`cancelledBy`/`cancelledAt`.
+- `pr_po_item_links` (`prItemId`, `poItemId`, `linkedQty`): PR line to PO line trace; written only by the PO module.
 
 ## API
-| Method | Path | Roles | Purpose |
+| Method | Path | Permission | Purpose |
 |---|---|---|---|
-| GET | `/api/pr/getprs` | super-admin, owner, floor_supervisor, back_office | Paginated list. Sortable: id, prNumber, type, status, createdAt. Free-text `q` matches prNumber/notes/type/status; `status`/`type` are separate filters. |
-| GET | `/api/pr/getprdetails/:id` | same | PR header + items (joined to item master, plus default-supplier suggestion and linked PO summaries) |
-| POST | `/api/pr/createpr` | same | Create PR + line items in one call |
-| PATCH | `/api/pr/updatepr` | same | Update header fields and/or insert/update/delete line items in one call (`prId` in body) |
-| DELETE | `/api/pr/deletepr/:id` | same | Cancel the PR (id in **path**) |
+| GET | `/api/pr/getprs` | `pr.manage` | Paginated list. Sort: id, prNumber, type, status, createdAt. `q` matches prNumber/notes/type/status; `status[]`, `type` filters. |
+| GET | `/api/pr/getprdetails/:id` | same | Header (+ `requestedByName`, `cancelledByName`), lines (item info, `estRatePaise`, `noCostHistory`, cancel audit, linked PO, default supplier), `linkedPos` |
+| POST | `/api/pr/createpr` | same | Create PR + lines (status `draft`) |
+| PATCH | `/api/pr/updatepr` | same | Edit header and `inserts`/`updates`/`deletes` of lines (`prId` in body). `status` in body is rejected |
+| DELETE | `/api/pr/deletepr/:id` | same | Cancel the PR; body `{reason}` 3–500 always |
+| POST | `/api/pr/:id/lines/:lineId/cancel` | same | Cancel one pending line; body `{reason}` 3–500 |
 
+Submit and withdraw are not PR routes: `POST /approval/submitRequest` (`docType: "pr"`) and `actOnRequest` with action `withdraw`.
 Full shapes: `cd backend && bun run contract:query "<METHOD /path>"`.
 
 ## Key flows
-- **`create`**: `prController.create` parses `createPrSchema` → `prService.create(body, actorId)` validates `assetId` required/valid when `type=maintenance`, resolves all `itemId`s against `itemMaster` (400 on any unknown id), derives `uom` per item server-side → `prRepository.createWithItems` opens a transaction, calls `allocateDocumentSequence(tx, "pr", requestedBy)` to mint `PR-{periodKey}-{seq}`, computes `estimatedAmountPaise` from `averageCostPaise × requestedQty`, inserts the PR row (`status: "draft"`) and its items.
-- **`update`**: `prService.update` blocks setting `status` to any of `approved/rejected/partial_ordered/fully_ordered` directly — those are "approval-owned" statuses (`APPROVAL_OWNED_STATUSES`) and must go through the approval action endpoint instead. Inside one transaction: validates the new status transition (if any) via `PR_STATUS_TRANSITIONS`, re-validates `assetId`/`type` combination, then applies `inserts`/`updates`/`deletes` against `purchase_request_items` (validating referenced line ids exist, no duplicate resulting `itemId`s), and finally calls `recalculateEstimatedAmountByPrId` to refresh the header total.
-- **`cancel`** (`DELETE /deletepr/:id`): `prService.cancel` asserts `PR_STATUS_TRANSITIONS[current]` allows `cancelled`, sets status via `setStatusCancelled`, then calls `approvalRepository.cancelOpenRequestForDocument("pr", prId)` to close out any open approval request for this doc.
-- **Approval hand-off**: the frontend's `EditPurchaseRequisitionModal`/`PurchaseRequisitionModals` calls `useSubmitApprovalRequestMutation` → `POST /approval/submitRequest` with `{ docType: "pr", docId }` — a *separate* endpoint from `updatepr`. `approvalService.submitRequest` looks up a matching policy (or an auto-approve fallback), opens the approval chain, and mirrors the resulting status/level back onto `purchase_requests` via `approvalRepository.updatePrApprovalMirror` (status becomes `pending_approval` or, if the policy auto-approves, `approved` immediately). Later, `approvalService.actOnRequest` (act on a pending step) again calls `updatePrApprovalMirror`, mapping the approval outcome to a PR status: `approved`/`rejected`/`cancelled`/`pending_approval` pass through as-is; `require_more_info` maps back to `draft`.
-- **PO hand-off (PR → PO)**: PR itself never creates PO rows. `poRepository.createWithItems`/`updateWithItems` (in the PO module) lock the targeted `purchase_request_items` rows `FOR UPDATE`, require `status = "pending"` and parent PR `status` in `{approved, partial_ordered}`, then bump `issuedQty` and flip the PR item to `po_draft`, insert a `pr_po_item_links` row, and call `prRepository.recomputeHeaderStatusFromItems(prId)` — which recomputes the **PR header status** from its items' statuses (`approved` if all items still pending, `fully_ordered` if all items are po_draft/ordered/closed, else `partial_ordered`). This is a direct repository write from the PO side, bypassing `prService.assertValidStatusTransition` — documented in-code as intentional, matching the existing approval-mirror pattern.
-- **List**: `prRepository.list` builds `ilike` search over `prNumber`/`notes`/`type`/`status`, `inArray` filters for `status[]`/`type`, sorts by an allowlist (`prSortColumns`), paginates with `count()` run in parallel.
-- **Details**: `prRepository.findPrDetailsById` does 3 queries in parallel (PR+requester name, items+linked PO via `prPoItemLinks`, distinct linked POs) plus one more batched (`selectDistinctOn`) query for "last supplier used per item" — explicitly written to avoid N+1 per line.
+- **create**: `assertCanLinkMachine` (needs `pr.link_machine` when `assetId` set, BR-AUTH-26); `maintenance` needs a valid `assetId` (`findMachineById`); duplicate item → `PR_DUPLICATE_ITEM`; required-by date in the past → `PR_DATE_IN_PAST`; every item must be active (`findItemMasterByIds` returns active only) else `PR_INVALID_ITEM`. `createWithItems` runs one transaction: `allocateDocumentSequence(tx, "pr", …)`, estimate, insert header (`draft`) and lines. Schema: notes required 1–2000, qty > 0 with at most 3 decimals, at least one line.
+- **update**: one transaction. `findPrByIdForUpdate` (row lock) → requester or `isSuperAdmin` else 403 `PR_NOT_REQUESTER` (BR-PR-17) → status must be `draft` else 409 `PR_NOT_EDITABLE`. `pr.link_machine` is checked only when `assetId` is added or changed (unchanged `assetId` passes). Lines: unknown line id 404, zero lines left → `PR_MIN_ONE_LINE`, duplicate items → `PR_DUPLICATE_ITEM`. Lines are written one row at a time. Ends with `recalculateEstimatedAmountByPrId`. The controller rejects any `status` key with 400 `PR_STATUS_VIA_ACTION` (BL-026).
+- **estimate (BR-PR-11/14)**: `effectiveRatePaise` = item average cost, or item `standardRatePaise` while average cost is 0. Detail lines carry `estRatePaise` and `noCostHistory` (average cost = 0); the edit modal shows a note for those lines (eea4fb1).
+- **cancel** (`DELETE /deletepr/:id`): `parseCancelReason` → `prService.cancel` in one transaction. If `pending_approval`, the open approval request is locked first (same order as approval actions), then the PR row lock. Requester or super-admin only. Lines on a PO (`po_draft/ordered/closed`, PO not cancelled) → 409 `PR_HAS_ORDERED_LINES` listing PO numbers. Only `draft`, `pending_approval`, `approved` can be cancelled (`PR_INVALID_TRANSITION`). `cancelPr` sets header `cancelled` + `cancelledBy/At/cancelReason` and cancels pending lines; `approvalRepository.cancelOpenRequestForDocument` runs in the same transaction.
+- **cancelLine** (BR-PR-33/36): PR lock, then line lock (CRP-2 order). Requester / super-admin; line `po_draft`/`ordered` → 409 `PR_LINE_ON_LIVE_PO`; not `pending` → `PR_LINE_NOT_PENDING`; header must be `approved`/`partial_ordered`. `cancelItem` stores reason/who/when, then `recomputeHeaderStatusFromItems`.
+- **submit / withdraw / decide**: `approvalService.submitRequest` opens the chain (or auto-approves) and mirrors status onto the PR via `approvalRepository.updatePrApprovalMirror` (`pending_approval` or `approved`). `actOnRequest`: `withdraw` and `require_more_info` → `draft`; approve / reject / cancel pass through. Inactive items are not re-checked at submit.
+- **header status from lines** (`recomputeHeaderStatusFromItems`, called by PO code and line cancel): runs only when the header is `approved`/`partial_ordered`/`fully_ordered`; ignores cancelled lines; all pending → `approved`, all on PO → `fully_ordered`, else `partial_ordered`; every line cancelled → header `cancelled` (reason "All lines cancelled", no `cancelledBy`).
+- **PO hand-off**: PO code (`poRepository`) locks PR headers first (`lockHeadersInOrder`) then lines, sets `po_draft` and `issuedQty` on draft; `orderPrLinesOfPo` → `ordered` on PO approval; `cancelPrLinesOfPo` → `cancelled` (gives `issuedQty` back) on PO cancel or reject; `closePrLinesOfPo` → `closed` on PO short-close; deleting a line from a draft PO reverts the PR line to `pending`.
+- **list / details**: `prRepository.list` does `ilike` over prNumber/notes and text casts of type/status, `inArray` for status/type, count in parallel. `findPrDetailsById` runs header, lines and linked POs in parallel plus one batched `selectDistinctOn` for the last supplier per item (no N+1).
 
 ## Invariants & gotchas
-- `uom` on a PR item is **always** derived server-side from `itemMaster.uom` — never trust a client-sent `uom` (P2.4 in the remediation doc flagged the create schema still nominally accepting `uom`, but `prService.create`/`update` always overwrite it from the item master lookup).
-- `assetId` is required when `type = "maintenance"` and must resolve to a real row in `machines` — checked on both create and update (including the case where `type` is being changed *to* maintenance without also setting `assetId`).
-- Header `status` cannot be set to `approved/rejected/partial_ordered/fully_ordered` via `PATCH /updatepr` — must go through `POST /approval/submitRequest` + `POST /approval/actOnRequest/:id`. Attempting it throws `BadRequestError("Use the approval action endpoint to approve or reject a PR")`.
-- `estimatedAmountPaise` is a point-in-time snapshot of `itemMaster.averageCostPaise × requestedQty` at the moment of the last create/update — it is **not** recalculated when `averageCostPaise` changes later on the item master; only a PR-item mutation triggers a recompute.
-- `purchaseRequestItems.status` is the single source of truth the PO module reads to decide whether a line is still draftable (`"pending"`) — the PR module itself only ever sets it to `pending` (implicitly, at insert) or reverts it via the PO module's cancel path; it never writes `po_draft` itself (only the PO module does, in `createWithItems`/`updateWithItems`).
-- **`prItemStatusEnum` values `ordered`/`closed` are declared but never written anywhere in `backend/src`** (verified by grep across `repository/` and `service/`, including the GRN module). A PR item only ever reaches `pending` or `po_draft` today; it never advances further even after its PO is fully received or closed. `recomputeHeaderStatusFromItems`'s "all ordered" check (`["po_draft", "ordered", "closed"].includes(...)`) therefore only ever matches on `po_draft` in practice — the PR header still correctly reaches `fully_ordered`, but this is effectively dead code for the `ordered`/`closed` item states.
-- `PR_STATUS_TRANSITIONS` is a forward-only DAG (no `approved → draft` etc.); `require_more_info` isn't a PR-side concept at all — it's an approval-request outcome that maps back to PR `status: "draft"`.
-- **Known frontend/backend contract mismatch**: `frontend/src/lib/api/purchase-requisitions/fetchers.ts`'s `deletePurchaseRequisition(payload)` calls `api.delete(API_ROUTES.purchaseRequisitions.remove, payload)` where `API_ROUTES.purchaseRequisitions.remove` is the **plain string** `"/pr/deletepr"` (no id interpolated) and the id is sent as `{ prId }` in the request body. The backend route is `DELETE /api/pr/deletepr/:id` (id in the **path**, no body parsing at all — `prController.remove` reads `c.req.param("id")` only). Contrast with the PO module's `remove: (poId) => \`/po/deletepo/${poId}\`` which is correctly parameterized. This means PR cancel from the UI is likely broken or silently hitting a 404/undefined-id route today — verify against the running backend before assuming cancel works from the PR list/detail UI.
+- `uom` is always taken from the item master, never from the client.
+- Lock order everywhere: approval request → PR header → PR lines (CRP-2). Do not lock lines first.
+- `recomputeHeaderStatusFromItems` is a direct repository write (no transition table). `PR_STATUS_TRANSITIONS` no longer exists in `prService`.
+- `ordered` is written on PO approval; `closed` only by PO short-close (a fully received PO leaves its lines `ordered`).
+- Estimate is a snapshot: recomputed on create / line edits, not when item cost changes later.
+- `saleOrderId` is stored as given: no FK, no existence check (no sale-order module yet).
+- Frontend: the edit modal reads `isSuperAdmin` from the auth session store (`/auth/me`) to show edit / cancel for non-requesters; machine field gated by `useCan("pr.link_machine")`. The list sends status / type search through `q` (`use-pr-list-controls`).
 
 ## Tests
 | File | Covers |
 |---|---|
-| *(none found)* | `backend/docs/backend-audit-remediation-2026-07-21.md` §5 proposes route-level and service-level tests for this module; none exist in `src/**/__tests__` or `*.test.ts` as of this writing. |
+| `backend/src/routes/pr-lifecycle.test.ts` | BR-PR-01, 02, 06, 08, 11, 14, 15, 17, 19, 21, 45, 46, 47 |
+| `backend/src/routes/pr-cancel.test.ts` | BR-PR-15, 17, 39, 41, 42, 43, 45, 46, 47 (+ BR-KD-01..16) |
+| `backend/src/routes/pr-machine.test.ts` | BR-AUTH-26, BR-PR-17 |
+| `backend/src/routes/po-lifecycle.test.ts` | PR side of PO flows: BR-PR-25, 28, 30, 31, 32, 33, 36, 46, 47 |
+| `backend/src/routes/approval-requests.test.ts`, `service/approvalService.test.ts` | approval submit / withdraw / act for PR docs |
+
+No frontend tests.
 
 ## Known gaps / debt
-- Frontend `deletePurchaseRequisition` sends `DELETE /pr/deletepr` with `{ prId }` in the body; backend expects `DELETE /pr/deletepr/:id` with the id in the path — see gotcha above. High-priority fix candidate.
-- No PR detail page route (`purchase-requisitions/[id]/page.tsx` doesn't exist) — detail data is only consumed inside the edit modal, not a shareable/linkable URL.
-- `backend/docs/backend-audit-remediation-2026-07-21.md` P1.1 (atomic sequence strategy for PR numbers) and P2.4 (drop unused `uom` from the create payload contract) — both appear to already be implemented in current code (`allocateDocumentSequence`, service-side `uom` derivation) but the doc itself hasn't been marked resolved; treat the doc as historical audit input, not current status.
-- No automated tests for any layer of this module (repository/service/controller/route).
-- `saleOrderId` has no FK/existence check anywhere in `prService` — a nonexistent sale order id is accepted silently (there's no sale-order module yet per `backend/CLAUDE.md`, so this is presumably a forward-compatible placeholder, not a bug in isolation).
-
-## Known gaps (from spec draft 2026-09-27)
-- Benchmark: ERPNext Material Request (Draft → Submitted → Ordered/Partially Ordered/Received/Stopped/Cancelled, per-line ordered/received qty, no edit after submit).
-- Benchmark: Odoo Purchase Requisition (draft → confirmed → done/cancel; cancelling the PO doesn't cancel the requisition).
-- Benchmark: SAP B1 Purchase Request (Open/Closed per line, copy-to-PO full or part qty, can't cancel once copied).
-- Benchmark adaptation: one approval chain, no RFQ step, full remaining qty per PO line, no GST on PR, estimate from average cost.
-- Schema: add `updatedBy`, `cancelledBy`, `cancelledAt`, `cancelReason` to `purchase_requests` (BR-PR-41, BR-PR-46).
-- Done in code: BR-PR-01 (`prRepository.createWithItems`, `allocateDocumentSequence`); BR-PR-02 (`prService.create/update`); uom from item master; saleOrderId stored.
-- BR-PR-06: `isActive` not checked; duplicate-item check runs on update only, not create.
-- BR-PR-08: Zod `requestedQty` is `.int()` in `backend/src/types/pr.types.ts`; `expectedDate` not in create/update schema.
-- BR-PR-11: recompute done (`recalculateEstimatedAmountByPrId`); recompute at submit not done; cost source per grn spec / BL-014.
-- BR-PR-14: `noCostHistory` flag and warning not built.
-- BR-PR-15/17: `prService.update` has no status guard, no own-PR check; PATCH accepts `pending_approval`/`cancelled`; zero-line edit not blocked.
-- BR-PR-19/21: submit, approve, send back done (`approvalService.submitRequest/actOnRequest`); approval tests partial.
-- BR-PR-21: approval `cancel` (withdraw) maps PR to `cancelled`, should map to `draft`.
-- BR-PR-25/28: done in `poRepository.createWithItems/updateWithItems`.
-- BR-PR-30/32/33: `ordered`/`closed` line states never written; line-cancel action doesn't exist (BL-019).
-- BR-PR-31: PO line delete / PO cancel revert done; PO approval reject/cancel via mirror does not revert PR lines.
-- BR-PR-36: `recomputeHeaderStatusFromItems` doesn't ignore `cancelled` lines and doesn't skip draft/pending/rejected/cancelled headers.
-- BR-PR-36/39: `PR_STATUS_TRANSITIONS` treats `fully_ordered` as terminal; must allow the moves back to `partial_ordered`/`approved`.
-- BR-PR-39/41/42: cancel doesn't check line states, doesn't cancel pending lines, needs no reason; approval cancel not in the same transaction.
-- BR-PR-43: backend DELETE = cancel done; frontend sends id in body (BL-001).
-- BR-PR-45: done (`backend/src/routes/pr.ts`).
-- BR-PR-46/47: audit fields and row-lock status re-check inside transactions not built.
-- Screens: no PR detail route `purchase-requisitions/[id]`; detail should show line status, issued qty, linked PO, `noCostHistory` warning, approval trail, and PR line → PO → GRN trace.
-- Screens: list hides cancelled/rejected by default (UI filter); actions per status: draft = edit/submit/cancel; pending = withdraw/cancel; approved/partial = create PO, cancel line, cancel PR.
-- Reports: open PR lines queue (pending lines on approved/partial PRs, by default supplier) exists as the `/purchase-orders` queue.
+- Fixed by the code (verified at `eea4fb1`): BL-001 (cancel sends id in path + reason), BL-019 (`ordered`/`closed`/`cancelled` are now written by the PO flows), BL-026 (edit only in draft, PATCH rejects `status`), BL-028 (PO reject cancels PR lines), BL-029 (header recompute has a status guard).
+- BL-030 open: `prService.update` still writes lines one by one and is one long function.
+- BL-034 open: `prRepository.list` `q` still matches `type::text` / `status::text`, and the frontend list sends status / type through `q`.
+- CRP-5 (repo layering): `poRepository` writes PR line rows directly and calls `prRepository`; repositories cross module lines.
+- `saleOrderId` existence is not validated (waits for the sale-order module, M4).
+- Inactive items are checked at create / edit only, not at submit.
+- No PR detail route; detail lives in the edit modal.
+- PERF-03 / 05 / 09 (minor batching and search): named in review findings (`.pipeline/m1/findings.md`), not fixed.
 
 ## History
 | Date | PR / commit | Change |
 |---|---|---|
-| 2026-07-21 | (see `backend/docs/backend-audit-remediation-2026-07-21.md`) | Backend audit + remediation plan scoped to the PR flow (non-null integrity, AppError contract, atomic PR numbering, status transition guardrails, delete-contract path-param alignment) |
-| 2026-09-27 | 0a406f4 | Map last verified against this commit |
+| 2026-07-21 | (see `backend/docs/backend-audit-remediation-2026-07-21.md`) | Backend audit + remediation plan scoped to the PR flow |
+| 2026-09-27 | 0a406f4 | Map first verified |
+| 2026-09-29 | work/m1 0a406f4..eea4fb1 | M1 build: draft-only edit, requester/super-admin rule, cancel with reason and audit, line cancel, line states written by PO flows, estimate fallback + `noCostHistory`, machine permission, row locks; frozen spec v2; 4 test files |

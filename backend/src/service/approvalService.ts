@@ -1,12 +1,16 @@
 import { db } from "../db/client";
+import { type Actor, can } from "../lib/auth-middleware";
+import { isUniqueViolation } from "../lib/db-errors";
 import {
   BadRequestError,
   ConflictError,
   ForbiddenError,
+  InternalServerError,
   NotFoundError,
 } from "../lib/errors";
-import type { Role } from "../lib/token";
 import { approvalRepository } from "../repository/approvalRepository";
+import { poRepository } from "../repository/poRepository";
+import { prRepository } from "../repository/prRepository";
 import type {
   approvalActionRequestSchemaType,
   approvalChainSchemaType,
@@ -22,7 +26,7 @@ import type {
 
 type ActorContext = {
   actorId: number;
-  actorRole: Role;
+  actor: Actor;
 };
 
 type ApprovalRequestStatus =
@@ -84,13 +88,11 @@ function currentApproverFields(chain: approvalChainSchemaType, level: number) {
       };
 }
 
-function isUniqueViolation(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === "23505"
-  );
+const POLICY_SLOT_TAKEN_MESSAGE =
+  "An active policy with the same priority, doc type and category already exists";
+
+function slotTakenError() {
+  return new ConflictError(POLICY_SLOT_TAKEN_MESSAGE, "POLICY_PRIORITY_TAKEN");
 }
 
 function toTrailAction(action: approvalActionRequestSchemaType["action"]) {
@@ -101,18 +103,10 @@ function toTrailAction(action: approvalActionRequestSchemaType["action"]) {
     approve: "approved",
     reject: "rejected",
     sent_back: "require_more_info",
-    cancel: "cancelled",
+    withdraw: "cancelled",
   };
 
   return mapped[action];
-}
-
-function isPrivilegedApprovalReader(actorRole: Role) {
-  return (
-    actorRole === "super-admin" ||
-    actorRole === "owner" ||
-    actorRole === "back_office"
-  );
 }
 
 function canSubmitForApproval(status: string) {
@@ -123,7 +117,7 @@ async function assertCanReadRequest(
   request: NonNullable<ApprovalRequestRow>,
   actor: ActorContext,
 ) {
-  if (isPrivilegedApprovalReader(actor.actorRole)) {
+  if (can(actor.actor, "approval.view_all")) {
     return;
   }
 
@@ -155,30 +149,25 @@ async function assertChainHasEligibleApprovers(chain: approvalChainSchemaType) {
   for (const step of chain) {
     if (step.approverType === "role") {
       const roleName = step.role;
-      if (!roleName) {
-        throw new BadRequestError("Approval chain role is missing");
-      }
-
-      const activeCount =
-        await approvalRepository.countActiveEmployeesByRoleName(roleName);
+      const activeCount = roleName
+        ? await approvalRepository.countActiveEmployeesByRoleName(roleName)
+        : 0;
       if (activeCount === 0) {
         throw new BadRequestError(
-          `No active employees found for role ${roleName}`,
+          `Approval step ${step.level} has no active employee with role ${roleName ?? "(missing)"}`,
+          "APPROVAL_NO_ELIGIBLE_APPROVER",
         );
       }
       continue;
     }
 
-    const employeeId = step.employeeId;
-    if (!employeeId) {
-      throw new BadRequestError("Approval chain specific approver is missing");
-    }
-
-    const approver =
-      await approvalRepository.findEmployeeWithRoleById(employeeId);
+    const approver = step.employeeId
+      ? await approvalRepository.findEmployeeWithRoleById(step.employeeId)
+      : undefined;
     if (!approver?.isActive) {
       throw new BadRequestError(
-        `Specific approver ${employeeId} is missing or inactive`,
+        `Approval step ${step.level} names employee ${step.employeeId ?? "(missing)"}, who is missing or inactive`,
+        "APPROVAL_NO_ELIGIBLE_APPROVER",
       );
     }
   }
@@ -243,7 +232,6 @@ export const approvalService = {
       priority: input.priority,
       docType: input.docType,
       subDocType: input.subDocType,
-      isSaleOrderLinked: input.isSaleOrderLinked ?? null,
       minAmountPaise: input.minAmountPaise ?? null,
       maxAmountPaise: input.maxAmountPaise ?? null,
       autoApprove: input.autoApprove ?? false,
@@ -258,9 +246,7 @@ export const approvalService = {
       return row;
     } catch (error) {
       if (isUniqueViolation(error)) {
-        throw new ConflictError(
-          "Active policy with same priority and docType already exists",
-        );
+        throw slotTakenError();
       }
       throw error;
     }
@@ -276,6 +262,33 @@ export const approvalService = {
       throw new NotFoundError("Approval policy not found");
     }
 
+    // BR-APR-05 / 06: the checks run on the stored values plus the change.
+    const effectiveMin =
+      input.minAmountPaise !== undefined
+        ? input.minAmountPaise
+        : existing.minAmountPaise;
+    const effectiveMax =
+      input.maxAmountPaise !== undefined
+        ? input.maxAmountPaise
+        : existing.maxAmountPaise;
+    if (
+      effectiveMin !== null &&
+      effectiveMax !== null &&
+      effectiveMax <= effectiveMin
+    ) {
+      throw new BadRequestError(
+        "maxAmountPaise must be greater than minAmountPaise",
+      );
+    }
+
+    const effectiveAutoApprove = input.autoApprove ?? existing.autoApprove;
+    const effectiveChain = input.approvalChain ?? existing.approvalChain;
+    if (!effectiveAutoApprove && effectiveChain.length === 0) {
+      throw new BadRequestError(
+        "approvalChain needs at least one step unless autoApprove",
+      );
+    }
+
     const data = {
       ...(input.name !== undefined ? { name: input.name } : {}),
       ...(input.description !== undefined
@@ -285,9 +298,6 @@ export const approvalService = {
       ...(input.priority !== undefined ? { priority: input.priority } : {}),
       ...(input.subDocType !== undefined
         ? { subDocType: input.subDocType }
-        : {}),
-      ...(input.isSaleOrderLinked !== undefined
-        ? { isSaleOrderLinked: input.isSaleOrderLinked }
         : {}),
       ...(input.minAmountPaise !== undefined
         ? { minAmountPaise: input.minAmountPaise }
@@ -316,15 +326,17 @@ export const approvalService = {
       return row;
     } catch (error) {
       if (isUniqueViolation(error)) {
-        throw new ConflictError(
-          "Active policy with same priority and docType already exists",
-        );
+        throw slotTakenError();
       }
       throw error;
     }
   },
 
-  async submitRequest(input: submitApprovalRequestSchemaType, actorId: number) {
+  async submitRequest(
+    input: submitApprovalRequestSchemaType,
+    actorId: number,
+    actor: Actor,
+  ) {
     const doc = await approvalRepository.findDocumentContext(
       input.docType,
       input.docId,
@@ -339,33 +351,56 @@ export const approvalService = {
       );
     }
 
+    // BR-APR-24 (v2): submit also needs the document type's own key.
+    const submitKey =
+      input.docType === "pr"
+        ? "pr.manage"
+        : input.docType === "po"
+          ? "po.manage"
+          : null;
+    if (submitKey && !can(actor, submitKey)) {
+      throw new ForbiddenError(
+        `Submitting a ${input.docType.toUpperCase()} needs the ${submitKey} permission`,
+        "PERMISSION_DENIED",
+      );
+    }
+
     if (!canSubmitForApproval(doc.status)) {
+      // BR-PR-19: an open request is the more specific answer than "wrong status".
+      const open = await approvalRepository.findPendingRequestByDoc(
+        input.docType,
+        input.docId,
+      );
+      if (open) {
+        throw new ConflictError(
+          "Document already has an open approval request",
+          "APPROVAL_ALREADY_OPEN",
+        );
+      }
       throw new ConflictError(
         `Cannot submit ${input.docType.toUpperCase()} for approval from status ${doc.status}`,
         "APPROVAL_INVALID_SOURCE_STATUS",
       );
     }
 
-    let policy = await approvalRepository.findMatchingActivePolicy({
-      docType: input.docType,
-      subDocType: doc.subDocType,
-      isSaleOrderLinked: doc.isSaleOrderLinked,
-      amountPaise: doc.amountPaise,
-    });
+    const resolvePolicy = async (amountPaise: number) => {
+      const matched =
+        (await approvalRepository.findMatchingActivePolicy({
+          docType: input.docType,
+          subDocType: doc.subDocType,
+          amountPaise,
+        })) ?? (await approvalRepository.findFallbackPolicy(input.docType));
+      if (!matched) {
+        // BR-APR-22: the fallback lives in seed data; missing = setup error.
+        throw new InternalServerError(
+          "Approval fallback policy is not configured",
+          "APPROVAL_FALLBACK_MISSING",
+        );
+      }
+      return matched;
+    };
 
-    if (!policy) {
-      policy = await approvalRepository.findOrCreateFallbackPolicy(
-        input.docType,
-        actorId,
-      );
-    }
-
-    if (!policy) {
-      throw new BadRequestError("Unable to resolve approval policy");
-    }
-
-    const chain = policy.approvalChain;
-    await assertChainHasEligibleApprovers(chain);
+    let policy = await resolvePolicy(doc.amountPaise);
 
     return db.transaction(async (tx) => {
       const existingPending = await approvalRepository.findPendingRequestByDoc(
@@ -381,8 +416,77 @@ export const approvalService = {
         );
       }
 
-      const autoApproved = policy.autoApprove === true;
+      // BR-PR-47: a PR is re-read under its row lock so a racing cancel or edit wins cleanly.
+      if (input.docType === "pr") {
+        const locked = await prRepository.findPrByIdForUpdate(input.docId, tx);
+        if (!locked || !canSubmitForApproval(locked.status)) {
+          // A racing submit that committed first is the more specific answer (BR-APR-26).
+          const raced = await approvalRepository.findPendingRequestByDoc(
+            input.docType,
+            input.docId,
+            tx,
+          );
+          if (raced) {
+            throw new ConflictError(
+              "Document already has an open approval request",
+              "APPROVAL_ALREADY_OPEN",
+            );
+          }
+          throw new ConflictError(
+            `Cannot submit PR for approval from status ${locked?.status ?? "missing"}`,
+            "APPROVAL_INVALID_SOURCE_STATUS",
+          );
+        }
+
+        // BR-PR-11: estimate recomputed at submit, before the policy is picked.
+        const fresh = await prRepository.recalculateEstimatedAmountByPrId(
+          input.docId,
+          tx,
+        );
+        if (fresh && fresh.estimatedAmountPaise !== doc.amountPaise) {
+          policy = await resolvePolicy(fresh.estimatedAmountPaise);
+        }
+      }
+
+      // BR-PO-06 / BR-PO-22: a PO is re-read under its row lock, so a racing
+      // edit, cancel or second submit wins cleanly and the policy is matched on
+      // the total incl. GST as it stands now.
+      if (input.docType === "po") {
+        const locked = await poRepository.lockPoById(input.docId, tx);
+        if (!locked || !canSubmitForApproval(locked.status)) {
+          const raced = await approvalRepository.findPendingRequestByDoc(
+            input.docType,
+            input.docId,
+            tx,
+          );
+          if (raced) {
+            throw new ConflictError(
+              "Document already has an open approval request",
+              "APPROVAL_ALREADY_OPEN",
+            );
+          }
+          throw new ConflictError(
+            `Cannot submit PO for approval from status ${locked?.status ?? "missing"}`,
+            "APPROVAL_INVALID_SOURCE_STATUS",
+          );
+        }
+        if (locked.totalAmountPaise !== doc.amountPaise) {
+          policy = await resolvePolicy(locked.totalAmountPaise);
+        }
+      }
+
+      const chain = policy.approvalChain;
+
+      // BR-APR-28 / 61: an auto-approve policy, or a requester who holds
+      // approval.auto_approve_own, skips the chain.
+      const autoApproved =
+        policy.autoApprove === true || can(actor, "approval.auto_approve_own");
       const now = new Date();
+
+      // BR-APR-23: not checked when the request is auto-approved.
+      if (!autoApproved) {
+        await assertChainHasEligibleApprovers(chain);
+      }
 
       const approverFields = autoApproved
         ? { currentApproverRole: null, currentApproverEmployeeId: null }
@@ -441,7 +545,9 @@ export const approvalService = {
             level: createdRequest.totalLevels,
             action: "auto_approved",
             actionBy: actorId,
-            notes: "Auto-approved by policy",
+            notes: policy.autoApprove
+              ? `Auto-approved by policy ${policy.name}`
+              : "Auto-approved: own request",
           },
           tx,
         );
@@ -454,7 +560,7 @@ export const approvalService = {
             status: autoApproved ? "approved" : "pending_approval",
             currentApprovalLevel: createdRequest.currentLevel,
             totalApprovalLevels: createdRequest.totalLevels,
-            approvedBy: autoApproved ? actorId : null,
+            approvedBy: null,
           },
           tx,
         );
@@ -467,10 +573,14 @@ export const approvalService = {
             status: autoApproved ? "approved" : "pending_approval",
             currentApprovalLevel: createdRequest.currentLevel,
             totalApprovalLevels: createdRequest.totalLevels,
-            approvedBy: autoApproved ? actorId : null,
+            approvedBy: null,
           },
           tx,
         );
+        // BR-PR-30: an auto-approved PO orders its PR lines at once.
+        if (autoApproved) {
+          await poRepository.orderPrLinesOfPo(input.docId, tx);
+        }
       }
 
       if (input.docType === "sco" && autoApproved) {
@@ -525,6 +635,20 @@ export const approvalService = {
     input: approvalActionRequestSchemaType,
     actorId: number,
   ) {
+    // BR-APR-37: approve, reject and send back need a typed comment.
+    const notes = input.notes?.trim() ? input.notes.trim() : null;
+    if (
+      notes === null &&
+      (input.action === "approve" ||
+        input.action === "reject" ||
+        input.action === "sent_back")
+    ) {
+      throw new BadRequestError(
+        "A comment is required to approve, reject or send back",
+        "APPROVAL_NOTES_REQUIRED",
+      );
+    }
+
     return db.transaction(async (tx) => {
       await approvalRepository.lockRequestById(requestId, tx);
 
@@ -534,13 +658,19 @@ export const approvalService = {
       }
 
       if (request.status !== "pending_approval") {
-        throw new BadRequestError("Approval request is not pending");
+        throw new ConflictError(
+          "Approval request is not pending",
+          "APPROVAL_NOT_PENDING",
+        );
       }
 
       const chain = request.chainSnapshot;
-      if (input.action === "cancel") {
+      if (input.action === "withdraw") {
         if (request.requestedBy !== actorId) {
-          throw new ForbiddenError("Only requester can cancel this approval");
+          throw new ForbiddenError(
+            "Only the requester can withdraw this approval",
+            "APPROVAL_NOT_REQUESTER",
+          );
         }
       } else {
         await assertEligibleActorForCurrentStep(
@@ -548,6 +678,21 @@ export const approvalService = {
           request.currentLevel,
           actorId,
         );
+
+        // BR-APR-33: one employee cannot approve two levels of one request.
+        if (
+          input.action === "approve" &&
+          (await approvalRepository.hasEmployeeApproved(
+            request.id,
+            actorId,
+            tx,
+          ))
+        ) {
+          throw new ForbiddenError(
+            "You already approved a level of this request",
+            "APPROVAL_ALREADY_ACTED",
+          );
+        }
       }
 
       let nextStatus: ApprovalRequestStatus = request.status;
@@ -573,7 +718,7 @@ export const approvalService = {
         completionTime = new Date();
       }
 
-      if (input.action === "cancel") {
+      if (input.action === "withdraw") {
         nextStatus = "cancelled";
         completionTime = new Date();
       }
@@ -606,21 +751,24 @@ export const approvalService = {
           level: request.currentLevel,
           action: toTrailAction(input.action),
           actionBy: actorId,
-          notes: input.notes ?? null,
+          notes,
         },
         tx,
       );
 
       if (request.docType === "pr") {
+        // BR-PR-21 / BR-APR-39: withdraw returns the PR to draft (not cancelled).
         const prStatus =
-          nextStatus === "approved" ||
-          nextStatus === "rejected" ||
-          nextStatus === "cancelled" ||
-          nextStatus === "pending_approval"
-            ? nextStatus
-            : nextStatus === "require_more_info"
-              ? "draft"
-              : undefined;
+          input.action === "withdraw"
+            ? "draft"
+            : nextStatus === "approved" ||
+                nextStatus === "rejected" ||
+                nextStatus === "cancelled" ||
+                nextStatus === "pending_approval"
+              ? nextStatus
+              : nextStatus === "require_more_info"
+                ? "draft"
+                : undefined;
 
         await approvalRepository.updatePrApprovalMirror(
           request.docId,
@@ -635,58 +783,69 @@ export const approvalService = {
       }
 
       if (request.docType === "po") {
-        const poStatus =
-          nextStatus === "approved"
-            ? "approved"
-            : nextStatus === "rejected"
-              ? "cancelled"
-              : nextStatus === "require_more_info"
-                ? "draft"
-                : nextStatus === "cancelled"
-                  ? "cancelled"
-                  : "pending_approval";
+        if (input.action === "reject") {
+          // BR-APR-43 / BR-PO-07: a rejected request cancels the PO
+          // through the normal cancel path, so its PR lines are cancelled too.
+          await poRepository.lockPoById(request.docId, tx);
+          await poRepository.cancelLockedPo(
+            request.docId,
+            {
+              actorId,
+              reason: notes ?? "Approval request cancelled",
+            },
+            tx,
+          );
+          await approvalRepository.updatePoApprovalMirror(
+            request.docId,
+            {
+              currentApprovalLevel: updatedRequest.currentLevel,
+              totalApprovalLevels: updatedRequest.totalLevels,
+              approvedBy: null,
+            },
+            tx,
+          );
+        } else {
+          const poStatus =
+            input.action === "withdraw" || nextStatus === "require_more_info"
+              ? "draft"
+              : nextStatus === "approved"
+                ? "approved"
+                : "pending_approval";
 
-        await approvalRepository.updatePoApprovalMirror(
-          request.docId,
-          {
-            status: poStatus,
-            currentApprovalLevel: updatedRequest.currentLevel,
-            totalApprovalLevels: updatedRequest.totalLevels,
-            approvedBy: nextStatus === "approved" ? actorId : null,
-          },
-          tx,
-        );
+          await approvalRepository.updatePoApprovalMirror(
+            request.docId,
+            {
+              status: poStatus,
+              currentApprovalLevel: updatedRequest.currentLevel,
+              totalApprovalLevels: updatedRequest.totalLevels,
+              approvedBy: nextStatus === "approved" ? actorId : null,
+            },
+            tx,
+          );
+
+          // BR-PR-30: the last-level approve orders the PO's PR lines.
+          if (nextStatus === "approved") {
+            await poRepository.orderPrLinesOfPo(request.docId, tx);
+          }
+        }
       }
 
       if (request.docType === "sco") {
-        if (nextStatus === "approved") {
-          await approvalRepository.updateScoApprovalMirror(
-            request.docId,
-            { status: "approved" },
-            tx,
-          );
-        }
+        // BR-APR-42: an SCO is never left at require_more_info; send back and
+        // withdraw both return it to draft. Approve at a middle level keeps it pending.
+        const scoStatus =
+          input.action === "withdraw" || nextStatus === "require_more_info"
+            ? "draft"
+            : nextStatus === "approved" ||
+                nextStatus === "rejected" ||
+                nextStatus === "cancelled"
+              ? nextStatus
+              : undefined;
 
-        if (nextStatus === "rejected") {
+        if (scoStatus) {
           await approvalRepository.updateScoApprovalMirror(
             request.docId,
-            { status: "rejected" },
-            tx,
-          );
-        }
-
-        if (nextStatus === "require_more_info") {
-          await approvalRepository.updateScoApprovalMirror(
-            request.docId,
-            { status: "require_more_info" },
-            tx,
-          );
-        }
-
-        if (nextStatus === "cancelled") {
-          await approvalRepository.updateScoApprovalMirror(
-            request.docId,
-            { status: "cancelled" },
+            { status: scoStatus },
             tx,
           );
         }
@@ -704,10 +863,12 @@ export const approvalService = {
 
     if (
       targetEmployeeId !== actor.actorId &&
-      actor.actorRole !== "super-admin"
+      !can(actor.actor, "approval.view_others_pending")
     ) {
       throw new ForbiddenError(
-        "Only super-admin can fetch another employee approvals",
+        "You are not allowed to fetch another employee approvals",
+        "PERMISSION_DENIED",
+        { key: "approval.view_others_pending" },
       );
     }
 
@@ -750,5 +911,46 @@ export const approvalService = {
     await assertCanReadRequest(request, actor);
 
     return request;
+  },
+
+  async getApprovalHistory(
+    params: approvalDocLookupParamSchemaType,
+    actor: ActorContext,
+  ) {
+    const doc = await approvalRepository.findDocumentContext(
+      params.docType,
+      params.docId,
+    );
+    if (!doc) {
+      throw new NotFoundError("Source document not found");
+    }
+
+    const history = await approvalRepository.listRequestsWithTrailByDoc(
+      params.docType,
+      params.docId,
+    );
+    if (history.length === 0) {
+      return [];
+    }
+
+    // BR-APR-51: show the requests this caller may read; none readable = 403.
+    const readable: typeof history = [];
+    let denied: unknown;
+    for (const item of history) {
+      try {
+        await assertCanReadRequest(item, actor);
+        readable.push(item);
+      } catch (error) {
+        if (!(error instanceof ForbiddenError)) {
+          throw error;
+        }
+        denied = error;
+      }
+    }
+    if (readable.length === 0 && denied) {
+      throw denied;
+    }
+
+    return readable;
   },
 };

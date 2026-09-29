@@ -1,5 +1,5 @@
 /**
- * `bun run db:test:prepare` — push the current schema and the page-access seed
+ * `bun run db:test:prepare` — push the current schema and the role seed
  * into the test database (DATABASE_URL_TEST). Safe to re-run: drizzle-kit push
  * diffs the schema and the seed is idempotent.
  */
@@ -21,10 +21,24 @@ if (push.exitCode !== 0) {
 const sql = postgres(url, { prepare: false, max: 1 });
 try {
   const seed = await Bun.file(
-    new URL("../src/db/seed_page_access.sql", import.meta.url),
+    new URL("../src/db/seed_roles.sql", import.meta.url),
   ).text();
   await sql.unsafe(seed);
-  console.log("Test database ready: schema pushed, page access seeded.");
+  // The shared db client reads DATABASE_URL at import time: point it at the test DB first.
+  process.env.DATABASE_URL = url;
+  const { syncCatalog, seedGrants } = await import(
+    "../src/lib/permissions-sync"
+  );
+  await syncCatalog();
+  await seedGrants();
+  // BR-APR-22: the built-in fallback approval policy is seed data the code only reads.
+  const { seedFallbackPolicies } = await import("./seed-approval-policies");
+  await seedFallbackPolicies(null);
+  const { disconnectDb } = await import("../src/db/client");
+  await disconnectDb();
+  console.log(
+    "Test database ready: schema pushed, roles seeded, permission catalog synced.",
+  );
 } finally {
   await sql.end({ timeout: 5 });
 }

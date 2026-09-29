@@ -13,18 +13,52 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import {
 	usePurchaseOrderDetailQuery,
 	useUpdatePurchaseOrderMutation,
 } from "@/lib/api/purchase-orders/queries";
+import { useSupplierItemsQuery } from "@/lib/api/suppliers/queries";
+import { GST_PERCENT_VALUES } from "@/types/purchase-orders";
 import type { PurchaseRequisitionItem } from "@/types/purchase-requisitions";
 
 function formatMoney(paise?: number | null) {
 	return `₹${((paise ?? 0) / 100).toLocaleString("en-IN", {
 		maximumFractionDigits: 0,
 	})}`;
+}
+
+function GstSelect({
+	id,
+	value,
+	onChange,
+}: {
+	id: string;
+	value: string;
+	onChange: (value: string) => void;
+}) {
+	return (
+		<Select value={value} onValueChange={onChange}>
+			<SelectTrigger id={id} className="w-full" aria-label="GST percent">
+				<SelectValue placeholder="GST %" />
+			</SelectTrigger>
+			<SelectContent>
+				{GST_PERCENT_VALUES.map((gst) => (
+					<SelectItem key={gst} value={String(gst)}>
+						GST {gst}%
+					</SelectItem>
+				))}
+			</SelectContent>
+		</Select>
+	);
 }
 
 export function EditPOModal({
@@ -52,12 +86,27 @@ export function EditPOModal({
 	const [expectedDeliveryDate, setExpectedDeliveryDate] = useState("");
 	const [notes, setNotes] = useState("");
 	const [rates, setRates] = useState<Record<number, string>>({});
+	const [gsts, setGsts] = useState<Record<number, string>>({});
+	const [addedGsts, setAddedGsts] = useState<Record<number, string>>({});
 	const [removedIds, setRemovedIds] = useState<Set<number>>(() => new Set());
 	const [addedLineIds, setAddedLineIds] = useState<Set<number>>(
 		() => new Set(),
 	);
 	const [addedRates, setAddedRates] = useState<Record<number, string>>({});
 	const updateMutation = useUpdatePurchaseOrderMutation();
+	// GST % for newly added lines comes from the supplier's active price list.
+	const supplierItemsQuery = useSupplierItemsQuery(
+		po?.supplierId ?? 0,
+		{ page: 1, pageSize: 100 },
+		open && Boolean(po),
+	);
+	const catalogGstByItemId = useMemo(() => {
+		const map = new Map<number, number>();
+		for (const item of supplierItemsQuery.data?.data ?? []) {
+			if (item.taxPercentage != null) map.set(item.itemId, item.taxPercentage);
+		}
+		return map;
+	}, [supplierItemsQuery.data?.data]);
 
 	// Seed form state from the fetched PO exactly once per time the modal opens —
 	// not on every `po`/`items` reference change, or a background refetch (e.g.
@@ -70,6 +119,7 @@ export function EditPOModal({
 			setRemovedIds(new Set());
 			setAddedLineIds(new Set());
 			setAddedRates({});
+			setAddedGsts({});
 			return;
 		}
 		if (!po || seededRef.current) return;
@@ -86,6 +136,11 @@ export function EditPOModal({
 				items.map((item) => [item.id, String(item.unitPricePaise / 100)]),
 			),
 		);
+		setGsts(
+			Object.fromEntries(
+				items.map((item) => [item.id, String(item.gstPercent ?? 0)]),
+			),
+		);
 	}, [open, po, items]);
 
 	const activeItems = items.filter((item) => !removedIds.has(item.id));
@@ -94,24 +149,45 @@ export function EditPOModal({
 		(line) => !addedLineIds.has(line.id),
 	);
 
+	// BR-PO-04: line tax = round(line value x GST % / 100), summed per line.
+	function lineTotal(valuePaise: number, gst: string | undefined) {
+		return valuePaise + Math.round((valuePaise * Number(gst || 0)) / 100);
+	}
 	const totalPaise =
 		activeItems.reduce(
 			(sum, item) =>
-				sum + Math.round(Number(rates[item.id] || 0) * 100 * item.qty),
+				sum +
+				lineTotal(
+					Math.round(Number(rates[item.id] || 0) * 100 * item.qty),
+					gsts[item.id],
+				),
 			0,
 		) +
 		addedLines.reduce(
 			(sum, line) =>
 				sum +
-				Math.round(Number(addedRates[line.id] || 0) * 100 * line.requestedQty),
+				lineTotal(
+					Math.round(
+						Number(addedRates[line.id] || 0) * 100 * line.requestedQty,
+					),
+					addedGsts[line.id],
+				),
 			0,
 		);
 
-	function addLine(lineId: number, estRatePaise?: number | null) {
+	function addLine(
+		lineId: number,
+		itemId: number,
+		estRatePaise?: number | null,
+	) {
 		setAddedLineIds((current) => new Set(current).add(lineId));
 		setAddedRates((current) => ({
 			...current,
 			[lineId]: current[lineId] ?? String((estRatePaise ?? 0) / 100),
+		}));
+		setAddedGsts((current) => ({
+			...current,
+			[lineId]: current[lineId] ?? String(catalogGstByItemId.get(itemId) ?? 0),
 		}));
 	}
 
@@ -129,16 +205,20 @@ export function EditPOModal({
 		const updates = activeItems
 			.filter(
 				(item) =>
-					Math.round(Number(rates[item.id] || 0) * 100) !== item.unitPricePaise,
+					Math.round(Number(rates[item.id] || 0) * 100) !==
+						item.unitPricePaise ||
+					Number(gsts[item.id] ?? 0) !== (item.gstPercent ?? 0),
 			)
 			.map((item) => ({
 				id: item.id,
 				unitPricePaise: Math.round(Number(rates[item.id] || 0) * 100),
+				gstPercent: Number(gsts[item.id] ?? 0),
 			}));
 		const deletes = [...removedIds].map((id) => ({ id }));
 		const inserts = addedLines.map((line) => ({
 			prItemId: line.id,
 			unitPricePaise: Math.round(Number(addedRates[line.id] || 0) * 100),
+			gstPercent: Number(addedGsts[line.id] ?? 0),
 		}));
 
 		updateMutation.mutate(
@@ -230,7 +310,7 @@ export function EditPOModal({
 								{activeItems.map((item) => (
 									<div
 										key={item.id}
-										className="grid gap-3 rounded-md border p-3 md:grid-cols-[1fr_7rem_8rem_auto] md:items-center"
+										className="grid gap-3 rounded-md border p-3 md:grid-cols-[1fr_7rem_7rem_8rem_auto] md:items-center"
 									>
 										<div className="min-w-0">
 											<span className="font-medium">
@@ -243,6 +323,7 @@ export function EditPOModal({
 										<div className="relative">
 											<IconCurrencyRupee className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
 											<Input
+												aria-label={`Rate for ${item.itemName ?? "line"}`}
 												type="number"
 												min={0}
 												value={rates[item.id] ?? ""}
@@ -255,6 +336,16 @@ export function EditPOModal({
 												className="pl-7"
 											/>
 										</div>
+										<GstSelect
+											id={`po-edit-line-gst-${item.id}`}
+											value={gsts[item.id] ?? "0"}
+											onChange={(value) =>
+												setGsts((current) => ({
+													...current,
+													[item.id]: value,
+												}))
+											}
+										/>
 										<div className="text-right font-medium">
 											{formatMoney(
 												Math.round(
@@ -290,7 +381,7 @@ export function EditPOModal({
 									{addedLines.map((line) => (
 										<div
 											key={line.id}
-											className="grid gap-3 rounded-md border border-dashed p-3 md:grid-cols-[1fr_7rem_8rem_auto] md:items-center"
+											className="grid gap-3 rounded-md border border-dashed p-3 md:grid-cols-[1fr_7rem_7rem_8rem_auto] md:items-center"
 										>
 											<div className="min-w-0">
 												<span className="font-medium">
@@ -303,6 +394,7 @@ export function EditPOModal({
 											<div className="relative">
 												<IconCurrencyRupee className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
 												<Input
+													aria-label={`Rate for ${line.itemName ?? "line"}`}
 													type="number"
 													min={0}
 													value={addedRates[line.id] ?? ""}
@@ -315,6 +407,16 @@ export function EditPOModal({
 													className="pl-7"
 												/>
 											</div>
+											<GstSelect
+												id={`po-edit-added-gst-${line.id}`}
+												value={addedGsts[line.id] ?? "0"}
+												onChange={(value) =>
+													setAddedGsts((current) => ({
+														...current,
+														[line.id]: value,
+													}))
+												}
+											/>
 											<div className="text-right font-medium">
 												{formatMoney(
 													Math.round(
@@ -345,7 +447,9 @@ export function EditPOModal({
 											type="button"
 											variant="outline"
 											size="sm"
-											onClick={() => addLine(line.id, line.estRatePaise)}
+											onClick={() =>
+												addLine(line.id, line.itemId, line.estRatePaise)
+											}
 										>
 											+ {line.itemName ?? "line"}
 										</Button>
@@ -398,7 +502,7 @@ export function EditPOModal({
 								disabled={activeItems.length === 0 || updateMutation.isPending}
 								onClick={onSubmit}
 							>
-								Save changes · {formatMoney(totalPaise)}
+								Save changes · {formatMoney(totalPaise)} incl. GST
 							</Button>
 						</DialogFooter>
 					</>

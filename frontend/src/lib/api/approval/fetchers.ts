@@ -4,6 +4,7 @@ import type {
 	ApprovalActionInput,
 	ApprovalCurrentByDocResponse,
 	ApprovalDocType,
+	ApprovalHistoryEntry,
 	ApprovalMyPendingParams,
 	ApprovalPolicyCreateInput,
 	ApprovalPolicyDetails,
@@ -83,4 +84,9 @@ export const getCurrentApprovalByDoc = (
 ) =>
 	api.get<Ok<ApprovalCurrentByDocResponse>>(
 		API_ROUTES.approval.getCurrentApprovalByDoc(docType, docId),
+	);
+
+export const getApprovalHistory = (docType: ApprovalDocType, docId: number) =>
+	api.get<Ok<ApprovalHistoryEntry[]>>(
+		API_ROUTES.approval.getApprovalHistory(docType, docId),
 	);

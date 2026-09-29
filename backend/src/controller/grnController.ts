@@ -67,14 +67,8 @@ export const grnController = {
     const lineId = parseId(c.req.param("lineId"), "GRN line id");
     const body = grnQaActionSchema.parse(await c.req.json());
     const actorId = parseActorId(c);
-    const actorRole = c.get("user").role;
-    const data = await grnService.qaAction(
-      grnId,
-      lineId,
-      body,
-      actorId,
-      actorRole,
-    );
+    const actor = c.get("actor");
+    const data = await grnService.qaAction(grnId, lineId, body, actorId, actor);
     return c.json({ success: true, data });
   },
 
@@ -83,14 +77,8 @@ export const grnController = {
     const lineId = parseId(c.req.param("lineId"), "GRN line id");
     const body = grnBypassSchema.parse(await c.req.json());
     const actorId = parseActorId(c);
-    const actorRole = c.get("user").role;
-    const data = await grnService.bypass(
-      grnId,
-      lineId,
-      body,
-      actorId,
-      actorRole,
-    );
+    const actor = c.get("actor");
+    const data = await grnService.bypass(grnId, lineId, body, actorId, actor);
     return c.json({ success: true, data });
   },
 

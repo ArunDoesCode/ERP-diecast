@@ -44,17 +44,20 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import {
 	useCreateLocationMutation,
 	useLocationsQuery,
 	useUpdateLocationMutation,
 } from "@/lib/api/asset/queries";
+import { useSuppliersQuery } from "@/lib/api/suppliers/queries";
 import {
 	type AssetLocation,
 	type AssetLocationCreatePayload,
 	type AssetLocationType,
-	assetLocationCreateSchema,
+	type AssetLocationUpdatePayload,
+	assetLocationFormSchema,
 	assetLocationTypeValues,
 } from "@/types/asset";
 
@@ -78,15 +81,80 @@ function toLocationOption(location: AssetLocation): SearchableSelectOption {
 	};
 }
 
-function toLocationPayload(
-	values: AssetLocationCreatePayload,
+type LocationFormValues = AssetLocationCreatePayload & { isActive: boolean };
+
+function buildLocationPayload(
+	values: LocationFormValues,
 ): AssetLocationCreatePayload {
+	const isVendor = values.type === "vendor_premise";
 	return {
 		name: values.name.trim(),
 		type: values.type,
-		isVirtual: values.isVirtual ?? false,
-		linkedVendorId: values.linkedVendorId ?? null,
+		...(isVendor ? {} : { isVirtual: values.isVirtual ?? false }),
+		linkedVendorId: isVendor ? (values.linkedVendorId ?? null) : null,
 	};
+}
+
+// Edit sends only what changed, so an unchanged type/supplier never trips LOCATION_IN_USE.
+function buildLocationUpdate(
+	values: LocationFormValues,
+	location: AssetLocation,
+): AssetLocationUpdatePayload {
+	const next = buildLocationPayload(values);
+	const payload: AssetLocationUpdatePayload = {};
+	if (next.name !== location.name) payload.name = next.name;
+	if (next.type !== location.type) payload.type = next.type;
+	if (next.isVirtual !== undefined && next.isVirtual !== location.isVirtual)
+		payload.isVirtual = next.isVirtual;
+	if ((next.linkedVendorId ?? null) !== location.linkedVendorId)
+		payload.linkedVendorId = next.linkedVendorId ?? null;
+	if (values.isActive !== location.isActive) payload.isActive = values.isActive;
+	return payload;
+}
+
+function SupplierPicker({
+	value,
+	onChange,
+}: {
+	value: number | null | undefined;
+	onChange: (supplierId: number | null) => void;
+}) {
+	const [search, setSearch] = useState("");
+	const debounced = useDebouncedValue(search, 350);
+	const suppliersQuery = useSuppliersQuery({
+		q: debounced || undefined,
+		page: 1,
+		pageSize: 20,
+		sortBy: "name",
+		sortDir: "asc",
+	});
+
+	const options = useMemo(() => {
+		const list: SearchableSelectOption[] = (
+			suppliersQuery.data?.data ?? []
+		).map((supplier) => ({
+			value: String(supplier.id),
+			label: supplier.name,
+		}));
+		if (value && !list.some((option) => option.value === String(value))) {
+			list.unshift({ value: String(value), label: `Supplier #${value}` });
+		}
+		return list;
+	}, [suppliersQuery.data, value]);
+
+	return (
+		<SearchableSelect
+			value={value ? String(value) : undefined}
+			options={options}
+			onValueChange={(next) => onChange(Number(next))}
+			searchValue={search}
+			onSearchChange={setSearch}
+			placeholder="Select supplier"
+			searchPlaceholder="Search supplier"
+			emptyText="No suppliers found"
+			isLoading={suppliersQuery.isLoading}
+		/>
+	);
 }
 
 type LocationEditorFormProps = {
@@ -108,8 +176,8 @@ function LocationEditorForm({
 			? createLocationMutation.isPending
 			: updateLocationMutation.isPending;
 
-	const form = useForm<AssetLocationCreatePayload>({
-		resolver: zodResolver(assetLocationCreateSchema),
+	const form = useForm<LocationFormValues>({
+		resolver: zodResolver(assetLocationFormSchema),
 		defaultValues:
 			mode === "edit" && location
 				? {
@@ -117,26 +185,33 @@ function LocationEditorForm({
 						type: location.type,
 						isVirtual: location.isVirtual,
 						linkedVendorId: location.linkedVendorId,
+						isActive: location.isActive,
 					}
 				: {
 						name: "",
 						type: "main_store",
 						isVirtual: false,
 						linkedVendorId: null,
+						isActive: true,
 					},
 	});
 
-	function onSubmit(values: AssetLocationCreatePayload) {
-		const payload = toLocationPayload(values);
+	const selectedType = form.watch("type");
 
+	function onSubmit(values: LocationFormValues) {
 		if (mode === "create") {
-			createLocationMutation.mutate(payload, {
+			createLocationMutation.mutate(buildLocationPayload(values), {
 				onSuccess: () => onDone(),
 			});
 			return;
 		}
 
 		if (!location) return;
+		const payload = buildLocationUpdate(values, location);
+		if (Object.keys(payload).length === 0) {
+			onDone();
+			return;
+		}
 
 		updateLocationMutation.mutate(
 			{ locationId: location.id, payload },
@@ -149,6 +224,23 @@ function LocationEditorForm({
 	return (
 		<Form {...form}>
 			<form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
+				{mode === "edit" ? (
+					<FormField
+						control={form.control}
+						name="isActive"
+						render={({ field }) => (
+							<FormItem className="flex flex-row items-center justify-end gap-2">
+								<FormLabel>Active</FormLabel>
+								<FormControl>
+									<Switch
+										checked={field.value}
+										onCheckedChange={field.onChange}
+									/>
+								</FormControl>
+							</FormItem>
+						)}
+					/>
+				) : null}
 				<FormField
 					control={form.control}
 					name="name"
@@ -196,50 +288,42 @@ function LocationEditorForm({
 					)}
 				/>
 
-				<FormField
-					control={form.control}
-					name="linkedVendorId"
-					render={({ field }) => (
-						<FormItem className="min-h-19">
-							<FormControl>
-								<FloatingLabelInput
-									id="location-linked-vendor"
-									label="Linked vendor ID (optional)"
-									type="number"
-									name={field.name}
-									value={field.value ?? ""}
-									onBlur={field.onBlur}
-									ref={field.ref}
-									onChange={(event) => {
-										const value = event.target.value;
-										field.onChange(
-											value === "" ? null : event.target.valueAsNumber,
-										);
-									}}
-								/>
-							</FormControl>
-							<FormMessage />
-						</FormItem>
-					)}
-				/>
-
-				<FormField
-					control={form.control}
-					name="isVirtual"
-					render={({ field }) => (
-						<FormItem className="min-h-19 flex flex-row items-center justify-between rounded-md border px-3 py-2">
-							<FormLabel>Virtual location</FormLabel>
-							<FormControl>
-								<Checkbox
-									checked={field.value ?? false}
-									onCheckedChange={(checked) =>
-										field.onChange(checked === true)
-									}
-								/>
-							</FormControl>
-						</FormItem>
-					)}
-				/>
+				{selectedType === "vendor_premise" ? (
+					<FormField
+						control={form.control}
+						name="linkedVendorId"
+						render={({ field }) => (
+							<FormItem className="min-h-19">
+								<FormLabel>Supplier</FormLabel>
+								<FormControl>
+									<SupplierPicker
+										value={field.value}
+										onChange={field.onChange}
+									/>
+								</FormControl>
+								<FormMessage />
+							</FormItem>
+						)}
+					/>
+				) : (
+					<FormField
+						control={form.control}
+						name="isVirtual"
+						render={({ field }) => (
+							<FormItem className="min-h-19 flex flex-row items-center justify-between rounded-md border px-3 py-2">
+								<FormLabel>Virtual location</FormLabel>
+								<FormControl>
+									<Checkbox
+										checked={field.value ?? false}
+										onCheckedChange={(checked) =>
+											field.onChange(checked === true)
+										}
+									/>
+								</FormControl>
+							</FormItem>
+						)}
+					/>
+				)}
 
 				<Button className="w-full" type="submit" disabled={isPending}>
 					{isPending
@@ -325,6 +409,16 @@ export function InventoryLocationsManager() {
 					<DataTableColumnHeader column={column} title="Linked Vendor" />
 				),
 				cell: ({ getValue }) => getValue<number | null>() ?? "—",
+			},
+			{
+				accessorKey: "isActive",
+				header: "Status",
+				cell: ({ getValue }) =>
+					getValue<boolean>() ? (
+						<Badge variant="secondary">Active</Badge>
+					) : (
+						<Badge variant="outline">Inactive</Badge>
+					),
 			},
 		],
 		[],

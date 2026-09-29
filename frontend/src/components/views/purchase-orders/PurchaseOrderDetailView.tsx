@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { SearchableSelect } from "@/components/common/SearchableSelect";
+import { ApprovalHistoryPanel } from "@/components/pages/approval/ApprovalHistoryPanel";
 import { CreateGrnModal } from "@/components/pages/grn/CreateGrnModal";
 import { ClosePoAlert } from "@/components/pages/purchase-orders/ClosePoAlert";
 import { ConfirmPoDialog } from "@/components/pages/purchase-orders/ConfirmPoDialog";
@@ -18,6 +19,9 @@ import { DelayPoDialog } from "@/components/pages/purchase-orders/DelayPoDialog"
 import { EditPOModal } from "@/components/pages/purchase-orders/EditPOModal";
 import { LogPoCommunicationDialog } from "@/components/pages/purchase-orders/LogPoCommunicationDialog";
 import { MarkPoInvoicedDialog } from "@/components/pages/purchase-orders/MarkPoInvoicedDialog";
+import { PoDetailPanel } from "@/components/pages/purchase-orders/PoDetailPanel";
+import { ShortClosePoAlert } from "@/components/pages/purchase-orders/ShortClosePoAlert";
+import { CancelPrLineDialog } from "@/components/pages/purchase-requisitions/CancelPrLineDialog";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -42,6 +46,14 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
 	Table,
@@ -52,6 +64,7 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { useCan } from "@/hooks/use-can";
 import { useSubmitApprovalRequestMutation } from "@/lib/api/approval/queries";
 import {
 	toPOCreatePayload,
@@ -64,14 +77,15 @@ import {
 	usePurchaseRequisitionDetailQuery,
 } from "@/lib/api/purchase-requisitions/queries";
 import {
+	useSupplierDetailQuery,
 	useSupplierItemsQuery,
 	useSuppliersQuery,
 } from "@/lib/api/suppliers/queries";
-import { canManageGrnDraft } from "@/lib/grn-permissions";
 import {
 	canCancelPurchaseOrder,
 	canClosePurchaseOrder,
 	canMarkPurchaseOrderInvoiced,
+	canShortClosePurchaseOrder,
 	PO_IN_TRANSIT_STATUSES,
 	PO_TERMINAL_STATUSES,
 } from "@/lib/po-status-badge";
@@ -80,7 +94,12 @@ import {
 	humanizeStatusLabel,
 } from "@/lib/pr-status-badge";
 import { useAuthSessionStore } from "@/lib/store/auth-session-store";
-import type { LastRateSource } from "@/types/purchase-orders";
+import {
+	GST_PERCENT_VALUES,
+	type LastRateSource,
+	PO_REASON_MAX,
+	PO_REASON_MIN,
+} from "@/types/purchase-orders";
 import type {
 	PRLinkedPo,
 	PurchaseRequisition,
@@ -146,18 +165,29 @@ function statusBadgeClass(status: string) {
 
 export function PurchaseOrderDetailView({ prId }: { prId: number }) {
 	const router = useRouter();
-	const role = useAuthSessionStore((state) => state.role);
-	const canManagePO = role !== "floor_supervisor";
+	const canManagePO = useCan("po.manage");
 	const [selectedLineIds, setSelectedLineIds] = useState<Set<number>>(
 		() => new Set(),
 	);
 	const [createOpen, setCreateOpen] = useState(false);
+	const [cancelLine, setCancelLine] = useState<PurchaseRequisitionItem | null>(
+		null,
+	);
+	const currentUserId = useAuthSessionStore((state) => state.userId);
+	const isSuperAdmin = useAuthSessionStore((state) => state.isSuperAdmin);
 
 	const detailQuery = usePurchaseRequisitionDetailQuery(prId, prId > 0);
 	const detail = detailQuery.data?.success ? detailQuery.data.data : undefined;
 	const lines = detail?.items ?? [];
 	const selectedLines = lines.filter((line) => selectedLineIds.has(line.id));
 	const pr = detail?.pr;
+	// BR-PR-33: a pending line can be cancelled on its own while the PR is
+	// approved or partly ordered, by the requester (super-admin: the API allows it too).
+	const canCancelLines =
+		pr != null &&
+		(pr.status === "approved" || pr.status === "partial_ordered") &&
+		((currentUserId != null && String(pr.requestedBy) === currentUserId) ||
+			isSuperAdmin);
 
 	function toggleLine(lineId: number, checked: boolean) {
 		setSelectedLineIds((current) => {
@@ -237,6 +267,7 @@ export function PurchaseOrderDetailView({ prId }: { prId: number }) {
 								selectedLineIds={selectedLineIds}
 								onToggleLine={toggleLine}
 								disabled={!canManagePO}
+								onCancelLine={canCancelLines ? setCancelLine : undefined}
 							/>
 
 							{canManagePO ? (
@@ -264,6 +295,18 @@ export function PurchaseOrderDetailView({ prId }: { prId: number }) {
 					/>
 				</div>
 			)}
+
+			{cancelLine && pr ? (
+				<CancelPrLineDialog
+					prId={pr.id}
+					lineId={cancelLine.id}
+					itemName={cancelLine.itemName ?? "line"}
+					open={cancelLine !== null}
+					onOpenChange={(open) => {
+						if (!open) setCancelLine(null);
+					}}
+				/>
+			) : null}
 
 			{createOpen && pr ? (
 				<CreatePOModal
@@ -319,11 +362,13 @@ function LinesTable({
 	selectedLineIds,
 	onToggleLine,
 	disabled,
+	onCancelLine,
 }: {
 	lines: PurchaseRequisitionItem[];
 	selectedLineIds: Set<number>;
 	onToggleLine: (lineId: number, checked: boolean) => void;
 	disabled?: boolean;
+	onCancelLine?: (line: PurchaseRequisitionItem) => void;
 }) {
 	return (
 		<Table>
@@ -336,6 +381,7 @@ function LinesTable({
 					<TableHead>Est rate</TableHead>
 					<TableHead>Status</TableHead>
 					<TableHead>PO</TableHead>
+					{onCancelLine ? <TableHead className="w-24" /> : null}
 				</TableRow>
 			</TableHeader>
 			<TableBody>
@@ -375,6 +421,20 @@ function LinesTable({
 								</Badge>
 							</TableCell>
 							<TableCell>{line.linkedPoNumber ?? "-"}</TableCell>
+							{onCancelLine ? (
+								<TableCell>
+									{isPending ? (
+										<Button
+											type="button"
+											size="sm"
+											variant="ghost"
+											onClick={() => onCancelLine(line)}
+										>
+											Cancel line
+										</Button>
+									) : null}
+								</TableCell>
+							) : null}
 						</TableRow>
 					);
 				})}
@@ -398,8 +458,8 @@ function LinkedPOs({
 	prId: number;
 	pendingLines: PurchaseRequisitionItem[];
 }) {
-	const role = useAuthSessionStore((state) => state.role);
-	const canManagePO = role !== "floor_supervisor";
+	const canManagePO = useCan("po.manage");
+	const canEditGrnDraft = useCan("grn.edit_draft");
 	const [editingPoId, setEditingPoId] = useState<number | null>(null);
 	const [receivingPoId, setReceivingPoId] = useState<number | null>(null);
 	const [dialogState, setDialogState] = useState<LinkedPoDialogState | null>(
@@ -419,160 +479,167 @@ function LinkedPOs({
 				) : (
 					<div className="space-y-2">
 						{linkedPos.map((po) => (
-							<div
-								key={po.id}
-								className="flex flex-col gap-2 rounded-md border p-3 text-xs sm:flex-row sm:items-center sm:justify-between"
-							>
-								<div className="flex flex-wrap items-center gap-2">
-									<span className="font-medium">{po.poNumber}</span>
-									<span className="text-muted-foreground">
-										Supplier #{po.supplierId}
-									</span>
-									<Badge variant="outline">
-										{humanizeStatusLabel(po.status)}
-									</Badge>
-									<span>{formatMoney(po.totalAmountPaise)}</span>
-								</div>
+							<div key={po.id} className="space-y-2">
+								<div className="flex flex-col gap-2 rounded-md border p-3 text-xs sm:flex-row sm:items-center sm:justify-between">
+									<div className="flex flex-wrap items-center gap-2">
+										<span className="font-medium">{po.poNumber}</span>
+										<span className="text-muted-foreground">
+											Supplier #{po.supplierId}
+										</span>
+										<Badge variant="outline">
+											{humanizeStatusLabel(po.status)}
+										</Badge>
+										<span>{formatMoney(po.totalAmountPaise)}</span>
+									</div>
 
-								<div className="flex flex-wrap gap-2">
-									{!canManagePO ? null : po.status === "draft" ? (
-										<>
-											<SubmitPOForApprovalButton poId={po.id} prId={prId} />
-											<Button
-												type="button"
-												size="sm"
-												variant="outline"
-												onClick={() => setEditingPoId(po.id)}
-											>
-												Edit
-											</Button>
-											<DiscardPOAlert
-												poId={po.id}
-												prId={prId}
-												poNumber={po.poNumber}
-											/>
-										</>
-									) : !PO_TERMINAL_STATUSES.has(po.status) ? (
-										<>
-											{po.status === "approved" ? (
-												<Button
-													type="button"
-													size="sm"
-													onClick={() =>
-														setDialogState({
-															type: "send",
-															poId: po.id,
-															poNumber: po.poNumber,
-														})
-													}
-												>
-													Send to supplier
-												</Button>
-											) : null}
-											{PO_IN_TRANSIT_STATUSES.has(po.status) ? (
-												<>
-													<Button
-														type="button"
-														size="sm"
-														variant="outline"
-														onClick={() =>
-															setDialogState({
-																type: "reminder",
-																poId: po.id,
-																poNumber: po.poNumber,
-															})
-														}
-													>
-														Reminder
-													</Button>
-													<Button
-														type="button"
-														size="sm"
-														variant="outline"
-														onClick={() =>
-															setDialogState({
-																type: "escalate",
-																poId: po.id,
-																poNumber: po.poNumber,
-															})
-														}
-													>
-														Escalate
-													</Button>
-													<Button
-														type="button"
-														size="sm"
-														variant="outline"
-														onClick={() =>
-															setDialogState({
-																type: "delay",
-																poId: po.id,
-																poNumber: po.poNumber,
-															})
-														}
-													>
-														Delay
-													</Button>
-													<Button
-														type="button"
-														size="sm"
-														variant="outline"
-														onClick={() =>
-															setDialogState({
-																type: "confirm",
-																poId: po.id,
-																poNumber: po.poNumber,
-															})
-														}
-													>
-														Confirm
-													</Button>
-												</>
-											) : null}
-											{canMarkPurchaseOrderInvoiced(po.status) ? (
+									<div className="flex flex-wrap gap-2">
+										{!canManagePO ? null : po.status === "draft" ? (
+											<>
+												<SubmitPOForApprovalButton poId={po.id} prId={prId} />
 												<Button
 													type="button"
 													size="sm"
 													variant="outline"
-													onClick={() =>
-														setDialogState({
-															type: "invoice",
-															poId: po.id,
-															poNumber: po.poNumber,
-														})
-													}
+													onClick={() => setEditingPoId(po.id)}
 												>
-													Mark Invoiced
+													Edit
 												</Button>
-											) : null}
-											{canClosePurchaseOrder(po.status) ? (
-												<ClosePoAlert poId={po.id} poNumber={po.poNumber} />
-											) : null}
-											{canCancelPurchaseOrder(po.status) ? (
 												<CancelPOAlert
 													poId={po.id}
 													prId={prId}
 													poNumber={po.poNumber}
 												/>
-											) : null}
-										</>
-									) : null}
-									{/* Independent of canManagePO: floor_supervisor is authorized by
+											</>
+										) : !PO_TERMINAL_STATUSES.has(po.status) ? (
+											<>
+												{po.status === "approved" ? (
+													<Button
+														type="button"
+														size="sm"
+														onClick={() =>
+															setDialogState({
+																type: "send",
+																poId: po.id,
+																poNumber: po.poNumber,
+															})
+														}
+													>
+														Send to supplier
+													</Button>
+												) : null}
+												{PO_IN_TRANSIT_STATUSES.has(po.status) ? (
+													<>
+														<Button
+															type="button"
+															size="sm"
+															variant="outline"
+															onClick={() =>
+																setDialogState({
+																	type: "reminder",
+																	poId: po.id,
+																	poNumber: po.poNumber,
+																})
+															}
+														>
+															Reminder
+														</Button>
+														<Button
+															type="button"
+															size="sm"
+															variant="outline"
+															onClick={() =>
+																setDialogState({
+																	type: "escalate",
+																	poId: po.id,
+																	poNumber: po.poNumber,
+																})
+															}
+														>
+															Escalate
+														</Button>
+														<Button
+															type="button"
+															size="sm"
+															variant="outline"
+															onClick={() =>
+																setDialogState({
+																	type: "delay",
+																	poId: po.id,
+																	poNumber: po.poNumber,
+																})
+															}
+														>
+															Delay
+														</Button>
+														<Button
+															type="button"
+															size="sm"
+															variant="outline"
+															onClick={() =>
+																setDialogState({
+																	type: "confirm",
+																	poId: po.id,
+																	poNumber: po.poNumber,
+																})
+															}
+														>
+															Confirm
+														</Button>
+													</>
+												) : null}
+												{canMarkPurchaseOrderInvoiced(po.status) ? (
+													<Button
+														type="button"
+														size="sm"
+														variant="outline"
+														onClick={() =>
+															setDialogState({
+																type: "invoice",
+																poId: po.id,
+																poNumber: po.poNumber,
+															})
+														}
+													>
+														Mark Invoiced
+													</Button>
+												) : null}
+												{canClosePurchaseOrder(po.status) ? (
+													<ClosePoAlert poId={po.id} poNumber={po.poNumber} />
+												) : null}
+												{canShortClosePurchaseOrder(po.status) ? (
+													<ShortClosePoAlert
+														poId={po.id}
+														poNumber={po.poNumber}
+													/>
+												) : null}
+												{canCancelPurchaseOrder(po.status) ? (
+													<CancelPOAlert
+														poId={po.id}
+														prId={prId}
+														poNumber={po.poNumber}
+													/>
+												) : null}
+											</>
+										) : null}
+										{/* Independent of canManagePO: grn.edit_draft holders are authorized by
 									the backend to create/manage GRN drafts (creategrn, bypass) even
 									though they can't manage the PO itself — never nest this inside
 									the canManagePO-gated block above. */}
-									{PO_IN_TRANSIT_STATUSES.has(po.status) &&
-									canManageGrnDraft(role) ? (
-										<Button
-											type="button"
-											size="sm"
-											variant="outline"
-											onClick={() => setReceivingPoId(po.id)}
-										>
-											Receive goods
-										</Button>
-									) : null}
+										{PO_IN_TRANSIT_STATUSES.has(po.status) &&
+										canEditGrnDraft ? (
+											<Button
+												type="button"
+												size="sm"
+												variant="outline"
+												onClick={() => setReceivingPoId(po.id)}
+											>
+												Receive goods
+											</Button>
+										) : null}
+									</div>
 								</div>
+								<PoApprovalHistory poId={po.id} />
+								<PoDetails poId={po.id} />
 							</div>
 						))}
 					</div>
@@ -658,6 +725,43 @@ function LinkedPOs({
 	);
 }
 
+function PoDetails({ poId }: { poId: number }) {
+	const [open, setOpen] = useState(false);
+
+	return (
+		<div className="space-y-2 px-1">
+			<Button
+				type="button"
+				size="sm"
+				variant="ghost"
+				aria-expanded={open}
+				onClick={() => setOpen((value) => !value)}
+			>
+				{open ? "Hide details" : "Details, GST and log"}
+			</Button>
+			{open ? <PoDetailPanel poId={poId} /> : null}
+		</div>
+	);
+}
+
+function PoApprovalHistory({ poId }: { poId: number }) {
+	const [open, setOpen] = useState(false);
+
+	return (
+		<div className="space-y-2 px-1">
+			<Button
+				type="button"
+				size="sm"
+				variant="ghost"
+				onClick={() => setOpen((value) => !value)}
+			>
+				{open ? "Hide approval history" : "Approval history"}
+			</Button>
+			{open ? <ApprovalHistoryPanel docType="po" docId={poId} /> : null}
+		</div>
+	);
+}
+
 function SubmitPOForApprovalButton({
 	poId,
 	prId,
@@ -692,45 +796,6 @@ function SubmitPOForApprovalButton({
 	);
 }
 
-function DiscardPOAlert({
-	poId,
-	prId,
-	poNumber,
-}: {
-	poId: number;
-	prId: number;
-	poNumber: string;
-}) {
-	const mutation = useCancelPurchaseOrderMutation();
-
-	return (
-		<AlertDialog>
-			<AlertDialogTrigger asChild>
-				<Button type="button" size="sm" variant="outline">
-					Discard
-				</Button>
-			</AlertDialogTrigger>
-			<AlertDialogContent>
-				<AlertDialogHeader>
-					<AlertDialogTitle>Discard {poNumber}?</AlertDialogTitle>
-					<AlertDialogDescription>
-						Lines return to pending. Cannot be undone.
-					</AlertDialogDescription>
-				</AlertDialogHeader>
-				<AlertDialogFooter>
-					<AlertDialogCancel>Cancel</AlertDialogCancel>
-					<AlertDialogAction
-						disabled={mutation.isPending}
-						onClick={() => mutation.mutate({ poId, prId })}
-					>
-						Discard
-					</AlertDialogAction>
-				</AlertDialogFooter>
-			</AlertDialogContent>
-		</AlertDialog>
-	);
-}
-
 function CancelPOAlert({
 	poId,
 	prId,
@@ -742,6 +807,7 @@ function CancelPOAlert({
 }) {
 	const [reason, setReason] = useState("");
 	const mutation = useCancelPurchaseOrderMutation();
+	const trimmed = reason.trim();
 
 	return (
 		<AlertDialog
@@ -758,21 +824,23 @@ function CancelPOAlert({
 				<AlertDialogHeader>
 					<AlertDialogTitle>Cancel {poNumber}?</AlertDialogTitle>
 					<AlertDialogDescription>
-						Lines return to pending for re-order. A reason is required.
+						Its PR lines are cancelled too, so a new PR is needed to order
+						again. A reason is required.
 					</AlertDialogDescription>
 				</AlertDialogHeader>
+				<Label htmlFor={`po-cancel-reason-${poId}`}>Reason</Label>
 				<Textarea
+					id={`po-cancel-reason-${poId}`}
 					value={reason}
+					maxLength={PO_REASON_MAX}
 					onChange={(event) => setReason(event.target.value)}
-					placeholder="Reason for cancellation"
+					placeholder={`Reason for cancellation (at least ${PO_REASON_MIN} characters)`}
 				/>
 				<AlertDialogFooter>
 					<AlertDialogCancel>Back</AlertDialogCancel>
 					<AlertDialogAction
-						disabled={!reason.trim() || mutation.isPending}
-						onClick={() =>
-							mutation.mutate({ poId, prId, reason: reason.trim() })
-						}
+						disabled={trimmed.length < PO_REASON_MIN || mutation.isPending}
+						onClick={() => mutation.mutate({ poId, prId, reason: trimmed })}
 					>
 						Cancel PO
 					</AlertDialogAction>
@@ -800,7 +868,9 @@ function CreatePOModal({
 	const [supplierId, setSupplierId] = useState<number | undefined>(
 		sharedDefaultSupplierId,
 	);
-	const [paymentTermsDays, setPaymentTermsDays] = useState("30");
+	// null = not typed yet, so the supplier's default terms show (BR-PO-23).
+	const [paymentTermsDays, setPaymentTermsDays] = useState<string | null>(null);
+	const [gsts, setGsts] = useState<Record<number, string>>({});
 	const [deliveryTerms, setDeliveryTerms] = useState("");
 	const [expectedDeliveryDate, setExpectedDeliveryDate] = useState("");
 	const [notes, setNotes] = useState("");
@@ -821,13 +891,33 @@ function CreatePOModal({
 		{ page: 1, pageSize: 100 },
 		Boolean(supplierId),
 	);
+	const supplierDetailQuery = useSupplierDetailQuery(supplierId ?? 0);
+	const supplierDefaultTerms = supplierDetailQuery.data?.success
+		? supplierDetailQuery.data.data.supplier.defaultPaymentTermsDays
+		: null;
+	const termsValue =
+		paymentTermsDays ??
+		(supplierDefaultTerms != null ? String(supplierDefaultTerms) : "");
 	const catalogRateByItemId = useMemo(() => {
 		const map = new Map<number, number>();
 		for (const item of supplierItemsQuery.data?.data ?? []) {
+			// Only active price-list rows suggest a rate / GST (BR-PO-03/04).
+			if (item.isActive === false) continue;
 			map.set(item.itemId, item.supplierUnitPricePaise);
 		}
 		return map;
 	}, [supplierItemsQuery.data?.data]);
+	const catalogGstByItemId = useMemo(() => {
+		const map = new Map<number, number>();
+		for (const item of supplierItemsQuery.data?.data ?? []) {
+			if (item.isActive === false || item.taxPercentage == null) continue;
+			map.set(item.itemId, item.taxPercentage);
+		}
+		return map;
+	}, [supplierItemsQuery.data?.data]);
+	function gstFor(line: PurchaseRequisitionItem) {
+		return gsts[line.id] ?? String(catalogGstByItemId.get(line.itemId) ?? 0);
+	}
 	const createMutation = useCreatePurchaseOrderMutation();
 
 	const defaultSupplierMismatchCount = supplierId
@@ -844,19 +934,23 @@ function CreatePOModal({
 	).size;
 	const supplierOptions = useMemo(
 		() =>
-			(suppliersQuery.data?.data ?? []).map((supplier: Supplier) => ({
-				value: String(supplier.id),
-				label: supplier.name,
-				secondaryLabel:
-					supplier.defaultPaymentTermsDays != null
-						? `${supplier.defaultPaymentTermsDays} day terms`
-						: undefined,
-			})),
+			(suppliersQuery.data?.data ?? [])
+				// BR-PO-01: inactive suppliers cannot be picked.
+				.filter((supplier: Supplier) => supplier.isActive)
+				.map((supplier: Supplier) => ({
+					value: String(supplier.id),
+					label: supplier.name,
+					secondaryLabel:
+						supplier.defaultPaymentTermsDays != null
+							? `${supplier.defaultPaymentTermsDays} day terms`
+							: undefined,
+				})),
 		[suppliersQuery.data?.data],
 	);
 	const totalPaise = lines.reduce((sum, line) => {
 		const rupees = Number(rates[line.id] || 0);
-		return sum + Math.round(rupees * 100 * line.requestedQty);
+		const value = Math.round(rupees * 100 * line.requestedQty);
+		return sum + value + Math.round((value * Number(gstFor(line))) / 100);
 	}, 0);
 
 	useEffect(() => {
@@ -873,15 +967,14 @@ function CreatePOModal({
 				prId: pr.id,
 				payload: toPOCreatePayload({
 					supplierId,
-					paymentTermsDays: paymentTermsDays
-						? Number(paymentTermsDays)
-						: undefined,
+					paymentTermsDays: termsValue ? Number(termsValue) : undefined,
 					deliveryTerms,
 					expectedDeliveryDate,
 					notes,
 					lines: lines.map((line) => ({
 						prItemId: line.id,
 						unitPriceRupees: Number(rates[line.id] || 0),
+						gstPercent: Number(gstFor(line)),
 					})),
 				}),
 			},
@@ -932,7 +1025,8 @@ function CreatePOModal({
 								id="po-create-payment-terms-days"
 								type="number"
 								min={0}
-								value={paymentTermsDays}
+								max={365}
+								value={termsValue}
 								onChange={(event) => setPaymentTermsDays(event.target.value)}
 							/>
 						</div>
@@ -941,7 +1035,7 @@ function CreatePOModal({
 								htmlFor="po-create-expected-delivery-date"
 								className="mb-1 block text-xs font-medium"
 							>
-								Delivery date
+								Delivery date (needed before sending)
 							</label>
 							<Input
 								id="po-create-expected-delivery-date"
@@ -979,6 +1073,10 @@ function CreatePOModal({
 								value={rates[line.id] ?? ""}
 								onChange={(value) =>
 									setRates((current) => ({ ...current, [line.id]: value }))
+								}
+								gst={gstFor(line)}
+								onGstChange={(value) =>
+									setGsts((current) => ({ ...current, [line.id]: value }))
 								}
 							/>
 						))}
@@ -1032,7 +1130,7 @@ function CreatePOModal({
 						onClick={onSubmit}
 					>
 						<IconTruckDelivery className="size-3.5" />
-						Create draft PO · {formatMoney(totalPaise)}
+						Create draft PO · {formatMoney(totalPaise)} incl. GST
 					</Button>
 				</DialogFooter>
 			</DialogContent>
@@ -1052,12 +1150,16 @@ function CreatePOLine({
 	catalogRatePaise,
 	value,
 	onChange,
+	gst,
+	onGstChange,
 }: {
 	line: PurchaseRequisitionItem;
 	supplierId?: number;
 	catalogRatePaise?: number;
 	value: string;
 	onChange: (value: string) => void;
+	gst: string;
+	onGstChange: (value: string) => void;
 }) {
 	// Rate-prefill priority: supplier catalog price (already fetched with the
 	// supplier) > PO-history/catalog lookup > PR estimate.
@@ -1091,7 +1193,7 @@ function CreatePOLine({
 	}, [referenceRatePaise]);
 
 	return (
-		<div className="grid gap-3 rounded-md border p-3 md:grid-cols-[1fr_7rem_9rem_8rem_8rem] md:items-center">
+		<div className="grid gap-3 rounded-md border p-3 md:grid-cols-[1fr_7rem_9rem_8rem_7rem_8rem] md:items-center">
 			<div className="min-w-0">
 				<div className="flex flex-wrap items-center gap-2">
 					<span className="font-medium">{line.itemName ?? "-"}</span>
@@ -1152,6 +1254,30 @@ function CreatePOLine({
 						className="pl-7"
 					/>
 				</div>
+			</div>
+
+			<div>
+				<Label
+					htmlFor={`po-create-line-gst-${line.id}`}
+					className="mb-1 block text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase"
+				>
+					GST %
+				</Label>
+				<Select value={gst} onValueChange={onGstChange}>
+					<SelectTrigger
+						id={`po-create-line-gst-${line.id}`}
+						className="w-full"
+					>
+						<SelectValue placeholder="GST %" />
+					</SelectTrigger>
+					<SelectContent>
+						{GST_PERCENT_VALUES.map((value) => (
+							<SelectItem key={value} value={String(value)}>
+								{value}%
+							</SelectItem>
+						))}
+					</SelectContent>
+				</Select>
 			</div>
 
 			<div className="text-right font-medium">

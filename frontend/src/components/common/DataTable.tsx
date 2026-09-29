@@ -18,12 +18,17 @@ const SKELETON_ROWS = 3;
 type DataTableProps<TData> = {
 	table: TableInstance<TData>;
 	isLoading?: boolean;
+	rowClassName?: (row: TData) => string | undefined;
 };
 
 // Render-only: owns header/body/skeleton/pagination markup for any TanStack Table
 // instance. Fetching, columns, sorting/pagination state stay with the feature
 // component that builds `table` — this just draws it.
-export function DataTable<TData>({ table, isLoading }: DataTableProps<TData>) {
+export function DataTable<TData>({
+	table,
+	isLoading,
+	rowClassName,
+}: DataTableProps<TData>) {
 	const rows = table.getRowModel().rows;
 	const leafColumns = table.getVisibleLeafColumns();
 
@@ -69,7 +74,7 @@ export function DataTable<TData>({ table, isLoading }: DataTableProps<TData>) {
 						</TableRow>
 					) : (
 						rows.map((row) => (
-							<TableRow key={row.id}>
+							<TableRow key={row.id} className={rowClassName?.(row.original)}>
 								{row.getVisibleCells().map((cell) => (
 									<TableCell key={cell.id}>
 										{flexRender(cell.column.columnDef.cell, cell.getContext())}
