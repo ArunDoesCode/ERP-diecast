@@ -321,7 +321,7 @@ export const approvalService = {
   async submitRequest(
     input: submitApprovalRequestSchemaType,
     actorId: number,
-    actor?: Actor,
+    actor: Actor,
   ) {
     const doc = await approvalRepository.findDocumentContext(
       input.docType,
@@ -414,7 +414,7 @@ export const approvalService = {
 
       const autoApproved =
         policy.autoApprove === true ||
-        (actor !== undefined && can(actor, "approval.auto_approve_own"));
+        can(actor, "approval.auto_approve_own");
       const now = new Date();
 
       const approverFields = autoApproved
