@@ -1,7 +1,7 @@
 ---
 module: auth-setup
 status: frozen           # draft | frozen | changed-after-freeze
-version: 7
+version: 8
 frozen_on: 2026-09-29
 owner: Arun
 depends_on: []           # every other module depends on this one
@@ -130,3 +130,4 @@ None open.
 - 2026-09-29 — frozen v5 (all questions answered by Arun)
 - 2026-09-29 — v6 clarified during build: key `employees.directory.view` (ow) for the existing Employee Directory screen (owner sees it today); `landing` and `approvals` screens need no key (any signed-in user); unbuilt seed pages get no screen (BR-AUTH-06). Read routes: item list, stock movements and item last-rate need `inventory.view`; posting a movement needs `inventory.adjust`; supplier list/detail/items/services reads need `supplier.view`.
 - 2026-09-29 — v7 clarified during build: `pr.link_machine` seeded to ow, bo, fs (was fs). Today owner and back office can save a maintenance PR with a machine, so BR-AUTH-21 (keep today's API access) requires it; they now also see the Machine field. The PR "Machine" field is `purchase_requests.assetId`.
+- 2026-09-29 — v8 clarified during build (BR-AUTH-19): a role held only by inactive employees can't be deleted either — 409 `ROLE_HAS_INACTIVE_EMPLOYEES` ("move them to another role first"); employees always keep a role.

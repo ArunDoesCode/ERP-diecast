@@ -11,3 +11,4 @@
 | F-TEST-7 | backend-dev 13 | backend/src/routes/pr-machine.test.ts ("holder … saves a PR with a machine") | reads body.data.id; POST /api/pr/createpr returns data.pr.id (see backend/.contracts/api-manifest.json) | fix now (test-writer) | fixed |
 | F-APR-1 | backend-dev 13 | backend/src/repository/approvalRepository.ts:394 | fallback approval chain hard-codes role "owner"; BR-AUTH-11 allows role names only in seed data → move the default chain into seed data | backlog to approval module (this batch) | open |
 | F-PR-1 | backend-dev 13 | backend/src/types/pr.types.ts updatePrSchema | saleOrderId/assetId/notes were wrongly required on PATCH → made optional | accepted (bug fix) | fixed |
+| TEST-8 | test-writer 16 | DELETE /setup/roles/:id | 500 FK violation when only inactive employees hold the role → 409 ROLE_HAS_INACTIVE_EMPLOYEES (spec v8) | fix now (backend-dev S6) | open |

@@ -12,3 +12,4 @@
 | 8 | test-writer (10) | can bo still create a maintenance PR (needs machine)? | yes — seed pr.link_machine to ow, bo, fs (BR-AUTH-21 parity) | spec v7 changelog, contract |
 | 9 | test-writer (10) | PR Machine field = purchase_requests.assetId? | yes | spec v7 changelog |
 | 10 | backend-dev (15) | S6 codes/choices: ROLE_NOT_ASSIGNABLE (BR-16), SCREEN_HAS_NO_KEY, unpaginated screens/assignable-roles, SYSTEM_ROLE_PROTECTED on super-admin grants (BR-18), UNKNOWN_KEY | all accepted | contract S6 |
+| 11 | test-writer (16) | delete role held only by inactive employees? | block: 409 ROLE_HAS_INACTIVE_EMPLOYEES (FK; employees keep a role) | spec v8 |
