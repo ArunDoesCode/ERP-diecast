@@ -39,3 +39,70 @@ Drizzle exports: `permissions`, `rolePermissions`, `screens`, `authAuditLog`.
 
 ## Screens (built pages only)
 landing `/landing` (null), setup `/setup` (setup.roles.manage), employee-directory `/employee-directory` (employees.directory.view), suppliers (supplier.view), purchase-orders (po.manage), purchase-requisitions (pr.manage), grn (grn.view), inventory (inventory.view), approvals `/approvals` (null).
+
+---
+
+# S3 — permission enforcement (interfaces only; no router switched, no behaviour change)
+
+## Types and functions
+- `route-registry.ts`: `AuthRequirement` gains `{ type: "permission"; key: PermissionKey }`. `roles` stays until every router is switched, then is removed. BR-AUTH-10: a non-public route declares exactly one `permission` key or `any-authenticated`.
+- `auth-middleware.ts` (signatures; bodies throw "not implemented"):
+  - `type Actor = { id, name, roleId, roleName, isSuperAdmin, isActive, permissions: Set<PermissionKey> }`
+  - `loadActor(employeeId): Promise<Actor | null>` (DB read, short cache), `invalidateActor(employeeId)`, `invalidateRole(roleId)` (call on any employee/role/grant change, BR-AUTH-12).
+  - `requirePermission(key)`: order = token (401) -> `loadActor` (missing or inactive => 401) -> super-admin passes -> else `actor.permissions.has(key)` or 403. Sets `c.set("actor", actor)`. Replaces `requireRole`.
+- Build-time note: `AppError` has no extra-fields slot and `onError` (`app.ts`) returns only `{success,message,code}`. S3 build must add an optional `details` to `AppError` and spread it in `onError` so `key` reaches the body (needs `errors.ts` + `app.ts`).
+
+## Error bodies
+| Case | Status | Body |
+|---|---|---|
+| No / bad / expired token (checked first, BR-AUTH-23) | 401 | `{ success:false, message, code:"UNAUTHORIZED" }` |
+| Employee inactive at request time (BR-AUTH-12) | 401 | `{ success:false, message, code:"UNAUTHORIZED" }` |
+| Signed in, lacks key (BR-AUTH-09) | 403 | `{ success:false, message, code:"PERMISSION_DENIED", key:"<permission key>" }` |
+
+## Token after S3 (BR-AUTH-01/12; signing NOT changed in this step)
+- Access and refresh payload: `{ userId: number|string, userName: string }` only. `role` and `allowedPages` are removed; role, active flag and keys come from `loadActor` on every request. Refresh (BR-AUTH-01/02) re-reads the employee: inactive => 401, no tokens; else tokens for the current record. `/auth/me` returns role and keys from the DB, not the token.
+- Today (until S3 build): `{ userId, userName, role, allowedPages }`.
+
+## Route -> key (real paths, from `end-points.ts`; base `/api`)
+Legend: `pub` = public, `any` = any signed-in user (`any-authenticated`), else the one key. super-admin passes all.
+
+| Route | Key |
+|---|---|
+| POST /auth/login, /auth/refresh, /auth/logout | pub |
+| GET /auth/me | any |
+| POST /auth/register | retired (route removed, BR-AUTH Q6=A) |
+| GET /setup/modules | `setup.roles.manage` (?) see Q2 |
+| GET/POST /setup/employees, GET /setup/employees/search, PATCH/DELETE /setup/employees/:id, POST /setup/employees/:id/qr | `setup.employees.manage` |
+| GET/POST /setup/roles, PATCH/DELETE /setup/roles/:id | `setup.roles.manage` |
+| GET/POST /setup/pages, PATCH/DELETE /setup/pages/:id | `setup.roles.manage` (old pages model, retired later) |
+| GET /setup/permissions, POST /setup/roles/:roleId/permissions | `setup.roles.manage` |
+| GET /asset/items, GET /asset/items/:itemId/last-rate, GET /asset/inventory/movements | `inventory.view` |
+| POST /asset/inventory/movements | `inventory.adjust` |
+| GET /asset/machines | `asset.manage` OR `pr.link_machine` (bo + fs today) see Q1 |
+| POST /asset/machines, PATCH /asset/machines/:id | `asset.manage` |
+| POST /asset/items, PATCH /asset/items/:id | `asset.manage` |
+| GET/POST /asset/services, PATCH /asset/services/:id | `asset.manage` |
+| GET/POST /asset/locations, PATCH /asset/locations/:id | `asset.manage` |
+| GET /supplier/listSuppliers, GET /supplier/:supplierId/detail, GET /supplier/:supplierId/listItems, GET /supplier/:supplierId/listServices | `supplier.view` |
+| POST /supplier/createSupplier, PATCH /supplier/updateSupplier/:id, POST /supplier/:supplierId/createItem, PATCH /supplier/:supplierId/editItem, POST /supplier/:supplierId/createService, PATCH /supplier/:supplierId/editService | `supplier.manage` |
+| GET /pr/getprs, GET /pr/getprdetails/:id, POST /pr/createpr, PATCH /pr/updatepr, DELETE /pr/deletepr/:id | `pr.manage` (saving a machine: service check `pr.link_machine`, else 403, BR-AUTH-26) |
+| GET /po/getpos, GET /po/getpodetails/:id, POST /po/createpo, PATCH /po/updatepo, DELETE /po/deletepo/:id, POST /po/:id/send, /reminder, /escalate, /confirm, /invoice, /close, PATCH /po/:id/delay | `po.manage` |
+| GET /grn/getgrns, GET /grn/getgrndetails/:id | `grn.view` |
+| POST /grn/creategrn, PATCH /grn/updategrn, DELETE /grn/deletegrn/:id | `grn.edit_draft` |
+| POST /grn/:id/lines/:lineId/qa | `grn.qa_decide` |
+| POST /grn/:id/lines/:lineId/bypass | `grn.qa_bypass` |
+| POST /grn/:id/lines/:lineId/correction | `grn.correct` |
+| (service check, not a route key) over-receipt above PO qty | `grn.over_receipt_override` |
+| GET /approval/getPolicies, GET /approval/getPolicyDetails/:id | `approval.policy.view` |
+| POST /approval/createPolicy, PATCH /approval/updatePolicy/:id | `approval.policy.manage` |
+| POST /approval/submitRequest, GET /approval/getRequestDetails/:id, GET /approval/getRequestTrail/:id, POST /approval/actOnRequest/:id, GET /approval/getCurrentApprovalByDoc/:docType/:docId | any (chain decides who may act) |
+| GET /approval/getMyPendingApprovals | any (other employee's list needs `approval.view_others_pending`, service check) |
+| (service check) read any approval request | `approval.view_all` |
+| (service check) owner's own requests auto-approve | `approval.auto_approve_own` |
+| `employees.directory.view`, `sco.*` | screens / M2 routes (not in this table yet) |
+
+Note: the explorer parity table used older paths (`/pr/list`, `/grn/list`...); the paths above are the real ones and match `permissions-matrix.test.ts`.
+
+## Open questions (spec is silent)
+1. `GET /asset/machines` is allowed today for bo (`asset.manage`) and, after BR-AUTH-26, fs (`pr.link_machine`). BR-AUTH-10 says one key per route. Options: (A) allow `asset.manage` OR `pr.link_machine` via a service-level check, route declared `any-authenticated`; (B) also seed `pr.link_machine` to bo. Recommend A (seed test needs bo and fs both allowed, spec seed table says bo lacks `pr.link_machine`).
+2. `GET /setup/modules` and `/setup/pages*`: no key in spec. Assumed `setup.roles.manage` (super-admin only, same as today).
