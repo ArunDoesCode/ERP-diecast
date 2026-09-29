@@ -3,9 +3,8 @@
 > Single entry point for "where are we and what's next". Updated by `/feature` (at phase changes and in
 > every PR), `/watch-prs` (merges), `/status` (on demand) and `/wrap`. Humans: read this, then run `/status`.
 
-**Updated:** 2026-09-29 · **Milestone:** M1 procurement hardening — built on `work/m1`, PR open
-**Next action:** merge the m1 PR (`work/m1` → `main`), then `/feature subcontracting` on a fresh
-branch from `main` (BL-070).
+**Updated:** 2026-09-29 · **Milestone:** M2 Subcontracting — `/feature subcontracting` running (BL-070)
+**Next action:** wait for the subcontracting PR, then review + merge it.
 
 ## Modules
 | Module | Spec | Map | Code | Next step |
@@ -27,7 +26,7 @@ Legend — Code: none / schema only / partial / full. Tests per module: see each
 ## Active pipelines
 | Feature | Branch | Phase | PR | Waiting on |
 |---|---|---|---|---|
-| m1 (auth-setup, known-defects, PR, approval, PO + merged stock modules) | work/m1 | reviewed, all checks green, docs done | open | your review + merge |
+| subcontracting | claude/subcontracting-feature-b19136 | build (S1) | — | — |
 
 ## Waiting on you
 - [ ] Review + merge the m1 PR. Run the manual UI checklist in it (includes SPEC-P3: approval
@@ -38,6 +37,7 @@ Legend — Code: none / schema only / partial / full. Tests per module: see each
 - [ ] BL-011 migrations before UAT-1 (also drops `pages`/`role_pages`, BL-056).
 
 ## Recently done
+- 2026-09-29 — PR #13 merged: work/m1 → main (M1 done)
 - 2026-09-29 — work/m1 (not yet merged): permission layer S1–S7 (role lists and `role_pages` gone,
   `isSuperAdmin` on `/auth/me`), bootstrap-admin + db:reset, PR / approval / PO built to frozen specs,
   work/m1-stock merged (grn, inventory, suppliers), review findings fixed (incl. BL-069 owner stock-take locations); backlog BL-056..070 added,
