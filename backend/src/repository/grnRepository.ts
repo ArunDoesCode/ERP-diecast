@@ -149,6 +149,7 @@ export const grnRepository = {
         itemId: purchaseOrderItems.itemId,
         qty: purchaseOrderItems.qty,
         receivedQty: purchaseOrderItems.receivedQty,
+        uom: purchaseOrderItems.uom,
       })
       .from(purchaseOrderItems)
       .where(
@@ -157,6 +158,18 @@ export const grnRepository = {
           inArray(purchaseOrderItems.id, poItemIds),
         ),
       );
+  },
+
+  // BR-GRN-05: same challan from the same supplier only once.
+  async findByChallan(supplierId: number, challanNo: string) {
+    const [row] = await db
+      .select({ id: grns.id })
+      .from(grns)
+      .where(
+        and(eq(grns.supplierId, supplierId), eq(grns.challanNo, challanNo)),
+      )
+      .limit(1);
+    return row;
   },
 
   async createWithItems(data: CreateGrnData, lines: CreateGrnLineData[]) {

@@ -23,6 +23,9 @@ import type {
 const OVER_RECEIPT_TOLERANCE_RATIO = 1.05;
 const OVER_RECEIPT_OVERRIDE_ROLES: Role[] = ["owner", "back_office"];
 
+// Units counted in whole pieces (BR-GRN-02).
+const WHOLE_NUMBER_UNITS = ["pcs", "set", "sets", "nos"];
+
 function toPaginatedMeta(page: number, pageSize: number, total: number) {
   return {
     page,
@@ -118,6 +121,9 @@ export const grnService = {
     }
 
     const poItemIds = input.lines.map((line) => line.poItemId);
+    if (new Set(poItemIds).size !== poItemIds.length) {
+      throw new BadRequestError("A PO line can appear only once per GRN");
+    }
     const poItems = await grnRepository.findPoItemsByIds(po.id, poItemIds);
     const poItemMap = new Map(poItems.map((item) => [item.id, item]));
 
@@ -128,24 +134,54 @@ export const grnService = {
       );
     }
 
-    return grnRepository.createWithItems(
-      {
-        poId: po.id,
-        supplierId: po.supplierId,
-        createdBy: actorId,
-        challanNo: input.challanNo ?? null,
-        challanDate: input.challanDate ?? null,
-        vehicleNo: input.vehicleNo ?? null,
-        driverName: input.driverName ?? null,
-        driverPhone: input.driverPhone ?? null,
-        remarks: input.remarks ?? null,
-      },
-      input.lines.map((line) => ({
-        poItemId: line.poItemId,
-        arrivedQty: line.arrivedQty,
-        batchNumber: line.batchNumber ?? null,
-      })),
-    );
+    for (const line of input.lines) {
+      const uom = poItemMap.get(line.poItemId)?.uom.trim().toLowerCase();
+      if (
+        uom &&
+        WHOLE_NUMBER_UNITS.includes(uom) &&
+        !Number.isInteger(line.arrivedQty)
+      ) {
+        throw new BadRequestError(
+          `Arrived qty must be a whole number for items in ${uom}`,
+        );
+      }
+    }
+
+    const duplicateChallan = () =>
+      new ConflictError(
+        `Challan ${input.challanNo} is already recorded for this supplier`,
+      );
+    if (await grnRepository.findByChallan(po.supplierId, input.challanNo)) {
+      throw duplicateChallan();
+    }
+
+    try {
+      return await grnRepository.createWithItems(
+        {
+          poId: po.id,
+          supplierId: po.supplierId,
+          createdBy: actorId,
+          challanNo: input.challanNo,
+          challanDate: input.challanDate ?? null,
+          vehicleNo: input.vehicleNo ?? null,
+          driverName: input.driverName ?? null,
+          driverPhone: input.driverPhone ?? null,
+          remarks: input.remarks ?? null,
+        },
+        input.lines.map((line) => ({
+          poItemId: line.poItemId,
+          arrivedQty: line.arrivedQty,
+          batchNumber: line.batchNumber ?? null,
+        })),
+      );
+    } catch (error) {
+      // Two creates racing past the check above: the unique index decides.
+      const e = error as { code?: string; cause?: { code?: string } };
+      if ((e.code ?? e.cause?.code) === "23505") {
+        throw duplicateChallan();
+      }
+      throw error;
+    }
   },
 
   async update(input: updateGrnSchemaType) {
