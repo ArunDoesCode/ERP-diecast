@@ -32,6 +32,7 @@ export async function signAccessToken(payload: TokenPayload) {
 export async function signRefreshToken(payload: TokenPayload) {
   return new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+    .setJti(crypto.randomUUID())
     .setIssuedAt()
     .setExpirationTime(`${env.REFRESH_TOKEN_TTL_SECONDS}s`)
     .sign(refreshSecret);

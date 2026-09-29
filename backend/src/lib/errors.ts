@@ -40,6 +40,12 @@ export class UnauthorizedError extends AppError {
   }
 }
 
+export class TooManyRequestsError extends AppError {
+  constructor(message = "Too many requests", code = "RATE_LIMITED") {
+    super(message, 429, code);
+  }
+}
+
 export class InternalServerError extends AppError {
   constructor(message = "Internal server error", code = "INTERNAL_ERROR") {
     super(message, 500, code);

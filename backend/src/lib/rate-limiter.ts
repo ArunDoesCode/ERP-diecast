@@ -1,5 +1,5 @@
 import type { MiddlewareHandler } from "hono";
-import { ForbiddenError } from "./errors";
+import { TooManyRequestsError } from "./errors";
 import type { AppEnv } from "./types";
 
 // ponytail: in-memory, per-process — resets on restart, doesn't share state
@@ -23,7 +23,7 @@ export function rateLimiter({
     if (!entry || now > entry.resetAt) {
       hits.set(key, { count: 1, resetAt: now + windowMs });
     } else if (entry.count >= max) {
-      throw new ForbiddenError(
+      throw new TooManyRequestsError(
         "Too many attempts, try again later",
         "RATE_LIMITED",
       );
