@@ -29,3 +29,6 @@ inventory ledger rows, 20–50 concurrent users.
 
 Each finding: why it matters at plant scale + the concrete fix. `PERF-` ids; blocker only if it will
 visibly break at the scale above. Return the protocol block.
+
+## Code lookup
+- Read the diff first, then one `codegraph_explore` on changed repository/service functions for their callers (loops, N+1 shapes); don't Read files the call already returned. See PROTOCOL → Code lookup.

@@ -126,3 +126,18 @@ Tests are the spec turned into code. They must not be shaped by the implementati
 ## Loop limits
 - Max **3** fix iterations per verification phase. Same finding id open after 2 fixes → coordinator stops
   and asks the user. Never loop silently.
+
+## Code lookup (CodeGraph)
+Each worktree has its own index in `.codegraph/` (gitignored). `/feature` runs `codegraph init -i` once when
+it is missing and `codegraph sync` (incremental, seconds) at run start, after each slice commit and before the
+verify loop, so the index matches the branch. Agents never init or sync; if `.codegraph/` is missing, use
+Read/Grep as before.
+- **Use it for** "where is X", "who calls X", "what breaks if X changes", tests that cover X: one
+  `codegraph_explore` call with the symbol/file names in the query, `projectPath` = the worktree root
+  (absolute). It returns the verbatim source + call paths, so **do not Read a file it already returned**.
+- **Still Read/Grep for**: files you are about to edit (exact current lines), literal strings, config, docs,
+  SQL/migrations, and anything changed since the last sync (your own uncommitted edits).
+- **One call per question**, not a chain of explores. Ask about symbols, not whole directories.
+- **Test independence wins:** test-writer looks up signatures/types/routes only, never implementation bodies
+  of the code under test (explore returns bodies — read only the part it needs, or use the contract).
+- Not needed for: test-runner, doc-only tasks, reading a spec or map.

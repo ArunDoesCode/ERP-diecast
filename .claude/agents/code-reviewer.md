@@ -22,3 +22,6 @@ Look for, in priority order:
 
 Only report issues you can point to with file:line and explain concretely (input → wrong result). No style
 nitpicks that Biome would catch. Findings table per protocol with `CR-` ids. Return the protocol block.
+
+## Code lookup
+- Read the diff first, then one `codegraph_explore` over the changed symbols for callers, blast radius and untested callers; don't Read whole files the call already returned. See PROTOCOL → Code lookup.

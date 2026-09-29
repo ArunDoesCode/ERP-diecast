@@ -32,7 +32,7 @@ You are the coordinator (see `/feature` and `.claude/pipeline/PROTOCOL.md`).
 ## 2. Run sub-features
 For each sub-feature in order whose dependencies are merged into `epic/<module>`:
 `/feature <module> --sub <sub> --base epic/<module>` (full pipeline, its own branch + PR into the epic).
-Independent sub-features (no dependency between them) may run in parallel in separate worktrees; never
+Independent sub-features (no dependency between them) may run in parallel in separate worktrees (run `codegraph init -i` in each new one); never
 two that touch the same tables/screens.
 Wait for the user to merge each sub-PR (watcher reports merges), then `git pull` the epic branch and continue.
 

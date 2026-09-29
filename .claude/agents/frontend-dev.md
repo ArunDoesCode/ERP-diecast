@@ -31,3 +31,6 @@ In your report, add a **Map updates** section (new routes, views, components, qu
   quoting the spec rule that contradicts it.
 
 Return the protocol block.
+
+## Code lookup
+- Before changing an unfamiliar component/hook, one `codegraph_explore` on it (who renders/calls it); Read only the files you edit. API shapes come from `contract.md`, not the index. See PROTOCOL → Code lookup.

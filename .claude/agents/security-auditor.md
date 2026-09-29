@@ -33,3 +33,6 @@ Audit `git diff <base>...HEAD`, following data from route → controller → ser
 
 Report each finding with an exploit scenario (who, what request, what they gain) — no scenario, no finding.
 `SEC-` ids, severity blocker for any authz/IDOR/injection/data-exposure issue. Return the protocol block.
+
+## Code lookup
+- Read the diff first, then one `codegraph_explore` on the changed routes/services to trace who reaches them and where the permission check sits; don't Read files the call already returned. See PROTOCOL → Code lookup.

@@ -11,7 +11,7 @@ description: >
 1. **Restate** the bug as: expected vs actual, where (page/endpoint), which role, steps. Ask only for what's
    missing to reproduce. If it came from the factory, open a GitHub issue now (`gh issue create --label uat-bug --label defect --label P<n> --label mod:<module>`; severity S1/S2 → P1/P2)
    (id `UAT-NNN`, date, reporter, severity S1 blocks work / S2 wrong data / S3 annoyance / S4 cosmetic).
-2. **Locate** — delegate to `cavecrew-investigator` (package-level) or use codegraph to find the code path.
+2. **Locate** — delegate to `cavecrew-investigator` (package-level) or use codegraph to find the code path (`codegraph sync` first; one `codegraph_explore` call with the symbol names, per PROTOCOL → Code lookup).
    Decide the layer: frontend-only, contract mismatch (frontend path/body vs backend route), backend rule,
    or data/seed.
 3. **Map to spec** — find the BR in `docs/specs/<module>.md` that this violates.

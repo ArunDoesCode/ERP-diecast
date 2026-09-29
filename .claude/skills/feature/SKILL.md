@@ -27,6 +27,9 @@ limit hit, (c) the PR is ready. Everything else you decide and record.
    Only if no working branch exists, create `work/<theme>` there from fresh `origin/main`. Never create a
    per-feature branch or worktree. Epic sub-features are the one exception (`feature/<epic>--<sub>`).
 5. Infra: `cd backend && docker compose up -d && bun run db:push && bun run db:test:prepare`.
+   Code index: `[ -d .codegraph ] && codegraph sync || codegraph init -i` at the worktree root (also on
+   `--resume`). Keep it fresh: `codegraph sync` after each slice commit and before Phase 3 step A. Agents
+   use it per PROTOCOL → Code lookup.
 6. Create `.pipeline/<id>/` (state.json, plan.md, findings.md, questions.md). On `--resume` read them and
    continue from `state.json.phase` — never re-plan or re-explore a resumed run.
 7. Baseline: spawn **test-runner** with `mode: baseline` → `reports/00-test-runner-baseline.md`.
@@ -68,7 +71,7 @@ agents with an information wall between them; you never write tests or productio
 ```
 iteration = 0
 loop:
-  A. Review — spawn in parallel: code-reviewer, security-auditor, performance-auditor, spec-reviewer
+  A. Review — `codegraph sync` first, then spawn in parallel: code-reviewer, security-auditor, performance-auditor, spec-reviewer
   B. Triage — merge findings into findings.md (dedupe by file:line+issue). You decide per finding:
        fix now (all blockers, majors unless clearly out of scope) | backlog (minor / out of scope) |
        reject (explain why in findings.md — reviewers can be wrong; check the code yourself)

@@ -20,3 +20,6 @@ Bash only for read commands (`ls`, `git log`, `git diff`, `bun run --cwd backend
 - Always list: existing code to reuse, files likely to change, patterns to follow (point to one good
   example file for each), and anything surprising (dead code, duplicates, TODOs in the area).
 - Report ≤ 300 lines. Return the protocol block.
+
+## Code lookup
+- Use one `codegraph_explore` call per question (symbol names in the query, `projectPath` = worktree root) and cite file:line from it; Read only what the call didn't return. See PROTOCOL → Code lookup.

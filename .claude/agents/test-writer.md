@@ -70,3 +70,6 @@ path plus at least one negative path (wrong role, over-quantity, invalid status)
    the valuable output; list them first.
 4. If the DB isn't reachable, say: run `docker compose up -d && bun run db:test:prepare` in `backend/`. Tests run
    only against `DATABASE_URL_TEST` (the `bun test` preload enforces it) — never point them at the dev DB.
+
+## Code lookup
+- Look up interfaces only (signatures, types, routes, fixtures) with `codegraph_explore`; never read implementation bodies of the code under test — explore returns full source, so ask about types/routes and ignore service/repository logic. See PROTOCOL → Code lookup and Test independence.

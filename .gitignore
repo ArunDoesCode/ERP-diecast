@@ -97,3 +97,6 @@ backend/storage/
 playwright-report/
 test-results/
 *.lcov
+
+# --- CodeGraph index (per worktree, rebuilt by /feature) ---
+.codegraph/
