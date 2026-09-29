@@ -23,7 +23,7 @@
     "test:watch": "bun test --watch"
   },
   "dependencies": {
-    "@hono/node-server": "^2.0.6",
+    "@hono/node-server": "^2.1.1",
     "drizzle-orm": "^1.0.0-rc.5-5935859",
     "drizzle-zod": "^0.8.3",
     "hono": "^4.12.27",
