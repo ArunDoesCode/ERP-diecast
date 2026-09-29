@@ -22,6 +22,7 @@ import type {
   assetServiceCreateSchemaType,
   assetServiceListQuerySchemaType,
   assetServiceUpdateSchemaType,
+  assetStockListQuerySchemaType,
 } from "../types/asset.types";
 
 type DbUniqueError = {
@@ -60,6 +61,10 @@ function getConflictError(error: unknown) {
     return new ConflictError("Service code already exists");
   }
 
+  if (constraint.includes("locations_name")) {
+    return new ConflictError("Location name already exists");
+  }
+
   if (constraint.includes("machines_name")) {
     return new ConflictError("Machine name already exists");
   }
@@ -69,6 +74,47 @@ function getConflictError(error: unknown) {
   }
 
   return new ConflictError("Duplicate value violates a unique constraint");
+}
+
+// BR-INV-12, 13 on the values the location will have.
+async function checkLocationRules(
+  next: {
+    type: "main_store" | "vendor_premise" | "finished_goods" | "scrap_yard";
+    linkedVendorId: number | null;
+  },
+  currentId: number | undefined,
+) {
+  if (next.type === "vendor_premise") {
+    if (next.linkedVendorId === null) {
+      throw new BadRequestError("A vendor premise must link a supplier");
+    }
+    const supplier = await assetRepository.findSupplierForLocation(
+      next.linkedVendorId,
+    );
+    if (!supplier) {
+      throw new BadRequestError("Supplier not found");
+    }
+    if (!supplier.isActive) {
+      throw new BadRequestError("Supplier is inactive");
+    }
+    const others = await assetRepository.countLocations("vendor_premise", {
+      supplierId: next.linkedVendorId,
+      ...(currentId !== undefined ? { excludeId: currentId } : {}),
+    });
+    if (others > 0) {
+      throw new ConflictError("This supplier already has a vendor premise");
+    }
+  } else if (next.linkedVendorId !== null) {
+    throw new BadRequestError("Only a vendor premise can link a supplier");
+  }
+  if (next.type === "main_store") {
+    const others = await assetRepository.countLocations("main_store", {
+      ...(currentId !== undefined ? { excludeId: currentId } : {}),
+    });
+    if (others > 0) {
+      throw new ConflictError("There is already a main store");
+    }
+  }
 }
 
 export const assetService = {
@@ -212,24 +258,87 @@ export const assetService = {
     };
   },
 
-  async createLocation(input: assetLocationCreateSchemaType) {
-    const created = await assetRepository.createLocation(input);
-    if (!created) {
-      throw new InternalServerError("Failed to create location");
+  async createLocation(input: assetLocationCreateSchemaType, actorId: number) {
+    await checkLocationRules(
+      { type: input.type, linkedVendorId: input.linkedVendorId ?? null },
+      undefined,
+    );
+    try {
+      const created = await assetRepository.createLocation(
+        {
+          ...input,
+          linkedVendorId: input.linkedVendorId ?? null,
+          ...(input.type === "vendor_premise" ? { isVirtual: true } : {}),
+        },
+        actorId,
+      );
+      if (!created) {
+        throw new InternalServerError("Failed to create location");
+      }
+      return created;
+    } catch (error) {
+      throw getConflictError(error) ?? error;
     }
-    return created;
   },
 
-  async updateLocation(id: number, input: assetLocationUpdateSchemaType) {
-    const updated = await assetRepository.updateLocation(id, input);
-    if (!updated) {
+  async updateLocation(
+    id: number,
+    input: assetLocationUpdateSchemaType,
+    actorId: number,
+  ) {
+    const current = await assetRepository.findLocationById(id);
+    if (!current) {
       throw new NotFoundError("Location not found");
     }
-    return updated;
+    const type = input.type ?? current.type;
+    const linkedVendorId =
+      input.linkedVendorId !== undefined
+        ? input.linkedVendorId
+        : type === "vendor_premise"
+          ? current.linkedVendorId
+          : null;
+    const typeChanges = type !== current.type;
+    const linkChanges = linkedVendorId !== current.linkedVendorId;
+
+    if (
+      (typeChanges || linkChanges) &&
+      (await assetRepository.locationHasLedgerRows(id))
+    ) {
+      throw new ConflictError(
+        "Type and linked supplier can't change once the location has stock rows",
+        "LOCATION_IN_USE",
+      );
+    }
+    if (typeChanges || linkChanges) {
+      await checkLocationRules({ type, linkedVendorId }, id);
+      if (typeChanges && current.type === "main_store") {
+        const others = await assetRepository.countLocations("main_store", {
+          excludeId: id,
+        });
+        if (others === 0) {
+          throw new ConflictError("There must be exactly one main store");
+        }
+      }
+    }
+    try {
+      const updated = await assetRepository.updateLocation(id, {
+        ...input,
+        ...(typeChanges || linkChanges ? { linkedVendorId } : {}),
+        ...(type === "vendor_premise" ? { isVirtual: true } : {}),
+        lastUpdatedBy: actorId,
+        lastUpdatedAt: new Date(),
+      });
+      if (!updated) {
+        throw new NotFoundError("Location not found");
+      }
+      return updated;
+    } catch (error) {
+      throw getConflictError(error) ?? error;
+    }
   },
 
-  // Manual stock-take / opening stock only (BR-GRN-43, 44). Document types are
-  // posted from their source document.
+  // Manual stock-take / opening stock only (BR-GRN-43, BR-INV-21..23).
+  // Document types are posted from their source document.
   async createInventoryMovement(
     input: assetManualMovementCreateSchemaType,
     actorId: number,
@@ -242,26 +351,15 @@ export const assetService = {
         `Type ${input.referenceType} is posted from its source document, not by hand.`,
       );
     }
-    const isStockIn = input.quantityChange > 0;
-    if (
-      isStockIn &&
-      (input.unitCostPaise === undefined || input.unitCostPaise <= 0)
-    ) {
-      throw new BadRequestError(
-        "unitCostPaise must be greater than 0 for a manual stock-in.",
-      );
-    }
-    const created = await assetRepository.createInventoryMovement(
-      {
-        ...input,
-        referenceType: input.referenceType,
-      },
-      actorId,
-    );
-    if (!created) {
-      throw new InternalServerError("Failed to create inventory movement");
-    }
-    return created;
+    return assetRepository.manualMovement(input, actorId);
+  },
+
+  async inventoryStock(params: assetStockListQuerySchemaType) {
+    const { rows, total } = await assetRepository.listStock(params);
+    return {
+      data: rows,
+      meta: toPaginatedMeta(params.page, params.pageSize, total),
+    };
   },
 
   async inventoryReconciliation(params: assetReconciliationQuerySchemaType) {

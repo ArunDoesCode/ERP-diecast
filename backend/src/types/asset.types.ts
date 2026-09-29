@@ -367,58 +367,44 @@ const reasonSchema = z.string().trim().min(1).max(1000);
 const batchSchema = z.string().trim().min(1).max(100).nullish();
 const costSchema = z.number().int().min(1).max(2_147_483_647); // int4
 
-export const assetManualMovementSchema = z.discriminatedUnion("referenceType", [
-  // Stock-take: counted qty; server posts counted - balance at that location
-  // (0 difference -> 400 "no difference"). unitCostPaise is needed only when
-  // the difference is positive (BR-GRN-44); ignored when negative (valued at
-  // average).
-  z.object({
-    itemId: z.number().int().positive(),
-    locationId: z.number().int().positive(),
-    referenceType: z.literal("stock_adjustment"),
-    countedQty: qty3dp.refine((v) => v >= 0, {
-      message: "Counted quantity cannot be negative",
+export const assetManualMovementCreateSchema = z.discriminatedUnion(
+  "referenceType",
+  [
+    // Stock-take: counted qty; server posts counted - balance at that location
+    // (0 difference -> 400 "no difference"). unitCostPaise is needed only when
+    // the difference is positive (BR-GRN-44); ignored when negative (valued at
+    // average).
+    z.object({
+      itemId: z.number().int().positive(),
+      locationId: z.number().int().positive(),
+      referenceType: z.literal("stock_adjustment"),
+      countedQty: qty3dp.refine((v) => v >= 0, {
+        message: "Counted quantity cannot be negative",
+      }),
+      unitCostPaise: costSchema.optional(),
+      reason: reasonSchema,
+      batchNumber: batchSchema,
     }),
-    unitCostPaise: costSchema.optional(),
-    reason: reasonSchema,
-    batchNumber: batchSchema,
-  }),
-  // Opening stock: qty + rate; only for an item+location with no ledger rows.
-  z.object({
-    itemId: z.number().int().positive(),
-    locationId: z.number().int().positive(),
-    referenceType: z.literal("opening_stock"),
-    qty: qty3dp.refine((v) => v > 0, {
-      message: "Quantity must be greater than 0",
+    // Opening stock: qty + rate; only for an item+location with no ledger rows.
+    z.object({
+      itemId: z.number().int().positive(),
+      locationId: z.number().int().positive(),
+      referenceType: z.literal("opening_stock"),
+      qty: qty3dp.refine((v) => v > 0, {
+        message: "Quantity must be greater than 0",
+      }),
+      unitCostPaise: costSchema,
+      reason: reasonSchema,
+      batchNumber: batchSchema,
     }),
-    unitCostPaise: costSchema,
-    reason: reasonSchema,
-    batchNumber: batchSchema,
-  }),
-  z.object({
-    itemId: z.number().int().positive(),
-    locationId: z.number().int().positive(),
-    referenceType: documentMovementReferenceTypeSchema,
-    reason: z.string().optional(),
-  }),
-]);
-export type assetManualMovementSchemaType = z.infer<
-  typeof assetManualMovementSchema
->;
-
-// LEGACY signed-quantity shape, still used by assetService/assetRepository
-// until slice S9 replaces it with assetManualMovementSchema above. Not routed.
-export const assetManualMovementCreateSchema = z.object({
-  itemId: z.number().int().positive(),
-  locationId: z.number().int().positive(),
-  referenceType: inventoryReferenceTypeSchema,
-  quantityChange: z.number().refine((v) => v !== 0, {
-    message: "quantityChange must be non-zero",
-  }),
-  unitCostPaise: z.number().int().min(0).max(2_147_483_647).optional(),
-  reason: z.string().trim().min(1).max(1000),
-  batchNumber: z.string().trim().min(1).max(100).nullish(),
-});
+    z.object({
+      itemId: z.number().int().positive(),
+      locationId: z.number().int().positive(),
+      referenceType: documentMovementReferenceTypeSchema,
+      reason: z.string().optional(),
+    }),
+  ],
+);
 export type assetManualMovementCreateSchemaType = z.infer<
   typeof assetManualMovementCreateSchema
 >;

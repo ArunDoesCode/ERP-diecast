@@ -7,12 +7,14 @@ import {
   getTableColumns,
   gte,
   ilike,
+  inArray,
   lt,
   or,
   sql,
 } from "drizzle-orm";
 import { db } from "../db/client";
 import {
+  grns,
   inventoryLedger,
   itemMaster,
   locations,
@@ -22,8 +24,9 @@ import {
   purchaseRequestItems,
   serviceMaster,
   supplierItems,
+  supplierMaster,
 } from "../db/schemas/02_procurement";
-import { NotFoundError } from "../lib/errors";
+import { BadRequestError, ConflictError, NotFoundError } from "../lib/errors";
 import type { PartialUpdate } from "../lib/types";
 import type {
   assetInventoryMovementListQuerySchemaType,
@@ -37,6 +40,7 @@ import type {
   assetReconciliationQuerySchemaType,
   assetServiceCreateSchemaType,
   assetServiceListQuerySchemaType,
+  assetStockListQuerySchemaType,
 } from "../types/asset.types";
 import { postStock } from "./stockPostingRepository";
 
@@ -57,6 +61,8 @@ const inventoryMovementColumns = {
   transactionType: inventoryLedger.transactionType,
   referenceType: inventoryLedger.referenceType,
   referenceId: inventoryLedger.referenceId,
+  referenceLineId: inventoryLedger.referenceLineId,
+  sourceNumber: grns.grnNumber,
   quantityChange: inventoryLedger.quantityChange,
   balanceAfter: inventoryLedger.balanceAfter,
   unitCostPaise: inventoryLedger.unitCostPaise,
@@ -368,6 +374,17 @@ export const assetRepository = {
         .from(inventoryLedger)
         .innerJoin(itemMaster, eq(itemMaster.id, inventoryLedger.itemId))
         .innerJoin(locations, eq(locations.id, inventoryLedger.locationId))
+        .leftJoin(
+          grns,
+          and(
+            eq(grns.id, inventoryLedger.referenceId),
+            inArray(inventoryLedger.referenceType, [
+              "grn",
+              "grn_bypass",
+              "grn_correction",
+            ]),
+          ),
+        )
         .where(whereClause)
         .orderBy(orderFn(sortColumn), asc(inventoryLedger.id))
         .limit(params.pageSize)
@@ -375,7 +392,17 @@ export const assetRepository = {
       db.select({ value: count() }).from(inventoryLedger).where(whereClause),
     ]);
 
-    return { rows, total: totalRow?.value ?? 0 };
+    return {
+      rows: rows.map(({ sourceNumber, ...row }) => ({
+        ...row,
+        sourceDocument: {
+          type: row.referenceType,
+          id: row.referenceId,
+          number: sourceNumber ?? null,
+        },
+      })),
+      total: totalRow?.value ?? 0,
+    };
   },
 
   async listLocations(params: assetLocationListQuerySchemaType) {
@@ -388,38 +415,85 @@ export const assetRepository = {
     const q = params.q?.trim();
     const pattern = q ? `%${q}%` : undefined;
 
-    const whereClause = pattern
-      ? or(ilike(locations.name, pattern), ilike(locations.type, pattern))
-      : undefined;
+    const whereClause = and(
+      pattern
+        ? or(
+            ilike(locations.name, pattern),
+            sql`${locations.type}::text ilike ${pattern}`,
+          )
+        : undefined,
+      params.isActive !== undefined
+        ? eq(locations.isActive, params.isActive)
+        : undefined,
+    );
 
-    const [rows, [totalRow]] = whereClause
-      ? await Promise.all([
-          db
-            .select(locationColumns)
-            .from(locations)
-            .where(whereClause)
-            .orderBy(orderFn(sortColumn), asc(locations.id))
-            .limit(params.pageSize)
-            .offset((params.page - 1) * params.pageSize),
-          db.select({ value: count() }).from(locations).where(whereClause),
-        ])
-      : await Promise.all([
-          db
-            .select(locationColumns)
-            .from(locations)
-            .orderBy(orderFn(sortColumn), asc(locations.id))
-            .limit(params.pageSize)
-            .offset((params.page - 1) * params.pageSize),
-          db.select({ value: count() }).from(locations),
-        ]);
+    const [rows, [totalRow]] = await Promise.all([
+      db
+        .select(locationColumns)
+        .from(locations)
+        .where(whereClause)
+        .orderBy(orderFn(sortColumn), asc(locations.id))
+        .limit(params.pageSize)
+        .offset((params.page - 1) * params.pageSize),
+      db.select({ value: count() }).from(locations).where(whereClause),
+    ]);
 
     return { rows, total: totalRow?.value ?? 0 };
   },
 
-  async createLocation(input: assetLocationCreateSchemaType) {
+  async findLocationById(id: number) {
+    const [row] = await db
+      .select(locationColumns)
+      .from(locations)
+      .where(eq(locations.id, id))
+      .limit(1);
+    return row;
+  },
+
+  async findSupplierForLocation(supplierId: number) {
+    const [row] = await db
+      .select({ id: supplierMaster.id, isActive: supplierMaster.isActive })
+      .from(supplierMaster)
+      .where(eq(supplierMaster.id, supplierId))
+      .limit(1);
+    return row;
+  },
+
+  // Other locations of a type (optionally linked to one supplier).
+  async countLocations(
+    type: (typeof locations.$inferSelect)["type"],
+    opts: { excludeId?: number; supplierId?: number } = {},
+  ) {
+    const [row] = await db
+      .select({ value: count() })
+      .from(locations)
+      .where(
+        and(
+          eq(locations.type, type),
+          opts.excludeId !== undefined
+            ? sql`${locations.id} <> ${opts.excludeId}`
+            : undefined,
+          opts.supplierId !== undefined
+            ? eq(locations.linkedVendorId, opts.supplierId)
+            : undefined,
+        ),
+      );
+    return row?.value ?? 0;
+  },
+
+  async locationHasLedgerRows(locationId: number) {
+    const [row] = await db
+      .select({ id: inventoryLedger.id })
+      .from(inventoryLedger)
+      .where(eq(inventoryLedger.locationId, locationId))
+      .limit(1);
+    return row !== undefined;
+  },
+
+  async createLocation(input: assetLocationCreateSchemaType, actorId: number) {
     const [created] = await db
       .insert(locations)
-      .values(input)
+      .values({ ...input, createdBy: actorId, lastUpdatedBy: actorId })
       .returning(locationColumns);
     return created;
   },
@@ -434,33 +508,127 @@ export const assetRepository = {
     return updated;
   },
 
-  // Manual movement: type `adjustment`, reference id 0. Stock-out is valued at
-  // the current average and may not go below zero at the location (BR-GRN-33,
-  // 44); stock-in feeds the moving average.
-  async createInventoryMovement(
-    input: Omit<assetManualMovementCreateSchemaType, "referenceType"> & {
-      referenceType: "stock_adjustment" | "opening_stock";
-    },
+  // Manual movement (BR-GRN-43/44, BR-INV-21..23): type `adjustment`, reference
+  // id 0, posted through postStock in one transaction. The item row is locked
+  // before the balance is read, so the stock-take difference is exact.
+  async manualMovement(
+    input: Extract<
+      assetManualMovementCreateSchemaType,
+      { referenceType: "stock_adjustment" | "opening_stock" }
+    >,
     actorId: number,
   ) {
-    const isStockIn = input.quantityChange > 0;
     return db.transaction(async (tx) => {
+      const [item] = await tx
+        .select({
+          id: itemMaster.id,
+          uom: itemMaster.uom,
+          isActive: itemMaster.isActive,
+        })
+        .from(itemMaster)
+        .where(eq(itemMaster.id, input.itemId))
+        .limit(1)
+        .for("update");
+      if (!item) {
+        const [service] = await tx
+          .select({ id: serviceMaster.id })
+          .from(serviceMaster)
+          .where(eq(serviceMaster.id, input.itemId))
+          .limit(1);
+        if (service) {
+          // BR-INV-10: services never hold stock
+          throw new BadRequestError("Services do not hold stock");
+        }
+        throw new NotFoundError("Item not found");
+      }
       const [location] = await tx
-        .select({ id: locations.id })
+        .select({ id: locations.id, isActive: locations.isActive })
         .from(locations)
         .where(eq(locations.id, input.locationId))
         .limit(1);
       if (!location) {
         throw new NotFoundError("Location not found");
       }
+      if (!location.isActive) {
+        // BR-INV-15
+        throw new BadRequestError("Location is inactive");
+      }
+
+      const qty =
+        input.referenceType === "opening_stock" ? input.qty : input.countedQty;
+      if (
+        (item.uom === "pcs" || item.uom === "set") &&
+        !Number.isInteger(qty)
+      ) {
+        // BR-INV-08
+        throw new BadRequestError(
+          `Items in ${item.uom} take whole numbers only`,
+        );
+      }
+
+      const [lastRow] = await tx
+        .select({ balanceAfter: inventoryLedger.balanceAfter })
+        .from(inventoryLedger)
+        .where(
+          and(
+            eq(inventoryLedger.itemId, input.itemId),
+            eq(inventoryLedger.locationId, input.locationId),
+          ),
+        )
+        .orderBy(desc(inventoryLedger.id))
+        .limit(1);
+
+      if (input.referenceType === "opening_stock") {
+        if (lastRow) {
+          throw new ConflictError(
+            "This item already has stock rows at this location, use stock-take",
+          );
+        }
+        if (!item.isActive) {
+          throw new BadRequestError("Item is inactive");
+        }
+        return postStock(tx, {
+          itemId: input.itemId,
+          locationId: input.locationId,
+          batchNumber: input.batchNumber,
+          transactionType: "adjustment",
+          referenceType: "opening_stock",
+          referenceId: 0,
+          quantityChange: input.qty,
+          unitCostPaise: input.unitCostPaise,
+          notes: input.reason,
+          createdBy: actorId,
+        });
+      }
+
+      // stock-take: post counted - balance at this location
+      const diffMilli =
+        Math.round(input.countedQty * 1000) -
+        Math.round((lastRow?.balanceAfter ?? 0) * 1000);
+      if (diffMilli === 0) {
+        throw new BadRequestError(
+          "No difference between counted and system stock",
+        );
+      }
+      const isStockIn = diffMilli > 0;
+      if (isStockIn && !item.isActive) {
+        throw new BadRequestError(
+          "Item is inactive, it can only be adjusted down",
+        );
+      }
+      if (isStockIn && input.unitCostPaise === undefined) {
+        throw new BadRequestError(
+          "unitCostPaise (> 0) is needed when counted is above the system stock",
+        );
+      }
       return postStock(tx, {
         itemId: input.itemId,
         locationId: input.locationId,
         batchNumber: input.batchNumber,
         transactionType: "adjustment",
-        referenceType: input.referenceType,
+        referenceType: "stock_adjustment",
         referenceId: 0,
-        quantityChange: input.quantityChange,
+        quantityChange: diffMilli / 1000,
         unitCostPaise: isStockIn ? (input.unitCostPaise ?? 0) : 0,
         valueAtAverage: !isStockIn,
         blockNegative: !isStockIn,
@@ -468,6 +636,102 @@ export const assetRepository = {
         createdBy: actorId,
       });
     });
+  },
+
+  // Stock view (BR-INV-19, 07, 06): active items plus inactive items that
+  // still hold stock; per-location balance = last ledger balance.
+  async listStock(params: assetStockListQuerySchemaType) {
+    const q = params.q?.trim();
+    const pattern = q ? `%${q}%` : undefined;
+    const valueExpr = sql`round(${itemMaster.currentStock} * ${itemMaster.averageCostPaise})`;
+    const belowExpr = and(
+      eq(itemMaster.isActive, true),
+      sql`${itemMaster.reorderLevel} > 0`,
+      sql`${itemMaster.currentStock} <= ${itemMaster.reorderLevel}`,
+    );
+    const whereClause = and(
+      or(eq(itemMaster.isActive, true), sql`${itemMaster.currentStock} <> 0`),
+      pattern
+        ? or(ilike(itemMaster.sku, pattern), ilike(itemMaster.name, pattern))
+        : undefined,
+      params.category ? eq(itemMaster.category, params.category) : undefined,
+      params.belowReorder === true ? belowExpr : undefined,
+      params.belowReorder === false ? sql`not (${belowExpr})` : undefined,
+      params.locationId !== undefined
+        ? sql`exists (select 1 from ${inventoryLedger} where ${inventoryLedger.itemId} = ${itemMaster.id} and ${inventoryLedger.locationId} = ${params.locationId})`
+        : undefined,
+    );
+    const sortColumn =
+      params.sortBy === "valuePaise"
+        ? valueExpr
+        : params.sortBy
+          ? itemSortColumns[params.sortBy]
+          : itemMaster.id;
+    const orderFn = params.sortDir === "desc" ? desc : asc;
+
+    const [items, [totalRow]] = await Promise.all([
+      db
+        .select({
+          itemId: itemMaster.id,
+          sku: itemMaster.sku,
+          name: itemMaster.name,
+          category: itemMaster.category,
+          uom: itemMaster.uom,
+          currentStock: itemMaster.currentStock,
+          averageCostPaise: itemMaster.averageCostPaise,
+          reorderLevel: itemMaster.reorderLevel,
+          isActive: itemMaster.isActive,
+        })
+        .from(itemMaster)
+        .where(whereClause)
+        .orderBy(orderFn(sortColumn), asc(itemMaster.id))
+        .limit(params.pageSize)
+        .offset((params.page - 1) * params.pageSize),
+      db.select({ value: count() }).from(itemMaster).where(whereClause),
+    ]);
+
+    const balances =
+      items.length === 0
+        ? []
+        : await db
+            .selectDistinctOn(
+              [inventoryLedger.itemId, inventoryLedger.locationId],
+              {
+                itemId: inventoryLedger.itemId,
+                locationId: inventoryLedger.locationId,
+                locationName: locations.name,
+                locationType: locations.type,
+                balance: inventoryLedger.balanceAfter,
+              },
+            )
+            .from(inventoryLedger)
+            .innerJoin(locations, eq(locations.id, inventoryLedger.locationId))
+            .where(
+              inArray(
+                inventoryLedger.itemId,
+                items.map((i) => i.itemId),
+              ),
+            )
+            .orderBy(
+              inventoryLedger.itemId,
+              inventoryLedger.locationId,
+              desc(inventoryLedger.id),
+            );
+
+    return {
+      rows: items.map((item) => ({
+        ...item,
+        valuePaise: Math.round(item.currentStock * item.averageCostPaise),
+        belowReorder:
+          item.isActive &&
+          item.reorderLevel > 0 &&
+          item.currentStock <= item.reorderLevel,
+        locations: balances
+          .filter((b) => b.itemId === item.itemId)
+          .map(({ itemId: _i, ...b }) => b),
+      })),
+      total: totalRow?.value ?? 0,
+    };
   },
 
   // Mismatch rows only (BR-GRN-41): item stock vs ledger total, and each

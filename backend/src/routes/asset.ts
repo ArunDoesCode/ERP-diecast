@@ -25,7 +25,7 @@ import {
   assetMachineListQuerySchema,
   assetMachineSchema,
   assetMachineUpdateSchema,
-  assetManualMovementSchema,
+  assetManualMovementCreateSchema,
   assetReconciliationQuerySchema,
   assetReconciliationRowSchema,
   assetServiceCreateSchema,
@@ -257,7 +257,7 @@ register({
   summary:
     "Manual stock movement: stock-take (stock_adjustment, counted qty) or opening stock (opening_stock, qty + rate) only, reason required. Document reference types get 400.",
   auth: INVENTORY_ADJUST_AUTH,
-  request: { body: assetManualMovementSchema },
+  request: { body: assetManualMovementCreateSchema },
   responses: { "201": successResponse(assetInventoryMovementSchema) },
 });
 
@@ -300,7 +300,7 @@ register({
 
 assetRouter.get(
   ASSET_ROUTES.listLocations,
-  requireAssetManage,
+  requireRole("super-admin", "owner", "back_office", "floor_supervisor"), // perm: inventory.view
   asyncHandler(assetController.listLocations),
 );
 register({
@@ -308,7 +308,7 @@ register({
   path: `${ASSET_BASE_PATH}${ASSET_ROUTES.listLocations}`,
   tags: ["asset"],
   summary: "List inventory locations, paginated.",
-  auth: ASSET_AUTH,
+  auth: INVENTORY_VIEW_AUTH,
   request: { query: assetLocationListQuerySchema },
   responses: { "200": paginatedResponse(assetLocationSchema) },
   pagination: {

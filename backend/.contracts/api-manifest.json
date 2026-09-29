@@ -1073,7 +1073,9 @@
         "type": "roles",
         "roles": [
           "super-admin",
-          "back_office"
+          "owner",
+          "back_office",
+          "floor_supervisor"
         ]
       },
       "request": {
