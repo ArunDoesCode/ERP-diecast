@@ -1,0 +1,997 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DiecastOS Developer Handbook</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --bg: #f5f7f9;
+    --surface: #ffffff;
+    --surface-2: #eef2f5;
+    --ink: #17212b;
+    --ink-2: #3e4c59;
+    --muted: #66758a;
+    --line: #d8e0e7;
+    --accent: #0e7c7b;
+    --accent-soft: #dff1f0;
+    --warn: #9a6207;
+    --warn-soft: #fbf0db;
+    --bad: #b3261e;
+    --bad-soft: #fbe3e1;
+    --good: #1f7a3f;
+    --good-soft: #e0f2e6;
+    --code-bg: #1d2733;
+    --code-ink: #e6edf3;
+    --code-dim: #8fa1b3;
+    --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+    --body: "Public Sans", "Segoe UI", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #10161c;
+      --surface: #161e26;
+      --surface-2: #1c2630;
+      --ink: #e5ebf0;
+      --ink-2: #bac6d1;
+      --muted: #8a99a8;
+      --line: #2a3643;
+      --accent: #4cc3bf;
+      --accent-soft: #143331;
+      --warn: #e2b458;
+      --warn-soft: #34290f;
+      --bad: #f2837b;
+      --bad-soft: #3a1b19;
+      --good: #6dcf8f;
+      --good-soft: #15301f;
+      --code-bg: #0b1117;
+      --code-ink: #e6edf3;
+      --code-dim: #7d8fa1;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #10161c;
+    --surface: #161e26;
+    --surface-2: #1c2630;
+    --ink: #e5ebf0;
+    --ink-2: #bac6d1;
+    --muted: #8a99a8;
+    --line: #2a3643;
+    --accent: #4cc3bf;
+    --accent-soft: #143331;
+    --warn: #e2b458;
+    --warn-soft: #34290f;
+    --bad: #f2837b;
+    --bad-soft: #3a1b19;
+    --good: #6dcf8f;
+    --good-soft: #15301f;
+    --code-bg: #0b1117;
+    --code-ink: #e6edf3;
+    --code-dim: #7d8fa1;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 16.5px;
+    line-height: 1.65;
+    padding-inline: 16px;
+    padding-block: 0 64px;
+  }
+  a { color: var(--accent); text-underline-offset: 2px; }
+  a:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+
+  .shell {
+    max-width: 1180px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 250px minmax(0, 1fr);
+    gap: 48px;
+  }
+  @media (max-width: 900px) {
+    .shell { grid-template-columns: minmax(0, 1fr); gap: 0; }
+    nav.toc { position: static; max-height: none; border-bottom: 1px solid var(--line); padding-bottom: 16px; margin-bottom: 8px; }
+  }
+
+  header.masthead {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding-block: 40px 28px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 32px;
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  h1 {
+    font-family: var(--display);
+    font-weight: 800;
+    font-size: clamp(30px, 5vw, 46px);
+    line-height: 1.08;
+    letter-spacing: -0.01em;
+    margin: 8px 0 12px;
+    text-wrap: balance;
+  }
+  .lede { font-size: 18px; color: var(--ink-2); max-width: 68ch; margin: 0; }
+  .meta { margin-top: 14px; font-size: 13px; color: var(--muted); font-family: var(--mono); }
+
+  nav.toc {
+    position: sticky;
+    top: calc(env(safe-area-inset-top, 0px) + 16px);
+    align-self: start;
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+    font-size: 14px;
+  }
+  nav.toc .label { font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+  nav.toc ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; counter-reset: toc; }
+  nav.toc li { counter-increment: toc; }
+  nav.toc a {
+    display: flex; gap: 10px; padding: 5px 8px; border-radius: 6px;
+    color: var(--ink-2); text-decoration: none; line-height: 1.35;
+  }
+  nav.toc a::before { content: counter(toc, decimal-leading-zero); font-family: var(--mono); font-size: 11px; color: var(--muted); padding-top: 2px; }
+  nav.toc a:hover { background: var(--surface-2); color: var(--ink); }
+  nav.toc a.active { background: var(--accent-soft); color: var(--ink); }
+
+  main { min-width: 0; }
+  section.chapter { padding-block: 8px 40px; border-bottom: 1px solid var(--line); margin-bottom: 36px; scroll-margin-top: 16px; }
+  section.chapter:last-of-type { border-bottom: 0; }
+  .chap-no { font-family: var(--mono); font-size: 12px; color: var(--muted); letter-spacing: 0.06em; }
+  h2 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(24px, 3.4vw, 31px);
+    line-height: 1.15;
+    margin: 4px 0 14px;
+    text-wrap: balance;
+  }
+  h3 { font-family: var(--display); font-weight: 600; font-size: 19px; margin: 30px 0 8px; text-wrap: balance; }
+  p, ul, ol.plain { max-width: 70ch; }
+  p { margin: 0 0 14px; }
+  ul, ol.plain { padding-left: 22px; margin: 0 0 14px; }
+  li { margin-bottom: 6px; }
+  strong { font-weight: 650; }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    padding: 1px 5px;
+    border-radius: 4px;
+    word-break: break-word;
+  }
+  pre.term {
+    background: var(--code-bg);
+    color: var(--code-ink);
+    font-family: var(--mono);
+    font-size: 13.5px;
+    line-height: 1.6;
+    padding: 14px 16px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 0 0 16px;
+    max-width: 78ch;
+  }
+  pre.term .c { color: var(--code-dim); }
+  pre.term .p { color: #7ee0c3; user-select: none; }
+
+  .callout {
+    max-width: 70ch;
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin: 0 0 16px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+  }
+  .callout .tag { font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; display: block; margin-bottom: 4px; }
+  .callout p:last-child { margin-bottom: 0; }
+  .callout.info { background: var(--accent-soft); border-color: transparent; }
+  .callout.info .tag { color: var(--accent); }
+  .callout.warn { background: var(--warn-soft); border-color: transparent; }
+  .callout.warn .tag { color: var(--warn); }
+  .callout.analogy { border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; }
+  .callout.analogy .tag { color: var(--accent); }
+
+  .table-wrap { overflow-x: auto; margin: 0 0 18px; max-width: 100%; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+  th { font-family: var(--display); font-weight: 600; font-size: 13px; background: var(--surface-2); color: var(--ink-2); }
+  tr:last-child td { border-bottom: 0; }
+  td code { white-space: nowrap; }
+
+  .compare { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 0 0 18px; max-width: 900px; }
+  @media (max-width: 640px) { .compare { grid-template-columns: minmax(0, 1fr); } }
+  .compare > div { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
+  .compare h4 { font-family: var(--display); font-size: 15px; margin: 0 0 8px; }
+  .compare ul { margin: 0; padding-left: 18px; font-size: 15px; }
+  .compare .old h4 { color: var(--muted); }
+  .compare .new h4 { color: var(--accent); }
+
+  .diagram { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; margin: 0 0 18px; overflow-x: auto; max-width: 100%; }
+  .diagram pre.mermaid { margin: 0; background: transparent; }
+  .diagram .cap { font-size: 13px; color: var(--muted); margin-top: 10px; }
+
+  .tree { font-family: var(--mono); font-size: 13px; line-height: 1.55; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; overflow-x: auto; margin: 0 0 16px; max-width: 78ch; white-space: pre; color: var(--ink); }
+  .tree .n { color: var(--muted); }
+  .tree .h { color: var(--accent); font-weight: 500; }
+
+  .steps { list-style: none; padding: 0; margin: 0 0 18px; display: flex; flex-direction: column; gap: 10px; max-width: 78ch; counter-reset: s; }
+  .steps li { counter-increment: s; display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; margin: 0; }
+  .steps li::before { content: counter(s); font-family: var(--display); font-weight: 700; font-size: 15px; width: 28px; height: 28px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; }
+  .steps li p { margin: 0 0 6px; }
+  .steps li p:last-child { margin: 0; }
+  .who { font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; padding: 1px 7px; border-radius: 999px; margin-left: 6px; vertical-align: 2px; }
+  .who.you { background: var(--warn-soft); color: var(--warn); }
+  .who.ai { background: var(--accent-soft); color: var(--accent); }
+  .who.gh { background: var(--surface-2); color: var(--ink-2); border: 1px solid var(--line); }
+
+  details.faq { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; margin: 0 0 10px; max-width: 78ch; }
+  details.faq summary { cursor: pointer; padding: 12px 16px; font-weight: 600; list-style: none; display: flex; justify-content: space-between; gap: 12px; }
+  details.faq summary::-webkit-details-marker { display: none; }
+  details.faq summary::after { content: "+"; font-family: var(--mono); color: var(--muted); }
+  details.faq[open] summary::after { content: "−"; }
+  details.faq .a { padding: 0 16px 12px; }
+
+  .gloss-tools { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 0 0 14px; }
+  .gloss-tools input {
+    font: inherit; font-size: 15px; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--surface); color: var(--ink); width: min(360px, 100%);
+  }
+  .gloss-tools .count { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  dl.gloss { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; margin: 0; max-width: 82ch; }
+  dl.gloss > div { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; }
+  dl.gloss dt { font-family: var(--display); font-weight: 600; font-size: 15.5px; }
+  dl.gloss dt .cat { font-family: var(--mono); font-weight: 400; font-size: 11px; color: var(--muted); margin-left: 8px; text-transform: uppercase; letter-spacing: 0.06em; }
+  dl.gloss dd { margin: 3px 0 0; color: var(--ink-2); font-size: 15px; }
+  .empty { color: var(--muted); font-size: 14px; }
+
+  @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+<style>body{margin:0} img{max-width:100%} [hidden]{display:none!important}</style>
+</head>
+<body>
+
+
+<header class="masthead">
+  <div class="eyebrow">DiecastOS · ERP-diecast repo · Handbook</div>
+  <h1>How code gets from your editor to main</h1>
+  <p class="lede">You already know how to build features. This handbook explains everything around the code: git branches, pull requests, worktrees, CI, tests, the <code>.claude</code> folder and the agent pipeline. Every term is explained in plain words, with the real files and commands from this repo.</p>
+  <div class="meta">Written 2026-09-27 · Repo: github.com/ArunDoesCode/ERP-diecast · Read top to bottom the first time; use the glossary later.</div>
+</header>
+
+<div class="shell">
+  <nav class="toc" aria-label="Chapters">
+    <div class="label">Chapters</div>
+    <ol>
+      <li><a href="#big-picture">The whole flow in one picture</a></li>
+      <li><a href="#git">Git basics, compared to what you do today</a></li>
+      <li><a href="#branches">Branches</a></li>
+      <li><a href="#prs">Pull requests (PRs)</a></li>
+      <li><a href="#worktrees">Worktrees</a></li>
+      <li><a href="#ci">CI: the robot that checks every PR</a></li>
+      <li><a href="#tests">Tests and checks</a></li>
+      <li><a href="#database">The local database and Docker</a></li>
+      <li><a href="#claude-folder">The .claude folder</a></li>
+      <li><a href="#docs">The docs folder</a></li>
+      <li><a href="#pipeline">The agent pipeline</a></li>
+      <li><a href="#your-day">Your day, command by command</a></li>
+      <li><a href="#whatif">What if…</a></li>
+      <li><a href="#glossary">Glossary</a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+    <!-- 1 -->
+    <section class="chapter" id="big-picture">
+      <div class="chap-no">Chapter 01</div>
+      <h2>The whole flow in one picture</h2>
+      <p>Before: you wrote code, committed, and pushed straight to <code>main</code>. Now there is one extra stop between your code and <code>main</code>: a <strong>pull request</strong>, where a robot runs the checks and you look at the result before it goes in.</p>
+
+      <div class="diagram">
+<pre class="mermaid">
+flowchart LR
+  A["Requirement"] --> B["Spec<br/>(you + Claude)"]
+  B --> C["Branch<br/>feature/grn"]
+  C --> D["Code + tests<br/>(agents or you)"]
+  D --> E["Push branch<br/>to GitHub"]
+  E --> F["Pull request"]
+  F --> G{"CI checks<br/>green?"}
+  G -- "no" --> D
+  G -- "yes" --> H["You test the UI"]
+  H -- "comments" --> D
+  H -- "looks good" --> I["Merge into main"]
+</pre>
+        <div class="cap">Everything left of "Merge" happens on a separate branch, so <code>main</code> only ever receives finished, checked work.</div>
+      </div>
+
+      <p>The rest of this handbook explains each box. If you only remember three things:</p>
+      <ul>
+        <li><strong>A branch</strong> is a separate line of work, so unfinished code never lands on <code>main</code>.</li>
+        <li><strong>A pull request</strong> is a request to merge a branch into <code>main</code>. It's where checks run and where you review.</li>
+        <li><strong>CI</strong> is a robot on GitHub's servers that runs type checks, lint and tests on every pull request, so you don't have to remember to.</li>
+      </ul>
+    </section>
+
+    <!-- 2 -->
+    <section class="chapter" id="git">
+      <div class="chap-no">Chapter 02</div>
+      <h2>Git basics, compared to what you do today</h2>
+
+      <p>Git keeps the full history of your project as a chain of snapshots. Each snapshot is a <strong>commit</strong>. The copy on GitHub is called the <strong>remote</strong>, and git nicknames it <code>origin</code>. Your laptop has its own full copy of the repository with its own history.</p>
+
+      <div class="compare">
+        <div class="old">
+          <h4>What you do today</h4>
+          <ul>
+            <li>Edit files in <code>~/codes/ERP-diecast</code></li>
+            <li><code>git add .</code> and <code>git commit -m "…"</code></li>
+            <li><code>git push</code> sends your commits to <code>main</code> on GitHub</li>
+            <li><code>git pull</code> brings other people's commits down</li>
+            <li>Everyone works on <code>main</code> directly</li>
+          </ul>
+        </div>
+        <div class="new">
+          <h4>What changes</h4>
+          <ul>
+            <li>Same commands, but on a <strong>branch</strong> instead of <code>main</code></li>
+            <li><code>git push</code> sends the <em>branch</em> to GitHub</li>
+            <li>You open a <strong>pull request</strong> to merge it</li>
+            <li>CI checks it; you merge it on GitHub</li>
+            <li>Then <code>git pull</code> on <code>main</code>, as before</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3>The four places your code can be</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Place</th><th>What it is</th><th>How code gets there</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Working folder</strong></td><td>The files you see and edit on disk</td><td>You type</td></tr>
+            <tr><td><strong>Staging area</strong></td><td>Changes you've marked for the next commit</td><td><code>git add</code></td></tr>
+            <tr><td><strong>Local history</strong></td><td>Commits saved on your laptop</td><td><code>git commit</code></td></tr>
+            <tr><td><strong>Remote (origin)</strong></td><td>The copy on GitHub everyone shares</td><td><code>git push</code> (and <code>git pull</code> to bring it back)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Commands you'll see, in plain words</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Command</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td><code>git status</code></td><td>Shows what you've changed and which branch you're on. Run it often; it never changes anything.</td></tr>
+            <tr><td><code>git log --oneline</code></td><td>Lists recent commits, one per line. The 7-character code at the start (e.g. <code>ffa1255</code>) is the commit's ID.</td></tr>
+            <tr><td><code>git fetch</code></td><td>Downloads news from GitHub (new commits, new branches) <em>without</em> changing your files.</td></tr>
+            <tr><td><code>git pull</code></td><td><code>fetch</code> + apply the new commits to the branch you're on.</td></tr>
+            <tr><td><code>git push</code></td><td>Uploads your commits on the current branch to GitHub.</td></tr>
+            <tr><td><code>git diff</code></td><td>Shows exactly which lines you changed and haven't committed yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 3 -->
+    <section class="chapter" id="branches">
+      <div class="chap-no">Chapter 03</div>
+      <h2>Branches</h2>
+
+      <div class="callout analogy">
+        <span class="tag">Analogy</span>
+        <p><code>main</code> is the approved drawing of a die. A branch is a photocopy you mark up while designing a change. The approved drawing stays clean until your markup is checked and accepted. Then the changes are copied onto it (that's a <strong>merge</strong>).</p>
+      </div>
+
+      <p>A <strong>branch</strong> is just a name pointing at a chain of commits. When you create one, it starts as an exact copy of where you were (usually <code>main</code>). Commits you make on it don't affect <code>main</code> at all until you merge.</p>
+
+      <div class="diagram">
+<pre class="mermaid">
+gitGraph
+  commit id: "68941a7"
+  branch worktree-workflow-setup
+  checkout worktree-workflow-setup
+  commit id: "a29819d workflow"
+  commit id: "0a406f4 pipeline"
+  commit id: "b17de0e knowledge"
+  commit id: "5681c94 CI green"
+  checkout main
+  merge worktree-workflow-setup id: "ffa1255 merge PR #1"
+</pre>
+        <div class="cap">This is exactly what happened with PR #1: five commits on a branch, then one merge commit (<code>ffa1255</code>) that brought them into <code>main</code>.</div>
+      </div>
+
+      <h3>Why bother</h3>
+      <ul>
+        <li><strong><code>main</code> always works.</strong> The factory will eventually run what's on <code>main</code>. Half-finished GRN changes never reach it.</li>
+        <li><strong>Several things at once.</strong> A GRN fix and a BOM feature can be in progress on two branches without mixing.</li>
+        <li><strong>Easy undo.</strong> If an idea doesn't work, delete the branch. <code>main</code> never saw it.</li>
+      </ul>
+
+      <h3>Branch commands</h3>
+      <pre class="term"><span class="p">$</span> git switch main                 <span class="c"># go to main</span>
+<span class="p">$</span> git pull                        <span class="c"># make sure it's up to date</span>
+<span class="p">$</span> git switch -c feature/grn-fix   <span class="c"># create a new branch from here and move onto it</span>
+<span class="c">  … edit, git add, git commit as usual …</span>
+<span class="p">$</span> git push -u origin feature/grn-fix   <span class="c"># first push of a new branch (-u links it to GitHub)</span>
+<span class="p">$</span> git push                        <span class="c"># later pushes on the same branch</span>
+<span class="p">$</span> git branch                      <span class="c"># list your branches; * marks the current one</span>
+<span class="p">$</span> git branch -d feature/grn-fix   <span class="c"># delete it after it's merged</span></pre>
+
+      <h3>Branch names used in this repo</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Pattern</th><th>Used for</th><th>Created by</th></tr></thead>
+          <tbody>
+            <tr><td><code>main</code></td><td>The approved, working code</td><td>Exists already</td></tr>
+            <tr><td><code>feature/&lt;name&gt;</code></td><td>One feature, e.g. <code>feature/dev-foundation</code></td><td><code>/feature</code> or you</td></tr>
+            <tr><td><code>epic/&lt;name&gt;</code></td><td>A very large feature that's split into parts (e.g. BOM)</td><td><code>/epic</code></td></tr>
+            <tr><td><code>feature/&lt;epic&gt;--&lt;part&gt;</code></td><td>One part of an epic, merged into the epic branch</td><td><code>/epic</code></td></tr>
+            <tr><td><code>worktree-…</code></td><td>Branches Claude Code created for its own worktrees (like PR #1's)</td><td>Claude Code</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 4 -->
+    <section class="chapter" id="prs">
+      <div class="chap-no">Chapter 04</div>
+      <h2>Pull requests (PRs)</h2>
+
+      <p>A <strong>pull request</strong> is a page on GitHub that says "please merge branch X into <code>main</code>". It shows every changed line, runs the CI checks, and has a place for comments. Nothing happens to <code>main</code> until someone presses <strong>Merge</strong>. For this repo, that's you.</p>
+
+      <h3>Life of a PR</h3>
+      <ol class="steps">
+        <li><p><strong>Open</strong><span class="who ai">agent</span> <span class="who you">or you</span></p><p>After pushing a branch: <code>gh pr create</code>, or the "Compare &amp; pull request" button GitHub shows.</p></li>
+        <li><p><strong>Checks run</strong><span class="who gh">GitHub</span></p><p>CI starts automatically. The PR shows a yellow dot (running), a green tick (passed) or a red cross (failed).</p></li>
+        <li><p><strong>Review</strong><span class="who you">you</span></p><p>Read the description (the pipeline writes what changed and a manual test checklist), try it in the UI, and leave comments on specific lines if something's wrong.</p></li>
+        <li><p><strong>Fix</strong><span class="who ai">agent</span></p><p>New commits pushed to the same branch appear in the same PR automatically, and CI runs again.</p></li>
+        <li><p><strong>Merge</strong><span class="who you">you</span></p><p>Press <strong>Merge pull request</strong>. GitHub creates a merge commit on <code>main</code>. The PR is closed and marked "Merged".</p></li>
+        <li><p><strong>Tidy up</strong><span class="who you">you</span> <span class="who ai">or /watch-prs</span></p><p>Delete the branch (GitHub offers a button), and run <code>git pull</code> on <code>main</code> locally.</p></li>
+      </ol>
+
+      <h3>What the PR status words mean</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>You see</th><th>Meaning</th><th>What to do</th></tr></thead>
+          <tbody>
+            <tr><td>✅ All checks have passed</td><td>CI ran and everything is green</td><td>Test in the UI, then merge</td></tr>
+            <tr><td>❌ Some checks were not successful</td><td>A CI job failed (type error, lint error or failing test)</td><td>Click "Details" to see which step and why; don't merge until fixed</td></tr>
+            <tr><td>🟡 Some checks haven't completed yet</td><td>CI is still running (usually 1–2 minutes here)</td><td>Wait</td></tr>
+            <tr><td>"This branch has conflicts"</td><td>Someone changed the same lines on <code>main</code> since the branch started</td><td>See <a href="#whatif">What if… → merge conflict</a></td></tr>
+            <tr><td>Merge button enabled while red</td><td>On GitHub Free with a private repo, checks can't be made mandatory</td><td>It's on you not to merge red PRs</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout info">
+        <span class="tag">What happened with PR #1</span>
+        <p>Its checks went red at first. That wasn't because of the PR's own changes: it added CI for the first time, and CI found problems that were already on <code>main</code> but that nobody had been checking (a half-finished rename in the approval form, a formatting error, lint errors). They were fixed on the same branch, CI went green, and then it was merged.</p>
+      </div>
+    </section>
+
+    <!-- 5 -->
+    <section class="chapter" id="worktrees">
+      <div class="chap-no">Chapter 05</div>
+      <h2>Worktrees</h2>
+
+      <p>This is the part that's usually confusing, because it's not something you need when you work alone in one folder.</p>
+
+      <div class="callout analogy">
+        <span class="tag">Analogy</span>
+        <p>Normally, one folder shows one branch at a time. <code>git switch</code> swaps every file in the folder to the other branch. A <strong>worktree is a second folder attached to the same repository</strong>, showing a different branch. It's like having a second desk with a different drawing laid out, both drawings coming from the same filing cabinet.</p>
+      </div>
+
+      <div class="tree"><span class="h">~/codes/ERP-diecast/</span>                     <span class="n">← your main folder (branch: main)</span>
+├── .git/                                 <span class="n">← THE repository: all history, all branches (one copy)</span>
+├── backend/  frontend/  docs/ …          <span class="n">← files of branch "main"</span>
+└── .claude/worktrees/
+    ├── <span class="h">dev-foundation/</span>                   <span class="n">← worktree 2 (branch: feature/dev-foundation)</span>
+    │   └── backend/  frontend/  docs/ …  <span class="n">← full set of files for THAT branch</span>
+    └── <span class="h">grn/</span>                              <span class="n">← worktree 3 (branch: feature/grn)</span>
+        └── backend/  frontend/  docs/ …</div>
+
+      <h3>Why the agent pipeline needs them</h3>
+      <ul>
+        <li><strong>Agents and you don't collide.</strong> While an agent edits <code>backend/</code> for <code>feature/grn</code> in its worktree, your main folder is untouched. Your own half-done edits don't leak into the agent's work, and the other way round.</li>
+        <li><strong>Parallel features.</strong> Two pipelines can run at once, one folder each.</li>
+        <li><strong>No switching cost.</strong> With one folder, <code>git switch</code> would change files under a running dev server or an agent mid-edit. With worktrees nobody has to switch.</li>
+      </ul>
+
+      <h3>Things that are true about worktrees</h3>
+      <ul>
+        <li><strong>There's still only one repository.</strong> All folders share the single <code>.git</code>. A commit made in a worktree is instantly visible from your main folder (<code>git log feature/grn</code>). Nothing is copied or synced.</li>
+        <li><strong>Each folder is a full checkout.</strong> It has every file, and it needs its own <code>bun install</code> (its own <code>node_modules</code>) and its own <code>.env</code> if it runs the app. That's why they use disk space.</li>
+        <li><strong>A branch can only be open in one folder at a time.</strong> If <code>feature/grn</code> is open in a worktree, you can't also <code>git switch feature/grn</code> in your main folder.</li>
+        <li><strong>Why inside <code>.claude/</code>:</strong> it's where Claude Code creates worktrees by default, and the pipeline follows that. The folder is hidden from git by a local ignore rule (<code>.git/info/exclude</code> contains <code>**/.claude/worktrees/</code>), so worktrees never show up as "changes" and are never committed.</li>
+        <li><strong>They don't go away on merge.</strong> Merging a PR changes <code>main</code> on GitHub only. The worktree folder stays until it's removed (the pipeline's <code>/watch-prs</code> removes it after a merge; otherwise you do).</li>
+      </ul>
+
+      <h3>Worktree commands</h3>
+      <pre class="term"><span class="p">$</span> git worktree list                                 <span class="c"># show all folders and their branches</span>
+<span class="p">$</span> git worktree add -b feature/x .claude/worktrees/x main   <span class="c"># new folder + new branch from main</span>
+<span class="p">$</span> cd .claude/worktrees/x                            <span class="c"># work there like any folder</span>
+<span class="p">$</span> git -C .claude/worktrees/x status --short         <span class="c"># check a worktree without cd-ing into it</span>
+<span class="p">$</span> git worktree remove .claude/worktrees/x           <span class="c"># delete the folder (refuses if it has uncommitted work)</span>
+<span class="p">$</span> git branch -d feature/x                           <span class="c"># delete the branch too, once merged</span></pre>
+
+      <div class="callout info">
+        <span class="tag">You don't have to use them yourself</span>
+        <p>For your own manual work, the plain branch flow from Chapter 03 in your main folder is enough. Worktrees are mainly for the agents. You'll only really touch them to <code>cd</code> into one and run the app when testing a PR, or to remove a leftover one.</p>
+      </div>
+    </section>
+
+    <!-- 6 -->
+    <section class="chapter" id="ci">
+      <div class="chap-no">Chapter 06</div>
+      <h2>CI: the robot that checks every PR</h2>
+
+      <p><strong>CI</strong> stands for <em>Continuous Integration</em>: every time code is about to be merged, a machine automatically builds and checks it. On GitHub this is done by <strong>GitHub Actions</strong>.</p>
+
+      <h3>Where it's configured</h3>
+      <p>One file: <code>.github/workflows/ci.yml</code> at the repo root. GitHub looks in <code>.github/workflows/</code> of every repository and runs any YAML file it finds there. There's no setting to turn on and no server of your own. Committing the file is the whole setup.</p>
+
+      <h3>Where it runs</h3>
+      <p>On <strong>GitHub's machines</strong>, not your laptop. For each run, GitHub starts a fresh, empty Linux virtual machine (<code>ubuntu-latest</code>, called a <strong>runner</strong>), downloads your code, runs the steps, reports the result, and throws the machine away. Your Docker, your database and your laptop being on or off make no difference. The free plan includes a monthly allowance of minutes for private repos (check GitHub → Settings → Billing); one run of this repo takes about a minute.</p>
+
+      <h3>When it runs</h3>
+      <p>The top of the file says:</p>
+      <pre class="term">on:
+  pull_request:          <span class="c"># every time a PR is opened or gets new commits</span>
+  push:
+    branches: [main]     <span class="c"># and every time main itself changes (e.g. after a merge)</span></pre>
+
+      <h3>What it runs: the file explained</h3>
+      <p>A workflow has <strong>jobs</strong> (they run in parallel, each on its own machine), and each job has <strong>steps</strong> (they run in order; the first failing step stops the job).</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Job</th><th>Step</th><th>What it proves</th></tr></thead>
+          <tbody>
+            <tr><td rowspan="7"><strong>backend</strong><br/><span style="color:var(--muted);font-size:13px">with a Postgres 15 <em>service container</em>, a throwaway database started just for this job</span></td><td>checkout, setup-bun</td><td>Gets your code and installs Bun</td></tr>
+            <tr><td><code>bun install --frozen-lockfile</code></td><td>Dependencies install exactly as locked in <code>bun.lock</code></td></tr>
+            <tr><td><code>bun run typecheck</code></td><td>No TypeScript errors (<code>tsc --noEmit</code>)</td></tr>
+            <tr><td><code>bun run lint</code></td><td>Biome finds no errors (formatting, unused imports, risky code)</td></tr>
+            <tr><td>Schema + seed</td><td>Drizzle schema can be created on an empty DB; <code>seed_page_access.sql</code> runs cleanly</td></tr>
+            <tr><td><code>bun test</code></td><td>All backend tests pass against that database</td></tr>
+            <tr><td><code>contract:generate</code></td><td>The API contract (list of 82 endpoints) can be generated</td></tr>
+            <tr><td rowspan="3"><strong>frontend</strong></td><td>checkout, setup-bun, install</td><td>Same as above</td></tr>
+            <tr><td><code>bunx tsc --noEmit</code></td><td>No TypeScript errors in the Next.js app</td></tr>
+            <tr><td><code>bun run lint</code></td><td>Biome finds no errors</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>The fake secrets in the file (<code>ci-access-token-secret-…</code>) are only there because the backend refuses to start without secrets. They exist only inside that throwaway machine and protect nothing.</p>
+
+      <h3>How to see results</h3>
+      <ul>
+        <li><strong>On the PR page:</strong> the checks box near the bottom → <strong>Details</strong> next to a job → click the failed step (red cross) to read its output.</li>
+        <li><strong>Actions tab</strong> of the repo on GitHub: every run, for every branch.</li>
+        <li><strong>Terminal:</strong> <code>gh pr checks 1</code> (status of PR #1), <code>gh run list</code>, <code>gh run view &lt;id&gt; --log-failed</code> (only the failing lines).</li>
+      </ul>
+
+      <h3>Running the same checks on your laptop first</h3>
+      <pre class="term"><span class="p">$</span> cd backend  &amp;&amp; bun run typecheck &amp;&amp; bun run lint &amp;&amp; bun test
+<span class="p">$</span> cd frontend &amp;&amp; bunx tsc --noEmit &amp;&amp; bun run lint
+<span class="p">$</span> bunx biome check --write .     <span class="c"># auto-fix formatting and import order</span></pre>
+
+      <div class="callout warn">
+        <span class="tag">CI vs CD</span>
+        <p>You'll also hear <strong>CD</strong> (<em>Continuous Delivery/Deployment</em>): automatically deploying after checks pass. This repo has <strong>CI only</strong>. Nothing is deployed automatically.</p>
+      </div>
+    </section>
+
+    <!-- 7 -->
+    <section class="chapter" id="tests">
+      <div class="chap-no">Chapter 07</div>
+      <h2>Tests and checks</h2>
+
+      <p>"Checks" is the umbrella word. Each kind catches a different class of problem:</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Kind</th><th>Catches</th><th>Tool / command</th><th>In this repo</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Type check</strong></td><td>Wrong types, typos in field names (e.g. <code>prType</code> vs <code>subDocType</code>)</td><td><code>tsc --noEmit</code></td><td>Both packages</td></tr>
+            <tr><td><strong>Lint</strong></td><td>Formatting, unused imports, unsafe patterns, labels not linked to inputs</td><td>Biome (<code>bun run lint</code>)</td><td>Both packages</td></tr>
+            <tr><td><strong>Integration test</strong></td><td>A service/repository does the right thing against a real database</td><td><code>bun test</code></td><td><code>approvalRepository.test.ts</code></td></tr>
+            <tr><td><strong>Unit / structure test</strong></td><td>A small piece of logic, no database</td><td><code>bun test</code></td><td><code>route-registry.test.ts</code></td></tr>
+            <tr><td><strong>Business-rule test</strong></td><td>One numbered rule from a spec, e.g. <code>BR-GRN-04 rejects qty above PO open qty</code></td><td><code>bun test</code></td><td>Written by <code>test-writer</code> from now on</td></tr>
+            <tr><td><strong>Scenario test</strong></td><td>A whole flow: PR → approval → PO → GRN → stock</td><td><code>bun test</code> in <code>backend/src/scenarios/</code></td><td>Planned (M1)</td></tr>
+            <tr><td><strong>End-to-end (E2E) test</strong></td><td>A robot clicks through the real UI in a browser</td><td>Playwright</td><td>Planned (BL-010)</td></tr>
+            <tr><td><strong>Manual test</strong></td><td>"Does this make sense to a stores clerk?"</td><td>You, with the PR checklist</td><td>Every PR</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>How a test file looks</h3>
+      <p>Tests live next to the code as <code>*.test.ts</code>. <code>bun test</code> finds every such file and runs it.</p>
+      <pre class="term"><span class="c">// backend/src/service/grnService.test.ts (example of the style agents will write)</span>
+import { test, expect } from "bun:test";
+
+test("BR-GRN-04 rejects received qty above PO open qty", async () => {
+  <span class="c">// arrange: create a TEST_ supplier, item, PO with 100 open</span>
+  <span class="c">// act:     try to receive 120</span>
+  <span class="c">// assert:  it throws the right error and posts nothing to inventory_ledger</span>
+});</pre>
+      <p>Naming each test after its rule id (<code>BR-GRN-04</code>) links the spec, the test and the code. When a test fails, you know exactly which business rule broke.</p>
+    </section>
+
+    <!-- 8 -->
+    <section class="chapter" id="database">
+      <div class="chap-no">Chapter 08</div>
+      <h2>The local database and Docker</h2>
+
+      <p>The backend needs PostgreSQL. You don't install Postgres on your Mac. You run it inside <strong>Docker</strong>.</p>
+      <ul>
+        <li><strong>Docker</strong> runs small isolated "mini-computers" called <strong>containers</strong>. Docker Desktop is the Mac app that runs them; it must be open.</li>
+        <li><strong>Docker Compose</strong> starts containers described in a file. <code>backend/docker-compose.yaml</code> describes one: Postgres 15, database <code>diecast</code>, on port 5432.</li>
+        <li><code>docker compose up -d</code> (in <code>backend/</code>) starts it in the background. Your data lives in a Docker <strong>volume</strong> and survives restarts.</li>
+      </ul>
+
+      <h3>Getting the database ready</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Command (in <code>backend/</code>)</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr><td><code>docker compose up -d</code></td><td>Start Postgres</td></tr>
+            <tr><td><code>bun run db:push</code></td><td><strong>Schema push:</strong> Drizzle compares your TypeScript schema files with the database and creates/alters tables to match</td></tr>
+            <tr><td><code>psql … -f src/db/seed_page_access.sql</code></td><td><strong>Seed:</strong> inserts starter data (roles, pages, who sees which page)</td></tr>
+            <tr><td><code>bun run db:seed:approval-policies</code></td><td>Seeds approval rules (needs a super-admin employee to exist)</td></tr>
+            <tr><td><code>bun run db:reset</code> <em>(planned, BL-005)</em></td><td>One command: wipe, push schema, seed everything, add realistic test data and a login per role</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout info">
+        <span class="tag">Who needs a database, when</span>
+        <p><strong>CI</strong> creates its own throwaway one on GitHub. You do nothing. <strong>Pipeline agents</strong> start the Docker one when they run tests, so keep Docker Desktop open during a <code>/feature</code> run. <strong>You</strong> need it only to click through a PR in the browser. Once <code>db:reset</code> exists (the dev-foundation feature), that's a single command.</p>
+      </div>
+
+      <p><strong>Migrations vs push:</strong> today the schema is applied with <code>db:push</code> ("make the DB look like the code"). Before the factory has real data, this switches to <strong>migrations</strong>: numbered SQL files that record each change, so production data is upgraded safely and reviewably (decision D-004, backlog BL-011).</p>
+    </section>
+
+    <!-- 9 -->
+    <section class="chapter" id="claude-folder">
+      <div class="chap-no">Chapter 09</div>
+      <h2>The .claude folder</h2>
+
+      <p><code>.claude/</code> folders hold instructions and configuration for Claude Code. The app is plain code; these files only change how Claude behaves in this repo. There are three of them, and where each one sits decides <strong>when</strong> Claude reads it.</p>
+
+      <div class="tree"><span class="h">ERP-diecast/</span>
+├── CLAUDE.md                  <span class="n">← always read: how work flows, the rules, where docs live</span>
+├── .claude/                   <span class="n">← ROOT: the workflow layer, for the whole repo</span>
+│   ├── settings.json          <span class="n">← permissions: what Claude may run without asking (shared, committed)</span>
+│   ├── settings.local.json    <span class="n">← your personal extra permissions (not committed)</span>
+│   ├── agents/                <span class="n">← pipeline agents: explorer, backend-dev, frontend-dev, reviewers, test-runner…</span>
+│   ├── skills/                <span class="n">← your commands: /spec /freeze /feature /epic /watch-prs /status /map /bug /wrap</span>
+│   ├── pipeline/PROTOCOL.md   <span class="n">← how agents hand work to each other</span>
+│   └── worktrees/             <span class="n">← agent work folders (git-ignored locally)</span>
+├── backend/
+│   ├── CLAUDE.md              <span class="n">← read when working on backend files: Hono/Drizzle conventions</span>
+│   └── .claude/               <span class="n">← BACKEND layer: backend-only agents and skills</span>
+│       ├── agents/            <span class="n">← hono-builder, hono-reviewer (detailed backend rules)</span>
+│       └── skills/            <span class="n">← api-endpoint-intake, pagination-contract…</span>
+└── frontend/
+    ├── CLAUDE.md              <span class="n">← read when working on frontend files: Next.js 16 conventions</span>
+    └── .claude/               <span class="n">← FRONTEND layer</span>
+        ├── agents/            <span class="n">← nextjs-builder, nextjs-reviewer</span>
+        └── skills/            <span class="n">← data-table, ui-form-standards, structure-guard…</span></div>
+
+      <h3>Why some things are at the root and others aren't</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Lives in</th><th>Because it's about</th><th>Examples</th></tr></thead>
+          <tbody>
+            <tr><td>Root <code>.claude/</code></td><td>The <strong>process</strong>: spans backend and frontend (specs, PRs, reviews, tests)</td><td><code>/feature</code>, <code>spec-analyst</code>, <code>security-auditor</code>, <code>settings.json</code></td></tr>
+            <tr><td><code>backend/.claude/</code></td><td>How to write <strong>backend code</strong> specifically</td><td>"every list endpoint must paginate like this"</td></tr>
+            <tr><td><code>frontend/.claude/</code></td><td>How to write <strong>frontend code</strong> specifically</td><td>"forms use react-hook-form + Zod like this"</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The backend and frontend folders were there first. The root one was added for the workflow so the process rules aren't copied into both packages. The pipeline's <code>backend-dev</code> agent (root) is told to read <code>backend/.claude/agents/hono-builder.md</code> for the detailed rules, so the two layers work together.</p>
+
+      <h3>How Claude Code reads them</h3>
+      <ul>
+        <li><strong>Start Claude from the repo root</strong> (<code>cd ~/codes/ERP-diecast &amp;&amp; claude</code>). It loads the root <code>CLAUDE.md</code>, root <code>settings.json</code>, root agents and root skills.</li>
+        <li><strong>Package files load when relevant.</strong> Claude reads <code>backend/CLAUDE.md</code> when it works on backend files, and it discovers <code>backend/.claude/skills</code> for work under <code>backend/</code>. You saw these listed as "from backend/.claude/skills".</li>
+        <li><strong>Worktrees contain their own copy</strong> of all of this, because a worktree is a full checkout. That's why, while PR #1's worktree existed, <code>/context</code> listed skills twice (once from your folder, once from the worktree). Removing the worktree removes the duplicates.</li>
+        <li><strong>A branch's <code>.claude</code> files apply to that branch.</strong> If an agent changes an agent file on its branch, only that worktree sees the change until it's merged.</li>
+      </ul>
+
+      <h3>settings.json in one paragraph</h3>
+      <p>It lists commands Claude may run without asking (<code>allow</code>: git on feature branches, <code>gh pr</code>, <code>bun</code>, <code>docker compose up</code>…) and commands that are always refused (<code>deny</code>: force-push, pushing to <code>main</code>, <code>gh pr merge</code>, <code>rm -rf</code>, reading <code>.env</code>). On GitHub Free you can't lock <code>main</code> on the server, so these deny rules and your habit of merging only green PRs are the safety net.</p>
+    </section>
+
+    <!-- 10 -->
+    <section class="chapter" id="docs">
+      <div class="chap-no">Chapter 10</div>
+      <h2>The docs folder</h2>
+      <p>Everything the agents (and you) need to remember lives in <code>docs/</code> as plain Markdown, committed with the code. Each file has one job:</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>File</th><th>Answers</th><th>Updated by</th></tr></thead>
+          <tbody>
+            <tr><td><code>docs/STATUS.md</code></td><td><strong>Where are we? What's next?</strong> Start here every day.</td><td><code>/status</code>, <code>/feature</code>, <code>/wrap</code></td></tr>
+            <tr><td><code>docs/specs/&lt;module&gt;.md</code></td><td>What should this module do? States, numbered rules (<code>BR-GRN-04</code>), acceptance criteria</td><td><code>/spec</code> with you; locked by <code>/freeze</code></td></tr>
+            <tr><td><code>docs/modules/&lt;module&gt;.md</code></td><td>What does the code do today, and where is it? (the "module map")</td><td><code>/map</code>, <code>/feature</code></td></tr>
+            <tr><td><code>docs/backlog.md</code></td><td>What's deferred, broken or wished for? (<code>BL-001</code>…)</td><td>Everyone</td></tr>
+            <tr><td><code>docs/decisions.md</code></td><td>Why did we choose X? (<code>D-001</code>…)</td><td>Append-only</td></tr>
+            <tr><td><code>docs/uat-log.md</code></td><td>What did the factory report during testing?</td><td><code>/bug</code></td></tr>
+            <tr><td><code>docs/WORKFLOW.md</code></td><td>The daily routine and milestone plan</td><td>Rarely</td></tr>
+            <tr><td><code>docs/KNOWLEDGE.md</code></td><td>Which kind of knowledge goes in which file, and how that scales</td><td>Rarely</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><strong>Spec vs module map:</strong> the spec is the requirement ("GRN must not exceed PO quantity"). The map is the as-built description ("GRN logic is in <code>grnService.create</code>; stock is posted via <code>assetRepository.createInventoryMovement</code>"). Agents read the map instead of re-reading the whole codebase every time.</p>
+    </section>
+
+    <!-- 11 -->
+    <section class="chapter" id="pipeline">
+      <div class="chap-no">Chapter 11</div>
+      <h2>The agent pipeline</h2>
+      <p>An <strong>agent</strong> is a Claude instance with a specific job and instructions (a file in <code>.claude/agents/</code>). A <strong>subagent</strong> is an agent started by your main Claude session to do one task and report back. A <strong>skill</strong> is a saved procedure you trigger with a slash command, like <code>/feature</code>.</p>
+
+      <div class="diagram">
+<pre class="mermaid">
+flowchart TB
+  You(["You"]) -->|"/spec, /freeze"| Coord
+  Coord["Coordinator<br/>your main Claude session (Opus)"]
+  Coord -->|brief| EX["explorer (Haiku)<br/>finds code"]
+  Coord -->|brief| TW["test-writer (Sonnet)<br/>tests from rules"]
+  Coord -->|brief| BE["backend-dev (Sonnet)"]
+  Coord -->|brief| FE["frontend-dev (Sonnet)"]
+  Coord -->|brief| RV["4 reviewers (Sonnet)<br/>code · security · performance · spec"]
+  Coord -->|brief| TR["test-runner (Haiku)<br/>runs all checks"]
+  EX & TW & BE & FE & RV & TR -->|report| Coord
+  Coord -->|"push + PR"| GH[("GitHub")]
+  GH -->|"your comments"| Coord
+</pre>
+        <div class="cap">Hub and spoke: agents never talk to each other directly. The coordinator hands each one a written brief and reads its report. Everything is saved in <code>.pipeline/&lt;feature&gt;/</code> on the feature branch, so work can resume in a new session.</div>
+      </div>
+
+      <h3>The loop</h3>
+      <ol class="steps">
+        <li><p><strong>Spec</strong><span class="who you">you</span> <span class="who ai">spec-analyst</span></p><p><code>/spec grn</code>: Claude compares with how mature ERPs handle GRN, asks you questions, writes <code>docs/specs/grn.md</code> with numbered rules and questions for the factory.</p></li>
+        <li><p><strong>Freeze</strong><span class="who you">you</span></p><p><code>/freeze grn</code>: checks the spec is complete and locks it. From here the agents take over. New ideas go to the backlog, not into the build.</p></li>
+        <li><p><strong>Build</strong><span class="who ai">agents</span></p><p><code>/feature grn</code>: creates <code>feature/grn</code> in a worktree, writes failing tests from the rules, builds backend then frontend until tests pass.</p></li>
+        <li><p><strong>Verify</strong><span class="who ai">agents</span></p><p>Four reviewers check code quality, security, performance and "does it match the spec". Test-runner runs everything. Problems go back to the right developer agent; the loop repeats (max 3 times, then it asks you).</p></li>
+        <li><p><strong>PR</strong><span class="who ai">agents</span> <span class="who gh">GitHub</span></p><p>Pushes the branch, opens a PR with a summary and a manual test checklist, waits for CI to be green.</p></li>
+        <li><p><strong>You test and decide</strong><span class="who you">you</span></p><p>Follow the checklist in the browser. Merge, or leave comments. <code>/loop 10m /watch-prs</code> picks up comments and runs the fix loop again.</p></li>
+      </ol>
+    </section>
+
+    <!-- 12 -->
+    <section class="chapter" id="your-day">
+      <div class="chap-no">Chapter 12</div>
+      <h2>Your day, command by command</h2>
+
+      <h3>Start of day</h3>
+      <pre class="term"><span class="p">$</span> cd ~/codes/ERP-diecast
+<span class="p">$</span> git switch main &amp;&amp; git pull          <span class="c"># get everything that was merged</span>
+<span class="c">  open Docker Desktop</span>
+<span class="p">$</span> claude --model opus                   <span class="c"># start Claude from the repo root</span>
+<span class="p">&gt;</span> /status                               <span class="c"># what's waiting on me, what's next</span></pre>
+
+      <h3>Starting a new piece of work</h3>
+      <pre class="term"><span class="p">&gt;</span> /spec dev-foundation                  <span class="c"># answer its questions</span>
+<span class="p">&gt;</span> /freeze dev-foundation                <span class="c"># lock it</span>
+<span class="p">&gt;</span> /feature dev-foundation               <span class="c"># agents build → PR appears on GitHub</span></pre>
+
+      <h3>Testing a PR the agents opened</h3>
+      <pre class="term"><span class="p">$</span> cd ~/codes/ERP-diecast/.claude/worktrees/dev-foundation   <span class="c"># the PR's folder</span>
+<span class="p">$</span> cd backend  &amp;&amp; bun run db:reset &amp;&amp; bun run dev          <span class="c"># db:reset once BL-005 exists</span>
+<span class="p">$</span> cd ../frontend &amp;&amp; bun run dev                            <span class="c"># in a second terminal tab</span>
+<span class="c">  open http://localhost:3000, follow the checklist in the PR description</span>
+<span class="c">  then on GitHub: Merge, or comment "Step 4: expected X, got Y"</span></pre>
+
+      <h3>Making a small change yourself (no agents)</h3>
+      <pre class="term"><span class="p">$</span> git switch main &amp;&amp; git pull
+<span class="p">$</span> git switch -c fix/po-label-typo
+<span class="c">  … edit …</span>
+<span class="p">$</span> cd frontend &amp;&amp; bunx tsc --noEmit &amp;&amp; bun run lint   <span class="c"># same checks CI will run</span>
+<span class="p">$</span> git add -A &amp;&amp; git commit -m "fix: PO label typo"
+<span class="p">$</span> git push -u origin fix/po-label-typo
+<span class="p">$</span> gh pr create --fill                                 <span class="c"># or use the button on GitHub</span>
+<span class="c">  wait for green → merge on GitHub →</span>
+<span class="p">$</span> git switch main &amp;&amp; git pull &amp;&amp; git branch -d fix/po-label-typo</pre>
+
+      <h3>After a merge</h3>
+      <pre class="term"><span class="p">$</span> git switch main &amp;&amp; git pull
+<span class="p">$</span> git worktree list                                    <span class="c"># any leftover folders?</span>
+<span class="p">$</span> git worktree remove .claude/worktrees/&lt;name&gt;         <span class="c"># if /watch-prs didn't already</span>
+<span class="p">$</span> git branch -d &lt;branch&gt;</pre>
+
+      <h3>End of day</h3>
+      <pre class="term"><span class="p">&gt;</span> /wrap          <span class="c"># Claude saves what it learned today into the right docs file</span></pre>
+    </section>
+
+    <!-- 13 -->
+    <section class="chapter" id="whatif">
+      <div class="chap-no">Chapter 13</div>
+      <h2>What if…</h2>
+
+      <details class="faq"><summary>…I just want to push straight to main like before?</summary><div class="a">
+        <p>Git will let you (GitHub Free can't block it on a private repo). But then CI only checks <em>after</em> the code is already on <code>main</code>, and the agents' work and yours can clash. For a one-line typo it's harmless; for anything real, use a branch and a PR. It adds about two minutes.</p>
+      </div></details>
+
+      <details class="faq"><summary>…CI is red on my PR?</summary><div class="a">
+        <p>Open the PR → <strong>Details</strong> on the red job → click the red step. The last lines say what failed: a file and line for type/lint errors, a test name for failing tests. Fix on the same branch, commit, push. CI re-runs by itself. For formatting errors, <code>bunx biome check --write .</code> usually fixes them automatically.</p>
+      </div></details>
+
+      <details class="faq"><summary>…GitHub says "This branch has conflicts"?</summary><div class="a">
+        <p>A <strong>merge conflict</strong> means <code>main</code> changed the same lines your branch changed, and git can't decide which to keep. To fix:</p>
+        <pre class="term"><span class="p">$</span> git switch feature/x
+<span class="p">$</span> git pull origin main          <span class="c"># bring main's changes into your branch</span>
+<span class="c">  git marks conflicting spots in files like this:</span>
+<span class="c">  &lt;&lt;&lt;&lt;&lt;&lt;&lt; yours … ======= … theirs &gt;&gt;&gt;&gt;&gt;&gt;&gt;</span>
+<span class="c">  edit each spot to the correct final version, delete the markers</span>
+<span class="p">$</span> git add -A &amp;&amp; git commit
+<span class="p">$</span> git push</pre>
+        <p>Or ask Claude: "resolve the merge conflicts on feature/x with main". It's routine work.</p>
+      </div></details>
+
+      <details class="faq"><summary>…I edited files in my main folder while on main, and I wanted a branch?</summary><div class="a">
+        <p>Uncommitted changes move with you. Run <code>git switch -c feature/x</code> <em>before committing</em>, and your edits are now on the new branch, with <code>main</code> untouched.</p>
+      </div></details>
+
+      <details class="faq"><summary>…I want to throw away a branch or a worktree?</summary><div class="a">
+        <p><code>git worktree remove &lt;folder&gt;</code> (refuses if there's uncommitted work: that's a safety check; look with <code>git -C &lt;folder&gt; status</code> first), then <code>git branch -D &lt;branch&gt;</code> (capital D deletes even if unmerged) and <code>git push origin --delete &lt;branch&gt;</code> for the GitHub copy.</p>
+      </div></details>
+
+      <details class="faq"><summary>…the pipeline stops and asks me something?</summary><div class="a">
+        <p>That's by design. It only stops when the spec doesn't answer a question, or when the fix loop ran 3 times without success. Answer it; the answer is written into the spec so it's never asked again. Repeated stops usually mean the spec needs more detail.</p>
+      </div></details>
+
+      <details class="faq"><summary>…I don't understand what an agent did?</summary><div class="a">
+        <p>Everything is on the branch: the PR's <strong>Files changed</strong> tab shows the code, and <code>.pipeline/&lt;feature&gt;/</code> has the plan, each agent's report, all review findings and the questions asked. You can also ask Claude "explain this PR to me".</p>
+      </div></details>
+
+      <details class="faq"><summary>…something in this handbook is out of date?</summary><div class="a">
+        <p>The source of truth is the repo: <code>CLAUDE.md</code>, <code>docs/WORKFLOW.md</code>, <code>.claude/</code> and <code>.github/workflows/ci.yml</code>. Ask Claude to update this handbook when the workflow changes.</p>
+      </div></details>
+    </section>
+
+    <!-- 14 -->
+    <section class="chapter" id="glossary">
+      <div class="chap-no">Chapter 14</div>
+      <h2>Glossary</h2>
+      <div class="gloss-tools">
+        <label for="gloss-filter" class="sr" style="position:absolute;left:-9999px">Filter glossary</label>
+        <input id="gloss-filter" type="search" placeholder="Filter terms, e.g. merge, CI, seed" autocomplete="off">
+        <span class="count" id="gloss-count"></span>
+      </div>
+      <dl class="gloss" id="gloss">
+        <div><dt>Agent <span class="cat">Claude</span></dt><dd>A Claude instance with a specific role and instructions, defined in a file in <code>.claude/agents/</code> (e.g. <code>security-auditor</code>).</dd></div>
+        <div><dt>Acceptance criterion <span class="cat">Spec</span></dt><dd>A "Given … When … Then …" sentence in a spec that describes a testable outcome. Each one becomes a test.</dd></div>
+        <div><dt>Backlog <span class="cat">Docs</span></dt><dd>List of deferred work, bugs and ideas in <code>docs/backlog.md</code>, each with a permanent id like <code>BL-014</code>.</dd></div>
+        <div><dt>Base branch <span class="cat">Git</span></dt><dd>The branch a PR wants to merge <em>into</em>, usually <code>main</code> (or an <code>epic/…</code> branch for epic parts).</dd></div>
+        <div><dt>Biome <span class="cat">Tooling</span></dt><dd>The linter and formatter used in both packages (instead of ESLint/Prettier). <code>bun run lint</code> checks; <code>bunx biome check --write .</code> fixes what it can.</dd></div>
+        <div><dt>BR (business rule) <span class="cat">Spec</span></dt><dd>A numbered, testable rule in a spec, e.g. <code>BR-GRN-04</code>. Numbers are never reused.</dd></div>
+        <div><dt>Branch <span class="cat">Git</span></dt><dd>A named line of commits. Work on a branch doesn't affect <code>main</code> until it's merged.</dd></div>
+        <div><dt>Branch protection <span class="cat">GitHub</span></dt><dd>A GitHub setting that blocks direct pushes to <code>main</code> and requires green CI before merging. Not available for private repos on GitHub Free.</dd></div>
+        <div><dt>CD <span class="cat">CI/CD</span></dt><dd>Continuous Delivery/Deployment: automatically deploying code after checks pass. Not set up in this repo.</dd></div>
+        <div><dt>Check (status check) <span class="cat">GitHub</span></dt><dd>A pass/fail result shown on a PR, e.g. the <code>backend</code> and <code>frontend</code> CI jobs.</dd></div>
+        <div><dt>Checkout / switch <span class="cat">Git</span></dt><dd>Changing which branch your folder shows. <code>git switch &lt;branch&gt;</code> (newer) or <code>git checkout &lt;branch&gt;</code> (older, same thing).</dd></div>
+        <div><dt>CI <span class="cat">CI/CD</span></dt><dd>Continuous Integration: automatically building and checking every change before it's merged. Here: GitHub Actions running <code>.github/workflows/ci.yml</code>.</dd></div>
+        <div><dt>CLAUDE.md <span class="cat">Claude</span></dt><dd>A Markdown file of instructions Claude reads automatically: the root one always, package ones when working in that package.</dd></div>
+        <div><dt>Clone <span class="cat">Git</span></dt><dd>Downloading a full copy of a repository from GitHub (<code>git clone &lt;url&gt;</code>). You did this once, originally.</dd></div>
+        <div><dt>Codegraph <span class="cat">Tooling</span></dt><dd>An index of the code (<code>.codegraph/</code>) that lets agents look up a function and its callers quickly instead of searching every file.</dd></div>
+        <div><dt>Commit <span class="cat">Git</span></dt><dd>A saved snapshot of changes with a message and an id (hash). Made with <code>git commit</code>.</dd></div>
+        <div><dt>Commit hash / SHA <span class="cat">Git</span></dt><dd>The unique id of a commit, e.g. <code>ffa1255</code> (short form of a 40-character code).</dd></div>
+        <div><dt>Container <span class="cat">Docker</span></dt><dd>An isolated mini-environment running one program, e.g. Postgres. Started and stopped by Docker.</dd></div>
+        <div><dt>Contract / API manifest <span class="cat">Pipeline</span></dt><dd>The generated list of every backend endpoint with its request and response shape (<code>bun run contract:generate</code>). The frontend builds against it so paths and fields match.</dd></div>
+        <div><dt>Coordinator <span class="cat">Pipeline</span></dt><dd>Your main Claude session (Opus) running <code>/feature</code>: it plans, starts every other agent, triages findings and talks to you and GitHub.</dd></div>
+        <div><dt>Diff <span class="cat">Git</span></dt><dd>The exact lines added and removed between two versions. <code>git diff</code>, or the PR's "Files changed" tab.</dd></div>
+        <div><dt>Docker / Docker Desktop <span class="cat">Docker</span></dt><dd>Software that runs containers. Docker Desktop is the Mac app; it must be open for local databases.</dd></div>
+        <div><dt>Docker Compose <span class="cat">Docker</span></dt><dd>Starts containers described in a YAML file (<code>backend/docker-compose.yaml</code>) with <code>docker compose up -d</code>.</dd></div>
+        <div><dt>E2E test <span class="cat">Testing</span></dt><dd>End-to-end test: a robot drives a real browser through the UI (Playwright). Planned, BL-010.</dd></div>
+        <div><dt>Epic <span class="cat">Pipeline</span></dt><dd>A very large feature split into ordered parts, each with its own branch and PR into an <code>epic/…</code> branch, then one final PR into <code>main</code>.</dd></div>
+        <div><dt>Fast-forward <span class="cat">Git</span></dt><dd>A pull where your branch simply moves ahead to the new commits because you had no local changes of your own. No merge commit needed.</dd></div>
+        <div><dt>Feature branch <span class="cat">Git</span></dt><dd>A branch for one feature, e.g. <code>feature/grn</code>.</dd></div>
+        <div><dt>Fetch <span class="cat">Git</span></dt><dd>Download new commits and branches from GitHub without changing your files (<code>git fetch</code>).</dd></div>
+        <div><dt>Force push <span class="cat">Git</span></dt><dd><code>git push --force</code>: overwrite the GitHub copy of a branch with yours, discarding what was there. Denied for Claude in <code>settings.json</code>.</dd></div>
+        <div><dt>Freeze <span class="cat">Spec</span></dt><dd>Locking a spec (<code>/freeze</code>) so it can be built. After that, changes are deliberate change requests, and ideas go to the backlog.</dd></div>
+        <div><dt>gh <span class="cat">Tooling</span></dt><dd>GitHub's command-line tool: <code>gh pr create</code>, <code>gh pr checks</code>, <code>gh run view</code>. Used by you and the pipeline.</dd></div>
+        <div><dt>GitHub Actions <span class="cat">CI/CD</span></dt><dd>GitHub's built-in automation that runs workflow files from <code>.github/workflows/</code> on GitHub's machines.</dd></div>
+        <div><dt>HEAD <span class="cat">Git</span></dt><dd>"Where you are now": the commit your folder currently shows (usually the latest commit of your current branch).</dd></div>
+        <div><dt>Head branch <span class="cat">GitHub</span></dt><dd>The branch a PR wants to merge <em>from</em> (e.g. <code>feature/grn</code>).</dd></div>
+        <div><dt>Job <span class="cat">CI/CD</span></dt><dd>A group of steps in a workflow that runs on its own machine. This repo has two: <code>backend</code> and <code>frontend</code>, running in parallel.</dd></div>
+        <div><dt>Lint <span class="cat">Testing</span></dt><dd>Automatic checking for style and risky patterns without running the code. Here: Biome.</dd></div>
+        <div><dt>Local <span class="cat">Git</span></dt><dd>On your laptop, as opposed to on GitHub (remote).</dd></div>
+        <div><dt>main <span class="cat">Git</span></dt><dd>The primary branch: the approved, working code everyone builds from.</dd></div>
+        <div><dt>Merge <span class="cat">Git</span></dt><dd>Combining one branch's commits into another. Merging a PR puts the branch's work into <code>main</code>.</dd></div>
+        <div><dt>Merge commit <span class="cat">Git</span></dt><dd>The special commit a merge creates, joining two histories (e.g. <code>ffa1255 Merge pull request #1</code>).</dd></div>
+        <div><dt>Merge conflict <span class="cat">Git</span></dt><dd>When two branches changed the same lines and git can't choose; you edit the file to the correct version and commit.</dd></div>
+        <div><dt>Migration <span class="cat">Database</span></dt><dd>A numbered file recording one database schema change, applied in order. Safer than <code>db:push</code> once real data exists.</dd></div>
+        <div><dt>Model (Opus, Sonnet, Haiku) <span class="cat">Claude</span></dt><dd>Claude model sizes. Opus reasons most (coordinator, specs), Sonnet codes and reviews, Haiku is fast and cheap (searching, running commands).</dd></div>
+        <div><dt>Module map <span class="cat">Docs</span></dt><dd>An as-built description of one module in <code>docs/modules/</code>: files, tables, endpoints, flows, traps. Lets agents skip re-exploring.</dd></div>
+        <div><dt>origin <span class="cat">Git</span></dt><dd>Git's default nickname for the GitHub copy of your repo. <code>origin/main</code> = <code>main</code> as GitHub has it.</dd></div>
+        <div><dt>.pipeline folder <span class="cat">Pipeline</span></dt><dd><code>.pipeline/&lt;feature&gt;/</code> on a feature branch: the plan, briefs, agent reports, findings and questions of one pipeline run.</dd></div>
+        <div><dt>Pull <span class="cat">Git</span></dt><dd>Fetch from GitHub and apply the new commits to your current branch (<code>git pull</code>).</dd></div>
+        <div><dt>Pull request (PR) <span class="cat">GitHub</span></dt><dd>A GitHub page asking to merge one branch into another, with the diff, checks and comments.</dd></div>
+        <div><dt>Push <span class="cat">Git</span></dt><dd>Upload your commits on the current branch to GitHub (<code>git push</code>).</dd></div>
+        <div><dt>Remote <span class="cat">Git</span></dt><dd>A copy of the repo somewhere else, here GitHub, named <code>origin</code>.</dd></div>
+        <div><dt>Repository (repo) <span class="cat">Git</span></dt><dd>The project plus its full history. Lives in the <code>.git</code> folder; the files you see are one version of it.</dd></div>
+        <div><dt>Runner <span class="cat">CI/CD</span></dt><dd>The throwaway machine GitHub starts to run a CI job (<code>ubuntu-latest</code>).</dd></div>
+        <div><dt>Scenario test <span class="cat">Testing</span></dt><dd>A test that runs a whole business flow end to end through the backend (PR → approval → PO → GRN → stock).</dd></div>
+        <div><dt>Schema push <span class="cat">Database</span></dt><dd><code>bun run db:push</code>: Drizzle makes the database tables match your TypeScript schema files.</dd></div>
+        <div><dt>Seed <span class="cat">Database</span></dt><dd>Inserting starter data (roles, pages, test items) into an empty database.</dd></div>
+        <div><dt>Service container <span class="cat">CI/CD</span></dt><dd>A container CI starts next to a job, e.g. the throwaway Postgres the <code>backend</code> job tests against.</dd></div>
+        <div><dt>settings.json <span class="cat">Claude</span></dt><dd><code>.claude/settings.json</code>: which commands Claude may run without asking and which are always denied.</dd></div>
+        <div><dt>Skill <span class="cat">Claude</span></dt><dd>A saved procedure Claude follows, triggered by a slash command (<code>/feature</code>) or by matching the task. Lives in <code>.claude/skills/&lt;name&gt;/SKILL.md</code>.</dd></div>
+        <div><dt>Spec <span class="cat">Spec</span></dt><dd>The functional requirement for one module, in <code>docs/specs/</code>: what it must do, as numbered rules.</dd></div>
+        <div><dt>Staging area <span class="cat">Git</span></dt><dd>Changes marked with <code>git add</code> to go into the next commit.</dd></div>
+        <div><dt>Stash <span class="cat">Git</span></dt><dd>Temporarily shelving uncommitted changes (<code>git stash</code>) to get a clean folder, then bringing them back (<code>git stash apply</code>).</dd></div>
+        <div><dt>Step <span class="cat">CI/CD</span></dt><dd>One command inside a CI job. The first failing step stops the job.</dd></div>
+        <div><dt>Subagent <span class="cat">Claude</span></dt><dd>An agent started by your main Claude session for one task. It works in its own context and reports back. Subagents can't start further subagents.</dd></div>
+        <div><dt>Type check <span class="cat">Testing</span></dt><dd>Running the TypeScript compiler without producing output (<code>tsc --noEmit</code>) to find type errors.</dd></div>
+        <div><dt>Untracked file <span class="cat">Git</span></dt><dd>A file git sees in your folder but has never been committed or added (shown as <code>??</code> in <code>git status --short</code>).</dd></div>
+        <div><dt>Upstream / tracking branch <span class="cat">Git</span></dt><dd>The GitHub branch your local branch is linked to (set by <code>git push -u</code>), so plain <code>git push</code>/<code>git pull</code> know where to go.</dd></div>
+        <div><dt>Volume <span class="cat">Docker</span></dt><dd>Storage Docker keeps outside a container, so database data survives restarting the container.</dd></div>
+        <div><dt>Workflow (GitHub Actions) <span class="cat">CI/CD</span></dt><dd>A YAML file in <code>.github/workflows/</code> describing when to run (triggers) and what to run (jobs and steps).</dd></div>
+        <div><dt>Working folder / working tree <span class="cat">Git</span></dt><dd>The files on disk you edit, showing one branch.</dd></div>
+        <div><dt>Worktree <span class="cat">Git</span></dt><dd>An additional working folder attached to the same repository, showing a different branch. Used by the pipeline in <code>.claude/worktrees/</code>.</dd></div>
+        <div><dt>YAML <span class="cat">Tooling</span></dt><dd>An indentation-based config format (<code>.yml</code>/<code>.yaml</code>), used for CI workflows and Docker Compose.</dd></div>
+      </dl>
+      <p class="empty" id="gloss-empty" hidden>No term matches that filter.</p>
+    </section>
+
+  </main>
+</div>
+
+<script>
+  (function () {
+    var input = document.getElementById("gloss-filter");
+    var items = Array.prototype.slice.call(document.querySelectorAll("#gloss > div"));
+    var count = document.getElementById("gloss-count");
+    var empty = document.getElementById("gloss-empty");
+    function update() {
+      var q = (input.value || "").trim().toLowerCase();
+      var shown = 0;
+      items.forEach(function (el) {
+        var match = !q || el.textContent.toLowerCase().indexOf(q) !== -1;
+        el.hidden = !match;
+        if (match) shown++;
+      });
+      count.textContent = shown + " of " + items.length + " terms";
+      empty.hidden = shown !== 0;
+    }
+    input.addEventListener("input", update);
+    update();
+
+    var links = Array.prototype.slice.call(document.querySelectorAll("nav.toc a"));
+    var sections = links.map(function (a) { return document.querySelector(a.getAttribute("href")); });
+    if ("IntersectionObserver" in window) {
+      var obs = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) {
+            links.forEach(function (l) { l.classList.toggle("active", l.getAttribute("href") === "#" + e.target.id); });
+          }
+        });
+      }, { rootMargin: "-10% 0px -80% 0px" });
+      sections.forEach(function (s) { if (s) obs.observe(s); });
+    }
+  })();
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js"></script>
+<script>
+  var dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  mermaid.initialize({ startOnLoad: true, theme: dark ? "dark" : "neutral", securityLevel: "strict" });
+</script>
+</body>
+</html>
