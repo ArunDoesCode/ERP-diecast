@@ -470,6 +470,45 @@ describe("BR-GRN-05 challan", () => {
   });
 });
 
+describe("BR-GRN-05 challan on draft edit", () => {
+  test("BR-GRN-05 editing a draft to another GRN's challan (same supplier) is 409, challan unchanged", async () => {
+    const po = await newPo();
+    const ch = uid();
+    await newGrn(po, [1], { challanNo: ch });
+    const own = uid();
+    const g = await newGrn(po, [1], { challanNo: own });
+    const r = await call("PATCH", "/updategrn", "back_office", {
+      grnId: g.grnId,
+      challanNo: ch,
+    });
+    expect(r.status).toBe(409);
+    expect((await grnRow(g.grnId))!.challanNo).toBe(own);
+  });
+
+  test("BR-GRN-05 challan cannot be cleared on edit", async () => {
+    const po = await newPo();
+    const g = await newGrn(po, [1]);
+    const r = await call("PATCH", "/updategrn", "back_office", {
+      grnId: g.grnId,
+      challanNo: "",
+    });
+    expect(r.status).toBe(400);
+  });
+});
+
+describe("BR-GRN-06 draft edit of batch number", () => {
+  test("BR-GRN-06 batchNumber edited on a draft line is saved", async () => {
+    const po = await newPo();
+    const g = await newGrn(po, [10]);
+    const r = await call("PATCH", "/updategrn", "back_office", {
+      grnId: g.grnId,
+      lines: [{ id: g.lineIds[0], arrivedQty: 10, batchNumber: "HEAT-77" }],
+    });
+    expect(r.status).toBe(200);
+    expect((await lineRow(g.lineIds[0]!)).batchNumber).toBe("HEAT-77");
+  });
+});
+
 describe("BR-GRN-06 draft-only edit/delete", () => {
   test("BR-GRN-06 draft can be edited", async () => {
     const po = await newPo();

@@ -591,6 +591,28 @@ describe("BR-GRN-32 correction ledger row", () => {
     expect(it.averageCostPaise).toBe(21000);
   });
 
+  test("BR-GRN-39 negative computed average -> average stays", async () => {
+    const itemId = await makeItem("avgneg");
+    const a = await setupLine({ itemId, qty: 100, arrived: 100, rate: 1000 });
+    const b = await setupLine({ itemId, qty: 100, arrived: 100, rate: 30000 });
+    await accept(a.grnId, a.lineId, 100);
+    await accept(b.grnId, b.lineId, 100);
+    expect((await item(itemId)).averageCostPaise).toBe(15500);
+    const out = await manual("owner", {
+      itemId,
+      locationId: mainStoreId,
+      referenceType: "stock_adjustment",
+      quantityChange: -100,
+      reason: "issued",
+    });
+    expect([200, 201]).toContain(out.status);
+    // (100*15500 - 60*30000) / 40 < 0
+    await correct(b.grnId, b.lineId, 60);
+    const it = await item(itemId);
+    expect(it.currentStock).toBe(40);
+    expect(it.averageCostPaise).toBe(15500);
+  });
+
   test("BR-GRN-39 correction that takes stock to 0 leaves the average unchanged", async () => {
     const s = await setupLine({ qty: 500, arrived: 500, rate: 21000 });
     await accept(s.grnId, s.lineId, 500);
