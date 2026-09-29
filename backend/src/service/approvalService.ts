@@ -413,8 +413,7 @@ export const approvalService = {
       const chain = policy.approvalChain;
 
       const autoApproved =
-        policy.autoApprove === true ||
-        can(actor, "approval.auto_approve_own");
+        policy.autoApprove === true || can(actor, "approval.auto_approve_own");
       const now = new Date();
 
       const approverFields = autoApproved
