@@ -22,7 +22,7 @@ Run from the repo root (main checkout, not a feature worktree). Requires `gh aut
    `lastProcessedCommentAt` whose body does not start with `🤖`, or a review with state
    `CHANGES_REQUESTED`:
    → run `/feature <module> [--sub <sub> --base <base>] --resume --from-pr <n>` (full re-run loop).
-   Handle PRs one at a time (each in its own worktree).
+   Handle PRs one at a time, in the shared working worktree (`.claude/worktrees/bl-006-test-db`) — never a new one.
 4. **Merged PR whose state isn't `merged` yet** → run the "After merge" steps of `/feature`; if it belonged
    to an epic, `/epic <module> --resume` to start the next ready sub-feature.
 5. **Nothing new** → reply with one line: `No new PR activity (<n> open agent PRs).` and stop.

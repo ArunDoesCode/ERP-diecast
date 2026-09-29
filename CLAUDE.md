@@ -64,8 +64,14 @@ protocol: `.claude/pipeline/PROTOCOL.md`. Package agents (hono-*, nextjs-*) hold
 the dev/review agents read.
 
 ## Git
-- One branch per feature `feature/<id>` (epics: `epic/<name>` + `feature/<name>--<sub>` PRs into it), each
-  in its own worktree under `.claude/worktrees/`. Never commit to `main`; the user merges PRs.
+- **One working branch, one worktree, few PRs.** Work happens on one local branch `work/<theme>` (now
+  `work/m1`) in the one worktree `.claude/worktrees/bl-006-test-db`. Re-enter it (EnterWorktree `path=`);
+  never create a new branch or worktree per bug, feature, spec or doc fix.
+- Every item is its own commit on that branch (`fix(BL-018): …`, `test(…)`, `feat(…)`, `docs(…)`).
+  STATUS/backlog/map updates are commits there too — never a PR of their own.
+- **Don't push until the batch is ready.** Push and open one PR only when the user asks, or when a group
+  of related items is done and checked. The user merges; then start the next batch from fresh `main`.
+- A second branch/worktree only for a truly parallel session or an epic. Never commit to `main`.
 - Pipeline PRs carry label `agent-pipeline`. Pipeline replies on GitHub start with `🤖`.
 - CI (`.github/workflows/ci.yml`) must be green before a PR is handed to the user.
 
