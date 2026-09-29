@@ -12,27 +12,32 @@ import { ApiClientError } from "@/lib/api/client";
 import type {
 	ChallanCreatePayload,
 	CompanySettingsPayload,
+	LossLogParams,
 	OpenChallanParams,
 	QaDecisionPayload,
 	ReceiptCreatePayload,
 	ScoCreatePayload,
 	ScoListParams,
 	ScoUpdatePayload,
+	VendorStockParams,
 } from "@/types/subcontracting";
 
 import {
 	cancelSco,
+	closeSco,
 	createReceipt,
 	createSco,
 	decideReceiptQa,
 	getChallanById,
 	getCompanySettings,
+	getLossLog,
 	getOpenChallans,
 	getReceiptById,
 	getScoById,
 	getScoChallans,
 	getScoReceipts,
 	getScos,
+	getVendorStock,
 	issueChallan,
 	saveCompanySettings,
 	submitSco,
@@ -54,6 +59,10 @@ export const scoKeys = {
 	receipts: (scoId: number) => ["subcontracting", "receipts", scoId] as const,
 	receiptDetail: (receiptId: number) =>
 		["subcontracting", "receipt", receiptId] as const,
+	vendorStock: (params?: VendorStockParams) =>
+		["subcontracting", "vendor-stock", params ?? {}] as const,
+	lossLog: (params?: LossLogParams) =>
+		["subcontracting", "loss-log", params ?? {}] as const,
 	challanDetail: (challanId: number) =>
 		["subcontracting", "challan", challanId] as const,
 };
@@ -329,6 +338,58 @@ export function useDecideQaMutation(scoId: number, receiptId: number) {
 		},
 		onError: (error) => {
 			toast.error(errorMessage(error, "Failed to save QA decision"));
+		},
+	});
+}
+
+export function useVendorStockQuery(params: VendorStockParams) {
+	return useQuery({
+		queryKey: scoKeys.vendorStock(params),
+		queryFn: () => getVendorStock(params),
+		placeholderData: keepPreviousData,
+	});
+}
+
+export function useLossLogQuery(params: LossLogParams) {
+	return useQuery({
+		queryKey: scoKeys.lossLog(params),
+		queryFn: () => getLossLog(params),
+		placeholderData: keepPreviousData,
+	});
+}
+
+export function useCloseScoMutation() {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: (variables: { scoId: number; reason?: string }) =>
+			closeSco(variables.scoId, { reason: variables.reason }),
+		onSuccess: async (result, variables) => {
+			if (!result.success) {
+				toast.error(result.message || "Failed to close SCO");
+				return;
+			}
+			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: scoKeys.list() }),
+				queryClient.invalidateQueries({
+					queryKey: scoKeys.detail(variables.scoId),
+				}),
+				queryClient.invalidateQueries({
+					queryKey: scoKeys.challans(variables.scoId),
+				}),
+				queryClient.invalidateQueries({ queryKey: scoKeys.openChallans() }),
+				queryClient.invalidateQueries({
+					queryKey: ["subcontracting", "vendor-stock"],
+				}),
+				queryClient.invalidateQueries({
+					queryKey: ["subcontracting", "loss-log"],
+				}),
+				queryClient.invalidateQueries({ queryKey: ["inventory"] }),
+			]);
+			toast.success(result.message || "SCO closed");
+		},
+		onError: (error) => {
+			toast.error(errorMessage(error, "Failed to close SCO"));
 		},
 	});
 }

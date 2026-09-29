@@ -116,6 +116,8 @@ export type ScoListParams = {
 	status?: ScoStatus | ScoStatus[];
 	vendorId?: number;
 	q?: string;
+	createdFrom?: string;
+	createdTo?: string;
 };
 
 export type ScoListResult = {
@@ -367,3 +369,74 @@ export interface QaDecisionPayload {
 	rejectedQty: number;
 	notes?: string;
 }
+
+// ---- S4: close + reports ----
+
+export type ScoClosePayload = { reason?: string };
+
+export type VendorStockSortField =
+	| "vendorName"
+	| "itemSku"
+	| "qty"
+	| "valuePaise";
+
+export type VendorStockParams = {
+	page?: number;
+	pageSize?: number;
+	sortBy?: VendorStockSortField;
+	sortDir?: "asc" | "desc";
+	vendorId?: number;
+};
+
+export interface VendorStockRow {
+	vendorId: number;
+	vendorName: string;
+	itemId: number;
+	itemSku: string;
+	itemName: string;
+	qty: number;
+	valuePaise: number;
+}
+
+export type VendorStockResult = {
+	success: true;
+	data: VendorStockRow[];
+	meta: PaginationMeta;
+};
+
+export type LossLogSortField = "id" | "createdAt" | "qty" | "costPaise";
+
+export type LossLogParams = {
+	page?: number;
+	pageSize?: number;
+	sortBy?: LossLogSortField;
+	sortDir?: "asc" | "desc";
+	vendorId?: number;
+	scoId?: number;
+	createdFrom?: string;
+	createdTo?: string;
+};
+
+export interface LossLogRow {
+	ledgerId: number;
+	scoId: number;
+	scoNumber: string;
+	vendorId: number;
+	vendorName: string;
+	itemId: number;
+	itemSku: string;
+	itemName: string;
+	qty: number;
+	costPaise: number;
+	batchNumber: string | null;
+	reason: string;
+	createdBy: number;
+	createdByName: string | null;
+	createdAt: string;
+}
+
+export type LossLogResult = {
+	success: true;
+	data: LossLogRow[];
+	meta: PaginationMeta;
+};

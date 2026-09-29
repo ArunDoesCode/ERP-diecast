@@ -7,6 +7,7 @@ import { useState } from "react";
 import { ApprovalHistoryPanel } from "@/components/pages/approval/ApprovalHistoryPanel";
 import { formatPaise } from "@/components/pages/inventory/inventory-format";
 import { CancelScoAlert } from "@/components/pages/subcontracting/CancelScoAlert";
+import { CloseScoDialog } from "@/components/pages/subcontracting/CloseScoDialog";
 import { EnterReceiptDialog } from "@/components/pages/subcontracting/EnterReceiptDialog";
 import { IssueMaterialDialog } from "@/components/pages/subcontracting/IssueMaterialDialog";
 import { ScoChallansCard } from "@/components/pages/subcontracting/ScoChallansCard";
@@ -45,6 +46,12 @@ const CANCELLABLE: ReadonlySet<ScoStatus> = new Set([
 ]);
 
 // Material can be issued once approved, and again while partly issued (BR-SCO-07).
+// Close is allowed once material has moved (BR-SCO-19).
+const CLOSABLE: ReadonlySet<ScoStatus> = new Set([
+	"material_issued",
+	"material_received",
+]);
+
 const CAN_ISSUE_STATUS: ReadonlySet<ScoStatus> = new Set([
 	"approved",
 	"material_issued",
@@ -54,6 +61,7 @@ export function ScoDetailView({ scoId }: { scoId: number }) {
 	const canManage = useCan("sco.manage");
 	const canIssue = useCan("sco.issue_receive");
 	const canQa = useCan("sco.qa_decide");
+	const canClose = useCan("sco.close");
 	const userId = useAuthSessionStore((state) => state.userId);
 	const query = useScoDetailQuery(scoId);
 	const submitMutation = useSubmitScoMutation();
@@ -115,7 +123,7 @@ export function ScoDetailView({ scoId }: { scoId: number }) {
 					</div>
 					<p className="text-xs text-muted-foreground">{sco.vendorName}</p>
 				</div>
-				{canManage || canIssue ? (
+				{canManage || canIssue || canClose ? (
 					<div className="flex flex-wrap gap-2">
 						{canIssue && CAN_ISSUE_STATUS.has(sco.status) ? (
 							<IssueMaterialDialog
@@ -149,6 +157,13 @@ export function ScoDetailView({ scoId }: { scoId: number }) {
 									</Button>
 								) : null}
 							</>
+						) : null}
+						{canClose && CLOSABLE.has(sco.status) ? (
+							<CloseScoDialog
+								scoId={sco.id}
+								scoNumber={sco.scoNumber}
+								items={items}
+							/>
 						) : null}
 						{canManage && CANCELLABLE.has(sco.status) ? (
 							<CancelScoAlert scoId={sco.id} scoNumber={sco.scoNumber} />
@@ -190,6 +205,12 @@ export function ScoDetailView({ scoId }: { scoId: number }) {
 						<>
 							<Field label="Cancelled by" value={sco.cancelledByName ?? "-"} />
 							<Field label="Cancel reason" value={sco.cancelReason ?? "-"} />
+						</>
+					) : null}
+					{sco.status === "closed" ? (
+						<>
+							<Field label="Closed" value={formatScoDate(sco.closedAt)} />
+							<Field label="Close reason" value={sco.closeReason ?? "-"} />
 						</>
 					) : null}
 				</CardContent>

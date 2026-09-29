@@ -160,6 +160,9 @@ export const API_ROUTES = {
 		update: `${API_Header.sco}/updatesco`,
 		submit: (scoId: number) => `${API_Header.sco}/${scoId}/submit`,
 		cancel: (scoId: number) => `${API_Header.sco}/${scoId}/cancel`,
+		close: (scoId: number) => `${API_Header.sco}/${scoId}/close`,
+		vendorStock: `${API_Header.sco}/reports/vendor-stock`,
+		lossLog: `${API_Header.sco}/reports/loss-log`,
 		challans: (scoId: number) => `${API_Header.sco}/${scoId}/challans`,
 		receipts: (scoId: number) => `${API_Header.sco}/${scoId}/receipts`,
 		receiptDetail: (receiptId: number) =>

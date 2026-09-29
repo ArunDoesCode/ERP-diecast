@@ -58,6 +58,9 @@ export function SubcontractingView() {
 					<Button type="button" size="sm" variant="outline" asChild>
 						<Link href="/subcontracting/challans">Open challans</Link>
 					</Button>
+					<Button type="button" size="sm" variant="outline" asChild>
+						<Link href="/subcontracting/reports">Reports</Link>
+					</Button>
 					{canEditCompany ? (
 						<Button type="button" size="sm" variant="outline" asChild>
 							<Link href="/subcontracting/settings">

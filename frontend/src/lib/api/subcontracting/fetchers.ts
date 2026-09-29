@@ -8,6 +8,8 @@ import type {
 	CompanySettings,
 	CompanySettingsPayload,
 	CompanySettingsResult,
+	LossLogParams,
+	LossLogResult,
 	OpenChallanParams,
 	OpenChallanResult,
 	QaDecisionPayload,
@@ -15,12 +17,15 @@ import type {
 	ReceiptDetailResult,
 	ReceiptListResult,
 	ScoCancelPayload,
+	ScoClosePayload,
 	ScoCreatePayload,
 	ScoDetailPayload,
 	ScoDetailResult,
 	ScoListParams,
 	ScoListResult,
 	ScoUpdatePayload,
+	VendorStockParams,
+	VendorStockResult,
 } from "@/types/subcontracting";
 import type { ApiResult } from "@/types/suppliers";
 
@@ -132,5 +137,24 @@ export function decideReceiptQa(
 	return api.post<ReceiptDetailResult, QaDecisionPayload>(
 		API_ROUTES.subcontracting.receiptQa(receiptId, lineId),
 		payload,
+	);
+}
+
+export function closeSco(scoId: number, payload: ScoClosePayload) {
+	return api.post<ApiResult<ScoDetailPayload>, ScoClosePayload>(
+		API_ROUTES.subcontracting.close(scoId),
+		payload,
+	);
+}
+
+export function getVendorStock(params?: VendorStockParams) {
+	return api.get<VendorStockResult>(
+		`${API_ROUTES.subcontracting.vendorStock}${toQueryString(params)}`,
+	);
+}
+
+export function getLossLog(params?: LossLogParams) {
+	return api.get<LossLogResult>(
+		`${API_ROUTES.subcontracting.lossLog}${toQueryString(params)}`,
 	);
 }
