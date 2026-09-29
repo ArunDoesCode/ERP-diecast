@@ -8,6 +8,7 @@ import {
   serial,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { itemMaster } from "./02_procurement-catalog";
 import { supplierMaster } from "./02_procurement-suppliers";
@@ -269,24 +270,34 @@ export const grnStatusEnum = pgEnum("grn_status", [
 ]);
 
 // --- 4. GOODS RECEIVED NOTE (GRN) ---
-export const grns = pgTable("grns", {
-  id: serial("id").primaryKey(),
-  grnNumber: text("grn_number").unique().notNull(),
-  poId: integer("po_id").references(() => purchaseOrders.id),
-  supplierId: integer("supplier_id")
-    .references(() => supplierMaster.id)
-    .notNull(),
-  status: grnStatusEnum("status").default("draft").notNull(),
-  receivedDate: timestamp("received_date").defaultNow(),
-  createdBy: integer("created_by").references(() => employees.id),
-  // Header fields the delivery person actually fills in on arrival.
-  challanNo: text("challan_no"),
-  challanDate: timestamp("challan_date"),
-  vehicleNo: text("vehicle_no"),
-  driverName: text("driver_name"),
-  driverPhone: text("driver_phone"),
-  remarks: text("remarks"),
-});
+export const grns = pgTable(
+  "grns",
+  {
+    id: serial("id").primaryKey(),
+    grnNumber: text("grn_number").unique().notNull(),
+    poId: integer("po_id").references(() => purchaseOrders.id),
+    supplierId: integer("supplier_id")
+      .references(() => supplierMaster.id)
+      .notNull(),
+    status: grnStatusEnum("status").default("draft").notNull(),
+    receivedDate: timestamp("received_date").defaultNow(),
+    createdBy: integer("created_by").references(() => employees.id),
+    // Header fields the delivery person actually fills in on arrival.
+    challanNo: text("challan_no"),
+    challanDate: timestamp("challan_date"),
+    vehicleNo: text("vehicle_no"),
+    driverName: text("driver_name"),
+    driverPhone: text("driver_phone"),
+    remarks: text("remarks"),
+  },
+  (table) => ({
+    // BR-GRN-05: same challan from the same supplier only once (deleted GRNs are gone).
+    supplierChallanUq: uniqueIndex("uq_grns_supplier_challan").on(
+      table.supplierId,
+      table.challanNo,
+    ),
+  }),
+);
 
 // Add these to your existing `grnItems` table definition
 export const grnItems = pgTable(
@@ -309,10 +320,40 @@ export const grnItems = pgTable(
     qaBypassReason: text("qa_bypass_reason"), // Mandatory if bypassed
     qaBypassedBy: integer("qa_bypassed_by").references(() => employees.id),
     challanPhotoUrl: text("challan_photo_url"), // Proof of receipt
+    qaBypassedAt: timestamp("qa_bypassed_at"),
+
+    // Supplier heat / batch number (BR-GRN-21)
+    batchNumber: text("batch_number"),
+
+    // Over-receipt override (BR-GRN-15): stored when accepted past 105% of ordered
+    overReceiptExcessQty: doublePrecision("over_receipt_excess_qty"),
+    overReceiptReason: text("over_receipt_reason"),
+    overReceiptBy: integer("over_receipt_by").references(() => employees.id),
   },
   (table) => ({
     grnIdIdx: index("idx_grn_items_grn_id").on(table.grnId),
     poItemIdIdx: index("idx_grn_items_po_item_id").on(table.poItemId),
+  }),
+);
+
+// Corrections on a posted GRN line (BR-GRN-29, 35). The line's acceptedQty is
+// never edited; netAcceptedQty = acceptedQty - sum(qty).
+export const grnCorrections = pgTable(
+  "grn_corrections",
+  {
+    id: serial("id").primaryKey(),
+    grnItemId: integer("grn_item_id")
+      .references(() => grnItems.id)
+      .notNull(),
+    qty: doublePrecision("qty").notNull(), // > 0
+    reason: text("reason").notNull(),
+    createdBy: integer("created_by")
+      .references(() => employees.id)
+      .notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    grnItemIdx: index("idx_grn_corrections_grn_item_id").on(table.grnItemId),
   }),
 );
 

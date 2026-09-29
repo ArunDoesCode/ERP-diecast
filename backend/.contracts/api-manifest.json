@@ -619,8 +619,6 @@
           "category": "string.nonempty.required",
           "uom": "string.nonempty.required",
           "reorderLevel": "number.nonnegative.optional",
-          "currentStock": "number.nonnegative.optional",
-          "averageCostPaise": "integer.nonnegative.optional",
           "isActive": "boolean.optional"
         }
       },
@@ -667,8 +665,6 @@
           "category": "string.nonempty.optional",
           "uom": "string.nonempty.optional",
           "reorderLevel": "number.nonnegative.optional",
-          "currentStock": "number.nonnegative.optional",
-          "averageCostPaise": "integer.nonnegative.optional",
           "isActive": "boolean.optional"
         }
       },
@@ -867,7 +863,9 @@
         "type": "roles",
         "roles": [
           "super-admin",
-          "back_office"
+          "owner",
+          "back_office",
+          "floor_supervisor"
         ]
       },
       "request": {
@@ -876,7 +874,7 @@
           "pageSize": "integer.nonnegative.required",
           "itemId": "integer.positive.optional",
           "locationId": "integer.positive.optional",
-          "referenceType": "enum:grn,grn_bypass,pro,sco_issue,sco_receipt,job_order_issue,scrap_dispatch,stock_adjustment.optional",
+          "referenceType": "enum:grn,grn_bypass,pro,sco_issue,sco_receipt,job_order_issue,scrap_dispatch,stock_adjustment,grn_correction,opening_stock,sco_loss.optional",
           "transactionType": "enum:in,out,adjustment.optional",
           "fromDate": "unrepresentable.optional",
           "toDate": "unrepresentable.optional",
@@ -912,11 +910,12 @@
       "tags": [
         "asset"
       ],
-      "summary": "Record an inventory movement (in/out/adjustment).",
+      "summary": "Manual stock movement: stock-take (stock_adjustment) or opening stock (opening_stock) only, reason required. Document reference types get 400.",
       "auth": {
         "type": "roles",
         "roles": [
           "super-admin",
+          "owner",
           "back_office"
         ]
       },
@@ -924,13 +923,11 @@
         "body": {
           "itemId": "integer.positive.required",
           "locationId": "integer.positive.required",
-          "batchNumber": "string.nullable.optional",
-          "transactionType": "enum:in,out,adjustment.required",
-          "referenceType": "enum:grn,grn_bypass,pro,sco_issue,sco_receipt,job_order_issue,scrap_dispatch,stock_adjustment.required",
-          "referenceId": "integer.positive.required",
+          "referenceType": "enum:grn,grn_bypass,pro,sco_issue,sco_receipt,job_order_issue,scrap_dispatch,stock_adjustment,grn_correction,opening_stock,sco_loss.required",
           "quantityChange": "number.required",
-          "unitCostPaise": "integer.nonnegative.required",
-          "notes": "string.nullable.optional"
+          "unitCostPaise": "integer.nonnegative.optional",
+          "reason": "string.nonempty.required",
+          "batchNumber": "string.nonempty.nullable.optional"
         }
       },
       "responses": {
@@ -942,8 +939,9 @@
             "locationId": "unrepresentable.required",
             "batchNumber": "string.nullable.required",
             "transactionType": "enum:in,out,adjustment.required",
-            "referenceType": "enum:grn,grn_bypass,pro,sco_issue,sco_receipt,job_order_issue,scrap_dispatch,stock_adjustment.required",
+            "referenceType": "enum:grn,grn_bypass,pro,sco_issue,sco_receipt,job_order_issue,scrap_dispatch,stock_adjustment,grn_correction,opening_stock,sco_loss.required",
             "referenceId": "unrepresentable.required",
+            "referenceLineId": "unrepresentable.nullable.required",
             "quantityChange": "unrepresentable.required",
             "balanceAfter": "unrepresentable.required",
             "unitCostPaise": "unrepresentable.required",
@@ -953,6 +951,50 @@
             "createdAt": "unrepresentable.required"
           }
         }
+      }
+    },
+    {
+      "id": "GET /api/asset/inventory/reconciliation",
+      "method": "GET",
+      "path": "/api/asset/inventory/reconciliation",
+      "tags": [
+        "asset"
+      ],
+      "summary": "Stock reconciliation: items whose stock != ledger total and item+location pairs whose last balance != ledger total. Zero rows = OK.",
+      "auth": {
+        "type": "roles",
+        "roles": [
+          "super-admin",
+          "owner",
+          "back_office",
+          "floor_supervisor"
+        ]
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "sortBy": "enum:itemId.optional",
+          "sortDir": "enum:asc,desc.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "itemId"
+        ],
+        "searchable": false
       }
     },
     {
@@ -1327,7 +1369,7 @@
       "request": {
         "body": {
           "poId": "integer.positive.required",
-          "challanNo": "string.optional",
+          "challanNo": "string.nonempty.required",
           "challanDate": "unrepresentable.optional",
           "vehicleNo": "string.optional",
           "driverName": "string.optional",
@@ -1380,7 +1422,7 @@
       "request": {
         "body": {
           "grnId": "integer.positive.required",
-          "challanNo": "string.nullable.optional",
+          "challanNo": "string.nonempty.optional",
           "challanDate": "unrepresentable.nullable.optional",
           "vehicleNo": "string.nullable.optional",
           "driverName": "string.nullable.optional",
@@ -1447,7 +1489,7 @@
       "tags": [
         "grn"
       ],
-      "summary": "QA accept/reject a GRN line. Accept posts to the inventory ledger (referenceType=grn) and rolls the PO item/status forward. Blocked past 105% of ordered qty unless the actor is owner/back_office.",
+      "summary": "QA decision on a GRN line: acceptedQty + rejectedQty = arrived. Accepted qty > 0 posts to the inventory ledger (referenceType=grn) and rolls the PO item/status forward. Past 105% of ordered qty: 400 unless the actor holds grn.over_receipt_override and sends overrideReason.",
       "auth": {
         "type": "roles",
         "roles": [
@@ -1459,11 +1501,12 @@
       },
       "request": {
         "body": {
-          "decision": "enum:accept,reject.required",
-          "acceptedQty": "number.nonnegative.optional",
-          "rejectedQty": "number.nonnegative.optional",
+          "acceptedQty": "number.nonnegative.required",
+          "rejectedQty": "number.nonnegative.required",
           "remarks": "string.optional",
-          "certificateUrl": "string.uri.optional"
+          "certificateUrl": "string.uri.optional",
+          "batchNumber": "string.nonempty.optional",
+          "overrideReason": "string.nonempty.optional"
         }
       },
       "responses": {
@@ -1480,7 +1523,12 @@
             "isQaBypassed": "boolean.nullable.required",
             "qaBypassReason": "string.nullable.required",
             "qaBypassedBy": "unrepresentable.nullable.required",
-            "challanPhotoUrl": "string.nullable.required"
+            "challanPhotoUrl": "string.nullable.required",
+            "qaBypassedAt": "unrepresentable.nullable.required",
+            "batchNumber": "string.nullable.required",
+            "overReceiptExcessQty": "unrepresentable.nullable.required",
+            "overReceiptReason": "string.nullable.required",
+            "overReceiptBy": "unrepresentable.nullable.required"
           }
         }
       }
@@ -1498,14 +1546,15 @@
         "roles": [
           "super-admin",
           "owner",
-          "back_office",
-          "floor_supervisor"
+          "back_office"
         ]
       },
       "request": {
         "body": {
           "bypassReason": "string.nonempty.required",
-          "acceptedQty": "number.positive.optional"
+          "acceptedQty": "number.positive.optional",
+          "batchNumber": "string.nonempty.optional",
+          "overrideReason": "string.nonempty.optional"
         }
       },
       "responses": {
@@ -1522,7 +1571,12 @@
             "isQaBypassed": "boolean.nullable.required",
             "qaBypassReason": "string.nullable.required",
             "qaBypassedBy": "unrepresentable.nullable.required",
-            "challanPhotoUrl": "string.nullable.required"
+            "challanPhotoUrl": "string.nullable.required",
+            "qaBypassedAt": "unrepresentable.nullable.required",
+            "batchNumber": "string.nullable.required",
+            "overReceiptExcessQty": "unrepresentable.nullable.required",
+            "overReceiptReason": "string.nullable.required",
+            "overReceiptBy": "unrepresentable.nullable.required"
           }
         }
       }
@@ -1534,7 +1588,7 @@
       "tags": [
         "grn"
       ],
-      "summary": "Correct a previously posted GRN line — posts a negative stock_adjustment ledger entry without mutating the original GRN line row.",
+      "summary": "Correct a previously posted GRN line: posts one grn_correction ledger row (-qty at the posted cost), lowers PO received qty; the line's acceptedQty is never edited.",
       "auth": {
         "type": "roles",
         "roles": [
@@ -1558,8 +1612,9 @@
             "locationId": "unrepresentable.required",
             "batchNumber": "string.nullable.required",
             "transactionType": "enum:in,out,adjustment.required",
-            "referenceType": "enum:grn,grn_bypass,pro,sco_issue,sco_receipt,job_order_issue,scrap_dispatch,stock_adjustment.required",
+            "referenceType": "enum:grn,grn_bypass,pro,sco_issue,sco_receipt,job_order_issue,scrap_dispatch,stock_adjustment,grn_correction,opening_stock,sco_loss.required",
             "referenceId": "unrepresentable.required",
+            "referenceLineId": "unrepresentable.nullable.required",
             "quantityChange": "unrepresentable.required",
             "balanceAfter": "unrepresentable.required",
             "unitCostPaise": "unrepresentable.required",

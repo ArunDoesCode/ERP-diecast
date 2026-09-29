@@ -8,7 +8,6 @@ import type { AuthRequirement } from "../lib/route-registry";
 import { register } from "../lib/route-registry";
 import type { AppEnv } from "../lib/types";
 import {
-  assetInventoryMovementCreateSchema,
   assetInventoryMovementListQuerySchema,
   assetInventoryMovementSchema,
   assetItemCreateSchema,
@@ -25,6 +24,9 @@ import {
   assetMachineListQuerySchema,
   assetMachineSchema,
   assetMachineUpdateSchema,
+  assetManualMovementCreateSchema,
+  assetReconciliationQuerySchema,
+  assetReconciliationRowSchema,
   assetServiceCreateSchema,
   assetServiceListQuerySchema,
   assetServiceSchema,
@@ -34,17 +36,31 @@ import { END_POINTS } from "./end-points";
 
 const ASSET_ROUTES = END_POINTS.asset;
 const ASSET_BASE_PATH = "/api/asset";
+// asset.manage (seed: back_office) - masters.
 const ASSET_AUTH: AuthRequirement = {
   type: "roles",
   roles: ["super-admin", "back_office"],
 };
+// inventory.view (seed: owner, back_office, floor_supervisor).
+const INVENTORY_VIEW_AUTH: AuthRequirement = {
+  type: "roles",
+  roles: ["super-admin", "owner", "back_office", "floor_supervisor"],
+};
+// inventory.adjust (seed: owner, back_office).
+const INVENTORY_ADJUST_AUTH: AuthRequirement = {
+  type: "roles",
+  roles: ["super-admin", "owner", "back_office"],
+};
 
 const assetRouter = new Hono<AppEnv>();
 
-assetRouter.use("*", requireAuth, requireRole("super-admin", "back_office"));
+assetRouter.use("*", requireAuth);
+// Every route except the inventory ones below gets this guard (asset.manage).
+const requireAssetManage = requireRole("super-admin", "back_office"); // perm: asset.manage
 
 assetRouter.get(
   ASSET_ROUTES.listMachines,
+  requireAssetManage,
   asyncHandler(assetController.listMachines),
 );
 register({
@@ -63,6 +79,7 @@ register({
 
 assetRouter.post(
   ASSET_ROUTES.createMachine,
+  requireAssetManage,
   asyncHandler(assetController.createMachine),
 );
 register({
@@ -77,6 +94,7 @@ register({
 
 assetRouter.patch(
   ASSET_ROUTES.updateMachine,
+  requireAssetManage,
   asyncHandler(assetController.updateMachine),
 );
 register({
@@ -91,6 +109,7 @@ register({
 
 assetRouter.get(
   ASSET_ROUTES.listItems,
+  requireAssetManage,
   asyncHandler(assetController.listItems),
 );
 register({
@@ -109,6 +128,7 @@ register({
 
 assetRouter.post(
   ASSET_ROUTES.createItem,
+  requireAssetManage,
   asyncHandler(assetController.createItem),
 );
 register({
@@ -123,6 +143,7 @@ register({
 
 assetRouter.patch(
   ASSET_ROUTES.updateItem,
+  requireAssetManage,
   asyncHandler(assetController.updateItem),
 );
 register({
@@ -137,6 +158,7 @@ register({
 
 assetRouter.get(
   ASSET_ROUTES.lastRate,
+  requireAssetManage,
   asyncHandler(assetController.getLastRate),
 );
 register({
@@ -154,6 +176,7 @@ register({
 
 assetRouter.get(
   ASSET_ROUTES.listServices,
+  requireAssetManage,
   asyncHandler(assetController.listServices),
 );
 register({
@@ -172,6 +195,7 @@ register({
 
 assetRouter.post(
   ASSET_ROUTES.createService,
+  requireAssetManage,
   asyncHandler(assetController.createService),
 );
 register({
@@ -186,6 +210,7 @@ register({
 
 assetRouter.patch(
   ASSET_ROUTES.updateService,
+  requireAssetManage,
   asyncHandler(assetController.updateService),
 );
 register({
@@ -200,6 +225,7 @@ register({
 
 assetRouter.get(
   ASSET_ROUTES.listInventoryMovements,
+  requireRole("super-admin", "owner", "back_office", "floor_supervisor"), // perm: inventory.view
   asyncHandler(assetController.listInventoryMovements),
 );
 register({
@@ -207,7 +233,7 @@ register({
   path: `${ASSET_BASE_PATH}${ASSET_ROUTES.listInventoryMovements}`,
   tags: ["asset"],
   summary: "List inventory movement rows, paginated.",
-  auth: ASSET_AUTH,
+  auth: INVENTORY_VIEW_AUTH,
   request: { query: assetInventoryMovementListQuerySchema },
   responses: { "200": paginatedResponse(assetInventoryMovementSchema) },
   pagination: {
@@ -218,20 +244,40 @@ register({
 
 assetRouter.post(
   ASSET_ROUTES.createInventoryMovements,
+  requireRole("super-admin", "owner", "back_office"), // perm: inventory.adjust
   asyncHandler(assetController.createInventoryMovement),
 );
 register({
   method: "POST",
   path: `${ASSET_BASE_PATH}${ASSET_ROUTES.createInventoryMovements}`,
   tags: ["asset"],
-  summary: "Record an inventory movement (in/out/adjustment).",
-  auth: ASSET_AUTH,
-  request: { body: assetInventoryMovementCreateSchema },
+  summary:
+    "Manual stock movement: stock-take (stock_adjustment) or opening stock (opening_stock) only, reason required. Document reference types get 400.",
+  auth: INVENTORY_ADJUST_AUTH,
+  request: { body: assetManualMovementCreateSchema },
   responses: { "201": successResponse(assetInventoryMovementSchema) },
 });
 
 assetRouter.get(
+  ASSET_ROUTES.inventoryReconciliation,
+  requireRole("super-admin", "owner", "back_office", "floor_supervisor"), // perm: inventory.view
+  asyncHandler(assetController.inventoryReconciliation),
+);
+register({
+  method: "GET",
+  path: `${ASSET_BASE_PATH}${ASSET_ROUTES.inventoryReconciliation}`,
+  tags: ["asset"],
+  summary:
+    "Stock reconciliation: items whose stock != ledger total and item+location pairs whose last balance != ledger total. Zero rows = OK.",
+  auth: INVENTORY_VIEW_AUTH,
+  request: { query: assetReconciliationQuerySchema },
+  responses: { "200": paginatedResponse(assetReconciliationRowSchema) },
+  pagination: { sortableFields: ["itemId"], searchable: false },
+});
+
+assetRouter.get(
   ASSET_ROUTES.listLocations,
+  requireAssetManage,
   asyncHandler(assetController.listLocations),
 );
 register({
@@ -250,6 +296,7 @@ register({
 
 assetRouter.post(
   ASSET_ROUTES.createLocation,
+  requireAssetManage,
   asyncHandler(assetController.createLocation),
 );
 register({
@@ -264,6 +311,7 @@ register({
 
 assetRouter.patch(
   ASSET_ROUTES.updateLocation,
+  requireAssetManage,
   asyncHandler(assetController.updateLocation),
 );
 register({

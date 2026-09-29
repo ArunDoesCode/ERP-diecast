@@ -15,7 +15,7 @@ import {
   grnDetailsSchema,
   grnItemSchema,
   grnListQuerySchema,
-  grnQaActionSchema,
+  grnQaActionBodySchema,
   grnSchema,
   updateGrnSchema,
 } from "../types/grn.types";
@@ -24,22 +24,23 @@ import { END_POINTS } from "./end-points";
 const GRN_ROUTES = END_POINTS.grn;
 const GRN_BASE_PATH = "/api/grn";
 
-// Create/update draft, bypass.
+// Roles per permission key (docs/specs/grn.md "Who can do what") = seed roles + super-admin.
 const GRN_DRAFT_AUTH: AuthRequirement = {
   type: "roles",
   roles: ["super-admin", "owner", "back_office", "floor_supervisor"],
 };
-// QA accept/reject.
 const GRN_QA_AUTH: AuthRequirement = {
   type: "roles",
   roles: ["super-admin", "owner", "back_office", "qa_inspector"],
 };
-// Correction.
+const GRN_BYPASS_AUTH: AuthRequirement = {
+  type: "roles",
+  roles: ["super-admin", "owner", "back_office"],
+};
 const GRN_CORRECTION_AUTH: AuthRequirement = {
   type: "roles",
   roles: ["super-admin", "owner", "back_office"],
 };
-// List/details — every desk role, read-only.
 const GRN_READ_AUTH: AuthRequirement = {
   type: "roles",
   roles: [
@@ -65,7 +66,7 @@ grnRouter.get(
     "floor_supervisor",
     "qa_inspector",
     "die_designer",
-  ),
+  ), // perm: grn.view
   asyncHandler(grnController.list),
 );
 register({
@@ -91,7 +92,7 @@ grnRouter.get(
     "floor_supervisor",
     "qa_inspector",
     "die_designer",
-  ),
+  ), // perm: grn.view
   asyncHandler(grnController.details),
 );
 register({
@@ -106,7 +107,7 @@ register({
 
 grnRouter.post(
   GRN_ROUTES.create,
-  requireRole("super-admin", "owner", "back_office", "floor_supervisor"),
+  requireRole("super-admin", "owner", "back_office", "floor_supervisor"), // perm: grn.edit_draft
   asyncHandler(grnController.create),
 );
 register({
@@ -122,7 +123,7 @@ register({
 
 grnRouter.patch(
   GRN_ROUTES.update,
-  requireRole("super-admin", "owner", "back_office", "floor_supervisor"),
+  requireRole("super-admin", "owner", "back_office", "floor_supervisor"), // perm: grn.edit_draft
   asyncHandler(grnController.update),
 );
 register({
@@ -138,7 +139,7 @@ register({
 
 grnRouter.delete(
   GRN_ROUTES.remove,
-  requireRole("super-admin", "owner", "back_office", "floor_supervisor"),
+  requireRole("super-admin", "owner", "back_office", "floor_supervisor"), // perm: grn.edit_draft
   asyncHandler(grnController.remove),
 );
 register({
@@ -152,7 +153,7 @@ register({
 
 grnRouter.post(
   GRN_ROUTES.qaAction,
-  requireRole("super-admin", "owner", "back_office", "qa_inspector"),
+  requireRole("super-admin", "owner", "back_office", "qa_inspector"), // perm: grn.qa_decide
   asyncHandler(grnController.qaAction),
 );
 register({
@@ -160,15 +161,15 @@ register({
   path: `${GRN_BASE_PATH}${GRN_ROUTES.qaAction}`,
   tags: ["grn"],
   summary:
-    "QA accept/reject a GRN line. Accept posts to the inventory ledger (referenceType=grn) and rolls the PO item/status forward. Blocked past 105% of ordered qty unless the actor is owner/back_office.",
+    "QA decision on a GRN line: acceptedQty + rejectedQty = arrived. Accepted qty > 0 posts to the inventory ledger (referenceType=grn) and rolls the PO item/status forward. Past 105% of ordered qty: 400 unless the actor holds grn.over_receipt_override and sends overrideReason.",
   auth: GRN_QA_AUTH,
-  request: { body: grnQaActionSchema },
+  request: { body: grnQaActionBodySchema },
   responses: { "200": successResponse(grnItemSchema) },
 });
 
 grnRouter.post(
   GRN_ROUTES.bypass,
-  requireRole("super-admin", "owner", "back_office", "floor_supervisor"),
+  requireRole("super-admin", "owner", "back_office"), // perm: grn.qa_bypass
   asyncHandler(grnController.bypass),
 );
 register({
@@ -177,14 +178,14 @@ register({
   tags: ["grn"],
   summary:
     "Fast-track QA bypass for a GRN line (mandatory reason). Posts to the inventory ledger immediately (referenceType=grn_bypass) and rolls the PO item/status forward.",
-  auth: GRN_DRAFT_AUTH,
+  auth: GRN_BYPASS_AUTH,
   request: { body: grnBypassSchema },
   responses: { "200": successResponse(grnItemSchema) },
 });
 
 grnRouter.post(
   GRN_ROUTES.correction,
-  requireRole("super-admin", "owner", "back_office"),
+  requireRole("super-admin", "owner", "back_office"), // perm: grn.correct
   asyncHandler(grnController.correction),
 );
 register({
@@ -192,7 +193,7 @@ register({
   path: `${GRN_BASE_PATH}${GRN_ROUTES.correction}`,
   tags: ["grn"],
   summary:
-    "Correct a previously posted GRN line — posts a negative stock_adjustment ledger entry without mutating the original GRN line row.",
+    "Correct a previously posted GRN line: posts one grn_correction ledger row (-qty at the posted cost), lowers PO received qty; the line's acceptedQty is never edited.",
   auth: GRN_CORRECTION_AUTH,
   request: { body: grnCorrectionSchema },
   responses: { "201": successResponse(assetInventoryMovementSchema) },

@@ -6,6 +6,13 @@ import {
   grns,
 } from "../db/schemas/02_procurement-purchasing";
 
+// Quantities: up to 3 decimals (BR-GRN-02). Whole-number rule for pcs/set items
+// needs the item's unit, so the service enforces that one (400).
+const qty3 = (schema: z.ZodNumber) =>
+  schema.refine((v) => Math.abs(v * 1000 - Math.round(v * 1000)) < 1e-6, {
+    message: "Quantity can have at most 3 decimals",
+  });
+
 export const grnStatusSchema = z.enum(grnStatusEnum.enumValues);
 export type grnStatusSchemaType = z.infer<typeof grnStatusSchema>;
 
@@ -31,6 +38,10 @@ export const grnItemDetailSchema = grnItemSchema.extend({
   itemSku: z.string(),
   itemName: z.string(),
   orderedQty: z.number(),
+  // Sum of all corrections posted on this line (BR-GRN-35).
+  correctedQty: z.number(),
+  // acceptedQty - correctedQty. acceptedQty itself never changes (BR-GRN-35).
+  netAcceptedQty: z.number(),
 });
 export type grnItemDetailSchemaType = z.infer<typeof grnItemDetailSchema>;
 
@@ -45,13 +56,17 @@ export type grnDetailsSchemaType = z.infer<typeof grnDetailsSchema>;
 // `draft` status; no stock effect until a line is QA-accepted or bypassed.
 export const createGrnLineSchema = z.object({
   poItemId: z.number().int().positive(),
-  arrivedQty: z.number().positive(),
+  arrivedQty: qty3(z.number().positive()),
+  // Supplier heat / batch number, copied onto the ledger row (BR-GRN-21).
+  batchNumber: z.string().trim().min(1).max(100).optional(),
 });
 export type createGrnLineSchemaType = z.infer<typeof createGrnLineSchema>;
 
 export const createGrnSchema = z.object({
   poId: z.number().int().positive(),
-  challanNo: z.string().max(100).optional(),
+  // Mandatory (BR-GRN-05). receivedDate is NOT accepted: server time (BR-GRN-08);
+  // if a client sends it, it is ignored.
+  challanNo: z.string().trim().min(1).max(100),
   challanDate: z.coerce.date().optional(),
   vehicleNo: z.string().max(50).optional(),
   driverName: z.string().max(200).optional(),
@@ -65,14 +80,16 @@ export type createGrnSchemaType = z.infer<typeof createGrnSchema>;
 // Only legal while the GRN is still `draft` (no line has posted yet).
 export const updateGrnLineSchema = z.object({
   id: z.number().int().positive(),
-  arrivedQty: z.number().positive(),
+  arrivedQty: qty3(z.number().positive()),
+  batchNumber: z.string().trim().min(1).max(100).nullish(),
 });
 export type updateGrnLineSchemaType = z.infer<typeof updateGrnLineSchema>;
 
 export const updateGrnSchema = z
   .object({
     grnId: z.number().int().positive(),
-    challanNo: z.string().max(100).nullish(),
+    // Challan stays mandatory: it can be changed but not cleared (BR-GRN-05).
+    challanNo: z.string().trim().min(1).max(100).optional(),
     challanDate: z.coerce.date().nullish(),
     vehicleNo: z.string().max(50).nullish(),
     driverName: z.string().max(200).nullish(),
@@ -102,57 +119,49 @@ export const updateGrnSchema = z
   });
 export type updateGrnSchemaType = z.infer<typeof updateGrnSchema>;
 
-// POST /grn/:id/lines/:lineId/qa body — QA accept/reject decision.
-// certificateUrl/remarks are logged onto a `qaTests` row, not the grnItems
-// row (grnItems has no such columns — reusing the existing qaTests table
-// instead of adding new ones).
-export const grnQaActionSchema = z
+// POST /grn/:id/lines/:lineId/qa body — one decision per line (BR-GRN-09, 10).
+// acceptedQty + rejectedQty must equal the line's arrived qty (service, 400).
+// The line is `passed` if acceptedQty > 0, else `failed`; `decision` is derived
+// (output only, not sent). certificateUrl/remarks go onto one `qa_tests` row.
+export const grnQaActionBodySchema = z
   .object({
-    decision: z.enum(["accept", "reject"]),
-    acceptedQty: z.number().min(0).optional(),
-    rejectedQty: z.number().min(0).optional(),
+    acceptedQty: qty3(z.number().min(0)),
+    rejectedQty: qty3(z.number().min(0)),
     remarks: z.string().max(1000).optional(),
     certificateUrl: z.string().url().optional(),
+    batchNumber: z.string().trim().min(1).max(100).optional(),
+    // Required (and only honoured) when the accept goes past 105% of ordered
+    // and the actor holds `grn.over_receipt_override` (BR-GRN-15).
+    overrideReason: z.string().trim().min(1).max(1000).optional(),
   })
-  .superRefine((data, ctx) => {
-    if (
-      data.decision === "accept" &&
-      (data.acceptedQty === undefined || data.acceptedQty <= 0)
-    ) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "acceptedQty must be > 0 when decision is accept",
-        path: ["acceptedQty"],
-      });
-    }
-    if (
-      data.decision === "reject" &&
-      (data.rejectedQty === undefined || data.rejectedQty <= 0)
-    ) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "rejectedQty must be > 0 when decision is reject",
-        path: ["rejectedQty"],
-      });
-    }
+  .refine((d) => d.acceptedQty + d.rejectedQty > 0, {
+    message: "acceptedQty + rejectedQty must be > 0",
   });
+
+// Parsed form used by controller/service: adds the derived `decision`.
+export const grnQaActionSchema = grnQaActionBodySchema.transform((d) => ({
+  ...d,
+  decision: (d.acceptedQty > 0 ? "accept" : "reject") as "accept" | "reject",
+}));
 export type grnQaActionSchemaType = z.infer<typeof grnQaActionSchema>;
 
-// POST /grn/:id/lines/:lineId/bypass body — mandatory reason. acceptedQty
-// defaults to the line's arrivedQty (receivedQty column) if omitted; the
-// caller may reduce it for visible damage at receipt.
+// POST /grn/:id/lines/:lineId/bypass body — needs `grn.qa_bypass` and a reason
+// (BR-GRN-18). acceptedQty defaults to arrived; a smaller value records the rest
+// as rejected (BR-GRN-10).
 export const grnBypassSchema = z.object({
-  bypassReason: z.string().min(1).max(1000),
-  acceptedQty: z.number().positive().optional(),
+  bypassReason: z.string().trim().min(1).max(1000),
+  acceptedQty: qty3(z.number().positive()).optional(),
+  batchNumber: z.string().trim().min(1).max(100).optional(),
+  overrideReason: z.string().trim().min(1).max(1000).optional(),
 });
 export type grnBypassSchemaType = z.infer<typeof grnBypassSchema>;
 
-// POST /grn/:id/lines/:lineId/correction body — owner/back_office only.
-// Posts a negative stock_adjustment ledger entry; never mutates the
-// original GRN line row (audit trail stays intact).
+// POST /grn/:id/lines/:lineId/correction body — `grn.correct` (BR-GRN-29).
+// Posts one `grn_correction` ledger row (-qty at the posted cost); never edits
+// the line's accepted qty (BR-GRN-35).
 export const grnCorrectionSchema = z.object({
-  qty: z.number().positive(),
-  reason: z.string().min(1).max(1000),
+  qty: qty3(z.number().positive()),
+  reason: z.string().trim().min(1).max(1000),
 });
 export type grnCorrectionSchemaType = z.infer<typeof grnCorrectionSchema>;
 

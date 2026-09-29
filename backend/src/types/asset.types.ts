@@ -41,16 +41,23 @@ export type assetItemListQuerySchemaType = z.infer<
 >;
 
 export const assetItemCreateSchema = createInsertSchema(itemMaster)
-  .omit({ id: true, createdBy: true, createdAt: true })
+  .omit({
+    id: true,
+    createdBy: true,
+    createdAt: true,
+    currentStock: true,
+    averageCostPaise: true,
+  })
   .extend({
     sku: z.string().min(1),
     name: z.string().min(1),
     category: z.string().min(1),
     uom: z.string().min(1),
     reorderLevel: z.number().nonnegative().optional(),
-    currentStock: z.number().nonnegative().optional(),
-    averageCostPaise: z.number().int().nonnegative().optional(),
-  });
+  })
+  // currentStock / averageCostPaise are not accepted (BR-GRN-40): strict makes
+  // sending them a 400 instead of silently dropping them.
+  .strict();
 export type assetItemCreateSchemaType = z.infer<typeof assetItemCreateSchema>;
 
 // GET /asset/items/:itemId/last-rate query + response — fallback chain:
@@ -76,17 +83,22 @@ export const assetLastRateSchema = z.object({
 export type assetLastRateSchemaType = z.infer<typeof assetLastRateSchema>;
 
 export const assetItemUpdateSchema = createUpdateSchema(itemMaster)
-  .omit({ id: true, createdBy: true, createdAt: true })
+  .omit({
+    id: true,
+    createdBy: true,
+    createdAt: true,
+    currentStock: true,
+    averageCostPaise: true,
+  })
   .extend({
     sku: z.string().min(1).optional(),
     name: z.string().min(1).optional(),
     category: z.string().min(1).optional(),
     uom: z.string().min(1).optional(),
     reorderLevel: z.number().nonnegative().optional(),
-    currentStock: z.number().nonnegative().optional(),
-    averageCostPaise: z.number().int().nonnegative().optional(),
     isActive: z.boolean().optional(),
   })
+  .strict()
   .superRefine((data, ctx) => {
     const hasUpdateField =
       data.sku !== undefined ||
@@ -95,8 +107,6 @@ export const assetItemUpdateSchema = createUpdateSchema(itemMaster)
       data.category !== undefined ||
       data.uom !== undefined ||
       data.reorderLevel !== undefined ||
-      data.currentStock !== undefined ||
-      data.averageCostPaise !== undefined ||
       data.isActive !== undefined;
 
     if (!hasUpdateField) {
@@ -178,6 +188,15 @@ export const inventoryReferenceTypeSchema = z.enum([
   "job_order_issue",
   "scrap_dispatch",
   "stock_adjustment",
+  "grn_correction",
+  "opening_stock",
+  "sco_loss",
+]);
+
+// The only reference types the manual movement screen may post (BR-GRN-43).
+export const manualMovementReferenceTypeSchema = z.enum([
+  "stock_adjustment",
+  "opening_stock",
 ]);
 
 export const inventoryTransactionTypeSchema = z.enum([
@@ -274,6 +293,56 @@ export const assetInventoryMovementCreateSchema = z.object({
 });
 export type assetInventoryMovementCreateSchemaType = z.infer<
   typeof assetInventoryMovementCreateSchema
+>;
+
+// POST /asset/inventory/movements body — manual stock-take / opening stock
+// (BR-GRN-43, 44). referenceType is the full enum on purpose: document types
+// get 400 "post from its source document" from the service. Server sets
+// transactionType = adjustment. unitCostPaise: required > 0 for stock-in
+// (quantityChange > 0); ignored for stock-out (valued at current average).
+export const assetManualMovementCreateSchema = z.object({
+  itemId: z.number().int().positive(),
+  locationId: z.number().int().positive(),
+  referenceType: inventoryReferenceTypeSchema,
+  quantityChange: z
+    .number()
+    .refine((v) => v !== 0, { message: "quantityChange must be non-zero" })
+    .refine((v) => Math.abs(v * 1000 - Math.round(v * 1000)) < 1e-6, {
+      message: "Quantity can have at most 3 decimals",
+    }),
+  unitCostPaise: z.number().int().min(0).optional(),
+  reason: z.string().trim().min(1).max(1000),
+  batchNumber: z.string().trim().min(1).max(100).nullish(),
+});
+export type assetManualMovementCreateSchemaType = z.infer<
+  typeof assetManualMovementCreateSchema
+>;
+
+// GET /asset/inventory/reconciliation (BR-GRN-41). One row per mismatch;
+// zero rows = books agree with the ledger.
+export const assetReconciliationRowSchema = z.object({
+  kind: z.enum(["item_stock", "item_location_balance"]),
+  itemId: z.number().int(),
+  itemSku: z.string(),
+  // null for kind = item_stock
+  locationId: z.number().int().nullable(),
+  // item.currentStock (item_stock) or the last ledger balanceAfter (item_location_balance)
+  storedQty: z.number(),
+  // sum of quantityChange over the ledger (whole item, or that item+location)
+  ledgerQty: z.number(),
+});
+export type assetReconciliationRowSchemaType = z.infer<
+  typeof assetReconciliationRowSchema
+>;
+
+export const assetReconciliationQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(10),
+  sortBy: z.enum(["itemId"]).optional(),
+  sortDir: z.enum(["asc", "desc"]).default("asc"),
+});
+export type assetReconciliationQuerySchemaType = z.infer<
+  typeof assetReconciliationQuerySchema
 >;
 
 // Response shape for a stored inventory ledger row.

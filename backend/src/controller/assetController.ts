@@ -99,6 +99,11 @@ export const assetController = {
     return c.json({ success: true, data }, 201);
   },
 
+  // Contract stub (m1-stock S5 implements it).
+  async inventoryReconciliation(c: Context<AppEnv>) {
+    return c.json({ success: false, message: "Not implemented" }, 501);
+  },
+
   async listLocations(c: Context<AppEnv>) {
     const query = assetLocationListQuerySchema.parse(
       Object.fromEntries(new URL(c.req.url).searchParams),

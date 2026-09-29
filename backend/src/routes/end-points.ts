@@ -25,6 +25,7 @@ export const END_POINTS = {
     updateService: "/services/:id",
     listInventoryMovements: "/inventory/movements",
     createInventoryMovements: "/inventory/movements",
+    inventoryReconciliation: "/inventory/reconciliation",
     listLocations: "/locations",
     createLocation: "/locations",
     updateLocation: "/locations/:id",

@@ -59,6 +59,9 @@ export const inventoryRefTypeEnum = pgEnum("inventory_ref_type", [
   "job_order_issue", // AUTOMATIC: Consumed by furnace/machine (Backflush)
   "scrap_dispatch", // Sold scrap/dross outward
   "stock_adjustment", // Manual correction after physical audit
+  "grn_correction", // Correction of a posted GRN line (BR-GRN-32)
+  "opening_stock", // Manual opening balance (BR-GRN-40, 43)
+  "sco_loss", // Loss at a subcontractor (BR-SCO-19)
 ]);
 
 export const locationTypeEnum = pgEnum("location_type", [
@@ -100,6 +103,8 @@ export const inventoryLedger = pgTable(
     transactionType: inventoryTxTypeEnum("transaction_type").notNull(),
     referenceType: inventoryRefTypeEnum("reference_type").notNull(),
     referenceId: integer("reference_id").notNull(), // ID of the GRN, SCO, or Job Order
+    // Line of the reference document (e.g. grn_items.id) - BR-GRN-21, 32
+    referenceLineId: integer("reference_line_id"),
 
     // QUANTITY
     quantityChange: doublePrecision("quantity_change").notNull(), // + for IN, - for OUT
