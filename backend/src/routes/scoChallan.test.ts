@@ -646,26 +646,26 @@ describe("BR-SCO-09 challan number and print data", () => {
     expect(n.length).toBeLessThanOrEqual(16);
   });
 
-  test("BR-SCO-09 financial year runs Apr-Mar: 31 Mar 2033 is 32-33, 1 Apr 2033 is 33-34", async () => {
+  test("BR-SCO-09 financial year runs Apr-Mar: 31 Mar 2026 is 25-26, 1 Apr 2026 is 26-27", async () => {
     const raw = await makeRaw({ stock: 5000 });
     const { scoId, itemIds } = await makeSco(localVendorId, [
       { rawItemId: raw },
     ]);
     const id = itemIds[0] as number;
     const a = await challan("bo", scoId, [{ scoItemId: id, qty: 10 }], {
-      challanDate: "2033-03-31T06:00:00.000Z",
+      challanDate: "2026-03-31T06:00:00.000Z",
     });
     const b = await challan("bo", scoId, [{ scoItemId: id, qty: 10 }], {
-      challanDate: "2033-04-01T06:00:00.000Z",
+      challanDate: "2026-04-01T06:00:00.000Z",
     });
     expect(a.status).toBe(201);
     expect(b.status).toBe(201);
-    expect(a.json.data.challan.challanNumber).toMatch(/^JWC\/32-33\/\d+$/);
-    expect(b.json.data.challan.challanNumber).toMatch(/^JWC\/33-34\/\d+$/);
+    expect(a.json.data.challan.challanNumber).toMatch(/^JWC\/25-26\/\d+$/);
+    expect(b.json.data.challan.challanNumber).toMatch(/^JWC\/26-27\/\d+$/);
   });
 
   test("BR-SCO-09 numbers are consecutive within a FY and a refused challan does not burn one", async () => {
-    const date = { challanDate: "2034-04-05T06:00:00.000Z" };
+    const date = { challanDate: "2026-04-05T06:00:00.000Z" };
     const raw = await makeRaw({ stock: 5000 });
     const noHsn = await makeRaw({ stock: 5000, hsn: null });
     const ok1 = await makeSco(localVendorId, [{ rawItemId: raw }]);
@@ -740,6 +740,46 @@ describe("BR-SCO-09 challan number and print data", () => {
       `/sco/challans/${created.json.data.challan.id}`,
     );
     expect(res.json.data.vendor.gstin).toBeNull();
+  });
+
+  test("BR-SCO-09 challan date in the future -> 400, nothing posts, no number burned", async () => {
+    const raw = await makeRaw({ stock: 5000 });
+    const { scoId, itemIds } = await makeSco(localVendorId, [
+      { rawItemId: raw },
+    ]);
+    const id = itemIds[0] as number;
+    const before = (await issueRows(raw)).length;
+    const res = await challan("bo", scoId, [{ scoItemId: id, qty: 10 }], {
+      challanDate: daysFromNow(3),
+    });
+    expect(res.status).toBe(400);
+    expect(await challanCount(scoId)).toBe(0);
+    expect((await issueRows(raw)).length).toBe(before);
+    const far = await challan("bo", scoId, [{ scoItemId: id, qty: 10 }], {
+      challanDate: "2027-04-01T06:00:00.000Z",
+    });
+    expect(far.status).toBe(400);
+  });
+
+  test("BR-SCO-09 challan date of today is accepted; a past date is accepted; omitted defaults to today", async () => {
+    const raw = await makeRaw({ stock: 5000 });
+    const { scoId, itemIds } = await makeSco(localVendorId, [
+      { rawItemId: raw },
+    ]);
+    const id = itemIds[0] as number;
+    const today = await challan("bo", scoId, [{ scoItemId: id, qty: 10 }], {
+      challanDate: new Date().toISOString(),
+    });
+    const past = await challan("bo", scoId, [{ scoItemId: id, qty: 10 }], {
+      challanDate: daysFromNow(-10),
+    });
+    const dflt = await challan("bo", scoId, [{ scoItemId: id, qty: 10 }]);
+    expect(today.status).toBe(201);
+    expect(past.status).toBe(201);
+    expect(dflt.status).toBe(201);
+    expect(String(dflt.json.data.challan.challanDate).slice(0, 10)).toBe(
+      new Date().toISOString().slice(0, 10),
+    );
   });
 
   test("BR-SCO-09 unknown challan -> 404", async () => {
@@ -876,11 +916,11 @@ describe("BR-SCO-11 return due date and days left", () => {
       "bo",
       scoId,
       [{ scoItemId: itemIds[0] as number, qty: 10 }],
-      { challanDate: "2026-10-01T06:00:00.000Z" },
+      { challanDate: "2026-06-01T06:00:00.000Z" },
     );
     expect(res.status).toBe(201);
     expect(String(res.json.data.challan.returnDueDate).slice(0, 10)).toBe(
-      "2027-10-01",
+      "2027-06-01",
     );
   });
 
