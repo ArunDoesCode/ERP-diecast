@@ -685,13 +685,18 @@ describe("db:reset with fixtures (BR-KD-35, 44, 46)", () => {
     }
   });
 
-  test("BR-KD-46 fixtures never set stock or average cost", async () => {
-    const rows =
-      await sql`SELECT current_stock, average_cost_paise FROM item_master`;
+  test("BR-KD-46 after reset each item's currentStock equals its ledger balance (no direct writes)", async () => {
+    const rows = await sql`SELECT i.id, i.current_stock,
+        COALESCE((SELECT sum(l.quantity_change) FROM inventory_ledger l
+                  WHERE l.item_id = i.id), 0) AS ledger
+      FROM item_master i`;
+    expect(rows.length).toBeGreaterThan(0);
     for (const r of rows) {
-      expect(Number(r.current_stock)).toBe(0);
-      expect(Number(r.average_cost_paise)).toBe(0);
+      expect(Number(r.current_stock)).toBeCloseTo(Number(r.ledger), 6);
     }
+    // stock exists only where the ledger has rows
+    const stocked = rows.filter((r) => Number(r.current_stock) !== 0);
+    expect(stocked.length).toBeGreaterThan(0);
   });
 
   test("BR-KD-46 money is integer paise: PO subtotal equals sum of qty x rate (24_500 not 245.00)", async () => {
