@@ -69,3 +69,9 @@ If a decision is reversed, add a new entry that references the old one — don't
   files only in `test(` commits and none in `feat(`/`fix(` — pipeline notes in a `test(` commit are fine.
 - **Why:** (1)(2) BR-GRN-22/37/42 need one atomic, ordered path; (3) keep the batch to spec scope;
   (4) that is how PROTOCOL.md rule 5 reads; test-runner flagged it stricter.
+
+### D-011 — Main store can't be deactivated (2026-09-29, work/m1-stock)
+- **Decision:** deactivating the only active `main_store` → 409. Asked and answered by Arun during the inventory
+  build; spec line added at the next spec change (BL-048).
+- **Why:** GRN always posts to the main store (BR-INV-13) and an inactive location takes no postings
+  (BR-INV-15), so deactivating it would stop every receipt.

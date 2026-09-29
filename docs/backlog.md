@@ -42,6 +42,13 @@ Type: defect · infra · feature · debt · idea.
 | BL-043 | P3 | debt | grn | Whole-number unit list duplicated in `frontend/src/lib/grn-units.ts` and backend `WHOLE_NUMBER_UNITS`; expose from backend or add a contract test | m1-stock review CR-7 | 2026-09-29 |
 | BL-044 | P3 | debt | grn | grn-stock BR-GRN-43 example says owner → 200; API returns 201. Align the spec example at the next change | m1-stock test-writer note | 2026-09-29 |
 | BL-045 | P2 | feature | inventory | Stock reconciliation screen (API `GET /api/asset/inventory/reconciliation` exists) | m1-stock plan | 2026-09-29 |
+| BL-046 | P2 | defect | purchase-order | inventory BR-INV-05: an inactive item must not go on a new PO — a PR line approved before the item was deactivated can still become a PO line. Add the check where PO lines are drafted (PO code: auth session). SCO part of BR-INV-10 → subcontracting build | m1-stock review SPEC-20 | 2026-09-29 |
+| BL-047 | P3 | debt | purchase-order | Last-rate `source`: `pr_estimate` means item average (rename `item_average`); PO screen has no label for `standard_rate` and prefills 0 for legacy items with no standard rate — skip prefill when 0 | m1-stock review SPEC-24, CR-28 | 2026-09-29 |
+| BL-048 | P2 | debt | inventory | Spec touch-up at next change: BR-INV-13 "the only main store can't be deactivated (409)" (decided by Arun 2026-09-29); BR-INV-07 reorder level whole for pcs/set; BR-INV-24 legacy item with standard rate 0 → 0; posting to unknown location → 404 | m1-stock review SPEC-26..29 | 2026-09-29 |
+| BL-049 | P3 | idea | inventory | Location `isVirtual` is derived from type (vendor_premise only); spec silent for other types — confirm | m1-stock review SPEC-25 | 2026-09-29 |
+| BL-050 | P3 | debt | inventory | Stock list search `ilike %q%` can't use an index; add pg_trgm if items pass ~50k | m1-stock review PERF-23 | 2026-09-29 |
+| BL-051 | P3 | debt | backend | Move `likePattern` (escapes `\ % _`) to lib and use it in supplier/po/pr/grn/approval/employee searches | m1-stock review SEC-21 | 2026-09-29 |
+| BL-052 | P3 | defect | inventory | PATCH location with only `isVirtual` returns 200 and changes nothing but the audit stamp; return 400 on empty payload | m1-stock review CR-27 | 2026-09-29 |
 
 ## Done
 | ID | Item | PR / commit | Closed |
@@ -62,4 +69,4 @@ Type: defect · infra · feature · debt · idea.
 | BL-018 | Confirmed + fixed: `authService.refresh` re-reads active employee + role + pages (401 if deactivated — was also refreshing forever). Regression test `src/service/authService.test.ts`. Also fixed test isolation: per-file `disconnectDb()` moved to a global afterAll in the test preload | PR #4 (fix), PR #6 (tests by test-writer) | 2026-09-27 |
 | BL-021 | Audit doc statuses verified against code: 13 resolved, 4 partial, 7 open, 1 frontend-only; status block at top. Open items not already tracked → BL-030..BL-037 | PR #4 | 2026-09-27 |
 
-Next free id: **BL-046**
+Next free id: **BL-053**

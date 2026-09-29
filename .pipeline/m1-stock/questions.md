@@ -10,3 +10,4 @@
 | 4 | Item "in use" flag for disabling SKU/unit up front | coordinator | not now; 409 toast is enough (BR-INV-04) | — |
 | 5 | Error envelope in contract.md `{error:{code}}` vs app `{message, code}` | coordinator | app shape `{message, code}` is right; contract.md wording fixed | contract.md |
 | 6 | BR-INV-10 service id as itemId: 400 (spec) vs contract "404/400" | coordinator | spec wins: 400 | contract.md |
+| 7 | Can the only main store be deactivated? | Arun (user) | No — block with 409 | findings SPEC-26; decisions D-011; spec line via BL-048 |

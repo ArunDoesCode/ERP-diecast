@@ -145,9 +145,9 @@ Machine row: `id, name, code: string|null (null only on rows that predate the co
 
 ## Locations
 ### POST `/api/asset/locations` — 201 `data = location row`
-Body: `{ name: string, type, isVirtual?: boolean, linkedVendorId?: int|null }`. Server rules: `vendor_premise` requires an existing **active** supplier, is stored `isVirtual = true`, one location per supplier; other types with `linkedVendorId` -> 400; second `main_store` -> 409.
+Body: `{ name: string, type, isVirtual (ignored; derived from type): boolean, linkedVendorId?: int|null }`. Server rules: `vendor_premise` requires an existing **active** supplier, is stored `isVirtual = true`, one location per supplier; other types with `linkedVendorId` -> 400; second `main_store` -> 409.
 Errors: 400; 403; 409 name exists (ignoring case) / second main_store / supplier already has a location.
-### PATCH `/api/asset/locations/:id` — 200. Body: `{ name?, type?, isVirtual?, linkedVendorId?: int|null, isActive?: boolean }` (>=1 field).
+### PATCH `/api/asset/locations/:id` — 200. Body: `{ name?, type?, isVirtual (ignored; derived from type), linkedVendorId?: int|null, isActive?: boolean }` (>=1 field).
 Errors: 400 (also posting into an inactive location is a 400 on the movement, not here); 403; 404; **409 `LOCATION_IN_USE`** when `type` or `linkedVendorId` changes and the location has ledger rows; 409 changing the only `main_store` to another type; 409 name clash.
 Location row: `id, name, type, isVirtual, linkedVendorId|null, isActive, createdBy|null, createdAt, lastUpdatedBy|null, lastUpdatedAt`.
 

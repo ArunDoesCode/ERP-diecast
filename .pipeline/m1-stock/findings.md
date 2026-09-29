@@ -44,3 +44,10 @@
 | SPEC-23 | minor | contract | contract.md | GET /locations guard text stale | fixed by coordinator in contract.md |
 | SPEC-24 | minor | contract | getLastRate source | `pr_estimate` means item average | backlog: consumers are PO screens (auth session) → BL-047; name kept |
 | SPEC-25 | minor | contract | locations isVirtual | client-sendable flag, spec silent | backlog |
+| PERF-27, PERF-28 | minor | backend | postStock location lookup; updateItemLocked | extra PK select per posting; short item lock | backlog / none |
+| SEC-21 | minor | backend | supplier/po/pr/grn/approval/employee repos | `%q%` not escaped outside inventory | backlog BL-051 |
+| CR-27 | minor | backend | assetService updateLocation | body with only isVirtual → 200 no-op | backlog BL-052 |
+| CR-28 | minor | frontend | PurchaseOrderDetailView / types/purchase-orders.ts | `standard_rate` source not labelled; ratePaise 0 prefilled | handed off with BL-047 (PO screens = auth session) |
+| SPEC-26 | major | spec | assetService updateLocation | deactivating the only main_store → 409 is unspecced | user decided: block it (questions.md row 7); spec line via BL-048 |
+| SPEC-27..29 | minor | spec | postStock 404; reorder whole for pcs/set; last rate 0 for legacy | unspecced but derived | backlog BL-048 (spec touch-up) |
+| TEST-4 | (blocker per runner) | test | 694efd5, 7202d74 | test( commits also carry .pipeline notes | reject: same as TEST-1/2, D-010 point 4 |
