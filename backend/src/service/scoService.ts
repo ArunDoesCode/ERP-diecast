@@ -190,7 +190,7 @@ export const scoService = {
   // BR-SCO-12, 17, 22: details plus qty at vendor, charge due and challan settlement.
   async getDetails(id: number): Promise<scoFullDetailsSchemaType> {
     const { sco, items } = await loadDetails(id);
-    const items2 = items.map((line) => {
+    const itemsWithCharge = items.map((line) => {
       const charge = computeScoLinePaise(
         line.acceptedQty,
         line.serviceUnitPricePaise,
@@ -203,12 +203,18 @@ export const scoService = {
         chargeDueGstPaise: charge.lineTaxPaise,
       };
     });
-    const subtotalPaise = items2.reduce((s, l) => s + l.chargeDuePaise, 0);
-    const gstPaise = items2.reduce((s, l) => s + l.chargeDueGstPaise, 0);
+    const subtotalPaise = itemsWithCharge.reduce(
+      (s, l) => s + l.chargeDuePaise,
+      0,
+    );
+    const gstPaise = itemsWithCharge.reduce(
+      (s, l) => s + l.chargeDueGstPaise,
+      0,
+    );
     const challanLines = await scoReceiptRepository.listChallanLinesForSco(id);
     return {
       sco,
-      items: items2,
+      items: itemsWithCharge,
       chargeDue: {
         subtotalPaise,
         gstPaise,
@@ -357,7 +363,9 @@ export const scoService = {
 
       const losses = lines
         .map((line) => ({ line, qty: qtyAtVendor(line) }))
-        .filter((l) => l.qty > 0);
+        .filter((l) => l.qty > 0)
+        // Item id order so concurrent closes cannot deadlock on item rows.
+        .sort((a, b) => a.line.rawItemId - b.line.rawItemId);
       if (losses.length > 0) {
         if (!can(actor, "sco.loss_override")) {
           throw new ForbiddenError(

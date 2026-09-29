@@ -274,42 +274,51 @@ export const scoStatusEnum = pgEnum("sco_status", [
   "cancelled",
 ]);
 
-export const subcontractingOrders = pgTable("subcontracting_orders", {
-  id: serial("id").primaryKey(),
-  scoNumber: text("sco_number").unique().notNull(),
-  vendorId: integer("vendor_id")
-    .references(() => supplierMaster.id)
-    .notNull(),
-  status: scoStatusEnum("status").default("draft").notNull(),
+export const subcontractingOrders = pgTable(
+  "subcontracting_orders",
+  {
+    id: serial("id").primaryKey(),
+    scoNumber: text("sco_number").unique().notNull(),
+    vendorId: integer("vendor_id")
+      .references(() => supplierMaster.id)
+      .notNull(),
+    status: scoStatusEnum("status").default("draft").notNull(),
 
-  // Link to the internal Job Order or Project this service is for (for cost accounting)
-  projectRef: text("project_ref"),
+    // Link to the internal Job Order or Project this service is for (for cost accounting)
+    projectRef: text("project_ref"),
 
-  notes: text("notes"),
-  // BR-SCO-03: required, today .. today + 365 days (checked by the API).
-  expectedReturnDate: timestamp("expected_return_date").notNull(),
-  // BR-SCO-04: money in paise. subtotal = sum(service price x return qty), no GST.
-  subtotalPaise: integer("subtotal_paise").default(0).notNull(),
-  taxAmountPaise: integer("tax_amount_paise").default(0).notNull(),
-  totalAmountPaise: integer("total_amount_paise").default(0).notNull(),
-  // Approval mirror, same as PR/PO (BR-SCO-06).
-  approvedBy: integer("approved_by").references(() => employees.id),
-  currentApprovalLevel: integer("current_approval_level").default(0).notNull(),
-  totalApprovalLevels: integer("total_approval_levels").default(0).notNull(),
-  // Kept nullable (older rows); the API always sets it and checks it on submit (BR-SCO-06).
-  createdBy: integer("created_by").references(() => employees.id),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  lastUpdatedBy: integer("last_updated_by").references(() => employees.id),
-  lastUpdatedAt: timestamp("last_updated_at").defaultNow().notNull(),
-  // BR-SCO-20: cancel who, when, why.
-  cancelledBy: integer("cancelled_by").references(() => employees.id),
-  cancelledAt: timestamp("cancelled_at"),
-  cancelReason: text("cancel_reason"),
-  // BR-SCO-19: close who, when, why (reason only when a loss is written off).
-  closedBy: integer("closed_by").references(() => employees.id),
-  closedAt: timestamp("closed_at"),
-  closeReason: text("close_reason"),
-});
+    notes: text("notes"),
+    // BR-SCO-03: required, today .. today + 365 days (checked by the API).
+    expectedReturnDate: timestamp("expected_return_date").notNull(),
+    // BR-SCO-04: money in paise. subtotal = sum(service price x return qty), no GST.
+    subtotalPaise: integer("subtotal_paise").default(0).notNull(),
+    taxAmountPaise: integer("tax_amount_paise").default(0).notNull(),
+    totalAmountPaise: integer("total_amount_paise").default(0).notNull(),
+    // Approval mirror, same as PR/PO (BR-SCO-06).
+    approvedBy: integer("approved_by").references(() => employees.id),
+    currentApprovalLevel: integer("current_approval_level")
+      .default(0)
+      .notNull(),
+    totalApprovalLevels: integer("total_approval_levels").default(0).notNull(),
+    // Kept nullable (older rows); the API always sets it and checks it on submit (BR-SCO-06).
+    createdBy: integer("created_by").references(() => employees.id),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    lastUpdatedBy: integer("last_updated_by").references(() => employees.id),
+    lastUpdatedAt: timestamp("last_updated_at").defaultNow().notNull(),
+    // BR-SCO-20: cancel who, when, why.
+    cancelledBy: integer("cancelled_by").references(() => employees.id),
+    cancelledAt: timestamp("cancelled_at"),
+    cancelReason: text("cancel_reason"),
+    // BR-SCO-19: close who, when, why (reason only when a loss is written off).
+    closedBy: integer("closed_by").references(() => employees.id),
+    closedAt: timestamp("closed_at"),
+    closeReason: text("close_reason"),
+  },
+  (t) => ({
+    vendorStatusIdx: index("idx_sco_vendor_status").on(t.vendorId, t.status),
+    createdAtIdx: index("idx_sco_created_at").on(t.createdAt.desc()),
+  }),
+);
 
 export const subcontractingOrderItems = pgTable("subcontracting_order_items", {
   id: serial("id").primaryKey(),
@@ -385,6 +394,7 @@ export const scoChallans = pgTable(
   (t) => ({
     scoIdx: index("idx_sco_challans_sco").on(t.scoId),
     dueIdx: index("idx_sco_challans_due").on(t.returnDueDate),
+    vendorIdx: index("idx_sco_challans_vendor").on(t.vendorId),
   }),
 );
 
@@ -612,6 +622,8 @@ export const scoReceiptSettlements = pgTable(
       .notNull(),
     // Raw pieces settled against that challan line, > 0.
     qty: integer("qty").notNull(),
+    // Part of qty drawn by processed pieces (the rest is unprocessed); QA costs from this part only (BR-SCO-14).
+    processedQty: integer("processed_qty").default(0).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => ({

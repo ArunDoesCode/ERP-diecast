@@ -132,6 +132,7 @@ export const scoReceiptRepository = {
     return tx
       .select({
         qty: scoReceiptSettlements.qty,
+        processedQty: scoReceiptSettlements.processedQty,
         unitIssueCostPaise: scoChallanLines.unitIssueCostPaise,
       })
       .from(scoReceiptSettlements)

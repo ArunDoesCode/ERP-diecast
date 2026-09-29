@@ -183,7 +183,7 @@ export const scoChallanService = {
         };
       });
       const valuePaise = prepared.reduce(
-        (sum, l) => sum + Math.round(l.qty * l.unitIssueCostPaise),
+        (sum, l) => sum + l.qty * l.unitIssueCostPaise,
         0,
       );
 
@@ -219,9 +219,17 @@ export const scoChallanService = {
         actorId,
         challanDate,
       );
+      const challanNumber = `JWC/${fy}/${seq}`;
+      // BR-SCO-09 (Rule 55): challan number is at most 16 characters.
+      if (challanNumber.length > 16) {
+        throw new ConflictError(
+          "Challan number would be longer than 16 characters",
+          "SCO_CHALLAN_NUMBER_TOO_LONG",
+        );
+      }
       const challanId = await scoChallanRepository.insertChallan(
         {
-          challanNumber: `JWC/${fy}/${seq}`,
+          challanNumber,
           scoId,
           vendorId: vendor.id,
           challanDate,

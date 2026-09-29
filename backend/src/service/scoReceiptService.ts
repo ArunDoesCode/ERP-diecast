@@ -11,7 +11,10 @@ import {
   scoRepository,
   type Tx,
 } from "../repository/scoRepository";
-import { postStock } from "../repository/stockPostingRepository";
+import {
+  type PostStockInput,
+  postStock,
+} from "../repository/stockPostingRepository";
 import type {
   createReceiptSchemaType,
   qaDecisionSchemaType,
@@ -274,7 +277,13 @@ export const scoReceiptService = {
       );
       const openByItem = new Map<number, OpenChallanLine[]>();
 
-      for (const wanted of input.lines) {
+      // Stock postings go in item id order so concurrent receipts cannot deadlock.
+      const ordered = [...input.lines].sort(
+        (a, b) =>
+          (byId.get(a.scoItemId)?.rawItemId ?? 0) -
+          (byId.get(b.scoItemId)?.rawItemId ?? 0),
+      );
+      for (const wanted of ordered) {
         const line = byId.get(wanted.scoItemId);
         if (!line) throw new NotFoundError("SCO line not found");
         const { send, ret } = ratioOf(line);
@@ -310,19 +319,35 @@ export const scoReceiptService = {
         );
 
         // BR-SCO-17: one row per challan line touched, oldest first.
-        const settled = new Map<number, number>();
-        for (const seg of [...processedSegments, ...unprocessedSegments]) {
-          settled.set(
-            seg.challanLineId,
-            (settled.get(seg.challanLineId) ?? 0) + seg.qty,
-          );
-        }
-        for (const [challanLineId, qty] of settled) {
+        // processedQty is kept apart so QA costs from processed pieces only (BR-SCO-14).
+        const settled = new Map<
+          number,
+          { qty: number; processedQty: number }
+        >();
+        const tally = (segs: Segment[], processed: boolean) => {
+          for (const seg of segs) {
+            const row = settled.get(seg.challanLineId) ?? {
+              qty: 0,
+              processedQty: 0,
+            };
+            row.qty += seg.qty;
+            if (processed) row.processedQty += seg.qty;
+            settled.set(seg.challanLineId, row);
+          }
+        };
+        tally(processedSegments, true);
+        tally(unprocessedSegments, false);
+        for (const [challanLineId, row] of settled) {
           await scoReceiptRepository.insertSettlement(
-            { receiptItemId: lineId, challanLineId, qty },
+            {
+              receiptItemId: lineId,
+              challanLineId,
+              qty: row.qty,
+              processedQty: row.processedQty,
+            },
             tx,
           );
-          await scoReceiptRepository.addSettledQty(challanLineId, qty, tx);
+          await scoReceiptRepository.addSettledQty(challanLineId, row.qty, tx);
         }
 
         // BR-SCO-16, 25: unprocessed raw goes back to main store in one pair of
@@ -428,11 +453,12 @@ export const scoReceiptService = {
         rawUsedFor(decided + accepted + rejected, send, ret) - usedBefore;
       const rawRejected = rawTotal - rawAccepted;
 
-      // BR-SCO-14: the line's issue cost (average over the challan lines it settled).
+      // BR-SCO-14: issue cost of the processed pieces only (average over the
+      // processed part of the challan lines it settled).
       const settled = await scoReceiptRepository.findSettledCosts(line.id, tx);
-      const settledQty = settled.reduce((s, r) => s + r.qty, 0);
+      const settledQty = settled.reduce((s, r) => s + r.processedQty, 0);
       const settledValue = settled.reduce(
-        (s, r) => s + r.qty * r.unitIssueCostPaise,
+        (s, r) => s + r.processedQty * r.unitIssueCostPaise,
         0,
       );
       const issueCost =
@@ -461,8 +487,10 @@ export const scoReceiptService = {
         averageEffect: "none" as const,
         createdBy: actorId,
       };
+      // Collected, then posted in item id order so concurrent QA decisions cannot deadlock.
+      const postings: PostStockInput[] = [];
       if (rawAccepted > 0) {
-        await postStock(tx, {
+        postings.push({
           ...rawBase,
           locationId: vendorLocation.id,
           transactionType: "out",
@@ -470,21 +498,23 @@ export const scoReceiptService = {
         });
       }
       if (rawRejected > 0 && scrapYard) {
-        await postStock(tx, {
-          ...rawBase,
-          locationId: vendorLocation.id,
-          transactionType: "out",
-          quantityChange: -rawRejected,
-        });
-        await postStock(tx, {
-          ...rawBase,
-          locationId: scrapYard.id,
-          transactionType: "in",
-          quantityChange: rawRejected,
-        });
+        postings.push(
+          {
+            ...rawBase,
+            locationId: vendorLocation.id,
+            transactionType: "out",
+            quantityChange: -rawRejected,
+          },
+          {
+            ...rawBase,
+            locationId: scrapYard.id,
+            transactionType: "in",
+            quantityChange: rawRejected,
+          },
+        );
       }
       if (accepted > 0) {
-        await postStock(tx, {
+        postings.push({
           itemId: scoLine.finishedItemId,
           locationId: mainStore.id,
           transactionType: "in",
@@ -500,6 +530,8 @@ export const scoReceiptService = {
           createdBy: actorId,
         });
       }
+      postings.sort((x, y) => x.itemId - y.itemId);
+      for (const posting of postings) await postStock(tx, posting);
 
       const lineStatus: ReceiptStatus =
         rejected === 0

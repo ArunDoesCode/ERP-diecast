@@ -8,6 +8,7 @@ import {
   InternalServerError,
   NotFoundError,
 } from "../lib/errors";
+import type { PermissionKey } from "../lib/permissions";
 import { approvalRepository } from "../repository/approvalRepository";
 import { poRepository } from "../repository/poRepository";
 import { prRepository } from "../repository/prRepository";
@@ -24,6 +25,16 @@ import type {
   submitApprovalRequestSchemaType,
   updateApprovalPolicySchemaType,
 } from "../types/approval.types";
+
+// BR-APR-24 (v2): permission key needed to submit each document type.
+const SUBMIT_KEYS: Record<
+  submitApprovalRequestSchemaType["docType"],
+  PermissionKey
+> = {
+  pr: "pr.manage",
+  po: "po.manage",
+  sco: "sco.manage",
+};
 
 type ActorContext = {
   actorId: number;
@@ -353,13 +364,11 @@ export const approvalService = {
     }
 
     // BR-APR-24 (v2): submit also needs the document type's own key.
-    const submitKey =
-      input.docType === "pr"
-        ? "pr.manage"
-        : input.docType === "po"
-          ? "po.manage"
-          : "sco.manage";
-    if (submitKey && !can(actor, submitKey)) {
+    const submitKey = SUBMIT_KEYS[input.docType];
+    if (!submitKey) {
+      throw new BadRequestError(`Unknown document type ${input.docType}`);
+    }
+    if (!can(actor, submitKey)) {
       throw new ForbiddenError(
         `Submitting a ${input.docType.toUpperCase()} needs the ${submitKey} permission`,
         "PERMISSION_DENIED",

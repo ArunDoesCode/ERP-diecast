@@ -35,6 +35,11 @@ import type {
   scoResponseSchemaType,
 } from "../types/sco.types";
 
+// Escape LIKE wildcards so a search term is matched literally (SEC-2).
+function escapeLike(value: string) {
+  return value.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+}
+
 export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type ScoInsert = typeof subcontractingOrders.$inferInsert;
 type ScoItemInsert = typeof subcontractingOrderItems.$inferInsert;
@@ -115,8 +120,8 @@ export const scoRepository = {
         : undefined,
       params.q
         ? or(
-            ilike(subcontractingOrders.scoNumber, `%${params.q}%`),
-            ilike(supplierMaster.name, `%${params.q}%`),
+            ilike(subcontractingOrders.scoNumber, `%${escapeLike(params.q)}%`),
+            ilike(supplierMaster.name, `%${escapeLike(params.q)}%`),
           )
         : undefined,
       params.createdFrom

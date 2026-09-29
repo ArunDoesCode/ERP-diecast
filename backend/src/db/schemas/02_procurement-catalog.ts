@@ -187,6 +187,10 @@ export const inventoryLedger = pgTable(
       table.id.desc(),
     ),
     createdAtIdx: index("idx_inventory_ledger_created_at").on(table.createdAt),
+    // Loss log (BR-SCO-19): only the few write-off rows, newest first.
+    scoLossIdx: index("idx_inventory_ledger_sco_loss")
+      .on(table.createdAt.desc(), table.id)
+      .where(sql`${table.referenceType} = 'sco_loss'`),
   }),
 );
 

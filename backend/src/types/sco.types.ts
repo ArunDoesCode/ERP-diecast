@@ -128,7 +128,7 @@ export const scoListQuerySchema = z.object({
     .pipe(z.array(scoStatusSchema).optional()),
   vendorId: z.coerce.number().int().positive().optional(),
   // Matches SCO number or vendor name (case-insensitive contains).
-  q: z.string().trim().min(1).optional(),
+  q: z.string().trim().min(1).max(100).optional(),
   // Register date filter (S4): SCO createdAt, inclusive, ISO dates.
   createdFrom: z.coerce.date().optional(),
   createdTo: z.coerce.date().optional(),
