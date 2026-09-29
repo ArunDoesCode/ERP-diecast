@@ -83,6 +83,8 @@ export const API_ROUTES = {
 			`${API_Header.supplier}/${supplierId}/createService`,
 		editService: (supplierId: number) =>
 			`${API_Header.supplier}/${supplierId}/editService`,
+		history: (supplierId: number) =>
+			`${API_Header.supplier}/${supplierId}/history`,
 	},
 	assets: {
 		items: `${API_Header.asset}/items`,

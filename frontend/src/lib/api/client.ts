@@ -16,11 +16,13 @@ type RequestOptions = {
 
 export class ApiClientError extends Error {
 	status: number;
+	body: unknown;
 
-	constructor(message: string, status: number) {
+	constructor(message: string, status: number, body?: unknown) {
 		super(message);
 		this.name = "ApiClientError";
 		this.status = status;
+		this.body = body;
 	}
 }
 
@@ -59,7 +61,11 @@ async function request<T>(
 		const errorBody = (await response.json().catch(() => null)) as {
 			message?: string;
 		} | null;
-		throw new ApiClientError(errorBody?.message ?? fallback, response.status);
+		throw new ApiClientError(
+			errorBody?.message ?? fallback,
+			response.status,
+			errorBody,
+		);
 	}
 
 	if (response.status === 204) {

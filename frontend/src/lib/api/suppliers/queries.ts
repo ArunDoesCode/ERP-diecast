@@ -12,7 +12,9 @@ import { toast } from "sonner";
 import { ApiClientError } from "@/lib/api/client";
 import type {
 	AssetLookupParams,
+	BatchRowResult,
 	SupplierCreatePayload,
+	SupplierHistoryParams,
 	SupplierItemCreatePayload,
 	SupplierItemEditPayload,
 	SupplierListParams,
@@ -31,6 +33,7 @@ import {
 	getAssetItems,
 	getAssetServices,
 	getSupplierDetail,
+	getSupplierHistory,
 	getSupplierItems,
 	getSupplierServices,
 	getSuppliers,
@@ -51,6 +54,10 @@ export const suppliersKeys = {
 		params
 			? (["suppliers", supplierId, "services", params] as const)
 			: (["suppliers", supplierId, "services"] as const),
+	history: (supplierId: number, params?: SupplierHistoryParams) =>
+		params
+			? (["suppliers", supplierId, "history", params] as const)
+			: (["suppliers", supplierId, "history"] as const),
 	supplierLookup: (params: Omit<AssetLookupParams, "page">) =>
 		["suppliers", "lookup", params] as const,
 	assetItemsLookup: (params: Omit<AssetLookupParams, "page">) =>
@@ -59,8 +66,49 @@ export const suppliersKeys = {
 		["suppliers", "asset-services", params] as const,
 };
 
+// A failed batch (400 BATCH_FAILED) carries one row per input row, with the
+// reason on the rows that failed. Nothing was saved (BR-SUP-21).
+export function getBatchFailures(error: unknown): BatchRowResult<unknown>[] {
+	if (!(error instanceof ApiClientError)) return [];
+	const body = error.body as { data?: unknown } | null;
+	if (!body || !Array.isArray(body.data)) return [];
+	return (body.data as BatchRowResult<unknown>[]).filter(
+		(row) => row.success === false,
+	);
+}
+
 function errorMessage(error: unknown, fallback: string) {
+	const failures = getBatchFailures(error);
+	if (failures.length > 0) {
+		return failures
+			.map(
+				(row) => `Row ${row.index + 1}: ${row.error ?? "could not be saved"}`,
+			)
+			.join("; ");
+	}
 	return error instanceof ApiClientError ? error.message : fallback;
+}
+
+function invalidateHistory(
+	queryClient: ReturnType<typeof useQueryClient>,
+	supplierId: number,
+) {
+	return queryClient.invalidateQueries({
+		queryKey: suppliersKeys.history(supplierId),
+	});
+}
+
+export function useSupplierHistoryQuery(
+	supplierId: number,
+	params: SupplierHistoryParams,
+	enabled = true,
+) {
+	return useQuery({
+		queryKey: suppliersKeys.history(supplierId, params),
+		queryFn: () => getSupplierHistory(supplierId, params),
+		enabled: supplierId > 0 && enabled,
+		placeholderData: keepPreviousData,
+	});
 }
 
 function normalize(value?: string | null) {
@@ -145,6 +193,7 @@ export function useUpdateSupplierMasterMutation() {
 				queryClient.invalidateQueries({
 					queryKey: suppliersKeys.detail(variables.supplierId),
 				}),
+				invalidateHistory(queryClient, variables.supplierId),
 			]);
 			toast.success(result.message || "Supplier updated");
 		},
@@ -246,17 +295,24 @@ export function useEditSupplierItemMutation() {
 			payload,
 		}: {
 			supplierId: number;
-			payload: SupplierItemEditPayload;
+			payload: SupplierItemEditPayload | SupplierItemEditPayload[];
 		}) => editSupplierItem(supplierId, payload),
 		onSuccess: async (result, variables) => {
 			if (!result.success) {
 				toast.error(result.message || "Failed to update item");
 				return;
 			}
-			await queryClient.invalidateQueries({
-				queryKey: suppliersKeys.items(variables.supplierId),
-			});
-			toast.success(result.message || "Item updated");
+			await Promise.all([
+				queryClient.invalidateQueries({
+					queryKey: suppliersKeys.items(variables.supplierId),
+				}),
+				invalidateHistory(queryClient, variables.supplierId),
+			]);
+			toast.success(
+				Array.isArray(variables.payload)
+					? `${result.summary.success} rows saved`
+					: "Item updated",
+			);
 		},
 		onError: (error) => {
 			toast.error(errorMessage(error, "Failed to update item"));
@@ -300,17 +356,24 @@ export function useEditSupplierServiceMutation() {
 			payload,
 		}: {
 			supplierId: number;
-			payload: SupplierServiceEditPayload;
+			payload: SupplierServiceEditPayload | SupplierServiceEditPayload[];
 		}) => editSupplierService(supplierId, payload),
 		onSuccess: async (result, variables) => {
 			if (!result.success) {
 				toast.error(result.message || "Failed to update service");
 				return;
 			}
-			await queryClient.invalidateQueries({
-				queryKey: suppliersKeys.services(variables.supplierId),
-			});
-			toast.success(result.message || "Service updated");
+			await Promise.all([
+				queryClient.invalidateQueries({
+					queryKey: suppliersKeys.services(variables.supplierId),
+				}),
+				invalidateHistory(queryClient, variables.supplierId),
+			]);
+			toast.success(
+				Array.isArray(variables.payload)
+					? `${result.summary.success} rows saved`
+					: "Service updated",
+			);
 		},
 		onError: (error) => {
 			toast.error(errorMessage(error, "Failed to update service"));
@@ -333,8 +396,8 @@ export function toSupplierCreatePayload(input: {
 	return {
 		name: input.name,
 		type: input.type as SupplierCreatePayload["type"],
-		gstNumber: normalize(input.gstNumber),
-		panNumber: normalize(input.panNumber),
+		gstNumber: normalize(input.gstNumber)?.toUpperCase(),
+		panNumber: normalize(input.panNumber)?.toUpperCase(),
 		contactPerson: normalize(input.contactPerson),
 		email: normalize(input.email),
 		phone: normalize(input.phone),
@@ -360,8 +423,8 @@ export function toSupplierMasterUpdatePayload(input: {
 		mode: "master",
 		name: normalize(input.name),
 		type: input.type as SupplierMasterUpdatePayload["type"],
-		gstNumber: normalize(input.gstNumber) ?? null,
-		panNumber: normalize(input.panNumber) ?? null,
+		gstNumber: normalize(input.gstNumber)?.toUpperCase() ?? null,
+		panNumber: normalize(input.panNumber)?.toUpperCase() ?? null,
 		contactPerson: normalize(input.contactPerson) ?? null,
 		email: normalize(input.email) ?? null,
 		phone: normalize(input.phone) ?? null,

@@ -26,6 +26,7 @@ export function SupplierServicesOfferingsPane({
 	pageSize,
 	onPageChange,
 	onEdit,
+	canManage,
 }: {
 	supplierId: number;
 	active: boolean;
@@ -34,6 +35,7 @@ export function SupplierServicesOfferingsPane({
 	pageSize: number;
 	onPageChange: (page: number) => void;
 	onEdit: (service: SupplierService) => void;
+	canManage: boolean;
 }) {
 	const serviceQuery = useSupplierServicesQuery(
 		supplierId,
@@ -55,16 +57,20 @@ export function SupplierServicesOfferingsPane({
 				header: ({ column }) => (
 					<DataTableColumnHeader column={column} title="Service" />
 				),
-				cell: ({ row }) => (
-					<Button
-						type="button"
-						variant="link"
-						className="h-auto p-0"
-						onClick={() => onEdit(row.original)}
-					>
-						{row.original.serviceName}
-					</Button>
-				),
+				cell: ({ row }) => {
+					const label = <span>{row.original.serviceName}</span>;
+					if (!canManage) return label;
+					return (
+						<Button
+							type="button"
+							variant="link"
+							className="h-auto p-0"
+							onClick={() => onEdit(row.original)}
+						>
+							{label}
+						</Button>
+					);
+				},
 			},
 			{
 				accessorKey: "serviceUnitPricePaise",
@@ -94,7 +100,7 @@ export function SupplierServicesOfferingsPane({
 				),
 			},
 		],
-		[onEdit],
+		[onEdit, canManage],
 	);
 
 	const pagination = useMemo<PaginationState>(
@@ -142,5 +148,11 @@ export function SupplierServicesOfferingsPane({
 		);
 	}
 
-	return <DataTable table={table} isLoading={serviceQuery.isLoading} />;
+	return (
+		<DataTable
+			table={table}
+			isLoading={serviceQuery.isLoading}
+			rowClassName={(row) => (row.isActive ? undefined : "opacity-50")}
+		/>
+	);
 }
