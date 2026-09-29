@@ -1083,7 +1083,7 @@ describe("BR-SCO-24 one transaction, lock, races", () => {
     expect(await receiptCount(s.scoId)).toBe(1);
     const d = await scoDetails(s.scoId);
     expect(d.items[0].pendingQaQty).toBe(400);
-    expect(d.items[0].qtyAtVendor).toBe(400);
+    expect(d.items[0].qtyAtVendor).toBe(0);
   });
 
   test("BR-SCO-24 two unprocessed returns at once for the last 400 -> one 201, one 409, store credited once", async () => {
