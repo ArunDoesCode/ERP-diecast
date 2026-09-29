@@ -5,9 +5,9 @@ import {
   NotFoundError,
 } from "../lib/errors";
 import type { Role } from "../lib/token";
-import { assetRepository } from "../repository/assetRepository";
 import { grnRepository } from "../repository/grnRepository";
 import { poRepository } from "../repository/poRepository";
+import { postStock } from "../repository/stockPostingRepository";
 import { poService } from "../service/poService";
 import type {
   createGrnSchemaType,
@@ -143,6 +143,7 @@ export const grnService = {
       input.lines.map((line) => ({
         poItemId: line.poItemId,
         arrivedQty: line.arrivedQty,
+        batchNumber: line.batchNumber ?? null,
       })),
     );
   },
@@ -212,9 +213,9 @@ export const grnService = {
     return { id: deleted.id };
   },
 
-  // Per-line QA reject — no stock effect, just marks the line failed.
-  // Wrapped in one transaction (grnRepository.withTransaction) alongside
-  // the qaTests insert + header rollup.
+  // QA decision on one line. One transaction: line lock, ledger row, item
+  // stock + average, line, QA row, PO line, PO and GRN status (BR-GRN-22).
+  // acceptedQty > 0 posts stock; acceptedQty = 0 is a full reject (no posting).
   async qaAction(
     grnId: number,
     lineId: number,
@@ -222,109 +223,86 @@ export const grnService = {
     actorId: number,
     actorRole: Role,
   ) {
-    const line = await grnRepository.findGrnItemForUpdate(grnId, lineId);
-    if (!line) {
-      throw new NotFoundError("GRN line not found");
-    }
-    if (line.poItemId == null || line.poId == null) {
-      throw new InternalServerError(
-        "GRN line is missing its purchase order item link",
-      );
-    }
-    // Re-bind as locals — TS narrowing on `line.poItemId`/`line.poId` above
-    // doesn't survive being read from inside the deferred closures below.
-    const poItemId = line.poItemId;
-    const poId = line.poId;
-
-    if (line.isQaBypassed || line.qaStatus !== "pending") {
-      throw new ConflictError(
-        "GRN line has already been finalized (accepted, rejected, or bypassed)",
-      );
-    }
-
-    if (input.decision === "reject") {
-      const rejectedQty = input.rejectedQty as number;
-
-      return grnRepository.withTransaction(async (tx) => {
-        const updatedLine = await grnRepository.updateGrnItemLine(
-          lineId,
-          { rejectedQty, qaStatus: "failed" },
-          tx,
-        );
-        await grnRepository.insertQaTest(
-          {
-            grnItemId: lineId,
-            status: "failed",
-            testReportUrl: input.certificateUrl ?? null,
-            notes: input.remarks ?? null,
-            testedBy: actorId,
-          },
-          tx,
-        );
-        await recomputeGrnHeaderStatus(grnId, tx);
-        return updatedLine;
-      });
-    }
-
-    // decision === "accept": posts to the inventory ledger via
-    // assetRepository.createInventoryMovement — the only stock-posting path
-    // in this codebase. That call opens its own internal transaction, so it
-    // can't be composed atomically with the grnItems/purchaseOrderItems/PO
-    // rollup writes that follow (wrapped in their own transaction below).
-    // Known limitation: a crash between the ledger post and that second
-    // transaction leaves a ledger entry with no matching GRN-line update —
-    // accepted as consistent with this repo's current maturity, not fixed
-    // here.
-    const acceptedQty = input.acceptedQty as number;
-    overReceiptGuard(
-      line.orderedQty,
-      line.poItemReceivedQty ?? 0,
-      acceptedQty,
-      actorRole,
-    );
-
-    const locationId = await grnRepository.findDefaultReceivingLocationId();
-
-    await assetRepository.createInventoryMovement(
-      {
-        itemId: line.itemId,
-        locationId,
-        transactionType: "in",
-        referenceType: "grn",
-        referenceId: grnId,
-        quantityChange: acceptedQty,
-        unitCostPaise: line.unitPricePaise,
-        notes: `GRN #${grnId} line #${lineId} QA accept`,
-      },
-      actorId,
-    );
+    const acceptedQty = input.acceptedQty;
+    const rejectedQty = input.rejectedQty;
 
     return grnRepository.withTransaction(async (tx) => {
+      const line = await grnRepository.findGrnItemForUpdate(grnId, lineId, tx);
+      if (!line) {
+        throw new NotFoundError("GRN line not found");
+      }
+      if (line.poItemId == null || line.poId == null) {
+        throw new InternalServerError(
+          "GRN line is missing its purchase order item link",
+        );
+      }
+      if (line.isQaBypassed || line.qaStatus !== "pending") {
+        throw new ConflictError(
+          "GRN line has already been finalized (accepted, rejected, or bypassed)",
+        );
+      }
+
+      const batchNumber = input.batchNumber ?? line.batchNumber ?? null;
+
+      if (acceptedQty > 0) {
+        overReceiptGuard(
+          line.orderedQty,
+          line.poItemReceivedQty ?? 0,
+          acceptedQty,
+          actorRole,
+        );
+        const locationId =
+          await grnRepository.findDefaultReceivingLocationId(tx);
+        await postStock(tx, {
+          itemId: line.itemId,
+          locationId,
+          transactionType: "in",
+          referenceType: "grn",
+          referenceId: grnId,
+          referenceLineId: lineId,
+          batchNumber,
+          quantityChange: acceptedQty,
+          unitCostPaise: line.unitPricePaise,
+          notes: `GRN #${grnId} line #${lineId} QA accept`,
+          createdBy: actorId,
+        });
+      }
+
       const updatedLine = await grnRepository.updateGrnItemLine(
         lineId,
-        { acceptedQty, qaStatus: "passed" },
+        {
+          acceptedQty,
+          rejectedQty,
+          qaStatus: acceptedQty > 0 ? "passed" : "failed",
+          batchNumber,
+        },
         tx,
       );
       await grnRepository.insertQaTest(
         {
           grnItemId: lineId,
-          status: "passed",
+          status: acceptedQty > 0 ? "passed" : "failed",
           testReportUrl: input.certificateUrl ?? null,
           notes: input.remarks ?? null,
           testedBy: actorId,
         },
         tx,
       );
-      await poRepository.incrementPoItemReceivedQty(poItemId, acceptedQty, tx);
-      await poService.recomputeReceiptStatus(poId, tx);
+      if (acceptedQty > 0) {
+        await poRepository.incrementPoItemReceivedQty(
+          line.poItemId,
+          acceptedQty,
+          tx,
+        );
+        await poService.recomputeReceiptStatus(line.poId, tx);
+      }
       await recomputeGrnHeaderStatus(grnId, tx);
       return updatedLine;
     });
   },
 
   // QA bypass — mandatory reason, posts immediately with referenceType
-  // `grn_bypass`. Same known non-atomicity limitation as the accept path
-  // above (ledger post is a separate transaction from the rollup writes).
+  // `grn_bypass`, in one transaction like the accept path.
   async bypass(
     grnId: number,
     lineId: number,
@@ -332,52 +310,47 @@ export const grnService = {
     actorId: number,
     actorRole: Role,
   ) {
-    const line = await grnRepository.findGrnItemForUpdate(grnId, lineId);
-    if (!line) {
-      throw new NotFoundError("GRN line not found");
-    }
-    if (line.poItemId == null || line.poId == null) {
-      throw new InternalServerError(
-        "GRN line is missing its purchase order item link",
+    return grnRepository.withTransaction(async (tx) => {
+      const line = await grnRepository.findGrnItemForUpdate(grnId, lineId, tx);
+      if (!line) {
+        throw new NotFoundError("GRN line not found");
+      }
+      if (line.poItemId == null || line.poId == null) {
+        throw new InternalServerError(
+          "GRN line is missing its purchase order item link",
+        );
+      }
+      if (line.isQaBypassed || line.qaStatus !== "pending") {
+        throw new ConflictError(
+          "GRN line has already been finalized (accepted, rejected, or bypassed)",
+        );
+      }
+
+      const acceptedQty = input.acceptedQty ?? line.receivedQty;
+      const batchNumber = input.batchNumber ?? line.batchNumber ?? null;
+
+      overReceiptGuard(
+        line.orderedQty,
+        line.poItemReceivedQty ?? 0,
+        acceptedQty,
+        actorRole,
       );
-    }
-    // Re-bind as locals — TS narrowing on `line.poItemId`/`line.poId` above
-    // doesn't survive being read from inside the deferred closures below.
-    const poItemId = line.poItemId;
-    const poId = line.poId;
 
-    if (line.isQaBypassed || line.qaStatus !== "pending") {
-      throw new ConflictError(
-        "GRN line has already been finalized (accepted, rejected, or bypassed)",
-      );
-    }
-
-    const acceptedQty = input.acceptedQty ?? line.receivedQty;
-
-    overReceiptGuard(
-      line.orderedQty,
-      line.poItemReceivedQty ?? 0,
-      acceptedQty,
-      actorRole,
-    );
-
-    const locationId = await grnRepository.findDefaultReceivingLocationId();
-
-    await assetRepository.createInventoryMovement(
-      {
+      const locationId = await grnRepository.findDefaultReceivingLocationId(tx);
+      await postStock(tx, {
         itemId: line.itemId,
         locationId,
         transactionType: "in",
         referenceType: "grn_bypass",
         referenceId: grnId,
+        referenceLineId: lineId,
+        batchNumber,
         quantityChange: acceptedQty,
         unitCostPaise: line.unitPricePaise,
         notes: `GRN #${grnId} line #${lineId} QA bypass: ${input.bypassReason}`,
-      },
-      actorId,
-    );
+        createdBy: actorId,
+      });
 
-    return grnRepository.withTransaction(async (tx) => {
       const updatedLine = await grnRepository.updateGrnItemLine(
         lineId,
         {
@@ -386,55 +359,84 @@ export const grnService = {
           isQaBypassed: true,
           qaBypassReason: input.bypassReason,
           qaBypassedBy: actorId,
+          batchNumber,
         },
         tx,
       );
-      await poRepository.incrementPoItemReceivedQty(poItemId, acceptedQty, tx);
-      await poService.recomputeReceiptStatus(poId, tx);
+      await poRepository.incrementPoItemReceivedQty(
+        line.poItemId,
+        acceptedQty,
+        tx,
+      );
+      await poService.recomputeReceiptStatus(line.poId, tx);
       await recomputeGrnHeaderStatus(grnId, tx);
       return updatedLine;
     });
   },
 
-  // Correction after posting — negative stock_adjustment ledger entry.
+  // Correction after posting — one `grn_correction` ledger row, a correction
+  // record and the PO line's received qty rolled back, in one transaction.
   // Does not mutate the original GRN line row; audit trail stays intact.
+  // (Sum-of-corrections, negative-balance and PO status rules: slice S4.)
   async correction(
     grnId: number,
     lineId: number,
     input: grnCorrectionSchemaType,
     actorId: number,
   ) {
-    const line = await grnRepository.findGrnItemForUpdate(grnId, lineId);
-    if (!line) {
-      throw new NotFoundError("GRN line not found");
-    }
+    return grnRepository.withTransaction(async (tx) => {
+      const line = await grnRepository.findGrnItemForUpdate(grnId, lineId, tx);
+      if (!line) {
+        throw new NotFoundError("GRN line not found");
+      }
+      if (line.poItemId == null || line.poId == null) {
+        throw new InternalServerError(
+          "GRN line is missing its purchase order item link",
+        );
+      }
 
-    if (!line.isQaBypassed && line.qaStatus !== "passed") {
-      throw new BadRequestError(
-        "This GRN line has not posted to inventory yet — nothing to correct.",
-      );
-    }
+      if (!line.isQaBypassed && line.qaStatus !== "passed") {
+        throw new BadRequestError(
+          "This GRN line has not posted to inventory yet — nothing to correct.",
+        );
+      }
 
-    if (input.qty > line.acceptedQty) {
-      throw new BadRequestError(
-        `Correction qty (${input.qty}) cannot exceed the line's accepted qty (${line.acceptedQty}).`,
-      );
-    }
+      if (input.qty > line.acceptedQty) {
+        throw new BadRequestError(
+          `Correction qty (${input.qty}) cannot exceed the line's accepted qty (${line.acceptedQty}).`,
+        );
+      }
 
-    const locationId = await grnRepository.findDefaultReceivingLocationId();
-
-    return assetRepository.createInventoryMovement(
-      {
+      const locationId = await grnRepository.findDefaultReceivingLocationId(tx);
+      const posted = await postStock(tx, {
         itemId: line.itemId,
         locationId,
         transactionType: "adjustment",
-        referenceType: "stock_adjustment",
+        referenceType: "grn_correction",
         referenceId: grnId,
+        referenceLineId: lineId,
+        batchNumber: line.batchNumber,
         quantityChange: -input.qty,
         unitCostPaise: line.unitPricePaise,
+        averageEffect: "out_at_cost",
         notes: `GRN correction for GRN #${grnId} line #${lineId}: ${input.reason}`,
-      },
-      actorId,
-    );
+        createdBy: actorId,
+      });
+      await grnRepository.insertCorrection(
+        {
+          grnItemId: lineId,
+          qty: input.qty,
+          reason: input.reason,
+          createdBy: actorId,
+        },
+        tx,
+      );
+      await poRepository.incrementPoItemReceivedQty(
+        line.poItemId,
+        -input.qty,
+        tx,
+      );
+      return posted;
+    });
   },
 };

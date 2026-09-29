@@ -10,7 +10,6 @@ import {
   lt,
   or,
 } from "drizzle-orm";
-
 import { db } from "../db/client";
 import {
   inventoryLedger,
@@ -35,6 +34,7 @@ import type {
   assetServiceCreateSchemaType,
   assetServiceListQuerySchemaType,
 } from "../types/asset.types";
+import { postStock } from "./stockPostingRepository";
 
 const itemColumns = getTableColumns(itemMaster);
 
@@ -437,50 +437,20 @@ export const assetRepository = {
     input: assetInventoryMovementCreateSchemaType,
     actorId: number,
   ) {
-    // ponytail: row-locks the last movement for this item+location so two
-    // concurrent movements can't both read the same balanceAfter (lost
-    // update). Doesn't lock a brand-new item+location pair with zero prior
-    // rows — real fix for that edge is a dedicated running-balance row with
-    // a unique constraint per item+location, not done here.
-    return db.transaction(async (tx) => {
-      const [lastRow] = await tx
-        .select({ balanceAfter: inventoryLedger.balanceAfter })
-        .from(inventoryLedger)
-        .where(
-          and(
-            eq(inventoryLedger.itemId, input.itemId),
-            eq(inventoryLedger.locationId, input.locationId),
-          ),
-        )
-        .orderBy(desc(inventoryLedger.createdAt), desc(inventoryLedger.id))
-        .limit(1)
-        .for("update");
-
-      const previousBalance = lastRow?.balanceAfter ?? 0;
-      const balanceAfter = previousBalance + input.quantityChange;
-
-      const [created] = await tx
-        .insert(inventoryLedger)
-        .values({
-          itemId: input.itemId,
-          locationId: input.locationId,
-          batchNumber: input.batchNumber ?? null,
-          transactionType: input.transactionType,
-          referenceType: input.referenceType,
-          referenceId: input.referenceId,
-          quantityChange: input.quantityChange,
-          balanceAfter,
-          unitCostPaise: input.unitCostPaise,
-          totalValueChangePaise: Math.round(
-            input.quantityChange * input.unitCostPaise,
-          ),
-          notes: input.notes ?? null,
-          createdBy: actorId,
-        })
-        .returning(inventoryMovementWriteColumns);
-
-      return created;
-    });
+    return db.transaction((tx) =>
+      postStock(tx, {
+        itemId: input.itemId,
+        locationId: input.locationId,
+        batchNumber: input.batchNumber,
+        transactionType: input.transactionType,
+        referenceType: input.referenceType,
+        referenceId: input.referenceId,
+        quantityChange: input.quantityChange,
+        unitCostPaise: input.unitCostPaise,
+        notes: input.notes,
+        createdBy: actorId,
+      }),
+    );
   },
 
   async listMachines(params: assetMachineListQuerySchemaType) {

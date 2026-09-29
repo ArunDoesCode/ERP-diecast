@@ -3,6 +3,7 @@ import { and, asc, count, desc, eq, ilike, inArray, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { itemMaster, locations } from "../db/schemas/02_procurement-catalog";
 import {
+  grnCorrections,
   grnItems,
   grns,
   purchaseOrderItems,
@@ -43,6 +44,7 @@ const grnItemColumns = {
   qaBypassReason: grnItems.qaBypassReason,
   qaBypassedBy: grnItems.qaBypassedBy,
   challanPhotoUrl: grnItems.challanPhotoUrl,
+  batchNumber: grnItems.batchNumber,
 };
 
 const grnItemDetailColumns = {
@@ -77,6 +79,7 @@ export type CreateGrnData = Pick<
 export type CreateGrnLineData = {
   poItemId: number;
   arrivedQty: number;
+  batchNumber?: string | null;
 };
 
 export type UpdateGrnHeaderData = Partial<
@@ -103,8 +106,8 @@ export const grnRepository = {
   // GRN header has no locationId column (deliberate — see build plan).
   // Every GRN posts to the first `main_store` location; throws if none is
   // configured rather than silently defaulting to null.
-  async findDefaultReceivingLocationId() {
-    const [row] = await db
+  async findDefaultReceivingLocationId(tx?: Tx) {
+    const [row] = await (tx ?? db)
       .select({ id: locations.id })
       .from(locations)
       .where(eq(locations.type, "main_store"))
@@ -193,6 +196,7 @@ export const grnRepository = {
             grnId: createdGrn.id,
             poItemId: line.poItemId,
             receivedQty: line.arrivedQty,
+            batchNumber: line.batchNumber ?? null,
             acceptedQty: 0,
             rejectedQty: 0,
             qaStatus: "pending",
@@ -225,9 +229,11 @@ export const grnRepository = {
 
   // Scoped by grnId (joined via WHERE) so a line belonging to a different
   // GRN can never be read/mutated by a request targeting this GRN.
+  // With `tx`, the line and its PO line are row-locked (FOR UPDATE) so one
+  // decision per line and the PO received-qty check are race-free.
   async findGrnItemForUpdate(grnId: number, lineId: number, tx?: Tx) {
     const executor = tx ?? db;
-    const [row] = await executor
+    const query = executor
       .select({
         ...grnItemColumns,
         poId: purchaseOrderItems.poId,
@@ -244,6 +250,15 @@ export const grnRepository = {
       .where(and(eq(grnItems.id, lineId), eq(grnItems.grnId, grnId)))
       .limit(1);
 
+    const [row] = tx ? await query.for("update") : await query;
+    return row;
+  },
+
+  async insertCorrection(
+    data: { grnItemId: number; qty: number; reason: string; createdBy: number },
+    tx: Tx,
+  ) {
+    const [row] = await tx.insert(grnCorrections).values(data).returning();
     return row;
   },
 
@@ -257,6 +272,7 @@ export const grnRepository = {
       isQaBypassed: boolean;
       qaBypassReason: string | null;
       qaBypassedBy: number | null;
+      batchNumber: string | null;
     }>,
     tx?: Tx,
   ) {
