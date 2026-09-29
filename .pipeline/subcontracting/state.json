@@ -5,9 +5,9 @@
   "phase": "build",
   "spec": "docs/specs/subcontracting.md v2",
   "slices": ["S1","S2","S3","S4"],
-  "currentSlice": "S3",
+  "currentSlice": "S4",
   "iteration": 0,
-  "nextSeq": 19,
+  "nextSeq": 20,
   "pr": null,
   "lastProcessedCommentAt": null,
   "envFile": "/Users/turbo_fltr/.claude/diecast-env/main-test.env"
