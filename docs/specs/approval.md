@@ -1,7 +1,7 @@
 ---
 module: approval
 status: frozen           # draft | frozen | changed-after-freeze
-version: 1
+version: 2
 frozen_on: 2026-09-29
 owner: Arun
 depends_on: [auth-setup, purchase-requisition, purchase-order, subcontracting, approval-policies]
@@ -107,3 +107,4 @@ None open.
 - 2026-09-29 — final answers folded. Q1a=B: no self-approval block, requester may act on a step they match (BR-APR-33). Q1b: owner's own requests auto-approved and auto-approve policies kept (BR-APR-61, policies BR-APR-05). Q4=B: rejected PO cancels its PR lines (BR-APR-43). Tables compacted.
 - 2026-09-29 — pre-freeze touch-up: BR-APR-43 cites BR-PO-07/11 and BR-PR-31/36 (Q4=B, reject or cancel). BR-APR-47 uses `PR_NOT_EDITABLE` for PRs. "(assumed)" dropped from BR-APR-24 and the stuck-request line.
 - 2026-09-29 — frozen v1 (all questions answered by Arun)
+- 2026-09-29 — v2 clarified during build (review): actions are only approve, reject, send back and withdraw — there is no approval `cancel` action; a document is cancelled only through its own module's cancel (BR-APR-48). Submit (BR-APR-24) also needs the document type's key (`pr.manage` for PRs, `po.manage` for POs). Error codes used: `APPROVAL_ALREADY_OPEN` (BR-APR-26), `APPROVAL_NOTES_REQUIRED` (BR-APR-37), `APPROVAL_NOT_REQUESTER` (BR-APR-39), `APPROVAL_ALREADY_ACTED` (BR-APR-33), `APPROVAL_NO_ELIGIBLE_APPROVER` (BR-APR-23). `isSaleOrderLinked` is not returned by the policy API (BR-APR-15).

@@ -1,7 +1,7 @@
 ---
 module: known-defects
 status: frozen           # draft | frozen | changed-after-freeze
-version: 2
+version: 3
 frozen_on: 2026-09-29
 owner: Arun
 depends_on: [purchase-requisition, approval, purchase-order, grn, inventory, auth-setup]
@@ -97,3 +97,4 @@ None open.
 - 2026-09-29 — final answers folded. Q4=A: IT person uses env + `bun run bootstrap-admin` (BR-KD-23). PR Q3=A carried into BR-KD-07 and who-table. PR Q2=A: fixture items get a standard rate (BR-KD-44, 46). "(assumed)" tags dropped (BR-KD-20, 23, 29, 30, 33). Not-now BL-019 line fixed to point at PR spec. Tables re-padded.
 - 2026-09-29 — frozen v1 (all questions answered by Arun)
 - 2026-09-29 — v2 clarified during build: every fixture login, including `admin@diecast.local` (super-admin), uses `SEED_USER_PASSWORD`; desk fixture users are `<role>@diecast.local` (owner, back_office, floor_supervisor, qa_inspector, die_designer). The "fixtures throw" (BR-KD-35) and "unknown seed key" (BR-KD-40) failure paths are not covered by automated tests (no test-only hooks in production code).
+- 2026-09-29 — v3 clarified during build (security review): BR-KD-30's local guard also requires `DB_RESET_CONFIRM=<db name>` when the database name is not `diecast` or ends in `_test`, or the local port is not 5432/5433 (an SSH tunnel to a real DB on localhost must not pass unconfirmed). After a run with `--allow-remote`, the summary prints "rotate the seed admin password now".

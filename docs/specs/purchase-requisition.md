@@ -1,7 +1,7 @@
 ---
 module: purchase-requisition
 status: frozen           # draft | frozen | changed-after-freeze
-version: 1
+version: 2
 frozen_on: 2026-09-29
 owner: Arun
 depends_on: [auth-setup, approval, purchase-order, grn, inventory]
@@ -111,3 +111,4 @@ None open.
 - 2026-09-29 — final answers folded. Q2=A: item standard rate used while average cost is 0 (BR-PR-11, 14). Q3=A: only requester or super-admin edits/cancels, all `pr.manage` holders view (BR-PR-17, 42, who-table). Approval Q4=B: PO cancel/reject cancels its PR lines; draft-PO line delete still → pending (BR-PR-31, 30, 36, line flow). Subcontracting Q1=A settled (BR-PR-25). "(assumed)" tags dropped (BR-PR-08, 11, 21, 43). Tables re-padded.
 - 2026-09-29 — pre-freeze touch-up: checked BR-PR-30, 31, 36 agree with approval Q4=B; last "pending subcontracting Q1" text replaced (subcontracting PRs → PO, SCOs created directly). `PR_NOT_EDITABLE` is also the code approval BR-APR-47 uses for PRs.
 - 2026-09-29 — frozen v1 (all questions answered by Arun)
+- 2026-09-29 — v2 clarified during build (review): status is never set through edit (400 `PR_STATUS_VIA_ACTION`); the `pr.link_machine` check (auth BR-AUTH-26) applies only when the machine is added or changed, not when an edit resends the same one; notes are at most 2000 characters; a `saleOrderId` must exist (400). PO-driven line changes (ordered / closed / cancelled by a PO action) are recorded on the PO's own record (who, when, reason) — BR-PR-46 is met through it. Error codes used: `PR_NOT_EDITABLE`, `PR_NOT_REQUESTER`, `PR_MIN_ONE_LINE`, `PR_INVALID_ITEM`, `PR_DUPLICATE_ITEM`, `PR_LINE_NOT_PENDING`, `PR_DATE_IN_PAST`, `PR_CANCEL_REASON_REQUIRED`, `PR_HAS_ORDERED_LINES`, `PR_INVALID_TRANSITION`.

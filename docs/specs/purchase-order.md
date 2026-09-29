@@ -1,7 +1,7 @@
 ---
 module: purchase-order
 status: frozen           # draft | frozen | changed-after-freeze
-version: 1
+version: 2
 frozen_on: 2026-09-29
 owner: Arun
 depends_on: [auth-setup, purchase-requisition, approval, approval-policies, grn, suppliers]
@@ -97,3 +97,4 @@ None open.
 - 2026-09-29 — final answers folded. Q1–Q7 = A: short-close whole PO (BR-PO-13), GST % per line from price list (BR-PO-04), cancel reason always 3–500 (BR-PO-11), rate ≥ 1 (BR-PO-03), overdue on revised date (BR-PO-19), one `po.manage` key, expected date required before send (BR-PO-18). Approval Q4 = B folded: PO reject/cancel cancels its PR lines (BR-PO-07, 09, 11). approval-policies Q1 = C: PO matched incl. GST (BR-PO-06). Assumed rules made firm. Tables un-padded. Suppliers alignment: inactive supplier → 400 (BR-PO-01), rate and GST % default from BR-SUP-16 / price list (BR-PO-03, 04), new BR-PO-23 payment terms copied (suppliers Q6 = A).
 - 2026-09-29 — pre-freeze touch-up: checked BR-PO-07, 09, 11 agree with approval Q4=B. BR-PO-03 suggestion falls back to the item standard rate (inventory BR-INV-24).
 - 2026-09-29 — frozen v1 (all questions answered by Arun)
+- 2026-09-29 — v2 clarified during build (review): supplier confirmation method is one of phone, email, whatsapp, in_person (400 otherwise) and becomes the log row's channel (BR-PO-17). Error codes used: `PO_NOT_EDITABLE` (409), `PO_RATE_REQUIRED`, `PO_NEEDS_A_LINE`, `PO_DATE_BEFORE_PO_DATE`, `PO_INVALID_STATUS`, `PO_STATUS_CHANGED`. The cancel dialog tells the user the PR lines are cancelled and a new PR is needed (BR-PO-11).

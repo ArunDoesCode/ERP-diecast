@@ -47,5 +47,20 @@
 | F-TEST-15 | backend-dev 48 | backend/src/routes/approval-requests.test.ts act helper | default param notes="TEST_aprreq note" swallows undefined → BR-APR-37 omitted-comment cases can never pass | fix now (test-writer) | fixed |
 | APR-SCOPE | backend-dev 48 | backend/scripts/prepare-test-db.ts | edited outside scope to seed inactive fallback policies (needed for BR-APR-22 on fresh DBs) | accepted | fixed |
 | F-TEST-16 | backend-dev 52 | backend/src/routes/po-lifecycle.test.ts BR-PO-21 trail test | reads approval_trails with no ORDER BY → flaky | fix now (test-writer) | fixed |
-| PO-F1 | backend-dev 52 | PR line cancel | reason validated but not stored; BR-PR-46 needs who/when (+ reason) on every status change → add cancel reason/by/at to PR lines | fix now (backend-dev) | open |
-| PO-F2 | backend-dev 52 | PO supplier confirmation | kept as PO columns, not a log row; BR-PO-17 says confirmation/reminder/escalation are log rows → add "confirmation" log type | fix now (backend-dev) | open |
+| PO-F1 | backend-dev 52 | PR line cancel | reason validated but not stored; BR-PR-46 needs who/when (+ reason) on every status change → add cancel reason/by/at to PR lines | fix now (backend-dev) | fixed |
+| PO-F2 | backend-dev 52 | PO supplier confirmation | kept as PO columns, not a log row; BR-PO-17 says confirmation/reminder/escalation are log rows → add "confirmation" log type | fix now (backend-dev) | fixed |
+| SPEC-P1 | spec 59 + code 56 CRP-3 | approvalService actOnRequest `cancel` | unspecced action half-cancels PRs | fix now: remove (approval v2) — test first | open |
+| CRP-1 | code 56 | frontend PR edit + backend updatePrSchema | edit sends status → always 400 | fix now (frontend + backend, PR v2) | open |
+| CRP-2 | code 56 + perf 58 PERF-01/02 | prService.cancelLine, poRepository join lock | lock order deadlock | fix now — test first | open |
+| CRP-4 | code 56 | prService link_machine check; PR edit payload | unchanged assetId → 403 | fix now (PR v2) — test first | open |
+| SPEC-P4 | spec 59 | approvalRepository policyColumns | isSaleOrderLinked still returned | fix now (approval v2) — test first | open |
+| SPEC-P2, SPEC-P7, PERF-12, CRP-n | spec 59, perf 58, code 56 | frontend PO/PR | cancel dialog wording, reason required type, narrow invalidation, response types | fix now (frontend) | open |
+| SEC-P1, SEC-P2 | security 57 | scripts/db-reset.ts | local guard by name/port + rotate warning (known-defects v3) | fix now — test first | open |
+| SEC-P3 | security 57 | approvalService.submitRequest | submit needs doc key (approval v2) | fix now — test first | open |
+| SEC-P4 | security 57 | pr.types notes, prService saleOrderId | notes ≤2000, sale order exists (PR v2) | fix now — test first | open |
+| CRP-8/SPEC-P5 | code 56, spec 59 | poService confirmSupplier | confirmation method enum (PO v2) | fix now — test first | open |
+| CRP-6, CRP-7, CRP-10, PERF-04, PERF-06, PERF-07, PERF-08 | code 56, perf 58 | backend PR/PO | typed errors, shared reason parser (400 on bad JSON), dead code, batch PR-line updates, indexes | fix now (backend) | open |
+| SPEC-P3 | spec 59 | frontend | BR-APR-57..60, UI half of BR-PR-39, BR-KD-16 untested | manual UI checklist in the PR | open |
+| SPEC-P6, SPEC-P9 | spec 59 | specs | undocumented codes; BR-PR-46 via PO record | fixed in spec changelogs (PR v2, PO v2, approval v2) | fixed |
+| SPEC-P8 | spec 59 | reports | contamination line missing in 3 reports | noted: briefs are pointer-only template calls, recorded in the coordinator transcript | rejected |
+| CRP-5, CRP-9, PERF-03, PERF-05, PERF-09, PERF-10, PERF-11, SPEC-P10 | code 56, perf 58, spec 59 | various | repo layering, SCO submit lock (M2), minor batching, trigram search, rate suggestion (after merge) | backlog / after merge | backlog |
