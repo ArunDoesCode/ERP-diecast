@@ -1,7 +1,7 @@
 ---
 module: known-defects
 status: frozen           # draft | frozen | changed-after-freeze
-version: 3
+version: 4
 frozen_on: 2026-09-29
 owner: Arun
 depends_on: [purchase-requisition, approval, purchase-order, grn, inventory, auth-setup]
@@ -74,7 +74,7 @@ when these PR rules pass. Old ids kept so tests can map:
 | BR-KD-35 | Steps in order: guard → drop `public` (and `drizzle`) schema only, never the DB → push schema (same as CI) → roles + permission-key seed (auth-setup BR-AUTH-21) → admin via BR-KD-17..27 (`admin@diecast.local`) → approval policies → fixtures → summary. `--no-fixtures` stops after policies. Any step fails → stop, print the step name, exit 1. Two runs give the same row counts and document numbers. | Fixtures throw → exit 1, "fixtures" printed, no summary; `--no-fixtures` → 1 employee, 0 PRs |
 | BR-KD-40 | The role + permission-key seed (auth-setup BR-AUTH-21; page grants are retired, BR-AUTH-15) fails loudly on an unknown role or key, never drops rows silently. It marks super-admin, owner and back_office as system roles. | Unknown key in the seed table → fails naming it; back_office gets `pr.manage` |
 | BR-KD-44 | Fixtures hold at least: Main Store + Scrap Yard; 2 HPDC machines; 8 items, each with a standard rate (ADC12 and LM24 ingot kg, release agent ltr, cover flux kg, plunger tip, shot sleeve, H13 block kg, gloves); 4 suppliers with valid-format GSTIN/PAN and priced items; one login per desk role (`<role>@diecast.local`) plus one QR-only operator. At least one of each PR, PO and GRN status, one QA-bypassed line, and one overdue PO; dates relative to the run date. | After reset each desk role logs in; `status=<s>` returns ≥ 1 PR for all 7 PR statuses |
-| BR-KD-46 | Fixture documents go through the real services as named fixture users, so numbers, trails and stock postings are real. Each approval is done by someone holding that step's role who is not the requester, with a comment (BR-APR-37). Stock arrives only via GRN; fixtures never set stock or average cost (so `currentStock` reads 0 and PR estimates use the standard rate until BL-014, which is expected). All money is integer paise. The summary prints row counts, login emails (no passwords) and ledger balance per item. | Every ledger row points to a GRN; `24_500` not `245.00` |
+| BR-KD-46 | Fixture documents go through the real services as named fixture users, so numbers, trails and stock postings are real. Each approval is done by someone holding that step's role who is not the requester, with a comment (BR-APR-37). Stock arrives only via GRN; fixtures never set stock or average cost directly — after reset each item's `currentStock` equals its ledger balance (BL-014 fixed). All money is integer paise. The summary prints row counts, login emails (no passwords) and ledger balance per item. | Every ledger row points to a GRN; `24_500` not `245.00` |
 
 ## Not now
 
@@ -98,3 +98,4 @@ None open.
 - 2026-09-29 — frozen v1 (all questions answered by Arun)
 - 2026-09-29 — v2 clarified during build: every fixture login, including `admin@diecast.local` (super-admin), uses `SEED_USER_PASSWORD`; desk fixture users are `<role>@diecast.local` (owner, back_office, floor_supervisor, qa_inspector, die_designer). The "fixtures throw" (BR-KD-35) and "unknown seed key" (BR-KD-40) failure paths are not covered by automated tests (no test-only hooks in production code).
 - 2026-09-29 — v3 clarified during build (security review): BR-KD-30's local guard also requires `DB_RESET_CONFIRM=<db name>` when the database name is not `diecast` or ends in `_test`, or the local port is not 5432/5433 (an SSH tunnel to a real DB on localhost must not pass unconfirmed); for such a local target the confirm alone is enough — `--allow-remote` stays for non-local hosts. After a run with `--allow-remote`, the summary prints "rotate the seed admin password now".
+- 2026-09-29 — v4 clarified during build: BL-014 is fixed (GRN accept posts stock and average cost), so BR-KD-46 no longer expects `currentStock` 0 after reset; it expects `currentStock` = ledger balance per item, with no direct writes.
