@@ -1,11 +1,11 @@
 import { db } from "../db/client";
+import { type Actor, can } from "../lib/auth-middleware";
 import {
   BadRequestError,
   ConflictError,
   ForbiddenError,
   NotFoundError,
 } from "../lib/errors";
-import type { Role } from "../lib/token";
 import { approvalRepository } from "../repository/approvalRepository";
 import type {
   approvalActionRequestSchemaType,
@@ -22,7 +22,7 @@ import type {
 
 type ActorContext = {
   actorId: number;
-  actorRole: Role;
+  actor: Actor;
 };
 
 type ApprovalRequestStatus =
@@ -107,14 +107,6 @@ function toTrailAction(action: approvalActionRequestSchemaType["action"]) {
   return mapped[action];
 }
 
-function isPrivilegedApprovalReader(actorRole: Role) {
-  return (
-    actorRole === "super-admin" ||
-    actorRole === "owner" ||
-    actorRole === "back_office"
-  );
-}
-
 function canSubmitForApproval(status: string) {
   return status === "draft";
 }
@@ -123,7 +115,7 @@ async function assertCanReadRequest(
   request: NonNullable<ApprovalRequestRow>,
   actor: ActorContext,
 ) {
-  if (isPrivilegedApprovalReader(actor.actorRole)) {
+  if (can(actor.actor, "approval.view_all")) {
     return;
   }
 
@@ -324,7 +316,11 @@ export const approvalService = {
     }
   },
 
-  async submitRequest(input: submitApprovalRequestSchemaType, actorId: number) {
+  async submitRequest(
+    input: submitApprovalRequestSchemaType,
+    actorId: number,
+    actor?: Actor,
+  ) {
     const doc = await approvalRepository.findDocumentContext(
       input.docType,
       input.docId,
@@ -381,7 +377,9 @@ export const approvalService = {
         );
       }
 
-      const autoApproved = policy.autoApprove === true;
+      const autoApproved =
+        policy.autoApprove === true ||
+        (actor !== undefined && can(actor, "approval.auto_approve_own"));
       const now = new Date();
 
       const approverFields = autoApproved
@@ -704,10 +702,12 @@ export const approvalService = {
 
     if (
       targetEmployeeId !== actor.actorId &&
-      actor.actorRole !== "super-admin"
+      !can(actor.actor, "approval.view_others_pending")
     ) {
       throw new ForbiddenError(
-        "Only super-admin can fetch another employee approvals",
+        "You are not allowed to fetch another employee approvals",
+        "PERMISSION_DENIED",
+        { key: "approval.view_others_pending" },
       );
     }
 

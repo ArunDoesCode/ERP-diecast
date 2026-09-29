@@ -2187,9 +2187,9 @@
       "request": {
         "body": {
           "type": "enum:sale_order,stock_reorder,maintenance,tooling,subcontracting,misc.optional",
-          "saleOrderId": "integer.positive.nullable.required",
-          "assetId": "integer.positive.nullable.required",
-          "notes": "string.nonempty.required",
+          "saleOrderId": "integer.positive.nullable.optional",
+          "assetId": "integer.positive.nullable.optional",
+          "notes": "string.nonempty.optional",
           "status": "enum:draft,pending_approval,approved,rejected,partial_ordered,fully_ordered,cancelled.optional",
           "prId": "integer.positive.required",
           "inserts": "unrepresentable.required",

@@ -74,6 +74,11 @@ export const invalidateRole: InvalidateRoleFn = (roleId) => {
   }
 };
 
+/** Permission decision for service-layer checks (BR-AUTH-11); super-admin holds every key. */
+export function can(actor: Actor, key: PermissionKey): boolean {
+  return actor.isSuperAdmin || actor.permissions.has(key);
+}
+
 /**
  * Token check (401) then actor load (missing or inactive => 401, BR-AUTH-12).
  * Sets `user` and `actor` on the context; runs once per request.
@@ -118,7 +123,7 @@ export function requirePermission(
   return async (c, next) => {
     await requireAuth(c, async () => {});
     const actor = c.get("actor");
-    if (!actor.isSuperAdmin && !actor.permissions.has(key)) {
+    if (!can(actor, key)) {
       throw new ForbiddenError("Permission denied", "PERMISSION_DENIED", {
         key,
       });

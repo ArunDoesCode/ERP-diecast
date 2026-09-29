@@ -1,10 +1,10 @@
+import { type Actor, can } from "../lib/auth-middleware";
 import {
   BadRequestError,
   ConflictError,
   InternalServerError,
   NotFoundError,
 } from "../lib/errors";
-import type { Role } from "../lib/token";
 import { assetRepository } from "../repository/assetRepository";
 import { grnRepository } from "../repository/grnRepository";
 import { poRepository } from "../repository/poRepository";
@@ -19,9 +19,8 @@ import type {
 } from "../types/grn.types";
 
 // Over-receipt tolerance: 5% above the PO line's ordered qty. Beyond that,
-// only owner/back_office may proceed (see overReceiptGuard).
+// only holders of grn.over_receipt_override may proceed (see overReceiptGuard).
 const OVER_RECEIPT_TOLERANCE_RATIO = 1.05;
-const OVER_RECEIPT_OVERRIDE_ROLES: Role[] = ["owner", "back_office"];
 
 function toPaginatedMeta(page: number, pageSize: number, total: number) {
   return {
@@ -36,14 +35,14 @@ function overReceiptGuard(
   orderedQty: number,
   existingReceivedQty: number,
   incomingQty: number,
-  actorRole: Role,
+  actor: Actor,
 ) {
   const tolerance = orderedQty * OVER_RECEIPT_TOLERANCE_RATIO;
   if (existingReceivedQty + incomingQty > tolerance) {
-    if (!OVER_RECEIPT_OVERRIDE_ROLES.includes(actorRole)) {
+    if (!can(actor, "grn.over_receipt_override")) {
       throw new BadRequestError(
         `Accepted quantity would exceed 105% of the ordered qty (${orderedQty}). ` +
-          "Only owner/back_office can override an over-receipt.",
+          "Only a role with the over-receipt override permission can override it.",
       );
     }
   }
@@ -220,7 +219,7 @@ export const grnService = {
     lineId: number,
     input: grnQaActionSchemaType,
     actorId: number,
-    actorRole: Role,
+    actor: Actor,
   ) {
     const line = await grnRepository.findGrnItemForUpdate(grnId, lineId);
     if (!line) {
@@ -280,7 +279,7 @@ export const grnService = {
       line.orderedQty,
       line.poItemReceivedQty ?? 0,
       acceptedQty,
-      actorRole,
+      actor,
     );
 
     const locationId = await grnRepository.findDefaultReceivingLocationId();
@@ -330,7 +329,7 @@ export const grnService = {
     lineId: number,
     input: grnBypassSchemaType,
     actorId: number,
-    actorRole: Role,
+    actor: Actor,
   ) {
     const line = await grnRepository.findGrnItemForUpdate(grnId, lineId);
     if (!line) {
@@ -358,7 +357,7 @@ export const grnService = {
       line.orderedQty,
       line.poItemReceivedQty ?? 0,
       acceptedQty,
-      actorRole,
+      actor,
     );
 
     const locationId = await grnRepository.findDefaultReceivingLocationId();

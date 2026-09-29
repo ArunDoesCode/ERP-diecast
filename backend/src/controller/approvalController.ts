@@ -1,7 +1,6 @@
 import type { Context } from "hono";
 
 import { UnauthorizedError } from "../lib/errors";
-import type { Role } from "../lib/token";
 import type { AppEnv } from "../lib/types";
 import { approvalService } from "../service/approvalService";
 import {
@@ -26,7 +25,7 @@ function parseActor(c: Context<AppEnv>) {
 
   return {
     actorId,
-    actorRole: c.get("actor").roleName as Role,
+    actor: c.get("actor"),
   };
 }
 
@@ -65,9 +64,9 @@ export const approvalController = {
 
   async submitRequest(c: Context<AppEnv>) {
     const body = submitApprovalRequestSchema.parse(await c.req.json());
-    const { actorId } = parseActor(c);
+    const { actorId, actor } = parseActor(c);
 
-    const data = await approvalService.submitRequest(body, actorId);
+    const data = await approvalService.submitRequest(body, actorId, actor);
     return c.json({ success: true, data }, 201);
   },
 

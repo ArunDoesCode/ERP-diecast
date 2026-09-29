@@ -1,4 +1,4 @@
-import { invalidateActor } from "../lib/auth-middleware";
+import { invalidateActor, loadActor } from "../lib/auth-middleware";
 import { BadRequestError, ConflictError, NotFoundError } from "../lib/errors";
 import { generateRawQrToken } from "../lib/qr-token";
 import { employeeRepository } from "../repository/employeeRepository";
@@ -10,9 +10,13 @@ import type {
   employeeUpdateSchemaType,
 } from "../types/setup.types";
 
-async function assertNotLastActiveSuperAdmin(currentRoleId: number) {
-  const currentRole = await roleRepository.findById(currentRoleId);
-  if (currentRole?.name !== "super-admin") {
+async function assertNotLastActiveSuperAdmin(
+  employeeId: number,
+  currentRoleId: number,
+) {
+  // Super-admin-ness comes from the permission layer's own decision (BR-AUTH-11), not a role name here.
+  const current = await loadActor(employeeId);
+  if (!current?.isSuperAdmin) {
     return;
   }
 
@@ -105,7 +109,7 @@ export const employeeService = {
     }
 
     if (existingEmployee.roleId !== input.roleId) {
-      await assertNotLastActiveSuperAdmin(existingEmployee.roleId);
+      await assertNotLastActiveSuperAdmin(id, existingEmployee.roleId);
     }
 
     const authState = await employeeRepository.findAuthStateById(id);
@@ -169,7 +173,7 @@ export const employeeService = {
       throw new NotFoundError("Employee not found");
     }
 
-    await assertNotLastActiveSuperAdmin(existingEmployee.roleId);
+    await assertNotLastActiveSuperAdmin(id, existingEmployee.roleId);
 
     const row = await employeeRepository.softDelete(id);
     if (!row) {

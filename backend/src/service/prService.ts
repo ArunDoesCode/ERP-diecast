@@ -1,5 +1,6 @@
 import { db } from "../db/client";
-import { BadRequestError, NotFoundError } from "../lib/errors";
+import { type Actor, can } from "../lib/auth-middleware";
+import { BadRequestError, ForbiddenError, NotFoundError } from "../lib/errors";
 import { approvalRepository } from "../repository/approvalRepository";
 import { prRepository } from "../repository/prRepository";
 import type {
@@ -20,6 +21,18 @@ const PR_STATUS_TRANSITIONS: Record<prStatusSchemaType, prStatusSchemaType[]> =
     rejected: [],
     cancelled: [],
   };
+
+// BR-AUTH-26: saving a PR with a machine needs pr.link_machine.
+function assertCanLinkMachine(
+  actor: Actor,
+  assetId: number | null | undefined,
+) {
+  if (assetId != null && !can(actor, "pr.link_machine")) {
+    throw new ForbiddenError("Permission denied", "PERMISSION_DENIED", {
+      key: "pr.link_machine",
+    });
+  }
+}
 
 function assertValidStatusTransition(
   current: prStatusSchemaType,
@@ -68,7 +81,8 @@ export const prService = {
     };
   },
 
-  async create(input: createPrSchemaType, actorId: number) {
+  async create(input: createPrSchemaType, actorId: number, actor: Actor) {
+    assertCanLinkMachine(actor, input.assetId);
     if (input.type === "maintenance" && input.assetId == null) {
       throw new BadRequestError(
         "assetId is required when PR type is maintenance",
@@ -117,7 +131,8 @@ export const prService = {
     );
   },
 
-  async update(input: updatePrSchemaType) {
+  async update(input: updatePrSchemaType, actor: Actor) {
+    assertCanLinkMachine(actor, input.assetId);
     if (
       input.status !== undefined &&
       APPROVAL_OWNED_STATUSES.has(input.status)

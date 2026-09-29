@@ -149,9 +149,9 @@ export const updatePrDeleteItemSchema = z.object({
 });
 
 const prUpdateBaseSchema = createUpdateSchema(purchaseRequests, {
-  saleOrderId: z.number().int().positive().nullable(),
-  assetId: z.number().int().positive().nullable(),
-  notes: z.string().min(1),
+  saleOrderId: z.number().int().positive().nullable().optional(),
+  assetId: z.number().int().positive().nullable().optional(),
+  notes: z.string().min(1).optional(),
 });
 
 export const updatePrSchema = prUpdateBaseSchema

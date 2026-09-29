@@ -39,13 +39,13 @@ export const prController = {
   async create(c: Context<AppEnv>) {
     const body = createPrSchema.parse(await c.req.json());
     const actorId = parseActorId(c);
-    const data = await prService.create(body, actorId);
+    const data = await prService.create(body, actorId, c.get("actor"));
     return c.json({ success: true, data }, 201);
   },
 
   async update(c: Context<AppEnv>) {
     const body = updatePrSchema.parse(await c.req.json());
-    const data = await prService.update(body);
+    const data = await prService.update(body, c.get("actor"));
     return c.json({ success: true, data });
   },
 
