@@ -227,11 +227,11 @@ describe("BR-AUTH-26 saving a PR with a machine", () => {
   test("BR-AUTH-26 holder of pr.link_machine saves a PR with a machine", async () => {
     const res = await call("linker", "POST", "/api/pr/createpr", prBody(true));
     expect(res.status).toBe(201);
-    const body = (await res.json()) as { data: { id: number } };
+    const body = (await res.json()) as { data: { pr: { id: number } } };
     const [row] = await db
       .select({ assetId: purchaseRequests.assetId })
       .from(purchaseRequests)
-      .where(eq(purchaseRequests.id, body.data.id));
+      .where(eq(purchaseRequests.id, body.data.pr.id));
     expect(row?.assetId).toBe(machineId);
   });
 
