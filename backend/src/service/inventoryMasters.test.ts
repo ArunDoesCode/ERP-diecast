@@ -1573,6 +1573,27 @@ describe("who can do what (inventory spec table)", () => {
     }
   });
 
+  test("BR-AUTH-21 GET /locations: asset.manage or inventory.view reads (owner, floor_supervisor 200); no key 403; writes stay asset.manage", async () => {
+    for (const role of [
+      "owner",
+      "back_office",
+      "floor_supervisor",
+      "super-admin",
+    ] as Role[]) {
+      expect((await call("GET", "/locations", role)).status).toBe(200);
+    }
+    for (const role of ["qa_inspector", "operator"] as Role[]) {
+      expect((await call("GET", "/locations", role)).status).toBe(403);
+    }
+    for (const role of ["owner", "floor_supervisor"] as Role[]) {
+      const r = await call("POST", "/locations", role, {
+        name: uid(),
+        type: "scrap_yard",
+      });
+      expect(r.status).toBe(403);
+    }
+  });
+
   test("no token is 401", async () => {
     const res = await app.request("/api/asset/items");
     expect(res.status).toBe(401);

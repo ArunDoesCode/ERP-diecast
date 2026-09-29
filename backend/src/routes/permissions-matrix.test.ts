@@ -57,7 +57,7 @@ const MATRIX: [string, string, R[]][] = [
   ["PATCH", "/api/asset/services/:id", ["bo"]],
   ["GET", "/api/asset/inventory/movements", OW_BO_FS],
   ["POST", "/api/asset/inventory/movements", OW_BO],
-  ["GET", "/api/asset/locations", ["bo"]],
+  ["GET", "/api/asset/locations", OW_BO_FS], // asset.manage OR inventory.view (auth-setup v10)
   ["POST", "/api/asset/locations", ["bo"]],
   ["PATCH", "/api/asset/locations/:id", ["bo"]],
   // grn
