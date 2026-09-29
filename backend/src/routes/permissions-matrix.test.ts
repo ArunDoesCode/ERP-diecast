@@ -110,12 +110,6 @@ const MATRIX: [string, string, R[]][] = [
       ["POST", "/api/setup/roles"],
       ["PATCH", "/api/setup/roles/:id"],
       ["DELETE", "/api/setup/roles/:id"],
-      ["GET", "/api/setup/pages"],
-      ["POST", "/api/setup/pages"],
-      ["PATCH", "/api/setup/pages/:id"],
-      ["DELETE", "/api/setup/pages/:id"],
-      ["GET", "/api/setup/permissions"],
-      ["POST", "/api/setup/roles/:roleId/permissions"],
     ] as [string, string][]
   ).map(([m, p]): [string, string, R[]] => [m, p, NONE]),
   // supplier: view = ow,bo,fs; manage = bo
@@ -208,6 +202,19 @@ describe("BR-AUTH-21 seed grants give each seed role the intended API access", (
   test("BR-AUTH-21 /auth/me is open to every signed-in role", async () => {
     for (const r of ALL_ROLES) {
       expect(await statusFor(r, "GET", "/api/auth/me")).toBe(200);
+    }
+  });
+
+  test("BR-AUTH-15 retired page-grant routes are gone: 404 even for super-admin", async () => {
+    for (const [m, p] of [
+      ["GET", "/api/setup/pages"],
+      ["POST", "/api/setup/pages"],
+      ["PATCH", "/api/setup/pages/1"],
+      ["DELETE", "/api/setup/pages/1"],
+      ["GET", "/api/setup/permissions"],
+      ["POST", "/api/setup/roles/1/permissions"],
+    ] as [string, string][]) {
+      expect(await statusFor("sa", m, p)).toBe(404);
     }
   });
 
