@@ -141,6 +141,125 @@ async function recomputeGrnHeaderStatus(
   }
 }
 
+// Draft-only guard (BR-GRN-06): locks the GRN row, re-checks status and that
+// no line has been decided, inside the caller's transaction.
+async function lockDraftGrn(
+  grnId: number,
+  tx: Parameters<typeof grnRepository.lockGrn>[1],
+  message: string,
+) {
+  const grn = await grnRepository.lockGrn(grnId, tx);
+  if (!grn) {
+    throw new NotFoundError("GRN not found");
+  }
+  if (grn.status !== "draft") {
+    throw new BadRequestError(message);
+  }
+  const lines = await grnRepository.findGrnItemsByGrnId(grnId, tx);
+  if (lines.some((l) => l.isQaBypassed || l.qaStatus !== "pending")) {
+    throw new BadRequestError(message);
+  }
+  return grn;
+}
+
+// BR-GRN-05: same challan from the same supplier only once. Also maps the
+// unique-index error of a racing write to the same plain 409.
+function duplicateChallan(challanNo: string) {
+  return new ConflictError(
+    `Challan ${challanNo} is already recorded for this supplier`,
+  );
+}
+
+function mapChallanClash(error: unknown, challanNo: string | undefined) {
+  const e = error as { code?: string; cause?: { code?: string } };
+  if (challanNo && (e?.code ?? e?.cause?.code) === "23505") {
+    return duplicateChallan(challanNo);
+  }
+  return error;
+}
+
+async function applyDraftUpdate(
+  input: updateGrnSchemaType,
+  tx: Parameters<typeof grnRepository.lockGrn>[1],
+) {
+  const grn = await lockDraftGrn(
+    input.grnId,
+    tx,
+    "GRN can only be edited while in draft status — use the correction endpoint for a posted line.",
+  ); // BR-GRN-06
+
+  // Same whole-number rule as create (BR-GRN-02), checked before any write.
+  if (input.lines.length > 0) {
+    const uoms = await grnRepository.findLineUoms(input.grnId);
+    for (const line of input.lines) {
+      const uom = uoms.get(line.id)?.trim().toLowerCase();
+      if (
+        uom &&
+        WHOLE_NUMBER_UNITS.includes(uom) &&
+        !Number.isInteger(line.arrivedQty)
+      ) {
+        throw new BadRequestError(
+          `Arrived qty must be a whole number for items in ${uom}`,
+        );
+      }
+    }
+  }
+
+  if (input.challanNo !== undefined) {
+    const clash = await grnRepository.findByChallan(
+      grn.supplierId,
+      input.challanNo,
+      input.grnId,
+    );
+    if (clash) {
+      throw duplicateChallan(input.challanNo);
+    }
+  }
+
+  const headerData = {
+    ...(input.challanNo !== undefined ? { challanNo: input.challanNo } : {}),
+    ...(input.challanDate !== undefined
+      ? { challanDate: input.challanDate }
+      : {}),
+    ...(input.vehicleNo !== undefined ? { vehicleNo: input.vehicleNo } : {}),
+    ...(input.driverName !== undefined ? { driverName: input.driverName } : {}),
+    ...(input.driverPhone !== undefined
+      ? { driverPhone: input.driverPhone }
+      : {}),
+    ...(input.remarks !== undefined ? { remarks: input.remarks } : {}),
+  };
+  if (Object.keys(headerData).length > 0) {
+    await grnRepository.updateHeader(input.grnId, headerData, tx);
+  }
+
+  for (const line of input.lines) {
+    const updated = await grnRepository.updateLineArrivedQty(
+      input.grnId,
+      line.id,
+      line.arrivedQty,
+      line.batchNumber,
+      tx,
+    );
+    if (!updated) {
+      throw new NotFoundError(`GRN line not found for id ${line.id}`);
+    }
+  }
+}
+
+// Locks GRN header then PO row, in that order everywhere (no deadlocks).
+async function lockGrnAndPo(
+  grnId: number,
+  tx: Parameters<typeof grnRepository.lockGrn>[1],
+) {
+  const grn = await grnRepository.lockGrn(grnId, tx);
+  if (!grn) {
+    throw new NotFoundError("GRN not found");
+  }
+  if (grn.poId != null) {
+    await grnRepository.lockPo(grn.poId, tx);
+  }
+}
+
 export const grnService = {
   async getDetails(grnId: number) {
     const row = await grnRepository.getDetails(grnId);
@@ -197,12 +316,8 @@ export const grnService = {
       }
     }
 
-    const duplicateChallan = () =>
-      new ConflictError(
-        `Challan ${input.challanNo} is already recorded for this supplier`,
-      );
     if (await grnRepository.findByChallan(po.supplierId, input.challanNo)) {
-      throw duplicateChallan();
+      throw duplicateChallan(input.challanNo);
     }
 
     try {
@@ -226,94 +341,32 @@ export const grnService = {
       );
     } catch (error) {
       // Two creates racing past the check above: the unique index decides.
-      const e = error as { code?: string; cause?: { code?: string } };
-      if ((e.code ?? e.cause?.code) === "23505") {
-        throw duplicateChallan();
-      }
-      throw error;
+      throw mapChallanClash(error, input.challanNo);
     }
   },
 
   async update(input: updateGrnSchemaType) {
-    const grn = await grnRepository.findGrnById(input.grnId);
-    if (!grn) {
-      throw new NotFoundError("GRN not found");
+    try {
+      await grnRepository.withTransaction((tx) => applyDraftUpdate(input, tx));
+    } catch (error) {
+      throw mapChallanClash(error, input.challanNo);
     }
-
-    if (grn.status !== "draft") {
-      throw new BadRequestError(
-        "GRN can only be edited while in draft status — use the correction endpoint for a posted line.",
-      );
-    }
-
-    // Same whole-number rule as create (BR-GRN-02), checked before any write.
-    if (input.lines.length > 0) {
-      const uoms = await grnRepository.findLineUoms(input.grnId);
-      for (const line of input.lines) {
-        const uom = uoms.get(line.id)?.trim().toLowerCase();
-        if (
-          uom &&
-          WHOLE_NUMBER_UNITS.includes(uom) &&
-          !Number.isInteger(line.arrivedQty)
-        ) {
-          throw new BadRequestError(
-            `Arrived qty must be a whole number for items in ${uom}`,
-          );
-        }
-      }
-    }
-
-    const headerData = {
-      ...(input.challanNo !== undefined ? { challanNo: input.challanNo } : {}),
-      ...(input.challanDate !== undefined
-        ? { challanDate: input.challanDate }
-        : {}),
-      ...(input.vehicleNo !== undefined ? { vehicleNo: input.vehicleNo } : {}),
-      ...(input.driverName !== undefined
-        ? { driverName: input.driverName }
-        : {}),
-      ...(input.driverPhone !== undefined
-        ? { driverPhone: input.driverPhone }
-        : {}),
-      ...(input.remarks !== undefined ? { remarks: input.remarks } : {}),
-    };
-
-    if (Object.keys(headerData).length > 0) {
-      await grnRepository.updateHeader(input.grnId, headerData);
-    }
-
-    for (const line of input.lines) {
-      const updated = await grnRepository.updateLineArrivedQty(
-        input.grnId,
-        line.id,
-        line.arrivedQty,
-      );
-      if (!updated) {
-        throw new NotFoundError(`GRN line not found for id ${line.id}`);
-      }
-    }
-
     return grnRepository.getDetails(input.grnId);
   },
 
   async remove(grnId: number) {
-    const grn = await grnRepository.findGrnById(grnId);
-    if (!grn) {
-      throw new NotFoundError("GRN not found");
-    }
-
-    if (grn.status !== "draft") {
-      throw new BadRequestError(
+    return grnRepository.withTransaction(async (tx) => {
+      await lockDraftGrn(
+        grnId,
+        tx,
         "Only draft GRNs can be deleted — use the correction endpoint for a posted line.",
-      );
-    }
-
-    const deleted = await grnRepository.deleteGrnWithItems(grnId);
-    if (!deleted) {
-      throw new NotFoundError("GRN not found");
-    }
-
-    return { id: deleted.id };
+      ); // BR-GRN-06
+      const deleted = await grnRepository.deleteGrnWithItems(grnId, tx);
+      if (!deleted) {
+        throw new NotFoundError("GRN not found");
+      }
+      return { id: deleted.id };
+    });
   },
 
   // QA decision on one line. One transaction: line lock, ledger row, item
@@ -330,6 +383,7 @@ export const grnService = {
     const rejectedQty = input.rejectedQty;
 
     return grnRepository.withTransaction(async (tx) => {
+      await lockGrnAndPo(grnId, tx);
       const line = await grnRepository.findGrnItemForUpdate(grnId, lineId, tx);
       if (!line) {
         throw new NotFoundError("GRN line not found");
@@ -388,12 +442,15 @@ export const grnService = {
         {
           acceptedQty,
           rejectedQty,
+          // BR-GRN-10: passed if accepted > 0, else failed
+          // BR-GRN-13: rejected qty never goes into stock (only accepted is posted)
           qaStatus: acceptedQty > 0 ? "passed" : "failed",
           batchNumber,
           ...(overReceipt ? { ...overReceipt, overReceiptBy: actorId } : {}),
         },
         tx,
       );
+      // BR-GRN-12: one QA test row per decision (tester, time, remarks, url)
       await grnRepository.insertQaTest(
         {
           grnItemId: lineId,
@@ -405,6 +462,7 @@ export const grnService = {
         tx,
       );
       if (acceptedQty > 0) {
+        // BR-GRN-27: accepted qty rolls into the PO line, PO status follows
         await poRepository.incrementPoItemReceivedQty(
           line.poItemId,
           acceptedQty,
@@ -412,7 +470,7 @@ export const grnService = {
         );
         await poService.recomputeReceiptStatus(line.poId, tx);
       }
-      await recomputeGrnHeaderStatus(grnId, tx);
+      await recomputeGrnHeaderStatus(grnId, tx); // BR-GRN-25
       return updatedLine;
     });
   },
@@ -427,6 +485,7 @@ export const grnService = {
     actorRole: Role,
   ) {
     return grnRepository.withTransaction(async (tx) => {
+      await lockGrnAndPo(grnId, tx);
       const line = await grnRepository.findGrnItemForUpdate(grnId, lineId, tx);
       if (!line) {
         throw new NotFoundError("GRN line not found");
@@ -486,7 +545,7 @@ export const grnService = {
           isQaBypassed: true,
           qaBypassReason: input.bypassReason,
           qaBypassedBy: actorId,
-          qaBypassedAt: new Date(),
+          qaBypassedAt: new Date(), // BR-GRN-12: who, when, why
           batchNumber,
           ...(overReceipt ? { ...overReceipt, overReceiptBy: actorId } : {}),
         },
@@ -498,7 +557,7 @@ export const grnService = {
         tx,
       );
       await poService.recomputeReceiptStatus(line.poId, tx);
-      await recomputeGrnHeaderStatus(grnId, tx);
+      await recomputeGrnHeaderStatus(grnId, tx); // BR-GRN-25
       return updatedLine;
     });
   },
@@ -506,7 +565,6 @@ export const grnService = {
   // Correction after posting — one `grn_correction` ledger row, a correction
   // record and the PO line's received qty rolled back, in one transaction.
   // Does not mutate the original GRN line row; audit trail stays intact.
-  // (Sum-of-corrections, negative-balance and PO status rules: slice S4.)
   async correction(
     grnId: number,
     lineId: number,
@@ -514,6 +572,7 @@ export const grnService = {
     actorId: number,
   ) {
     return grnRepository.withTransaction(async (tx) => {
+      await lockGrnAndPo(grnId, tx);
       const line = await grnRepository.findGrnItemForUpdate(grnId, lineId, tx);
       if (!line) {
         throw new NotFoundError("GRN line not found");
@@ -564,7 +623,7 @@ export const grnService = {
         batchNumber: line.batchNumber,
         quantityChange: -input.qty,
         unitCostPaise: posted0?.unitCostPaise ?? line.unitPricePaise,
-        averageEffect: "out_at_cost",
+        averageEffect: "out_at_cost", // BR-GRN-39
         blockNegative: true,
         notes: `GRN correction for GRN #${grnId} line #${lineId}: ${input.reason}`,
         createdBy: actorId,

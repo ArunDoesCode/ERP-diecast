@@ -5,7 +5,7 @@ import {
   inventoryLedger,
   itemMaster,
 } from "../db/schemas/02_procurement-catalog";
-import { ConflictError, NotFoundError } from "../lib/errors";
+import { BadRequestError, ConflictError, NotFoundError } from "../lib/errors";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -37,9 +37,14 @@ export type PostStockInput = {
 const toMilli = (qty: number) => Math.round(qty * 1000);
 const fromMilli = (milli: number) => milli / 1000;
 
+const INT4_MAX = 2_147_483_647; // ledger value columns are integer
+
 // qty x cost in paise, rounded half away from zero (BR-GRN-24).
 function rowValuePaise(qtyMilli: number, unitCostPaise: number) {
   const magnitude = Math.round(Math.abs(qtyMilli * unitCostPaise) / 1000);
+  if (magnitude > INT4_MAX) {
+    throw new BadRequestError("Row value is too large");
+  }
   return qtyMilli < 0 ? -magnitude : magnitude;
 }
 
@@ -119,10 +124,14 @@ export async function postStock(tx: Tx, input: PostStockInput) {
               newMilli,
           );
   } else if (effect === "out_at_cost" && newMilli > 0) {
-    averageCostPaise = Math.round(
+    // BR-GRN-39: a negative result keeps the old average.
+    const candidate = Math.round(
       (oldMilli * item.averageCostPaise + qtyMilli * input.unitCostPaise) /
         newMilli,
     );
+    if (candidate >= 0) {
+      averageCostPaise = candidate;
+    }
   }
 
   await tx

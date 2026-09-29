@@ -125,6 +125,10 @@ export const inventoryLedger = pgTable(
     itemLocationIdx: index("idx_inventory_ledger_item_location").on(
       table.itemId,
       table.locationId,
+      table.id.desc(),
+    ),
+    referenceLineIdx: index("idx_inventory_ledger_reference_line").on(
+      table.referenceLineId,
     ),
   }),
 );

@@ -9,9 +9,11 @@ import {
 // Quantities: up to 3 decimals (BR-GRN-02). Whole-number rule for pcs/set items
 // needs the item's unit, so the service enforces that one (400).
 const qty3 = (schema: z.ZodNumber) =>
-  schema.refine((v) => Math.abs(v * 1000 - Math.round(v * 1000)) < 1e-6, {
-    message: "Quantity can have at most 3 decimals",
-  });
+  schema
+    .refine((v) => Math.abs(v * 1000 - Math.round(v * 1000)) < 1e-6, {
+      message: "Quantity can have at most 3 decimals",
+    })
+    .refine((v) => v <= 1e9, { message: "Quantity is too large" });
 
 export const grnStatusSchema = z.enum(grnStatusEnum.enumValues);
 export type grnStatusSchemaType = z.infer<typeof grnStatusSchema>;
@@ -128,7 +130,13 @@ export const grnQaActionBodySchema = z
     acceptedQty: qty3(z.number().min(0)),
     rejectedQty: qty3(z.number().min(0)),
     remarks: z.string().max(1000).optional(),
-    certificateUrl: z.string().url().optional(),
+    certificateUrl: z
+      .string()
+      .url()
+      .refine((u) => /^https?:\/\//i.test(u), {
+        message: "certificateUrl must be an http(s) link",
+      })
+      .optional(),
     batchNumber: z.string().trim().min(1).max(100).optional(),
     // Required (and only honoured) when the accept goes past 105% of ordered
     // and the actor holds `grn.over_receipt_override` (BR-GRN-15).

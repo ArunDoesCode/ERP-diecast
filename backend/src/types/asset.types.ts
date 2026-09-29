@@ -309,8 +309,10 @@ export const assetManualMovementCreateSchema = z.object({
     .refine((v) => v !== 0, { message: "quantityChange must be non-zero" })
     .refine((v) => Math.abs(v * 1000 - Math.round(v * 1000)) < 1e-6, {
       message: "Quantity can have at most 3 decimals",
-    }),
-  unitCostPaise: z.number().int().min(0).optional(),
+    })
+    .refine((v) => Math.abs(v) <= 1e9, { message: "Quantity is too large" }),
+  // ledger cost columns are int4
+  unitCostPaise: z.number().int().min(0).max(2_147_483_647).optional(),
   reason: z.string().trim().min(1).max(1000),
   batchNumber: z.string().trim().min(1).max(100).nullish(),
 });

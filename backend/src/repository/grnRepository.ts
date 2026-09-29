@@ -1,4 +1,14 @@
-import { and, asc, count, desc, eq, ilike, inArray, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  ne,
+  sql,
+} from "drizzle-orm";
 
 import { db } from "../db/client";
 import {
@@ -178,19 +188,54 @@ export const grnRepository = {
   },
 
   // BR-GRN-05: same challan from the same supplier only once.
-  async findByChallan(supplierId: number, challanNo: string) {
+  async findByChallan(
+    supplierId: number,
+    challanNo: string,
+    excludeGrnId?: number,
+  ) {
     const [row] = await db
       .select({ id: grns.id })
       .from(grns)
       .where(
-        and(eq(grns.supplierId, supplierId), eq(grns.challanNo, challanNo)),
+        and(
+          eq(grns.supplierId, supplierId),
+          eq(grns.challanNo, challanNo),
+          excludeGrnId !== undefined ? ne(grns.id, excludeGrnId) : undefined,
+        ),
       )
       .limit(1);
     return row;
   },
 
+  // Lock order for every GRN write: GRN header, then PO row, then the line +
+  // PO line (findGrnItemForUpdate), then the item (postStock).
+  async lockGrn(grnId: number, tx: Tx) {
+    const [row] = await tx
+      .select({
+        id: grns.id,
+        status: grns.status,
+        poId: grns.poId,
+        supplierId: grns.supplierId,
+      })
+      .from(grns)
+      .where(eq(grns.id, grnId))
+      .limit(1)
+      .for("update");
+    return row;
+  },
+
+  async lockPo(poId: number, tx: Tx) {
+    await tx
+      .select({ id: purchaseOrders.id })
+      .from(purchaseOrders)
+      .where(eq(purchaseOrders.id, poId))
+      .limit(1)
+      .for("update");
+  },
+
   async createWithItems(data: CreateGrnData, lines: CreateGrnLineData[]) {
     return db.transaction(async (tx) => {
+      // BR-GRN-04: the number comes from a never-rolled-back counter
       const { periodKey, seq } = await allocateDocumentSequence(
         tx,
         "grn",
@@ -377,27 +422,30 @@ export const grnRepository = {
     grnId: number,
     lineId: number,
     arrivedQty: number,
+    batchNumber: string | null | undefined,
     tx?: Tx,
   ) {
     const executor = tx ?? db;
     const [row] = await executor
       .update(grnItems)
-      .set({ receivedQty: arrivedQty })
+      .set({
+        receivedQty: arrivedQty,
+        // undefined leaves it alone, null clears it
+        ...(batchNumber !== undefined ? { batchNumber } : {}),
+      })
       .where(and(eq(grnItems.id, lineId), eq(grnItems.grnId, grnId)))
       .returning(grnItemColumns);
 
     return row;
   },
 
-  async deleteGrnWithItems(grnId: number) {
-    return db.transaction(async (tx) => {
-      await tx.delete(grnItems).where(eq(grnItems.grnId, grnId));
-      const deletedRows = await tx
-        .delete(grns)
-        .where(eq(grns.id, grnId))
-        .returning({ id: grns.id });
-      return deletedRows[0];
-    });
+  async deleteGrnWithItems(grnId: number, tx: Tx) {
+    await tx.delete(grnItems).where(eq(grnItems.grnId, grnId));
+    const deletedRows = await tx
+      .delete(grns)
+      .where(eq(grns.id, grnId))
+      .returning({ id: grns.id });
+    return deletedRows[0];
   },
 
   async getDetails(grnId: number) {

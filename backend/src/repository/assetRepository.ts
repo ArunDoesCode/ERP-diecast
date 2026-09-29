@@ -22,6 +22,7 @@ import {
   serviceMaster,
   supplierItems,
 } from "../db/schemas/02_procurement";
+import { NotFoundError } from "../lib/errors";
 import type { PartialUpdate } from "../lib/types";
 import type {
   assetInventoryMovementListQuerySchemaType,
@@ -51,23 +52,6 @@ const inventoryMovementColumns = {
   locationId: inventoryLedger.locationId,
   locationName: locations.name,
   locationType: locations.type,
-  batchNumber: inventoryLedger.batchNumber,
-  transactionType: inventoryLedger.transactionType,
-  referenceType: inventoryLedger.referenceType,
-  referenceId: inventoryLedger.referenceId,
-  quantityChange: inventoryLedger.quantityChange,
-  balanceAfter: inventoryLedger.balanceAfter,
-  unitCostPaise: inventoryLedger.unitCostPaise,
-  totalValueChangePaise: inventoryLedger.totalValueChangePaise,
-  notes: inventoryLedger.notes,
-  createdBy: inventoryLedger.createdBy,
-  createdAt: inventoryLedger.createdAt,
-};
-
-const inventoryMovementWriteColumns = {
-  id: inventoryLedger.id,
-  itemId: inventoryLedger.itemId,
-  locationId: inventoryLedger.locationId,
   batchNumber: inventoryLedger.batchNumber,
   transactionType: inventoryLedger.transactionType,
   referenceType: inventoryLedger.referenceType,
@@ -445,8 +429,16 @@ export const assetRepository = {
     actorId: number,
   ) {
     const isStockIn = input.quantityChange > 0;
-    return db.transaction((tx) =>
-      postStock(tx, {
+    return db.transaction(async (tx) => {
+      const [location] = await tx
+        .select({ id: locations.id })
+        .from(locations)
+        .where(eq(locations.id, input.locationId))
+        .limit(1);
+      if (!location) {
+        throw new NotFoundError("Location not found");
+      }
+      return postStock(tx, {
         itemId: input.itemId,
         locationId: input.locationId,
         batchNumber: input.batchNumber,
@@ -459,8 +451,8 @@ export const assetRepository = {
         blockNegative: !isStockIn,
         notes: input.reason,
         createdBy: actorId,
-      }),
-    );
+      });
+    });
   },
 
   // Mismatch rows only (BR-GRN-41): item stock vs ledger total, and each
@@ -478,35 +470,43 @@ export const assetRepository = {
       having abs(i.current_stock - coalesce(sum(l.quantity_change), 0)) > 0.0005
       union all
       select 'item_location_balance'::text, i.id, i.sku, t.location_id,
-             t.stored_qty, t.ledger_qty
+             t.balance_after, t.ledger_qty
       from (
-        select item_id, location_id, sum(quantity_change) as ledger_qty,
-               (array_agg(balance_after order by id desc))[1] as stored_qty
+        select distinct on (item_id, location_id) item_id, location_id,
+               balance_after,
+               sum(quantity_change) over (partition by item_id, location_id)
+                 as ledger_qty
         from inventory_ledger
-        group by item_id, location_id
+        order by item_id, location_id, id desc
       ) t
       join item_master i on i.id = t.item_id
-      where abs(t.stored_qty - t.ledger_qty) > 0.0005`;
+      where abs(t.balance_after - t.ledger_qty) > 0.0005`;
 
-    const [rows, totals] = await Promise.all([
-      db.execute(sql`
-        select * from (${mismatches}) m
-        order by item_id ${dir}, kind, location_id
-        limit ${params.pageSize} offset ${(params.page - 1) * params.pageSize}`),
-      db.execute(sql`select count(*)::int as total from (${mismatches}) m`),
-    ]);
+    // One pass: the total rides along on every page row.
+    const rows = (await db.execute(sql`
+      select m.*, count(*) over ()::int as total
+      from (${mismatches}) m
+      order by item_id ${dir}, kind, location_id
+      limit ${params.pageSize} offset ${(params.page - 1) * params.pageSize}`)) as unknown as Array<{
+      kind: "item_stock" | "item_location_balance";
+      item_id: number;
+      item_sku: string;
+      location_id: number | null;
+      stored_qty: number;
+      ledger_qty: number;
+      total: number;
+    }>;
+    let total = Number(rows[0]?.total ?? 0);
+    if (rows.length === 0 && params.page > 1) {
+      // page past the end: the window count has no row to ride on
+      const counted = (await db.execute(
+        sql`select count(*)::int as total from (${mismatches}) m`,
+      )) as unknown as Array<{ total: number }>;
+      total = Number(counted[0]?.total ?? 0);
+    }
 
     return {
-      rows: (
-        rows as unknown as Array<{
-          kind: "item_stock" | "item_location_balance";
-          item_id: number;
-          item_sku: string;
-          location_id: number | null;
-          stored_qty: number;
-          ledger_qty: number;
-        }>
-      ).map((r) => ({
+      rows: rows.map((r) => ({
         kind: r.kind,
         itemId: r.item_id,
         itemSku: r.item_sku,
@@ -514,9 +514,7 @@ export const assetRepository = {
         storedQty: Number(r.stored_qty),
         ledgerQty: Number(r.ledger_qty),
       })),
-      total: Number(
-        (totals as unknown as Array<{ total: number }>)[0]?.total ?? 0,
-      ),
+      total,
     };
   },
 
