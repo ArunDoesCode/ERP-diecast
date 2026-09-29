@@ -107,7 +107,6 @@ register({
 
 approvalRouter.post(
   APPROVAL_ROUTES.submitRequest,
-  requireAuth,
   asyncHandler(approvalController.submitRequest),
 );
 register({
@@ -123,7 +122,6 @@ register({
 
 approvalRouter.get(
   APPROVAL_ROUTES.getRequestDetails,
-  requireAuth,
   asyncHandler(approvalController.getRequestDetails),
 );
 register({
@@ -138,7 +136,6 @@ register({
 
 approvalRouter.get(
   APPROVAL_ROUTES.getRequestTrail,
-  requireAuth,
   asyncHandler(approvalController.getRequestTrail),
 );
 register({
@@ -153,7 +150,6 @@ register({
 
 approvalRouter.post(
   APPROVAL_ROUTES.actOnRequest,
-  requireAuth,
   asyncHandler(approvalController.actOnRequest),
 );
 register({
@@ -161,7 +157,7 @@ register({
   path: `${APPROVAL_BASE_PATH}${APPROVAL_ROUTES.actOnRequest}`,
   tags: ["approval"],
   summary:
-    "Act on the current approval level of a request (approve/reject/sent_back/withdraw/cancel). `notes` is required for approve/reject/sent_back (400 APPROVAL_NOTES_REQUIRED).",
+    "Act on the current approval level of a request (approve/reject/sent_back/withdraw). `notes` is required for approve/reject/sent_back (400 APPROVAL_NOTES_REQUIRED).",
   auth: { type: "any-authenticated" },
   request: { body: approvalActionRequestSchema },
   responses: { "200": successResponse(approvalRequestSchema) },
@@ -169,7 +165,6 @@ register({
 
 approvalRouter.get(
   APPROVAL_ROUTES.getMyPendingApprovals,
-  requireAuth,
   asyncHandler(approvalController.getMyPendingApprovals),
 );
 register({
@@ -189,7 +184,6 @@ register({
 
 approvalRouter.get(
   APPROVAL_ROUTES.getCurrentApprovalByDoc,
-  requireAuth,
   asyncHandler(approvalController.getCurrentApprovalByDoc),
 );
 register({
@@ -206,7 +200,6 @@ register({
 
 approvalRouter.get(
   APPROVAL_ROUTES.getApprovalHistory,
-  requireAuth,
   asyncHandler(approvalController.getApprovalHistory),
 );
 register({

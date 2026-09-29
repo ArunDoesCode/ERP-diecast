@@ -78,12 +78,28 @@ if (!isLocal) {
       "Refused: DB_RESET_CONFIRM must equal the database name when using --allow-remote.",
     );
   }
-} else if (process.env.DB_RESET_CONFIRM && !allowRemote) {
-  // A confirmation with no override flag is a sign of a wrong command line; do nothing.
-  refuse(
-    EXIT.guard,
-    "Refused: DB_RESET_CONFIRM is set without --allow-remote.",
-  );
+} else {
+  // SEC-P1 (known-defects v3): "localhost" can be an SSH tunnel to a real database. A local
+  // target that is not the usual dev/test one needs DB_RESET_CONFIRM=<db name>; for such a
+  // target the confirm alone is enough (--allow-remote stays for non-local hosts).
+  const port = target.port || "5432";
+  const usualTarget =
+    (dbName === "diecast" || dbName.endsWith("_test")) &&
+    (port === "5432" || port === "5433");
+  if (!usualTarget) {
+    if (process.env.DB_RESET_CONFIRM !== dbName) {
+      refuse(
+        EXIT.guard,
+        `Refused: ${targetLabel} is not the usual local dev/test database (name diecast or *_test, port 5432/5433). Set DB_RESET_CONFIRM=${dbName} to override.`,
+      );
+    }
+  } else if (process.env.DB_RESET_CONFIRM && !allowRemote) {
+    // A confirmation with no override flag is a sign of a wrong command line; do nothing.
+    refuse(
+      EXIT.guard,
+      "Refused: DB_RESET_CONFIRM is set without --allow-remote.",
+    );
+  }
 }
 
 // --- BR-KD-33: inputs checked before any write ---
@@ -264,6 +280,12 @@ async function main() {
     for (const line of fixtureSummary) console.log(line);
   }
   console.log(`\ndb:reset done: ${targetLabel}`);
+  if (allowRemote) {
+    // SEC-P2 (known-defects v3): the seed admin password is shared; change it at once.
+    console.log(
+      "Warning: rotate the seed admin password now (this run used the shared seed password).",
+    );
+  }
   try {
     const { disconnectDb } = await import("../src/db/client");
     await disconnectDb();

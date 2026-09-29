@@ -147,6 +147,7 @@ export const approvalRequests = pgTable(
     uniqueOpenRequestPerDoc: uniqueIndex("uq_open_approval_request_per_doc")
       .on(table.docType, table.docId)
       .where(sql`${table.status} = 'pending_approval'`),
+    docIdx: index("idx_approval_requests_doc").on(table.docType, table.docId),
     statusRoleIdx: index("idx_approval_requests_status_role").on(
       table.status,
       table.currentApproverRole,

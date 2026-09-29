@@ -263,6 +263,17 @@ export const poRepository = {
       return [];
     }
 
+    // CRP-2 lock order: parent PR headers first (ascending), then the lines.
+    const sortedIds = [...new Set(ids)].sort((a, b) => a - b);
+    const owners = await tx
+      .selectDistinct({ prId: purchaseRequestItems.prId })
+      .from(purchaseRequestItems)
+      .where(inArray(purchaseRequestItems.id, sortedIds));
+    await prRepository.lockHeadersInOrder(
+      owners.map((o) => o.prId),
+      tx,
+    );
+
     return tx
       .select({
         id: purchaseRequestItems.id,
@@ -280,8 +291,9 @@ export const poRepository = {
         purchaseRequests,
         eq(purchaseRequests.id, purchaseRequestItems.prId),
       )
-      .where(inArray(purchaseRequestItems.id, ids))
-      .for("update");
+      .where(inArray(purchaseRequestItems.id, sortedIds))
+      .orderBy(asc(purchaseRequestItems.id))
+      .for("update", { of: purchaseRequestItems });
   },
 
   // Unlocked, best-effort read used only for the service-level "friendly"
@@ -620,6 +632,30 @@ export const poRepository = {
         await this.updatePoById(poId, headerData, tx);
       }
 
+      // CRP-2: take every PR lock this edit needs up front, headers first and
+      // lines in id order, before any line is changed.
+      const removedLinks =
+        deletes.length > 0
+          ? await tx
+              .select({ prItemId: prPoItemLinks.prItemId })
+              .from(prPoItemLinks)
+              .where(
+                inArray(
+                  prPoItemLinks.poItemId,
+                  deletes.map((del) => del.id),
+                ),
+              )
+          : [];
+      await this.findPurchaseRequestItemsByIdsForUpdate(
+        [
+          ...removedLinks
+            .map((link) => link.prItemId)
+            .filter((id): id is number => id != null),
+          ...inserts.map((line) => line.prItemId),
+        ],
+        tx,
+      );
+
       const changedItems: Awaited<ReturnType<typeof this.findPoItemsByPoId>> =
         [];
       const affectedPrIds = new Set<number>();
@@ -824,25 +860,40 @@ export const poRepository = {
     return row !== undefined;
   },
 
-  // PR lines behind a PO, with their parent PR (BR-PR-30..32).
+  // PR lines behind a PO, with their parent PR (BR-PR-30..32). Locks the PR
+  // headers first, then the lines (CRP-2), so callers that go on to change
+  // lines and recompute headers cannot deadlock with a PR-side action.
   async listLinkedPrLines(poId: number, tx: Tx) {
-    return tx
-      .select({
-        prItemId: prPoItemLinks.prItemId,
-        linkedQty: prPoItemLinks.linkedQty,
-        prId: purchaseRequestItems.prId,
-        status: purchaseRequestItems.status,
-      })
-      .from(prPoItemLinks)
-      .innerJoin(
-        purchaseOrderItems,
-        eq(purchaseOrderItems.id, prPoItemLinks.poItemId),
-      )
-      .innerJoin(
-        purchaseRequestItems,
-        eq(purchaseRequestItems.id, prPoItemLinks.prItemId),
-      )
-      .where(eq(purchaseOrderItems.poId, poId));
+    const linkQuery = () =>
+      tx
+        .select({
+          prItemId: prPoItemLinks.prItemId,
+          linkedQty: prPoItemLinks.linkedQty,
+          prId: purchaseRequestItems.prId,
+          status: purchaseRequestItems.status,
+        })
+        .from(prPoItemLinks)
+        .innerJoin(
+          purchaseOrderItems,
+          eq(purchaseOrderItems.id, prPoItemLinks.poItemId),
+        )
+        .innerJoin(
+          purchaseRequestItems,
+          eq(purchaseRequestItems.id, prPoItemLinks.prItemId),
+        )
+        .where(eq(purchaseOrderItems.poId, poId));
+
+    const preview = await linkQuery();
+    if (preview.length === 0) {
+      return preview;
+    }
+    await prRepository.lockHeadersInOrder(
+      preview.map((row) => row.prId),
+      tx,
+    );
+    return linkQuery()
+      .orderBy(asc(purchaseRequestItems.id))
+      .for("update", { of: purchaseRequestItems });
   },
 
   // BR-PR-30: the PO is approved -> its po_draft PR lines become ordered.
@@ -863,47 +914,63 @@ export const poRepository = {
   // BR-PR-31: PO cancelled or rejected -> its live PR lines are cancelled for
   // good, issuedQty drops by the linked qty, PR headers recomputed (BR-PR-36).
   async cancelPrLinesOfPo(poId: number, tx: Tx) {
-    const lines = await this.listLinkedPrLines(poId, tx);
-    const affectedPrIds = new Set<number>();
-    for (const line of lines) {
-      if (line.prItemId == null) {
-        continue;
-      }
-      if (line.status !== "po_draft" && line.status !== "ordered") {
-        continue;
-      }
-      await tx
-        .update(purchaseRequestItems)
-        .set({
-          status: "cancelled",
-          issuedQty: sql`greatest(${purchaseRequestItems.issuedQty} - ${line.linkedQty}, 0)`,
-        })
-        .where(eq(purchaseRequestItems.id, line.prItemId));
-      affectedPrIds.add(line.prId);
+    const lines = (await this.listLinkedPrLines(poId, tx)).filter(
+      (line) =>
+        line.prItemId != null &&
+        (line.status === "po_draft" || line.status === "ordered"),
+    );
+    if (lines.length === 0) {
+      return;
     }
-    for (const prId of affectedPrIds) {
+    // One UPDATE for all lines (PERF-04); each line gives back its own linked qty.
+    const giveBack = sql.join(
+      lines.map(
+        (line) =>
+          sql`when ${line.prItemId} then ${line.linkedQty}::double precision`,
+      ),
+      sql` `,
+    );
+    await tx
+      .update(purchaseRequestItems)
+      .set({
+        status: "cancelled",
+        issuedQty: sql`greatest(${purchaseRequestItems.issuedQty} - (case ${purchaseRequestItems.id} ${giveBack} else 0 end), 0)`,
+      })
+      .where(
+        inArray(
+          purchaseRequestItems.id,
+          lines.map((line) => line.prItemId as number),
+        ),
+      );
+    for (const prId of [...new Set(lines.map((line) => line.prId))].sort(
+      (a, b) => a - b,
+    )) {
       await prRepository.recomputeHeaderStatusFromItems(prId, tx);
     }
   },
 
   // BR-PR-32: PO short-closed -> its ordered PR lines are closed; issuedQty stays.
   async closePrLinesOfPo(poId: number, tx: Tx) {
-    const lines = await this.listLinkedPrLines(poId, tx);
-    const affectedPrIds = new Set<number>();
-    for (const line of lines) {
-      if (line.prItemId == null) {
-        continue;
-      }
-      if (line.status !== "ordered" && line.status !== "po_draft") {
-        continue;
-      }
-      await tx
-        .update(purchaseRequestItems)
-        .set({ status: "closed" })
-        .where(eq(purchaseRequestItems.id, line.prItemId));
-      affectedPrIds.add(line.prId);
+    const lines = (await this.listLinkedPrLines(poId, tx)).filter(
+      (line) =>
+        line.prItemId != null &&
+        (line.status === "ordered" || line.status === "po_draft"),
+    );
+    if (lines.length === 0) {
+      return;
     }
-    for (const prId of affectedPrIds) {
+    await tx
+      .update(purchaseRequestItems)
+      .set({ status: "closed" })
+      .where(
+        inArray(
+          purchaseRequestItems.id,
+          lines.map((line) => line.prItemId as number),
+        ),
+      );
+    for (const prId of [...new Set(lines.map((line) => line.prId))].sort(
+      (a, b) => a - b,
+    )) {
       await prRepository.recomputeHeaderStatusFromItems(prId, tx);
     }
   },

@@ -99,7 +99,7 @@ export type approvalChainSchemaType = z.infer<typeof approvalChainSchema>;
 // drizzle-zod's generic jsonb inference to the actual step-array contract.
 export const approvalPolicySchema = createSelectSchema(approvalPolicies, {
   approvalChain: () => approvalChainOrEmptySchema,
-});
+}).omit({ isSaleOrderLinked: true }); // BR-APR-15: never in the API
 export type approvalPolicySchemaType = z.infer<typeof approvalPolicySchema>;
 
 // Response shape for a stored approval request row.
@@ -339,14 +339,13 @@ export const approvalActionSchema = z.enum([
   "approve",
   "reject",
   "sent_back",
-  "cancel",
   "withdraw",
 ]);
 
 // `notes` (the typed comment) is REQUIRED for approve / reject / sent_back
 // (BR-APR-37): the service answers 400 `APPROVAL_NOTES_REQUIRED` (not a Zod
 // error, so the code is stable) — hence no `.min(1)` here. Optional for
-// withdraw / cancel (BR-APR-39).
+// withdraw (BR-APR-39). There is no approval `cancel` action (approval v2).
 export const approvalActionRequestSchema = z.object({
   action: approvalActionSchema,
   notes: z.string().optional(),

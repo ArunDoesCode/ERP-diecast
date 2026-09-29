@@ -272,7 +272,7 @@ export type updatePoDelaySchemaType = z.infer<typeof updatePoDelaySchema>;
 // POST /po/:id/confirm — supplier confirmation of the PO, never blocks a
 // status transition.
 export const confirmPoSchema = z.object({
-  confirmationMethod: z.string().min(1).max(200),
+  confirmationMethod: poCommunicationChannelSchema,
   note: z.string().max(1000).optional(),
 });
 export type confirmPoSchemaType = z.infer<typeof confirmPoSchema>;

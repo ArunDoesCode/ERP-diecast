@@ -83,7 +83,6 @@
             "priority": "unrepresentable.required",
             "docType": "enum:pr,po,sco.required",
             "subDocType": "enum:any,sale_order,stock_reorder,maintenance,tooling,subcontracting,misc.required",
-            "isSaleOrderLinked": "boolean.nullable.required",
             "minAmountPaise": "unrepresentable.nullable.required",
             "maxAmountPaise": "unrepresentable.nullable.required",
             "autoApprove": "boolean.required",
@@ -134,7 +133,6 @@
             "priority": "unrepresentable.required",
             "docType": "enum:pr,po,sco.required",
             "subDocType": "enum:any,sale_order,stock_reorder,maintenance,tooling,subcontracting,misc.required",
-            "isSaleOrderLinked": "boolean.nullable.required",
             "minAmountPaise": "unrepresentable.nullable.required",
             "maxAmountPaise": "unrepresentable.nullable.required",
             "autoApprove": "boolean.required",
@@ -185,7 +183,6 @@
             "priority": "unrepresentable.required",
             "docType": "enum:pr,po,sco.required",
             "subDocType": "enum:any,sale_order,stock_reorder,maintenance,tooling,subcontracting,misc.required",
-            "isSaleOrderLinked": "boolean.nullable.required",
             "minAmountPaise": "unrepresentable.nullable.required",
             "maxAmountPaise": "unrepresentable.nullable.required",
             "autoApprove": "boolean.required",
@@ -303,13 +300,13 @@
       "tags": [
         "approval"
       ],
-      "summary": "Act on the current approval level of a request (approve/reject/sent_back/withdraw/cancel). `notes` is required for approve/reject/sent_back (400 APPROVAL_NOTES_REQUIRED).",
+      "summary": "Act on the current approval level of a request (approve/reject/sent_back/withdraw). `notes` is required for approve/reject/sent_back (400 APPROVAL_NOTES_REQUIRED).",
       "auth": {
         "type": "any-authenticated"
       },
       "request": {
         "body": {
-          "action": "enum:approve,reject,sent_back,cancel,withdraw.required",
+          "action": "enum:approve,reject,sent_back,withdraw.required",
           "notes": "string.optional"
         }
       },
@@ -1969,7 +1966,7 @@
       },
       "request": {
         "body": {
-          "confirmationMethod": "string.nonempty.required",
+          "confirmationMethod": "enum:email,whatsapp,phone,in_person.required",
           "note": "string.optional"
         }
       },
@@ -2372,7 +2369,6 @@
           "saleOrderId": "integer.positive.nullable.optional",
           "assetId": "integer.positive.nullable.optional",
           "notes": "string.nonempty.optional",
-          "status": "enum:draft,pending_approval,approved,rejected,partial_ordered,fully_ordered,cancelled.optional",
           "prId": "integer.positive.required",
           "inserts": "unrepresentable.required",
           "updates": "unrepresentable.required",

@@ -549,6 +549,18 @@ export const prRepository = {
     return this.findPrById(prId, tx);
   },
 
+  // CRP-2 lock order: PR headers first (ascending id), then lines. Used before
+  // any code that locks PR lines on behalf of a PO.
+  async lockHeadersInOrder(prIds: number[], tx: Tx) {
+    if (prIds.length === 0) return;
+    await tx
+      .select({ id: purchaseRequests.id })
+      .from(purchaseRequests)
+      .where(inArray(purchaseRequests.id, [...new Set(prIds)]))
+      .orderBy(asc(purchaseRequests.id))
+      .for("update");
+  },
+
   // Lines of the PR that sit on a PO (po_draft/ordered/closed) with the live PO numbers (BR-PR-39).
   async findOrderedLinesWithLivePos(prId: number, tx: Tx) {
     const lines = await tx
@@ -624,7 +636,9 @@ export const prRepository = {
   // caller, after PO create/update/cancel touches PR items).
   // BR-PR-36: worked out over the non-cancelled lines, and only for a PR that
   // is approved / partial_ordered / fully_ordered (never draft, pending_approval,
-  // rejected or cancelled). Every line cancelled -> the PR is cancelled.
+  // rejected or cancelled). Every line cancelled -> the PR is cancelled. That
+  // auto-cancel sets no cancelledBy (the actor is on the line / PO / trail that
+  // cancelled the last line); cancelReason is "All lines cancelled".
   async recomputeHeaderStatusFromItems(prId: number, tx?: Tx) {
     const executor = tx ?? db;
     const [header] = await executor
@@ -685,7 +699,7 @@ export const prRepository = {
     return row;
   },
 
-  // BR-PR-33: lock one PR line (before the header, same order as PO create).
+  // BR-PR-33: lock one PR line. Always take the PR header lock first (CRP-2).
   async findItemByIdForUpdate(itemId: number, tx: Tx) {
     const [row] = await tx
       .select()

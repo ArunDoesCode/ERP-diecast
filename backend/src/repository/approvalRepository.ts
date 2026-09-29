@@ -174,7 +174,6 @@ const policyColumns = {
   priority: approvalPolicies.priority,
   docType: approvalPolicies.docType,
   subDocType: approvalPolicies.subDocType,
-  isSaleOrderLinked: approvalPolicies.isSaleOrderLinked,
   minAmountPaise: approvalPolicies.minAmountPaise,
   maxAmountPaise: approvalPolicies.maxAmountPaise,
   autoApprove: approvalPolicies.autoApprove,
@@ -278,7 +277,7 @@ export const approvalRepository = {
 
   async findPolicyById(id: number) {
     const [row] = await db
-      .select()
+      .select(policyColumns)
       .from(approvalPolicies)
       .where(eq(approvalPolicies.id, id))
       .limit(1);
@@ -302,7 +301,7 @@ export const approvalRepository = {
       .update(approvalPolicies)
       .set(data)
       .where(eq(approvalPolicies.id, id))
-      .returning();
+      .returning(policyColumns);
 
     return row;
   },

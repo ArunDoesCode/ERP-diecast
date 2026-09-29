@@ -355,8 +355,9 @@ export async function runFixtures(opts: {
   );
 
   {
+    // Submitting a PR needs pr.manage (approval v2, BR-APR-24): die_designer has none.
     const pr = await makePr(
-      "die_designer",
+      "back_office",
       "tooling",
       [{ sku: "RM-H13", qty: 100 }],
       "Spare die block",
@@ -366,7 +367,7 @@ export async function runFixtures(opts: {
       req.id,
       "reject",
       "Rejected: block already in stock, reuse it",
-      userId.die_designer,
+      userId.back_office,
     );
   }
 
@@ -410,7 +411,7 @@ export async function runFixtures(opts: {
     "Release agent, urgent",
   );
   const prTools = await approvedPr(
-    "die_designer",
+    "back_office",
     "tooling",
     [
       { sku: "RM-H13", qty: 500 },
@@ -419,7 +420,7 @@ export async function runFixtures(opts: {
     "H13 and plunger tips for die build",
   );
   const prSleeve = await approvedPr(
-    "die_designer",
+    "back_office",
     "tooling",
     [
       { sku: "SP-SLEEVE", qty: 12 },

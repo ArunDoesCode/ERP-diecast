@@ -35,27 +35,37 @@ export const prStatusEnum = pgEnum("pr_status", [
 ]);
 
 // --- 1. PURCHASE REQUEST (PR) ---
-export const purchaseRequests = pgTable("purchase_requests", {
-  id: serial("id").primaryKey(),
-  prNumber: text("pr_number").unique().notNull(),
-  type: prTypeEnum("type").notNull(),
-  saleOrderId: integer("sale_order_id"), // Null if stock_reorder or someother option
-  assetId: integer("asset_id"), // Only populated if type is 'maintenance' or 'tooling' (Optional: link to a specific machine/die)
-  status: prStatusEnum("status").default("draft").notNull(),
-  requestedBy: integer("requested_by")
-    .references(() => employees.id)
-    .notNull(),
-  approvedBy: integer("approved_by").references(() => employees.id),
-  currentApprovalLevel: integer("current_approval_level").default(0).notNull(),
-  totalApprovalLevels: integer("total_approval_levels").default(0).notNull(),
-  notes: text("notes"),
-  estimatedAmountPaise: integer("estimated_amount_paise").default(0).notNull(),
-  cancelledBy: integer("cancelled_by").references(() => employees.id),
-  cancelledAt: timestamp("cancelled_at"),
-  cancelReason: text("cancel_reason"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+export const purchaseRequests = pgTable(
+  "purchase_requests",
+  {
+    id: serial("id").primaryKey(),
+    prNumber: text("pr_number").unique().notNull(),
+    type: prTypeEnum("type").notNull(),
+    saleOrderId: integer("sale_order_id"), // Null if stock_reorder or someother option
+    assetId: integer("asset_id"), // Only populated if type is 'maintenance' or 'tooling' (Optional: link to a specific machine/die)
+    status: prStatusEnum("status").default("draft").notNull(),
+    requestedBy: integer("requested_by")
+      .references(() => employees.id)
+      .notNull(),
+    approvedBy: integer("approved_by").references(() => employees.id),
+    currentApprovalLevel: integer("current_approval_level")
+      .default(0)
+      .notNull(),
+    totalApprovalLevels: integer("total_approval_levels").default(0).notNull(),
+    notes: text("notes"),
+    estimatedAmountPaise: integer("estimated_amount_paise")
+      .default(0)
+      .notNull(),
+    cancelledBy: integer("cancelled_by").references(() => employees.id),
+    cancelledAt: timestamp("cancelled_at"),
+    cancelReason: text("cancel_reason"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    statusIdx: index("idx_purchase_requests_status").on(table.status),
+  }),
+);
 
 export const prItemStatusEnum = pgEnum("pr_item_status", [
   "pending",
@@ -87,6 +97,7 @@ export const purchaseRequestItems = pgTable(
   },
   (table) => ({
     prIdIdx: index("idx_pr_items_pr_id").on(table.prId),
+    statusIdx: index("idx_pr_items_status").on(table.status),
   }),
 );
 
@@ -103,55 +114,64 @@ export const poStatusEnum = pgEnum("po_status", [
 ]);
 
 // --- 2. PURCHASE ORDER (PO) ---
-export const purchaseOrders = pgTable("purchase_orders", {
-  id: serial("id").primaryKey(),
-  poNumber: text("po_number").unique().notNull(),
-  supplierId: integer("supplier_id")
-    .references(() => supplierMaster.id)
-    .notNull(), // Link to suppliers table
-  status: poStatusEnum("status").default("draft").notNull(),
-  // Financials (stored in paise to avoid floating point issues)
-  subtotalPaise: integer("subtotal_paise").default(0).notNull(),
-  taxAmountPaise: integer("tax_amount_paise").default(0).notNull(),
-  totalAmountPaise: integer("total_amount_paise").default(0).notNull(),
-  // Terms
-  paymentTermsDays: integer("payment_terms_days").default(0), // e.g., 30 for Net 30
-  deliveryTerms: text("delivery_terms"),
-  notes: text("notes"),
-  expectedDeliveryDate: timestamp("expected_delivery_date"),
-  approvedBy: integer("approved_by").references(() => employees.id),
-  currentApprovalLevel: integer("current_approval_level").default(0).notNull(),
-  totalApprovalLevels: integer("total_approval_levels").default(0).notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  createdBy: integer("created_by")
-    .references(() => employees.id)
-    .notNull(),
-  // Delay tracking — expectedDeliveryDate is never overwritten (audit
-  // trail); these hold the supplier's revised promise once one is given.
-  revisedDeliveryDate: timestamp("revised_delivery_date"),
-  delayReason: text("delay_reason"),
-  // Supplier confirmation of receipt/acceptance of the PO — informational
-  // only, never blocks a status transition.
-  supplierConfirmed: boolean("supplier_confirmed").default(false).notNull(),
-  confirmationMethod: text("confirmation_method"),
-  confirmedAt: timestamp("confirmed_at"),
-  confirmedBy: integer("confirmed_by").references(() => employees.id),
-  confirmationNote: text("confirmation_note"),
-  // Terminal close audit trail — set when a PO transitions to `closed`
-  // (legal from `fully_received` or `invoiced`).
-  closedAt: timestamp("closed_at"),
-  closedBy: integer("closed_by").references(() => employees.id),
-  closeNote: text("close_note"),
-  // Cancel audit trail (BR-PO-11, 21): who, when, why.
-  cancelledBy: integer("cancelled_by").references(() => employees.id),
-  cancelledAt: timestamp("cancelled_at"),
-  cancelReason: text("cancel_reason"),
-  // BR-PO-13: closed from partial_received with open qty dropped.
-  shortClosed: boolean("short_closed").default(false).notNull(),
-  // BR-PO-15, 21: who recorded the supplier invoice, and when.
-  invoicedBy: integer("invoiced_by").references(() => employees.id),
-  invoicedAt: timestamp("invoiced_at"),
-});
+export const purchaseOrders = pgTable(
+  "purchase_orders",
+  {
+    id: serial("id").primaryKey(),
+    poNumber: text("po_number").unique().notNull(),
+    supplierId: integer("supplier_id")
+      .references(() => supplierMaster.id)
+      .notNull(), // Link to suppliers table
+    status: poStatusEnum("status").default("draft").notNull(),
+    // Financials (stored in paise to avoid floating point issues)
+    subtotalPaise: integer("subtotal_paise").default(0).notNull(),
+    taxAmountPaise: integer("tax_amount_paise").default(0).notNull(),
+    totalAmountPaise: integer("total_amount_paise").default(0).notNull(),
+    // Terms
+    paymentTermsDays: integer("payment_terms_days").default(0), // e.g., 30 for Net 30
+    deliveryTerms: text("delivery_terms"),
+    notes: text("notes"),
+    expectedDeliveryDate: timestamp("expected_delivery_date"),
+    approvedBy: integer("approved_by").references(() => employees.id),
+    currentApprovalLevel: integer("current_approval_level")
+      .default(0)
+      .notNull(),
+    totalApprovalLevels: integer("total_approval_levels").default(0).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    createdBy: integer("created_by")
+      .references(() => employees.id)
+      .notNull(),
+    // Delay tracking — expectedDeliveryDate is never overwritten (audit
+    // trail); these hold the supplier's revised promise once one is given.
+    revisedDeliveryDate: timestamp("revised_delivery_date"),
+    delayReason: text("delay_reason"),
+    // Supplier confirmation of receipt/acceptance of the PO — informational
+    // only, never blocks a status transition.
+    supplierConfirmed: boolean("supplier_confirmed").default(false).notNull(),
+    confirmationMethod: text("confirmation_method"),
+    confirmedAt: timestamp("confirmed_at"),
+    confirmedBy: integer("confirmed_by").references(() => employees.id),
+    confirmationNote: text("confirmation_note"),
+    // Terminal close audit trail — set when a PO transitions to `closed`
+    // (legal from `fully_received` or `invoiced`).
+    closedAt: timestamp("closed_at"),
+    closedBy: integer("closed_by").references(() => employees.id),
+    closeNote: text("close_note"),
+    // Cancel audit trail (BR-PO-11, 21): who, when, why.
+    cancelledBy: integer("cancelled_by").references(() => employees.id),
+    cancelledAt: timestamp("cancelled_at"),
+    cancelReason: text("cancel_reason"),
+    // BR-PO-13: closed from partial_received with open qty dropped.
+    shortClosed: boolean("short_closed").default(false).notNull(),
+    // BR-PO-15, 21: who recorded the supplier invoice, and when.
+    invoicedBy: integer("invoiced_by").references(() => employees.id),
+    invoicedAt: timestamp("invoiced_at"),
+  },
+  (table) => ({
+    statusIdx: index("idx_purchase_orders_status").on(table.status),
+    supplierIdx: index("idx_purchase_orders_supplier_id").on(table.supplierId),
+  }),
+);
 
 export const purchaseOrderItems = pgTable(
   "purchase_order_items",
@@ -178,12 +198,19 @@ export const purchaseOrderItems = pgTable(
 
 // --- 3. PR TO PO MAPPING (Many-to-Many Resolution) ---
 // Because 1 PR can have multiple POs, and 1 PO can have multiple PRs
-export const prPoItemLinks = pgTable("pr_po_item_links", {
-  id: serial("id").primaryKey(),
-  prItemId: integer("pr_item_id").references(() => purchaseRequestItems.id),
-  poItemId: integer("po_item_id").references(() => purchaseOrderItems.id),
-  linkedQty: doublePrecision("linked_qty").notNull(),
-});
+export const prPoItemLinks = pgTable(
+  "pr_po_item_links",
+  {
+    id: serial("id").primaryKey(),
+    prItemId: integer("pr_item_id").references(() => purchaseRequestItems.id),
+    poItemId: integer("po_item_id").references(() => purchaseOrderItems.id),
+    linkedQty: doublePrecision("linked_qty").notNull(),
+  },
+  (table) => ({
+    prItemIdx: index("idx_pr_po_links_pr_item_id").on(table.prItemId),
+    poItemIdx: index("idx_pr_po_links_po_item_id").on(table.poItemId),
+  }),
+);
 
 export const poCommunicationTypeEnum = pgEnum("po_communication_type", [
   "po_sent",
@@ -209,20 +236,29 @@ export const poCommunicationStatusEnum = pgEnum("po_communication_status", [
 // yet) — shaped so real auto-email can be added later without a schema
 // change. `type=po_sent`'s latest row is what flips a PO to `dispatched`;
 // `reminder`/`escalation` rows are just log entries for the overdue queue.
-export const poCommunications = pgTable("po_communications", {
-  id: serial("id").primaryKey(),
-  poId: integer("po_id")
-    .references(() => purchaseOrders.id)
-    .notNull(),
-  type: poCommunicationTypeEnum("type").notNull(),
-  channel: poCommunicationChannelEnum("channel").notNull(),
-  status: poCommunicationStatusEnum("status").default("logged").notNull(),
-  toEmail: text("to_email"),
-  note: text("note"),
-  errorMessage: text("error_message"),
-  sentBy: integer("sent_by").references(() => employees.id),
-  sentAt: timestamp("sent_at").defaultNow().notNull(),
-});
+export const poCommunications = pgTable(
+  "po_communications",
+  {
+    id: serial("id").primaryKey(),
+    poId: integer("po_id")
+      .references(() => purchaseOrders.id)
+      .notNull(),
+    type: poCommunicationTypeEnum("type").notNull(),
+    channel: poCommunicationChannelEnum("channel").notNull(),
+    status: poCommunicationStatusEnum("status").default("logged").notNull(),
+    toEmail: text("to_email"),
+    note: text("note"),
+    errorMessage: text("error_message"),
+    sentBy: integer("sent_by").references(() => employees.id),
+    sentAt: timestamp("sent_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    poSentIdx: index("idx_po_communications_po_id_sent_at").on(
+      table.poId,
+      table.sentAt,
+    ),
+  }),
+);
 
 export const scoStatusEnum = pgEnum("sco_status", [
   "draft",

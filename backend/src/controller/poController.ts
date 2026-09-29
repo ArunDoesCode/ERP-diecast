@@ -1,10 +1,10 @@
 import type { Context } from "hono";
 
 import { BadRequestError, UnauthorizedError } from "../lib/errors";
+import { parseCancelReason } from "../lib/http";
 import type { AppEnv } from "../lib/types";
 import { poService } from "../service/poService";
 import {
-  cancelPoSchema,
   closePoSchema,
   confirmPoSchema,
   createPoSchema,
@@ -64,8 +64,7 @@ export const poController = {
     }
 
     // BR-PO-11: the reason is required for every status, draft included.
-    const rawBody = await c.req.text();
-    const { reason } = cancelPoSchema.parse(rawBody ? JSON.parse(rawBody) : {});
+    const reason = await parseCancelReason(c, "PO_CANCEL_REASON_REQUIRED");
 
     const data = await poService.cancel(id, reason, parseActorId(c));
     return c.json({ success: true, data });

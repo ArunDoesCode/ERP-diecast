@@ -1,7 +1,6 @@
 import { db } from "../db/client";
 import { type Actor, can } from "../lib/auth-middleware";
 import {
-  AppError,
   BadRequestError,
   ConflictError,
   ForbiddenError,
@@ -11,8 +10,8 @@ import { approvalRepository } from "../repository/approvalRepository";
 import { prRepository } from "../repository/prRepository";
 import type {
   createPrSchemaType,
+  prItemSchemaType,
   prListQuerySchemaType,
-  prStatusSchemaType,
   updatePrSchemaType,
 } from "../types/pr.types";
 
@@ -136,15 +135,6 @@ export const prService = {
   },
 
   async update(input: updatePrSchemaType, actor: Actor) {
-    assertCanLinkMachine(actor, input.assetId);
-    // BR-PR-15 / BR-KD-01: status is never set from the edit path.
-    if (input.status !== undefined) {
-      throw new BadRequestError(
-        "Status cannot be changed here; use the cancel or approval action",
-        "PR_STATUS_VIA_ACTION",
-      );
-    }
-
     return db.transaction(async (tx) => {
       const existingPr = await prRepository.findPrByIdForUpdate(input.prId, tx);
       if (!existingPr) {
@@ -163,6 +153,11 @@ export const prService = {
           `A PR in status ${existingPr.status} cannot be edited`,
           "PR_NOT_EDITABLE",
         );
+      }
+
+      // BR-AUTH-26 (PR v2): the key is needed only when the machine is added or changed.
+      if (input.assetId !== undefined && input.assetId !== existingPr.assetId) {
+        assertCanLinkMachine(actor, input.assetId);
       }
 
       const targetType = input.type ?? existingPr.type;
@@ -206,7 +201,7 @@ export const prService = {
       const updates = input.updates;
       const deletes = input.deletes;
 
-      const changedItems = [];
+      const changedItems: prItemSchemaType[] = [];
       const hasItemMutations =
         inserts.length > 0 || updates.length > 0 || deletes.length > 0;
 
@@ -369,20 +364,20 @@ export const prService = {
   },
 
   // BR-PR-33, 36: cancel one pending line while the header is approved /
-  // partial_ordered. Requester or super-admin only. Line row is locked before
-  // the header (the same order PO create uses), header recomputed after.
+  // partial_ordered. Requester or super-admin only. Lock order everywhere:
+  // PR header first, then its lines (CRP-2); header recomputed after.
   // The body reason (3-500) is validated by the controller and stored on the
   // line with who/when.
   async cancelLine(prId: number, lineId: number, reason: string, actor: Actor) {
     return db.transaction(async (tx) => {
-      const line = await prRepository.findItemByIdForUpdate(lineId, tx);
-      if (!line || line.prId !== prId) {
-        throw new AppError("PR line not found", 404, "PR_LINE_NOT_FOUND");
-      }
-
       const pr = await prRepository.findPrByIdForUpdate(prId, tx);
       if (!pr) {
-        throw new AppError("Purchase request not found", 404, "PR_NOT_FOUND");
+        throw new NotFoundError("Purchase request not found", "PR_NOT_FOUND");
+      }
+
+      const line = await prRepository.findItemByIdForUpdate(lineId, tx);
+      if (!line || line.prId !== prId) {
+        throw new NotFoundError("PR line not found", "PR_LINE_NOT_FOUND");
       }
 
       if (pr.requestedBy !== actor.id && !actor.isSuperAdmin) {
@@ -431,7 +426,7 @@ export const prService = {
     return db.transaction(async (tx) => {
       const pre = await prRepository.findPrById(prId, tx);
       if (!pre) {
-        throw new AppError("Purchase request not found", 404, "PR_NOT_FOUND");
+        throw new NotFoundError("Purchase request not found", "PR_NOT_FOUND");
       }
 
       // Same lock order as approval actions (request, then PR) so they cannot deadlock.
@@ -448,7 +443,7 @@ export const prService = {
 
       const pr = await prRepository.findPrByIdForUpdate(prId, tx);
       if (!pr) {
-        throw new AppError("Purchase request not found", 404, "PR_NOT_FOUND");
+        throw new NotFoundError("Purchase request not found", "PR_NOT_FOUND");
       }
 
       if (pr.requestedBy !== actor.id && !actor.isSuperAdmin) {
@@ -483,7 +478,7 @@ export const prService = {
         tx,
       );
       if (!row) {
-        throw new AppError("Purchase request not found", 404, "PR_NOT_FOUND");
+        throw new NotFoundError("Purchase request not found", "PR_NOT_FOUND");
       }
 
       await approvalRepository.cancelOpenRequestForDocument(

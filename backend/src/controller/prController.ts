@@ -1,10 +1,10 @@
 import type { Context } from "hono";
 
-import { AppError, BadRequestError, UnauthorizedError } from "../lib/errors";
+import { BadRequestError, UnauthorizedError } from "../lib/errors";
+import { parseCancelReason } from "../lib/http";
 import type { AppEnv } from "../lib/types";
 import { prService } from "../service/prService";
 import {
-  cancelPrSchema,
   createPrSchema,
   prListQuerySchema,
   updatePrSchema,
@@ -45,7 +45,15 @@ export const prController = {
   },
 
   async update(c: Context<AppEnv>) {
-    const body = updatePrSchema.parse(await c.req.json());
+    const raw = await c.req.json();
+    // BR-PR-15 / BR-KD-01: status is never set from the edit path, even to its current value.
+    if (raw && typeof raw === "object" && "status" in raw) {
+      throw new BadRequestError(
+        "Status cannot be changed here; use the cancel or approval action",
+        "PR_STATUS_VIA_ACTION",
+      );
+    }
+    const body = updatePrSchema.parse(raw);
     const data = await prService.update(body, c.get("actor"));
     return c.json({ success: true, data });
   },
@@ -53,19 +61,12 @@ export const prController = {
   async remove(c: Context<AppEnv>) {
     const id = Number(c.req.param("id"));
     if (!Number.isInteger(id) || id <= 0) {
-      throw new AppError("Invalid PR id", 400, "INVALID_PR_ID");
+      throw new BadRequestError("Invalid PR id", "INVALID_PR_ID");
     }
 
-    const raw = await c.req.json().catch(() => ({}));
-    const parsed = cancelPrSchema.safeParse(raw);
-    if (!parsed.success) {
-      throw new BadRequestError(
-        "A cancel reason of 3 to 500 characters is required",
-        "PR_CANCEL_REASON_REQUIRED",
-      );
-    }
+    const reason = await parseCancelReason(c, "PR_CANCEL_REASON_REQUIRED");
 
-    const data = await prService.cancel(id, parsed.data.reason, c.get("actor"));
+    const data = await prService.cancel(id, reason, c.get("actor"));
     return c.json({ success: true, data: { pr: data } });
   },
 
@@ -74,27 +75,15 @@ export const prController = {
     const id = Number(c.req.param("id"));
     const lineId = Number(c.req.param("lineId"));
     if (!Number.isInteger(id) || id <= 0) {
-      throw new AppError("Invalid PR id", 400, "INVALID_PR_ID");
+      throw new BadRequestError("Invalid PR id", "INVALID_PR_ID");
     }
     if (!Number.isInteger(lineId) || lineId <= 0) {
-      throw new AppError("Invalid PR line id", 400, "INVALID_PR_LINE_ID");
+      throw new BadRequestError("Invalid PR line id", "INVALID_PR_LINE_ID");
     }
 
-    const raw = await c.req.json().catch(() => ({}));
-    const parsed = cancelPrSchema.safeParse(raw);
-    if (!parsed.success) {
-      throw new BadRequestError(
-        "A cancel reason of 3 to 500 characters is required",
-        "PR_CANCEL_REASON_REQUIRED",
-      );
-    }
+    const reason = await parseCancelReason(c, "PR_CANCEL_REASON_REQUIRED");
 
-    const data = await prService.cancelLine(
-      id,
-      lineId,
-      parsed.data.reason,
-      c.get("actor"),
-    );
+    const data = await prService.cancelLine(id, lineId, reason, c.get("actor"));
     return c.json({ success: true, data });
   },
 };

@@ -103,7 +103,6 @@ function toTrailAction(action: approvalActionRequestSchemaType["action"]) {
     approve: "approved",
     reject: "rejected",
     sent_back: "require_more_info",
-    cancel: "cancelled",
     withdraw: "cancelled",
   };
 
@@ -349,6 +348,20 @@ export const approvalService = {
     if (doc.createdBy !== actorId) {
       throw new ForbiddenError(
         "Only the document creator can submit it for approval",
+      );
+    }
+
+    // BR-APR-24 (v2): submit also needs the document type's own key.
+    const submitKey =
+      input.docType === "pr"
+        ? "pr.manage"
+        : input.docType === "po"
+          ? "po.manage"
+          : null;
+    if (submitKey && !can(actor, submitKey)) {
+      throw new ForbiddenError(
+        `Submitting a ${input.docType.toUpperCase()} needs the ${submitKey} permission`,
+        "PERMISSION_DENIED",
       );
     }
 
@@ -652,13 +665,11 @@ export const approvalService = {
       }
 
       const chain = request.chainSnapshot;
-      if (input.action === "cancel" || input.action === "withdraw") {
+      if (input.action === "withdraw") {
         if (request.requestedBy !== actorId) {
           throw new ForbiddenError(
-            input.action === "withdraw"
-              ? "Only the requester can withdraw this approval"
-              : "Only requester can cancel this approval",
-            input.action === "withdraw" ? "APPROVAL_NOT_REQUESTER" : undefined,
+            "Only the requester can withdraw this approval",
+            "APPROVAL_NOT_REQUESTER",
           );
         }
       } else {
@@ -707,7 +718,7 @@ export const approvalService = {
         completionTime = new Date();
       }
 
-      if (input.action === "cancel" || input.action === "withdraw") {
+      if (input.action === "withdraw") {
         nextStatus = "cancelled";
         completionTime = new Date();
       }
@@ -772,8 +783,8 @@ export const approvalService = {
       }
 
       if (request.docType === "po") {
-        if (input.action === "reject" || input.action === "cancel") {
-          // BR-APR-43 / BR-PO-07: a rejected or cancelled request cancels the PO
+        if (input.action === "reject") {
+          // BR-APR-43 / BR-PO-07: a rejected request cancels the PO
           // through the normal cancel path, so its PR lines are cancelled too.
           await poRepository.lockPoById(request.docId, tx);
           await poRepository.cancelLockedPo(

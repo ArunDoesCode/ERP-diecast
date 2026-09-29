@@ -19,8 +19,8 @@ export class AppError extends Error {
 }
 
 export class NotFoundError extends AppError {
-  constructor(message = "Not found") {
-    super(message, 404, "NOT_FOUND");
+  constructor(message = "Not found", code = "NOT_FOUND") {
+    super(message, 404, code);
   }
 }
 

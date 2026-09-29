@@ -127,7 +127,7 @@ export type createPrItemSchemaType = z.infer<typeof createPrItemSchema>;
 const prCreateBaseSchema = createInsertSchema(purchaseRequests, {
   saleOrderId: z.number().int().positive().optional(),
   assetId: z.number().int().positive().optional(),
-  notes: z.string().min(1),
+  notes: z.string().min(1).max(2000),
 });
 
 export const createPrSchema = prCreateBaseSchema
@@ -192,7 +192,7 @@ export const updatePrDeleteItemSchema = z.object({
 const prUpdateBaseSchema = createUpdateSchema(purchaseRequests, {
   saleOrderId: z.number().int().positive().nullable().optional(),
   assetId: z.number().int().positive().nullable().optional(),
-  notes: z.string().min(1).optional(),
+  notes: z.string().min(1).max(2000).optional(),
 });
 
 export const updatePrSchema = prUpdateBaseSchema
@@ -201,7 +201,6 @@ export const updatePrSchema = prUpdateBaseSchema
     saleOrderId: true,
     assetId: true,
     notes: true,
-    status: true,
   })
   .extend({
     prId: z.number().int().positive(),
@@ -224,7 +223,6 @@ export const updatePrSchema = prUpdateBaseSchema
       data.saleOrderId !== undefined ||
       data.assetId !== undefined ||
       data.notes !== undefined ||
-      data.status !== undefined ||
       data.inserts.length > 0 ||
       data.updates.length > 0 ||
       data.deletes.length > 0;
