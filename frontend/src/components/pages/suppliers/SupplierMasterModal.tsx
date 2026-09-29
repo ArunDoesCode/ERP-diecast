@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import {
+	isValidGstin,
 	panFromGstin,
 	type SupplierMasterInput,
 	supplierMasterSchema,
@@ -132,6 +133,7 @@ export function SupplierMasterModal({
 															{...field}
 															id="supplier-name"
 															label="Supplier name"
+															maxLength={200}
 														/>
 													</FormControl>
 													<FormMessage />
@@ -191,10 +193,7 @@ export function SupplierMasterModal({
 															onChange={(event) => {
 																const gst = event.target.value.toUpperCase();
 																field.onChange(gst);
-																if (
-																	gst.length === 15 &&
-																	!form.getValues("panNumber")?.trim()
-																) {
+																if (isValidGstin(gst)) {
 																	form.setValue(
 																		"panNumber",
 																		panFromGstin(gst),
@@ -251,6 +250,7 @@ export function SupplierMasterModal({
 															value={field.value ?? ""}
 															id="supplier-contact"
 															label="Contact person (optional)"
+															maxLength={200}
 														/>
 													</FormControl>
 													<FormMessage />
@@ -268,6 +268,7 @@ export function SupplierMasterModal({
 															value={field.value ?? ""}
 															id="supplier-phone"
 															label="Phone (optional)"
+															maxLength={30}
 														/>
 													</FormControl>
 													<FormMessage />
@@ -285,6 +286,7 @@ export function SupplierMasterModal({
 															value={field.value ?? ""}
 															id="supplier-email"
 															label="Email (optional)"
+															maxLength={254}
 															type="email"
 														/>
 													</FormControl>
@@ -303,6 +305,7 @@ export function SupplierMasterModal({
 															value={field.value ?? ""}
 															id="supplier-address"
 															label="Address (optional)"
+															maxLength={500}
 														/>
 													</FormControl>
 													<FormMessage />

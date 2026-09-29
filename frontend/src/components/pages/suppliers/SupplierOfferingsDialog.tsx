@@ -436,6 +436,7 @@ export function SupplierOfferingsDialog({
 													{...field}
 													id="supplier-item-sku"
 													label="Supplier SKU"
+													maxLength={100}
 												/>
 											</FormControl>
 											<FormMessage />

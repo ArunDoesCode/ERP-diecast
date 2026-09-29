@@ -143,6 +143,10 @@ const PAN_PATTERN = /^[A-Z]{5}\d{4}[A-Z]$/;
 const MAX_PRICE_PAISE = 2147483647;
 
 // PAN sits at GSTIN chars 3-12 (BR-SUP-03).
+export function isValidGstin(gstin: string) {
+	return GSTIN_PATTERN.test(gstin);
+}
+
 export function panFromGstin(gstin: string) {
 	return gstin.slice(2, 12);
 }
