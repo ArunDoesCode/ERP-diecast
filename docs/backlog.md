@@ -53,12 +53,12 @@ Type: defect · infra · feature · debt · idea.
 | BL-066 | P3 | debt | purchase-order | PO create/update run queries per line, and the rate default calls `getLastRate` per line — batch (e.g. `DISTINCT ON`) | m1 PERF-03, PERF-05 | 2026-09-29 |
 | BL-067 | P3 | debt | backend | List `q` search uses leading-wildcard `ilike` (PR, PO, GRN number) — no index; add pg_trgm when lists grow. See BL-032, BL-050 | m1 PERF-09, PERF-M2 | 2026-09-29 |
 | BL-068 | P3 | debt | approval | `assertChainHasEligibleApprovers` runs one count per chain step; group into one query if touched | m1 PERF-11 (procurement review) | 2026-09-29 |
-| BL-069 | P2 | defect | inventory | `GET /asset/locations` needs `asset.manage`, but the stock-take / opening form is for `inventory.adjust` holders (owner has no `asset.manage`) → owner may not load the location list. Verify, then pick a key (auth-setup spec change) | m1 docs cleanup (route-key check) | 2026-09-29 |
 | BL-070 | P1 | feature | subcontracting | Build subcontracting (spec frozen v1): `/feature subcontracting` on a fresh branch from main after the m1 PR merges. Includes SCO parts of BR-INV-05/10, BR-SUP-06/07, BL-065 | m1 plan (next batch) | 2026-09-29 |
 
 ## Done
 | ID | Item | PR / commit | Closed |
 |---|---|---|---|
+| BL-069 | Fixed: `GET /asset/locations` readable with `asset.manage` or `inventory.view`, so owner can fill the stock-take location picker (auth-setup v10) | work/m1 cc28d80 | 2026-09-29 |
 | BL-001 | Fixed: frontend sends the id in the path plus a reason; one cancel path (BR-PR-39..47, BR-KD-01..13) | work/m1 2208a02, acd5c37 | 2026-09-29 |
 | BL-002 | Decided B: `isSaleOrderLinked` dropped from matching and the policy API (approval-policies BR-APR-15) | work/m1 966f37d, f1c9812 | 2026-09-29 |
 | BL-004 | Fixed: `bun run bootstrap-admin` creates the first super-admin (BR-KD-17..29) | work/m1 e4e94db | 2026-09-29 |

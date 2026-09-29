@@ -37,7 +37,7 @@ screen for stock-take and opening stock. All BR-INV-01..25 are built and tested
 | POST / PATCH | `/api/asset/items`, `/items/:id` | `asset.manage` (bo) | Create / edit / (de)activate item |
 | GET | `/api/asset/items/:itemId/last-rate` | `inventory.view` | BR-INV-24 chain, returns `source` |
 | GET / POST / PATCH | `/api/asset/services`, `/machines` | `asset.manage` (bo) | Masters. `GET /machines`: any login, service check `asset.manage` or `pr.link_machine` |
-| GET | `/api/asset/locations` | `asset.manage` (bo) | Read (the manual form needs it — see Known gaps) |
+| GET | `/api/asset/locations` | `asset.manage` or `inventory.view` (ow, bo, fs) | Read — pickers on stock view and stock-take form (auth-setup v10) |
 | POST / PATCH | `/api/asset/locations`, `/locations/:id` | `asset.manage` (bo) | Create / edit / (de)activate |
 | GET | `/api/asset/inventory/stock` | `inventory.view` | Stock view: unit, stock, average, value, per-location balances, reorder flag, inactive tag |
 | GET | `/api/asset/inventory/movements` | `inventory.view` | Read-only ledger list, names the source document |
@@ -67,7 +67,6 @@ screen for stock-take and opening stock. All BR-INV-01..25 are built and tested
 - BR-INV-05 PO half (PR line approved before deactivation) → BL-046 (PO code, auth session). SCO part → subcontracting build.
 - `inventory_ref_type` values `pro`, `job_order_issue`, `scrap_dispatch` still unwritten.
 - Stock list search not indexable (BL-050). No reconciliation screen (BL-045).
-- `GET /asset/locations` needs `asset.manage` (contract S7), but the stock-take / opening form is for `inventory.adjust` holders (owner has no `asset.manage`) — check whether owner can load locations (BL-069).
 
 ## ERP benchmark (with links)
 - ERPNext: default stock UOM cannot change once any stock transaction exists — make a new item instead ([Frappe forum](https://discuss.frappe.io/t/forced-item-stock-uom-via-db-set-value-what-should-i-verify-afterward/163769), [ERPNext Item](https://manualpt.angolaerp.co.ao/docs/user/manual/en/stock/item)). Adopted as BR-INV-04.
