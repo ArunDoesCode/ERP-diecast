@@ -243,9 +243,11 @@ export const scoRepository = {
     lines: PreparedScoLine[],
     tx: Tx,
   ) {
-    // The counter row records no actor: it is shared plumbing, and the SCO
-    // itself carries createdBy. Keeps employees deletable without counter rows.
-    const { periodKey, seq } = await allocateDocumentSequence(tx, "sco", null);
+    const { periodKey, seq } = await allocateDocumentSequence(
+      tx,
+      "sco",
+      data.createdBy as number,
+    );
     const [row] = await tx
       .insert(subcontractingOrders)
       .values({ ...data, scoNumber: `SCO-${periodKey}-${seq}` })
