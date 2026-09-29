@@ -135,7 +135,11 @@ export function useCreateLocationMutation() {
 		mutationFn: (payload: AssetLocationCreatePayload) =>
 			createLocation(payload),
 		onSuccess: async () => {
-			await queryClient.invalidateQueries({ queryKey: assetKeys.locations() });
+			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: assetKeys.locations() }),
+				queryClient.invalidateQueries({ queryKey: assetKeys.stock() }),
+				queryClient.invalidateQueries({ queryKey: assetKeys.movements() }),
+			]);
 			toast.success("Location created");
 		},
 		onError: (error) => {
@@ -156,7 +160,11 @@ export function useUpdateLocationMutation() {
 			payload: AssetLocationUpdatePayload;
 		}) => updateLocation(locationId, payload),
 		onSuccess: async () => {
-			await queryClient.invalidateQueries({ queryKey: assetKeys.locations() });
+			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: assetKeys.locations() }),
+				queryClient.invalidateQueries({ queryKey: assetKeys.stock() }),
+				queryClient.invalidateQueries({ queryKey: assetKeys.movements() }),
+			]);
 			toast.success("Location updated");
 		},
 		onError: (error) => {
@@ -215,7 +223,10 @@ export function useCreateItemMutation() {
 	return useMutation({
 		mutationFn: (payload: AssetItemCreatePayload) => createItem(payload),
 		onSuccess: async () => {
-			await queryClient.invalidateQueries({ queryKey: assetKeys.items() });
+			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: assetKeys.items() }),
+				queryClient.invalidateQueries({ queryKey: assetKeys.stock() }),
+			]);
 			toast.success("Item created");
 		},
 		onError: (error) => {
@@ -239,6 +250,7 @@ export function useUpdateItemMutation() {
 			await Promise.all([
 				queryClient.invalidateQueries({ queryKey: assetKeys.items() }),
 				queryClient.invalidateQueries({ queryKey: assetKeys.stock() }),
+				queryClient.invalidateQueries({ queryKey: assetKeys.movements() }),
 			]);
 			toast.success("Item updated");
 		},

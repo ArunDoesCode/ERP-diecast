@@ -143,6 +143,7 @@ function invalidateGrnAndPO(
 		queryClient.invalidateQueries({ queryKey: grnKeys.detail(grnId) }),
 		// Stock and moving average change on QA/bypass/correction postings.
 		queryClient.invalidateQueries({ queryKey: assetKeys.items() }),
+		queryClient.invalidateQueries({ queryKey: assetKeys.stock() }),
 		queryClient.invalidateQueries({ queryKey: assetKeys.movements() }),
 		queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.cards() }),
 		queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.detail(poId) }),
