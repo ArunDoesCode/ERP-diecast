@@ -51,7 +51,8 @@ All list endpoints paginated; all mutating endpoints are `super-admin`/`back_off
 | POST | `/api/asset/services` | super-admin, back_office | Create service master row |
 | PATCH | `/api/asset/services/:id` | super-admin, back_office | Update service master row |
 | GET | `/api/asset/inventory/movements` | super-admin, back_office | List ledger rows, paginated, filterable by item/location/referenceType/transactionType/date range |
-| POST | `/api/asset/inventory/movements` | super-admin, back_office | Record an ad-hoc movement directly (bypasses GRN flow entirely) |
+| POST | `/api/asset/inventory/movements` | super-admin, owner, back_office (`inventory.adjust`) | Manual only: `stock_adjustment` / `opening_stock`, reason required (BR-GRN-43/44) |
+| GET | `/api/asset/inventory/reconciliation` | `inventory.view` roles | Mismatch rows only (`kind` `item_stock` / `item_location_balance`), paginated (BR-GRN-41) |
 | GET | `/api/asset/locations` | super-admin, back_office | List locations, paginated, searchable (name/type) |
 | POST | `/api/asset/locations` | super-admin, back_office | Create location |
 | PATCH | `/api/asset/locations/:id` | super-admin, back_office | Update location |
@@ -62,13 +63,14 @@ All list endpoints paginated; all mutating endpoints are `super-admin`/`back_off
 Full shapes: `cd backend && bun run contract:query "<METHOD /path>"`.
 
 ## Key flows
-- `createInventoryMovement` (the only stock-posting primitive, called both directly via this route and internally from `grnService`): opens a transaction, `SELECT ... FOR UPDATE` on the most recent ledger row for that `itemId`+`locationId` (row-locks to prevent a lost-update race between two concurrent movements), computes `balanceAfter = previousBalance + quantityChange`, inserts the new row with `totalValueChangePaise = round(quantityChange * unitCostPaise)`.
+- **Updated 2026-09-29 (work/m1-stock, see `grn.md`):** the only stock-posting path is `stockPostingRepository.postStock(tx, …)`: locks the `item_master` row, reads the last balance for item+location (order by `id`), writes one ledger row (value = qty × cost rounded half away from zero; `referenceLineId`), updates item `currentStock` and moving `averageCostPaise` (BR-GRN-37/38/39) — all in the caller's tx. `blockNegative` → 409 "Insufficient stock". `assetRepository.createInventoryMovement` delegates to it; manual movements go through `assetRepository.manualMovement` (location must exist → 404; stock-out valued at current average; stock-in cost > 0; ledger `referenceId` = 0).
 - `getLastRate`: tries, in order, (1) most recent `purchaseOrderItems.unitPricePaise` for that supplier+item joined through `purchaseOrders`, (2) `supplierItems.supplierUnitPricePaise` for that supplier+item, (3) `itemMaster.averageCostPaise`. Returns `undefined`/404 only if none of the three exist.
 - Item/service/location/machine CRUD all follow the same shape: controller parses via Zod → service (pagination-meta wrap on list, `ConflictError` translation on unique-constraint violation for `createItem`/`updateItem`/`createService`/`updateService`) → repository (plain Drizzle select/insert/update, `getTableColumns` for full-row projections).
 
 ## Invariants & gotchas
-- **`itemMaster.currentStock` and `itemMaster.averageCostPaise` are never recomputed from `inventory_ledger` postings anywhere in the codebase.** They are writable via `assetItemCreateSchema`/`assetItemUpdateSchema` (manual entry only) and read by `getLastRate`'s fallback, but no service sums ledger movements back onto the item row. The ledger's own `balanceAfter` is the only place a running per-item-per-location balance actually lives. Any UI or report reading `itemMaster.currentStock` as "true current stock" is reading a field nothing keeps in sync with postings.
-- `POST /api/asset/inventory/movements` lets a `super-admin`/`back_office` user post any `referenceType` (including `grn`/`grn_bypass`) directly, with no check that a matching GRN/PO/SCO row for `referenceId` actually exists — `referenceId` is a bare int, not an FK. This is a second, unguarded path into the same ledger that GRN's flow posts through under business rules (over-receipt guard, QA state machine, etc.).
+- `itemMaster.currentStock` / `averageCostPaise` are kept by `postStock` only; item create/edit reject them (400, strict schemas, BR-GRN-40). Never write them anywhere else.
+- Ledger indexes: `(item_id, location_id, id desc)` and `reference_line_id`. `total_value_change_paise` is bigint; `unit_cost_paise` int4.
+- Reconciliation compares with tolerance 0.0005 (qty columns are double precision).
 - `locations.linkedVendorId` + `isVirtual` model a subcontractor's premises as a "location" for `sco_issue`/`sco_receipt` postings, but nothing in the current codebase writes those reference types (subcontracting has no service/controller layer yet — see `grn.md` Known gaps).
 - `machines` has no FK from anything; `purchaseRequests.assetId` (comment: "Only populated if type is 'maintenance' or 'tooling'") is a plain int, not `references(() => machines.id)`.
 - `category` on `itemMaster` and `type` on `machines` are free text, not enums — no DB constraint against arbitrary values.
@@ -79,22 +81,11 @@ Full shapes: `cd backend && bun run contract:query "<METHOD /path>"`.
 | — | none — no `*.test.ts` file targets asset service/repository/controller |
 
 ## Known gaps / debt
-- No mechanism keeps `itemMaster.currentStock`/`averageCostPaise` consistent with `inventory_ledger` — this is the single biggest correctness gap in the procurement slice today (flagged in both this file and `grn.md`).
-- `POST /api/asset/inventory/movements` is a fully open direct-posting endpoint with no cross-check against the document (`referenceId`) it claims to be for — a second, less-guarded path to the same ledger that GRN posts through.
 - `inventory_ref_type` enum values `pro`, `sco_issue`, `sco_receipt`, `job_order_issue`, `scrap_dispatch` are declared but never written by any current code path.
 - No automated tests for any part of this module.
 
-## Known gaps (from spec draft 2026-09-27)
-Rule ids refer to `docs/specs/grn-stock.md`.
-- BR-GRN-24: `totalValueChangePaise` uses `Math.round`, which is asymmetric for negatives; needs round half away from zero.
-- BR-GRN-37: `itemMaster.currentStock` is never updated from ledger postings.
-- BR-GRN-38/39: `itemMaster.averageCostPaise` is never recomputed; PR estimates and `getLastRate` fallback read a stale value.
-- BR-GRN-40: `assetItemCreateSchema`/`assetItemUpdateSchema` accept `currentStock` and `averageCostPaise`; enum value `opening_stock` missing.
-- BR-GRN-41: no reconciliation query exists.
-- BR-GRN-42: `createInventoryMovement` locks only the last ledger row for item+location, so the first posting for a new pair is unprotected; should lock the `item_master` row.
-- BR-GRN-43: `POST /asset/inventory/movements` accepts any `referenceType` (incl. `grn`, `grn_bypass`) with no document check and no mandatory reason (BL-015).
-- BR-GRN-44: manual adjustments have no negative-balance check, no cost > 0 check on stock-in, and take the client's cost on stock-out.
-- BR-GRN-43 roles: movements route allows super-admin, back_office only; spec adds owner.
+## grn-stock rules (BR-GRN-21..44)
+All built and tested on work/m1-stock (`backend/src/service/stockPosting.test.ts`). Details in `grn.md`.
 
 ## Known gaps (from inventory spec draft 2026-09-29)
 Rule ids refer to `docs/specs/inventory.md`.
@@ -127,3 +118,4 @@ Rule ids refer to `docs/specs/inventory.md`.
 | Date | PR / commit | Change |
 |---|---|---|
 | 2026-09-27 | 0a406f4 | Initial as-built map written |
+| 2026-09-29 | work/m1-stock 8cab134..1fe3cfd | grn-stock parts updated (posting engine, manual movements, reconciliation, item API). Rest of module not re-verified — `last_verified_commit` kept at 0a406f4 |

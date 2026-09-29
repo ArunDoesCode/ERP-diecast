@@ -21,3 +21,10 @@
 | SPEC-4, SPEC-5 | minor | backend | grnService comments | stale comment; BR id comments missing | fix now (iter 1) |
 | SPEC-6 | minor | backend | assetRepository:451-468 | opening_stock accepted as stock-out; BR-GRN-40 "opening stock goes in" | backlog: spec is silent; spec edits are off-limits on this branch → BL item, ask at next spec change |
 | COORD-1 | major | backend | 02_procurement-catalog.ts:115 | ledger total_value_change_paise int4 → receipts > ₹2.1 cr refused | fix now (brief 15) |
+| PERF-6 / SPEC-8 | minor | backend | grnService applyDraftUpdate | reads use db not tx | fix if another round runs, else backlog |
+| SPEC-7 | minor | backend | grnService mapChallanClash | any 23505 → challan conflict | reject: only the challan unique index can fire there |
+| PERF-7 | minor | backend | schema | no migration SQL; deploy relies on db:push | backlog → BL-011 (migrations) |
+| SPEC-guards | minor | spec | grn types | input caps not in spec | backlog: add to spec at next change |
+| CR-7 | minor | frontend | lib/grn-units.ts | unit list duplicated from backend | backlog |
+| CR-8 | minor | frontend | usePoItemUoms | new Map per render, no effect today | reject: no functional impact |
+| TEST-1, TEST-2 | (blocker per runner) | test | cd77a53, b78b070 | test( commits also carry .pipeline briefs/reports | reject: PROTOCOL rule 5 only requires test files in test( commits and none in feat(/fix( — both hold; runner confirmed no feat/fix commit touches a test file |

@@ -15,8 +15,8 @@ super-admin), BL-025..BL-027 (from spec drafts).
 | approval | draft v0 (+ approval-policies, 7 Qs) | [map](modules/approval.md) | full (₹/paise form bug BL-025) | approvalRepository.test, approval.types.test, approvalService.test | — | answer Qs → `/freeze approval` |
 | purchase-requisition | draft v0 (7 Qs) + known-defects draft (7 Qs) | [map](modules/purchase-requisition.md) | full (BL-001, BL-026) | none | — | answer Qs → `/freeze purchase-requisition` |
 | purchase-order | none | [map](modules/purchase-order.md) | full | none | — | spec in M1 |
-| grn | draft v0 (+ grn-stock, 7 Qs) | [map](modules/grn.md) | full (double-post race BL-027) | none | — | answer Qs → `/freeze grn` |
-| inventory | in grn spec | [map](modules/inventory.md) | full (stock/avg cost stale BL-014) | none | — | covered by grn spec |
+| grn | frozen v1 (+ grn-stock v1) | [map](modules/grn.md) | full — all BRs built on work/m1-stock | grnService.test, stockPosting.test | — | merge work/m1-stock into work/m1 |
+| inventory | frozen v1 (stock rules in grn-stock) | [map](modules/inventory.md) | full; grn-stock parts rebuilt (BL-014 fixed) | stockPosting.test | — | `/feature inventory` on work/m1-stock |
 | suppliers | none | [map](modules/suppliers.md) | full | none | — | spec in M1 |
 | subcontracting | none | — | schema only | none | — | M2 |
 | bom | none | — | none | none | — | M3 (after UAT-1 starts) |
@@ -28,6 +28,7 @@ Legend — Spec: none / draft / frozen vN · Code: none / schema only / partial 
 | Feature | Branch | Phase | PR | Waiting on |
 |---|---|---|---|---|
 | agent-scope docs | feature/agent-scope | PR open, CI green | [#10](../../pull/10) | you to merge |
+| grn + grn-stock | work/m1-stock | done, not pushed | — | merge into work/m1 (auth session) |
 
 ## Waiting on you
 - [ ] Merge PR #10 (docs-only: required Scope block in subagent briefs, model-alias note)

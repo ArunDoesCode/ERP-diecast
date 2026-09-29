@@ -61,3 +61,11 @@ If a decision is reversed, add a new entry that references the old one — don't
 - **Why:** if the same agent (or a coordinator that has seen the code) shapes the tests, they encode the
   implementation's assumptions and stop catching its mistakes.
 - **Rejected:** letting developers fix "wrong" tests themselves; developer-written manual test scripts.
+
+### D-010 — GRN/stock build choices (2026-09-29, work/m1-stock)
+- **Decision:** (1) one posting function `postStock` for every stock change, run in the caller's tx, lock
+  order GRN → PO → line → item; (2) ledger row value is `bigint` (a 100 t receipt is > int4 paise);
+  (3) stock reconciliation ships as an API only, screen in BL-045; (4) the test-integrity rule means test
+  files only in `test(` commits and none in `feat(`/`fix(` — pipeline notes in a `test(` commit are fine.
+- **Why:** (1)(2) BR-GRN-22/37/42 need one atomic, ordered path; (3) keep the batch to spec scope;
+  (4) that is how PROTOCOL.md rule 5 reads; test-runner flagged it stricter.
