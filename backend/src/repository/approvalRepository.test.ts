@@ -11,7 +11,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { eq, inArray } from "drizzle-orm";
 import { db } from "../db/client";
-import { roles } from "../db/schemas/01_auth";
+import { rolePermissions, roles } from "../db/schemas/01_auth";
 import {
   approvalPolicies,
   approvalRequests,
@@ -72,6 +72,11 @@ beforeAll(async () => {
     .values({ name: `${NAME_PREFIX}plain_role`, isSystem: false })
     .returning({ id: roles.id });
   plainRoleId = requireId(plainRole, "roles (plain fixture)");
+  // BR-APR-24: submitting a PR also needs the document type's key. Removed with
+  // the role on cleanup (role_permissions cascades).
+  await db
+    .insert(rolePermissions)
+    .values({ roleId: plainRoleId, permissionKey: "pr.manage" });
 
   const [requestor] = await db
     .insert(employees)
