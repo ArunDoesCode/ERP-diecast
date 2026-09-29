@@ -14,7 +14,6 @@ import { createApp } from "../app";
 import { db } from "../db/client";
 import { roles } from "../db/schemas/01_auth";
 import { employees } from "../db/schemas/03_hcm";
-import { signAccessToken } from "../lib/token";
 
 const app = createApp();
 const PREFIX = "test_authhttp_";
@@ -25,8 +24,10 @@ const R1 = `${PREFIX}r1@diecast.test`;
 const R2 = `${PREFIX}r2@diecast.test`;
 const R3 = `${PREFIX}r3@diecast.test`;
 const R4 = `${PREFIX}r4@diecast.test`;
+const EMPTY = `${PREFIX}empty@diecast.test`;
 const UNKNOWN = `${PREFIX}nobody@diecast.test`;
 
+let emptyRoleId = 0;
 let ipCounter = 0;
 function freshIp() {
   ipCounter += 1;
@@ -62,8 +63,22 @@ beforeAll(async () => {
     .where(eq(roles.name, "back_office"))
     .limit(1);
   if (!role) throw new Error("Fixture setup: role back_office missing");
+  await db.delete(roles).where(like(roles.name, `${PREFIX}%`));
+  const [empty] = await db
+    .insert(roles)
+    .values({ name: `${PREFIX}empty`, isSystem: false })
+    .returning({ id: roles.id });
+  if (!empty) throw new Error("Fixture setup: empty role insert failed");
+  emptyRoleId = empty.id;
   const passwordHash = await Bun.password.hash(PASSWORD);
   await db.insert(employees).values([
+    {
+      name: "TEST_authhttp_empty",
+      email: EMPTY,
+      passwordHash,
+      roleId: emptyRoleId,
+      isActive: true,
+    },
     ...[R1, R2, R3, R4].map((email, i) => ({
       name: `TEST_authhttp_r${i + 1}`,
       email,
@@ -90,6 +105,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await db.delete(employees).where(like(employees.email, `${PREFIX}%`));
+  await db.delete(roles).where(like(roles.name, `${PREFIX}%`));
 });
 
 describe("BR-AUTH-03 login failures look identical", () => {
@@ -240,16 +256,15 @@ describe("BR-AUTH-23 bad access token is 401 before any permission check", () =>
     expect(res.status).toBe(401);
   });
 
-  test("BR-AUTH-23 control: a valid token for a role with no grants is 403, not 401", async () => {
-    const token = await signAccessToken({
-      userId: 1,
-      userName: "x",
-      role: "operator",
-      allowedPages: [],
-    });
+  test("BR-AUTH-23 control: a real signed-in user whose role holds nothing is 403 PERMISSION_DENIED, not 401", async () => {
+    const signedIn = await login(EMPTY, PASSWORD);
+    const { data } = (await signedIn.json()) as {
+      data: { accessToken: string };
+    };
     const res = await app.request(PROTECTED, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${data.accessToken}` },
     });
     expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ code: "PERMISSION_DENIED" });
   });
 });

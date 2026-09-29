@@ -46,7 +46,7 @@ const MATRIX: [string, string, R[]][] = [
   ["POST", "/api/approval/createPolicy", NONE],
   ["PATCH", "/api/approval/updatePolicy/:id", NONE],
   // asset.manage = bo; inventory.* / pr.link_machine per BR-AUTH-21
-  ["GET", "/api/asset/machines", ["bo", "fs"]],
+  ["GET", "/api/asset/machines", ["ow", "bo", "fs"]],
   ["POST", "/api/asset/machines", ["bo"]],
   ["PATCH", "/api/asset/machines/:id", ["bo"]],
   ["GET", "/api/asset/items", OW_BO_FS],

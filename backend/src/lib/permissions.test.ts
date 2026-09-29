@@ -39,7 +39,7 @@ const SPEC: Record<string, R[]> = {
   "supplier.view": ["ow", "bo", "fs"],
   "supplier.manage": ["bo"],
   "pr.manage": ["ow", "bo", "fs"],
-  "pr.link_machine": ["fs"],
+  "pr.link_machine": ["ow", "bo", "fs"],
   "po.manage": ["ow", "bo"],
   "grn.view": ["ow", "bo", "fs", "qa", "dd"],
   "grn.edit_draft": ["ow", "bo", "fs"],
