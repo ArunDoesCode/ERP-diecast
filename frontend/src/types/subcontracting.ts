@@ -1,0 +1,176 @@
+import { z } from "zod";
+
+import type { ApiResult, PaginationMeta } from "@/types/suppliers";
+
+export const scoStatusValues = [
+	"draft",
+	"pending_approval",
+	"approved",
+	"rejected",
+	"require_more_info",
+	"material_issued",
+	"material_received",
+	"closed",
+	"cancelled",
+] as const;
+
+export type ScoStatus = (typeof scoStatusValues)[number];
+
+export type ScoSortField =
+	| "id"
+	| "scoNumber"
+	| "status"
+	| "createdAt"
+	| "expectedReturnDate";
+
+export interface Sco {
+	id: number;
+	scoNumber: string;
+	vendorId: number;
+	status: ScoStatus;
+	projectRef: string | null;
+	notes: string | null;
+	expectedReturnDate: string;
+	subtotalPaise: number;
+	taxAmountPaise: number;
+	totalAmountPaise: number;
+	approvedBy: number | null;
+	currentApprovalLevel: number;
+	totalApprovalLevels: number;
+	createdBy: number;
+	createdAt: string;
+	lastUpdatedBy: number | null;
+	lastUpdatedAt: string | null;
+	cancelledBy: number | null;
+	cancelledAt: string | null;
+	cancelReason: string | null;
+	closedBy: number | null;
+	closedAt: string | null;
+	closeReason: string | null;
+	vendorName: string;
+	cancelledByName: string | null;
+}
+
+export interface ScoLine {
+	id: number;
+	scoId: number;
+	rawItemId: number;
+	rawItemBatch: string | null;
+	/** SEND qty (whole pieces). */
+	rawQtyToIssue: number;
+	serviceId: number;
+	serviceDescription: string;
+	serviceHsnSacCode: string | null;
+	serviceUnitPricePaise: number;
+	/** GST %. */
+	serviceTaxPercentage: number;
+	finishedItemId: number;
+	/** RETURN qty (whole pieces). */
+	expectedReturnQty: number;
+	issuedQty: number;
+	acceptedQty: number;
+	rejectedQty: number;
+	unprocessedQty: number;
+	lossQty: number;
+	rawItemSku: string;
+	rawItemName: string;
+	finishedItemSku: string;
+	finishedItemName: string;
+	lineValuePaise: number;
+	lineTaxPaise: number;
+}
+
+export interface ScoDetailPayload {
+	sco: Sco;
+	items: ScoLine[];
+}
+
+export type ScoListParams = {
+	page?: number;
+	pageSize?: number;
+	sortBy?: ScoSortField;
+	sortDir?: "asc" | "desc";
+	status?: ScoStatus | ScoStatus[];
+	vendorId?: number;
+	q?: string;
+};
+
+export type ScoListResult = {
+	success: true;
+	data: Sco[];
+	meta: PaginationMeta;
+};
+
+export type ScoDetailResult = ApiResult<ScoDetailPayload>;
+
+export type ScoLineInput = {
+	rawItemId: number;
+	finishedItemId: number;
+	serviceId: number;
+	rawQtyToIssue: number;
+	expectedReturnQty: number;
+	serviceUnitPricePaise?: number;
+	serviceTaxPercentage?: number;
+	rawItemBatch?: string;
+};
+
+export type ScoCreatePayload = {
+	vendorId: number;
+	expectedReturnDate: string;
+	projectRef?: string;
+	notes?: string;
+	lines: ScoLineInput[];
+};
+
+export type ScoUpdatePayload = {
+	scoId: number;
+	expectedReturnDate?: string;
+	projectRef?: string | null;
+	notes?: string | null;
+	lines?: ScoLineInput[];
+};
+
+export type ScoCancelPayload = { reason: string };
+
+export const SCO_REASON_MIN = 3;
+export const SCO_REASON_MAX = 500;
+
+export const scoCancelSchema = z.object({
+	reason: z
+		.string()
+		.trim()
+		.min(SCO_REASON_MIN, `Reason must be at least ${SCO_REASON_MIN} characters`)
+		.max(SCO_REASON_MAX),
+});
+
+export interface CompanySettings {
+	id: number;
+	name: string;
+	address: string;
+	gstin: string;
+	stateCode: string;
+	updatedBy: number | null;
+	updatedAt: string;
+}
+
+export type CompanySettingsResult = {
+	success: true;
+	data: CompanySettings | null;
+};
+
+export const companySettingsSchema = z.object({
+	name: z.string().trim().min(1, "Name is required").max(200),
+	address: z.string().trim().min(1, "Address is required").max(500),
+	gstin: z
+		.string()
+		.trim()
+		.length(15, "GSTIN must be 15 characters")
+		.transform((value) => value.toUpperCase()),
+	stateCode: z
+		.string()
+		.trim()
+		.regex(/^\d{2}$/, "State code must be 2 digits"),
+});
+
+export type CompanySettingsInput = z.input<typeof companySettingsSchema>;
+export type CompanySettingsPayload = z.output<typeof companySettingsSchema>;

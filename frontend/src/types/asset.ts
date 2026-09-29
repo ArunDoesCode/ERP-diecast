@@ -91,6 +91,8 @@ export interface AssetItem {
 	averageCostPaise: number | null;
 	standardRatePaise: number;
 	isActive: boolean;
+	/** HSN code for the job-work challan (BR-SCO-08); null until set. */
+	hsnCode?: string | null;
 }
 
 export interface AssetStockLocationBalance {
@@ -385,7 +387,10 @@ export const assetItemCreateSchema = z.object({
 
 export const assetItemUpdateSchema = assetItemCreateSchema
 	.partial()
-	.extend({ isActive: z.boolean().optional() })
+	.extend({
+		isActive: z.boolean().optional(),
+		hsnCode: z.string().trim().min(1).max(20).nullable().optional(),
+	})
 	.refine(hasAtLeastOneDefinedField, {
 		message: "At least one field is required",
 	});
@@ -400,6 +405,13 @@ export const assetItemFormSchema = z.object({
 	}),
 	uom: z.enum(assetItemUomValues, { message: "Select a unit" }),
 	reorderLevel: z.number().nonnegative().optional(),
+	// Edit only: the create endpoint does not take an HSN code.
+	hsnCode: z
+		.string()
+		.trim()
+		.max(20, "HSN must be 20 characters or fewer")
+		.nullable()
+		.optional(),
 	standardRate: z
 		.number({ message: "Standard rate is required" })
 		.min(0.01, "Standard rate must be at least ₹0.01")

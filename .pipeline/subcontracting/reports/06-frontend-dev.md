@@ -25,3 +25,6 @@ tsc + biome clean. Not committed.
 3. Submit uses `POST /sco/:id/submit` (not approval `submitRequest`). Submit button is shown only when the signed-in user is the creator.
 4. Frontend sends explicit price and GST per line (prefilled from the vendor service list).
 5. Pre-existing lint/tsc errors: none.
+
+## Follow-up note
+- Company settings page and "Company details" link now gated on `company.manage` (was `sco.loss_override`). Q1/Q2 above resolved. HSN edit-only accepted. tsc + lint clean, not committed.

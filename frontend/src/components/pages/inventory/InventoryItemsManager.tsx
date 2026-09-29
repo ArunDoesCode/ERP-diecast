@@ -109,6 +109,8 @@ function toUpdatePayload(
 		payload.reorderLevel = next.reorderLevel;
 	if (next.standardRatePaise !== item.standardRatePaise)
 		payload.standardRatePaise = next.standardRatePaise;
+	const nextHsn = values.hsnCode?.trim() ? values.hsnCode.trim() : null;
+	if (nextHsn !== (item.hsnCode ?? null)) payload.hsnCode = nextHsn;
 	if (values.isActive !== item.isActive) payload.isActive = values.isActive;
 	return payload;
 }
@@ -156,6 +158,7 @@ function ItemEditorForm({ mode, item, onDone }: ItemEditorFormProps) {
 								? item.standardRatePaise / 100
 								: undefined,
 						isActive: item.isActive,
+						hsnCode: item.hsnCode ?? "",
 					}
 				: {
 						sku: "",
@@ -371,6 +374,30 @@ function ItemEditorForm({ mode, item, onDone }: ItemEditorFormProps) {
 								<p>{formatPaise(item.averageCostPaise)}</p>
 							</div>
 						</div>
+					) : null}
+
+					{mode === "edit" ? (
+						<FormField
+							control={form.control}
+							name="hsnCode"
+							render={({ field }) => (
+								<FormItem className="col-span-2 min-h-19">
+									<FormControl>
+										<FloatingLabelInput
+											id="item-hsn-code"
+											label="HSN code (optional)"
+											maxLength={20}
+											name={field.name}
+											value={field.value ?? ""}
+											onBlur={field.onBlur}
+											ref={field.ref}
+											onChange={(event) => field.onChange(event.target.value)}
+										/>
+									</FormControl>
+									<FormMessage />
+								</FormItem>
+							)}
+						/>
 					) : null}
 
 					<FormField
