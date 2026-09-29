@@ -54,3 +54,22 @@ Same batched flow as part 1: one contract step → test-writer (fresh) → backe
   On this branch only the smallest change if a test needs it, marked "take work/m1 version on merge".
 - New column `item_master.standard_rate_paise`: existing rows need a value — backend-dev picks a safe path for
   `db:push` (e.g. default 0 in DB, > 0 enforced by the API). PR estimates switching to it (BR-PR-11) stays with the auth session.
+
+---
+
+# Plan — m1-stock, part 3: suppliers
+
+Spec: `docs/specs/suppliers.md` v1 (frozen). Map: `docs/modules/suppliers.md`. Explorer: `reports/34-explorer.md`.
+Baseline: `reports/32-test-runner.md` (all green at 6257268; docs only since). Same batched flow.
+
+## Slices
+| # | Slice | BRs | Backend | Frontend |
+|---|---|---|---|---|
+| S11 | Supplier master | 01, 02, 03, 04, 05, 06, 07, 08, 09, 17, 22, 23, 24 | name unique ignoring case/spaces (create + rename, 409); GSTIN format + caps + unique ignoring case; PAN format, = GSTIN 3–12, auto-fill; type default; terms 0–365, email format; deactivate/reactivate, no delete; edit ≥ 1 field, optional fields clearable; create-with-items all-or-nothing naming bad items; plain error text; search incl. GSTIN + SKU, pageSize 1–100, active filter | master form: optional GSTIN/PAN/contact (only name required), PAN auto from GSTIN, status filter |
+| S12 | Price list, history, batch | 10, 11, 12, 13, 14, 15, 16, 18, 19, 20, 21, 22 | history table (who, when, field, old, new) for supplier + price-list changes; one row per item/service (409), unknown → 400; price > 0 paise; GST % fixed list; unit = item unit; lead time 0–365; qty ≤ 3 dp; inactive row never suggested; batch ≤ 100 rows, one target per row, all-or-nothing in one tx with per-row reasons | price-list forms (GST dropdown, unit locked to item), batch edit result per row, history view |
+
+## Decisions (none change the spec)
+- Guards: reads (`list`, `detail`, `listItems`, `listServices`) `supplier.view` (sa, ow, bo, fs); writes `supplier.manage` (sa, bo); `requireRole` + `// perm:`.
+- BR-SUP-25 (403 `PERMISSION_DENIED` naming the key) comes from the auth layer (BR-AUTH-09) on work/m1 — not tested on this branch.
+- BR-SUP-06/07 PO side (copy terms, inactive supplier → 400): already in work/m1 poService (BR-PO-01, 23). Here only the smallest change a test needs, marked "take work/m1 version on merge". SCO side → subcontracting session.
+- BR-SUP-16 is inventory BR-INV-24 (built); only confirm inactive price-list rows are skipped.
