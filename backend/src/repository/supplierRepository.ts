@@ -28,7 +28,6 @@ import type {
   supplierHistoryQuerySchemaType,
   supplierItemCreateSchemaType,
   supplierItemListQuerySchemaType,
-  supplierItemLookupQuerySchemaType,
   supplierListQuerySchemaType,
   supplierServiceCreateSchemaType,
   supplierServiceListQuerySchemaType,
@@ -95,13 +94,6 @@ const supplierSortColumns = {
   isActive: supplierMaster.isActive,
   createdAt: supplierMaster.createdAt,
 } as const;
-
-const itemLookupColumns = {
-  itemId: itemMaster.id,
-  itemName: itemMaster.name,
-  uom: itemMaster.uom,
-  sku: itemMaster.sku,
-};
 
 const supplierDetailItemColumns = {
   id: supplierItems.id,
@@ -212,44 +204,12 @@ export const supplierRepository = {
     return new Set(rows.map((row) => row.id));
   },
 
-  async listItems(params: supplierItemLookupQuerySchemaType) {
-    const q = params.q?.trim();
-    const pattern = q ? `%${q}%` : undefined;
-
-    const whereClause = pattern
-      ? or(ilike(itemMaster.name, pattern), ilike(itemMaster.sku, pattern))
-      : undefined;
-
-    const [rows, [totalRow]] = whereClause
-      ? await Promise.all([
-          db
-            .select(itemLookupColumns)
-            .from(itemMaster)
-            .where(whereClause)
-            .orderBy(asc(itemMaster.name), asc(itemMaster.id))
-            .limit(params.pageSize)
-            .offset((params.page - 1) * params.pageSize),
-          db.select({ value: count() }).from(itemMaster).where(whereClause),
-        ])
-      : await Promise.all([
-          db
-            .select(itemLookupColumns)
-            .from(itemMaster)
-            .orderBy(asc(itemMaster.name), asc(itemMaster.id))
-            .limit(params.pageSize)
-            .offset((params.page - 1) * params.pageSize),
-          db.select({ value: count() }).from(itemMaster),
-        ]);
-
-    return { rows, total: totalRow?.value ?? 0 };
-  },
-
   async listSupplierItems(
     supplierId: number,
     params: supplierItemListQuerySchemaType,
   ) {
     const q = params.q?.trim();
-    const pattern = q ? `%${q}%` : undefined;
+    const pattern = q ? `%${escapeLike(q)}%` : undefined;
 
     const whereClause = and(
       eq(supplierItems.supplierId, supplierId),
@@ -291,7 +251,7 @@ export const supplierRepository = {
     params: supplierServiceListQuerySchemaType,
   ) {
     const q = params.q?.trim();
-    const pattern = q ? `%${q}%` : undefined;
+    const pattern = q ? `%${escapeLike(q)}%` : undefined;
 
     const whereClause = and(
       eq(supplierServices.supplierId, supplierId),
@@ -428,42 +388,6 @@ export const supplierRepository = {
     return row;
   },
 
-  async updateItemBySupplierItemsId(
-    supplierId: number,
-    supplierItemsId: number,
-    data: SupplierItemUpdateData,
-  ) {
-    const [row] = await db
-      .update(supplierItems)
-      .set(data)
-      .where(
-        and(
-          eq(supplierItems.supplierId, supplierId),
-          eq(supplierItems.id, supplierItemsId),
-        ),
-      )
-      .returning(supplierItemColumns);
-    return row;
-  },
-
-  async updateItemByItemId(
-    supplierId: number,
-    itemId: number,
-    data: SupplierItemUpdateData,
-  ) {
-    const [row] = await db
-      .update(supplierItems)
-      .set(data)
-      .where(
-        and(
-          eq(supplierItems.supplierId, supplierId),
-          eq(supplierItems.itemId, itemId),
-        ),
-      )
-      .returning(supplierItemColumns);
-    return row;
-  },
-
   async createSupplierItems(
     supplierId: number,
     rows: SupplierItemCreateBatchData[],
@@ -484,44 +408,6 @@ export const supplierRepository = {
     return created;
   },
 
-  async editSupplierItemBySupplierItemsId(
-    supplierId: number,
-    supplierItemsId: number,
-    data: SupplierItemEditData,
-  ) {
-    const [row] = await db
-      .update(supplierItems)
-      .set(data)
-      .where(
-        and(
-          eq(supplierItems.supplierId, supplierId),
-          eq(supplierItems.id, supplierItemsId),
-        ),
-      )
-      .returning(supplierItemColumns);
-
-    return row;
-  },
-
-  async editSupplierItemByItemId(
-    supplierId: number,
-    itemId: number,
-    data: SupplierItemEditData,
-  ) {
-    const [row] = await db
-      .update(supplierItems)
-      .set(data)
-      .where(
-        and(
-          eq(supplierItems.supplierId, supplierId),
-          eq(supplierItems.itemId, itemId),
-        ),
-      )
-      .returning(supplierItemColumns);
-
-    return row;
-  },
-
   async createSupplierServices(
     supplierId: number,
     rows: SupplierServiceCreateData[],
@@ -540,44 +426,6 @@ export const supplierRepository = {
       .returning(supplierServiceColumns);
 
     return created;
-  },
-
-  async editSupplierServiceBySupplierServiceId(
-    supplierId: number,
-    supplierServiceId: number,
-    data: SupplierServiceEditData,
-  ) {
-    const [row] = await db
-      .update(supplierServices)
-      .set(data)
-      .where(
-        and(
-          eq(supplierServices.supplierId, supplierId),
-          eq(supplierServices.id, supplierServiceId),
-        ),
-      )
-      .returning(supplierServiceColumns);
-
-    return row;
-  },
-
-  async editSupplierServiceByServiceId(
-    supplierId: number,
-    serviceId: number,
-    data: SupplierServiceEditData,
-  ) {
-    const [row] = await db
-      .update(supplierServices)
-      .set(data)
-      .where(
-        and(
-          eq(supplierServices.supplierId, supplierId),
-          eq(supplierServices.serviceId, serviceId),
-        ),
-      )
-      .returning(supplierServiceColumns);
-
-    return row;
   },
 
   async transaction<T>(fn: (tx: Tx) => Promise<T>) {
@@ -673,6 +521,25 @@ export const supplierRepository = {
       .where(eq(supplierServices.id, rowId))
       .returning(supplierServiceColumns);
     return row;
+  },
+
+  // Lock every target row up front, ordered by id, so two batches cannot deadlock (PERF-40).
+  async lockItemRowsOrdered(supplierId: number, ex: Executor = db) {
+    await ex
+      .select({ id: supplierItems.id })
+      .from(supplierItems)
+      .where(eq(supplierItems.supplierId, supplierId))
+      .orderBy(asc(supplierItems.id))
+      .for("update");
+  },
+
+  async lockServiceRowsOrdered(supplierId: number, ex: Executor = db) {
+    await ex
+      .select({ id: supplierServices.id })
+      .from(supplierServices)
+      .where(eq(supplierServices.supplierId, supplierId))
+      .orderBy(asc(supplierServices.id))
+      .for("update");
   },
 
   async findItemUoms(itemIds: number[]) {

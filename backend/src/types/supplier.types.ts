@@ -120,9 +120,14 @@ const panField = z
 const emailField = z
   .string()
   .trim()
+  .max(254)
   .refine((v) => v === "" || z.email().safeParse(v).success, "Invalid email");
-const optText = z.string().trim();
-const nameField = z.string().trim().min(1, "Name is required");
+const optText = z.string().trim(); // SEC-40: give every use its own .max() below
+const shortText = optText.max(200);
+const phoneField = optText.max(30);
+const addressField = optText.max(500);
+const skuField = optText.max(100);
+const nameField = z.string().trim().min(1, "Name is required").max(200);
 const paymentTermsField = z.number().int().min(0).max(365);
 const gstPercentField = z
   .number()
@@ -134,6 +139,7 @@ const leadTimeField = z.number().int().min(0).max(365);
 const qtyField = z
   .number()
   .min(0)
+  .max(1e9)
   .refine((v) => Math.abs(v * 1000 - Math.round(v * 1000)) < 1e-6, {
     message: "Qty allows at most 3 decimals",
   });
@@ -174,15 +180,6 @@ export type supplierListQuerySchemaType = z.infer<
   typeof supplierListQuerySchema
 >;
 
-export const supplierItemLookupQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(10),
-  q: z.string().optional(),
-});
-export type supplierItemLookupQuerySchemaType = z.infer<
-  typeof supplierItemLookupQuerySchema
->;
-
 export const supplierServiceListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(10),
@@ -192,16 +189,9 @@ export type supplierServiceListQuerySchemaType = z.infer<
   typeof supplierServiceListQuerySchema
 >;
 
-export const supplierDetailQuerySchema = z.object({
-  supplierId: z.coerce.number().int().positive(),
-});
-export type supplierDetailQuerySchemaType = z.infer<
-  typeof supplierDetailQuerySchema
->;
-
 export const supplierItemCreateSchema = z.object({
   itemId: z.number().int().positive(),
-  supplierSku: optText.optional(),
+  supplierSku: skuField.optional(),
   supplierUnitPricePaise: pricePaiseField,
   taxPercentage: gstPercentField.default(0),
   leadTimeDays: leadTimeField.default(0),
@@ -231,10 +221,10 @@ export const supplierCreateSchema = z
     type: supplierTypeSchema.default("raw_material"),
     gstNumber: gstinField.optional(),
     panNumber: panField.optional(), // blank + GSTIN given -> filled from GSTIN
-    contactPerson: optText.optional(),
+    contactPerson: shortText.optional(),
     email: emailField.optional(),
-    phone: optText.optional(),
-    address: optText.optional(),
+    phone: phoneField.optional(),
+    address: addressField.optional(),
     defaultPaymentTermsDays: paymentTermsField.default(0),
     isActive: z.boolean().optional(),
     supplierItems: z.array(supplierItemCreateSchema).optional(),
@@ -250,10 +240,10 @@ const supplierMasterUpdateSchema = z
     type: supplierTypeSchema.optional(),
     gstNumber: gstinField.nullable().optional(),
     panNumber: panField.nullable().optional(),
-    contactPerson: optText.nullable().optional(),
+    contactPerson: shortText.nullable().optional(),
     email: emailField.nullable().optional(),
-    phone: optText.nullable().optional(),
-    address: optText.nullable().optional(),
+    phone: phoneField.nullable().optional(),
+    address: addressField.nullable().optional(),
     defaultPaymentTermsDays: paymentTermsField.optional(),
     isActive: z.boolean().optional(), // false = deactivate, true = reactivate (BR-SUP-07, 08)
   })
@@ -273,7 +263,7 @@ const supplierItemUpdateSchema = z
     mode: z.literal("item"),
     supplierItemsId: z.number().int().positive().optional(),
     itemId: z.number().int().positive().optional(),
-    supplierSku: optText.nullable().optional(),
+    supplierSku: skuField.nullable().optional(),
     supplierUnitPricePaise: pricePaiseField.optional(),
     taxPercentage: gstPercentField.optional(),
     leadTimeDays: leadTimeField.optional(),
@@ -317,7 +307,7 @@ export type supplierItemListQuerySchemaType = z.infer<
 export const supplierItemEditSchema = z.object({
   supplierItemsId: z.number().int().positive().optional(),
   itemId: z.number().int().positive().optional(),
-  supplierSku: optText.nullable().optional(),
+  supplierSku: skuField.nullable().optional(),
   supplierUnitPricePaise: pricePaiseField.optional(),
   taxPercentage: gstPercentField.optional(),
   leadTimeDays: leadTimeField.optional(),

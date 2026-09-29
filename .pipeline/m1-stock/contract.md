@@ -248,7 +248,8 @@ History rows are written for every supplier field change and every price-list pr
 | 409 | `CONFLICT` | `Already on this supplier's price list` | BR-SUP-11/22 create item/service, also DB unique clash |
 | 400 | `BAD_REQUEST` | `Unknown or repeated items: <ids>` | BR-SUP-17 |
 | 400 | `BATCH_FAILED` | `Some rows could not be saved, nothing was saved` | BR-SUP-21 |
-| 400 | — | `Validation failed` | any Zod rule above (format, range, 101 rows, PAN != GSTIN) |
+| 400 | — | `Validation failed` | any Zod rule above (format, range, 101 rows) |
+| 400 | — | `PAN must match characters 3-12 of the GST number` | PAN ≠ GSTIN chars 3–12 (checked in the service, also against the stored GSTIN/PAN on update) |
 | 404 | `NOT_FOUND` | `Supplier not found` | unknown supplier id |
 | 403 | `FORBIDDEN` | (role guard today) | no role; becomes `PERMISSION_DENIED` on merge |
 

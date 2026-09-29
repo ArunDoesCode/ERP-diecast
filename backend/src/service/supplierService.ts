@@ -482,7 +482,10 @@ export const supplierService = {
     try {
       const created = await supplierRepository.create(
         supplierData,
-        supplierItems,
+        supplierItems.map((item) => ({
+          ...item,
+          supplierSku: blankToNull(item.supplierSku) ?? undefined,
+        })),
         actorId,
       );
       return created.supplier;
@@ -598,6 +601,7 @@ export const supplierService = {
     const results: Row[] = [];
     try {
       await supplierRepository.transaction(async (tx) => {
+        await supplierRepository.lockItemRowsOrdered(supplierId, tx);
         for (const [index, edit] of edits.entries()) {
           const selector = {
             supplierItemsId: edit.supplierItemsId,
@@ -643,6 +647,7 @@ export const supplierService = {
     const results: Row[] = [];
     try {
       await supplierRepository.transaction(async (tx) => {
+        await supplierRepository.lockServiceRowsOrdered(supplierId, tx);
         for (const [index, edit] of edits.entries()) {
           const selector = {
             supplierServiceId: edit.supplierServiceId,

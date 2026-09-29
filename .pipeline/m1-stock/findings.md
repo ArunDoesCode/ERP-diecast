@@ -51,3 +51,12 @@
 | SPEC-26 | major | spec | assetService updateLocation | deactivating the only main_store → 409 is unspecced | user decided: block it (questions.md row 7); spec line via BL-048 |
 | SPEC-27..29 | minor | spec | postStock 404; reorder whole for pcs/set; last rate 0 for legacy | unspecced but derived | backlog BL-048 (spec touch-up) |
 | TEST-4 | (blocker per runner) | test | 694efd5, 7202d74 | test( commits also carry .pipeline notes | reject: same as TEST-1/2, D-010 point 4 |
+| PERF-40 | minor | backend | supplierService batch edit | row locks in request order → deadlock → 500 | fix now (cheap): lock targets ordered by id |
+| PERF-41..43 | minor | backend | supplier batch / services index / search | query count, missing service_id index, ilike | backlog (BL-054) / none |
+| SEC-40, SEC-41 | minor | backend | supplier.types.ts | unbounded text fields; qty no max | fix now (cheap) |
+| CR-40, CR-41, CR-42 | minor | backend | supplierService / supplierRepository | blank sku ""; item/service search not escaped; dead code | fix now (cheap) |
+| CR-43 | minor | backend | supplierService batch | item/service duplicates | backlog: existing BL-033 |
+| SPEC-40 | minor | test | supplierService.test.ts:306 | BR-SUP-08 shares a test with 07 | reject: the rule is asserted; no gap |
+| SPEC-41 / CR-44, SPEC-42 | minor | spec | supplierService | history tracks extra fields; single edit unknown row → 404 | backlog BL-055 (spec touch-up) |
+| SPEC-43 | minor | frontend | SupplierMasterModal.tsx:196 | stale PAN after GSTIN change → 400 | fix now (cheap): refill PAN from new GSTIN |
+| SPEC-44 | minor | contract | contract.md | PAN mismatch message text | fixed by coordinator |
