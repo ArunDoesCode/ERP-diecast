@@ -19,7 +19,7 @@ import { employees } from "./03_hcm";
 export type ApprovalChainStep = {
   level: number;
   approverType: "role" | "specific";
-  role?: string | undefined; // e.g. "store_manager", "production_head", "owner"
+  role?: string | undefined; // role name, e.g. "store_manager"
   employeeId?: number | undefined; // specific person (for owner in small factories)
 };
 

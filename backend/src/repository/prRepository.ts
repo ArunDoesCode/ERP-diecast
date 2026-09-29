@@ -391,7 +391,7 @@ export const prRepository = {
         isActive: itemMaster.isActive,
       })
       .from(itemMaster)
-      // BR-INV-05: inactive items can't go on a new PR line (take work/m1 version on merge)
+      // BR-INV-05: inactive items can't go on a new PR line
       .where(
         and(inArray(itemMaster.id, itemIds), eq(itemMaster.isActive, true)),
       );

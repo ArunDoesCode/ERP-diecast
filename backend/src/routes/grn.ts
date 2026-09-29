@@ -2,7 +2,7 @@ import { Hono } from "hono";
 
 import { grnController } from "../controller/grnController";
 import { asyncHandler } from "../lib/async-handler";
-import { requireAuth, requirePermission } from "../lib/auth-middleware";
+import { requirePermission } from "../lib/auth-middleware";
 import { paginatedResponse, successResponse } from "../lib/response-schemas";
 import { register } from "../lib/route-registry";
 import type { AppEnv } from "../lib/types";

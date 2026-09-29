@@ -440,7 +440,11 @@
       ],
       "summary": "List machines, paginated.",
       "auth": {
-        "type": "any-authenticated"
+        "type": "permission",
+        "key": "asset.manage",
+        "alsoKeys": [
+          "pr.link_machine"
+        ]
       },
       "request": {
         "query": {

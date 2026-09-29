@@ -45,7 +45,8 @@ function assertItemsUsable(
   itemIds: number[],
   itemMap: Map<number, { isActive: boolean }>,
 ) {
-  const bad = itemIds.filter((id) => !itemMap.get(id)?.isActive);
+  // The lookup only returns active items (BR-INV-05), so absent = missing or inactive.
+  const bad = itemIds.filter((id) => !itemMap.has(id));
   if (bad.length > 0) {
     throw new BadRequestError(
       `Item not found or inactive: ${bad.join(", ")}`,

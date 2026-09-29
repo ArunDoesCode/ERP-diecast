@@ -25,3 +25,11 @@ typecheck, no-role-names (4/4), pr-lifecycle, all scripts tests except one below
 - Trap: stale test DBs with data need the two tables dropped before `db:test:prepare` (`DROP TABLE role_pages, pages CASCADE`), drizzle push asks for data-loss confirmation.
 - PR: `estRatePaise` = effective rate (CASE avg>0 else standard); `noCostHistory` on detail items.
 - Trap: db-reset fixtures drift when service shapes change (`supplierService.create` returns supplier, QA needs both qtys).
+
+## Fix round (SEC-13, PERF-M1, SPEC-M2/CR-M2, CR-M3, SPEC-M3)
+- SEC-13: `GET /asset/machines` now `requireAnyPermission("asset.manage","pr.link_machine")`; registry `{type:"permission", key:"asset.manage", alsoKeys:["pr.link_machine"]}` (asset.ts). Service check kept as second layer. Manifest regenerated (no diff beyond auth).
+- PERF-M1: `idx_grns_po_id` on `grns.po_id` (schema; pushed to test DB).
+- SPEC-M2/CR-M2: unused `requireAuth` import removed (grn.ts, supplier.ts).
+- CR-M3: stale merge comment removed (prRepository); prService `assertItemsUsable` relies on the repo's active-only lookup (single check).
+- SPEC-M3: neutral role example in 02_procurement-approval.ts comment.
+- Result: typecheck clean, `bun test` 1154 pass / 0 fail (BR-KD-46 test now passes too). No test expectation changed.

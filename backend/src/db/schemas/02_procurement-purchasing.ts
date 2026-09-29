@@ -356,6 +356,7 @@ export const grns = pgTable(
       table.supplierId,
       table.challanNo,
     ),
+    poIdIdx: index("idx_grns_po_id").on(table.poId),
   }),
 );
 

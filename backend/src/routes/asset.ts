@@ -2,7 +2,10 @@ import { Hono } from "hono";
 
 import { assetController } from "../controller/assetController";
 import { asyncHandler } from "../lib/async-handler";
-import { requireAuth, requirePermission } from "../lib/auth-middleware";
+import {
+  requireAnyPermission,
+  requirePermission,
+} from "../lib/auth-middleware";
 import { paginatedResponse, successResponse } from "../lib/response-schemas";
 import { register } from "../lib/route-registry";
 import type { AppEnv } from "../lib/types";
@@ -43,7 +46,7 @@ const assetRouter = new Hono<AppEnv>();
 
 assetRouter.get(
   ASSET_ROUTES.listMachines,
-  requireAuth,
+  requireAnyPermission("asset.manage", "pr.link_machine"),
   asyncHandler(assetController.listMachines),
 );
 register({
@@ -51,7 +54,11 @@ register({
   path: `${ASSET_BASE_PATH}${ASSET_ROUTES.listMachines}`,
   tags: ["asset"],
   summary: "List machines, paginated.",
-  auth: { type: "any-authenticated" },
+  auth: {
+    type: "permission",
+    key: "asset.manage",
+    alsoKeys: ["pr.link_machine"],
+  },
   request: { query: assetMachineListQuerySchema },
   responses: { "200": paginatedResponse(assetMachineSchema) },
   pagination: {
