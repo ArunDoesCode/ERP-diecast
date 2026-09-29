@@ -613,21 +613,45 @@ describe("BR-SCO-19 close", () => {
     expect(await qtyAt(s.raw, await vendorLocationId(s.vendorId))).toBe(0);
   });
 
-  test("BR-SCO-19 a receipt still waiting for QA counts as not left at the vendor for loss purposes: pending qty is not written off", async () => {
+  test("BR-SCO-19 owner closes while a receipt line is pending QA -> 409, nothing written off, SCO unchanged", async () => {
     const s = await makeIssued({ lots: [1000] });
-    await receive(s, 400); // 400 processed, pending QA; 600 at vendor
+    await receive(s, 400); // 400 processed, pending QA; 600 still at vendor
+    const vloc = await vendorLocationId(s.vendorId);
+    const before = await qtyAt(s.raw, vloc);
     const res = await close("owner", s.scoId, { reason: "closing early" });
-    // whichever way close treats it, it must never write off more than is
-    // physically unaccounted for (600), and never a negative balance
-    if (res.status === 200) {
-      const loss = (await lossRows(s.raw)).reduce(
-        (a, r) => a + Math.abs(r.quantityChange),
-        0,
-      );
-      expect(loss).toBeLessThanOrEqual(600);
-    } else {
-      expect([400, 409]).toContain(res.status);
-    }
+    expect(res.status).toBe(409);
+    expect(await scoStatus(s.scoId)).toBe("material_issued");
+    expect(await lossRows(s.raw)).toHaveLength(0);
+    expect(await qtyAt(s.raw, vloc)).toBe(before);
+    const d = await scoDetails(s.scoId);
+    expect(d.items[0].lossQty).toBe(0);
+    expect(d.sco.closedAt).toBeNull();
+  });
+
+  test("BR-SCO-19 back office closes with everything received but still pending QA -> 409, stays material_received", async () => {
+    const s = await makeIssued({ lots: [1000] });
+    await receive(s, 1000);
+    expect(await scoStatus(s.scoId)).toBe("material_received");
+    const res = await close("bo", s.scoId);
+    expect(res.status).toBe(409);
+    expect(await scoStatus(s.scoId)).toBe("material_received");
+    expect(await lossRows(s.raw)).toHaveLength(0);
+  });
+
+  test("BR-SCO-19 pending QA on one of two receipts still blocks close; after the decision the remainder is written off", async () => {
+    const s = await makeIssued({ lots: [1000] });
+    const r1 = await receive(s, 300);
+    const r2 = await receive(s, 200);
+    expect((await qa("qa", r1.receiptId, r1.lineId, 300, 0)).status).toBe(200);
+    expect(
+      (await close("owner", s.scoId, { reason: "closing early" })).status,
+    ).toBe(409);
+    expect(await lossRows(s.raw)).toHaveLength(0);
+    expect((await qa("qa", r2.receiptId, r2.lineId, 200, 0)).status).toBe(200);
+    const res = await close("owner", s.scoId, { reason: "closing early" });
+    expect(res.status).toBe(200);
+    expect(res.json.data.items[0].lossQty).toBe(500);
+    expect(await qtyAt(s.raw, await vendorLocationId(s.vendorId))).toBe(0);
   });
 
   test("BR-SCO-19 close on approved (nothing issued) or draft SCO -> 409", async () => {
