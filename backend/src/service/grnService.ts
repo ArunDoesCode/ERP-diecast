@@ -30,7 +30,10 @@ const OVER_RECEIPT_OVERRIDE_ROLES: Role[] = [
 const toMilli = (qty: number) => Math.round(qty * 1000);
 
 // Accept / bypass only while the PO can still receive goods (BR-GRN-01).
-const RECEIVABLE_PO_STATUSES = [
+const RECEIVABLE_PO_STATUSES = ["dispatched", "partial_received"];
+
+// Corrections are blocked once the PO is invoiced or closed (BR-GRN-34).
+const CORRECTABLE_PO_STATUSES = [
   "dispatched",
   "partial_received",
   "fully_received",
@@ -527,13 +530,30 @@ export const grnService = {
         );
       }
 
-      if (input.qty > line.acceptedQty) {
-        throw new BadRequestError(
-          `Correction qty (${input.qty}) cannot exceed the line's accepted qty (${line.acceptedQty}).`,
+      const po = await poRepository.findPoById(line.poId, tx);
+      if (!po) {
+        throw new NotFoundError("Purchase order not found");
+      }
+      if (!CORRECTABLE_PO_STATUSES.includes(po.status)) {
+        throw new ConflictError(
+          `Purchase order is ${po.status} - a received line can no longer be corrected`,
         );
       }
 
-      const locationId = await grnRepository.findDefaultReceivingLocationId(tx);
+      const alreadyCorrected = await grnRepository.sumCorrections(lineId, tx);
+      if (
+        toMilli(alreadyCorrected) + toMilli(input.qty) >
+        toMilli(line.acceptedQty)
+      ) {
+        throw new BadRequestError(
+          `Corrections (${alreadyCorrected} already + ${input.qty}) cannot exceed the line's accepted qty (${line.acceptedQty}).`,
+        );
+      }
+
+      const posted0 = await grnRepository.findPostedRow(lineId, tx);
+      const locationId =
+        posted0?.locationId ??
+        (await grnRepository.findDefaultReceivingLocationId(tx));
       const posted = await postStock(tx, {
         itemId: line.itemId,
         locationId,
@@ -543,8 +563,9 @@ export const grnService = {
         referenceLineId: lineId,
         batchNumber: line.batchNumber,
         quantityChange: -input.qty,
-        unitCostPaise: line.unitPricePaise,
+        unitCostPaise: posted0?.unitCostPaise ?? line.unitPricePaise,
         averageEffect: "out_at_cost",
+        blockNegative: true,
         notes: `GRN correction for GRN #${grnId} line #${lineId}: ${input.reason}`,
         createdBy: actorId,
       });
@@ -562,6 +583,7 @@ export const grnService = {
         -input.qty,
         tx,
       );
+      await poService.recomputeReceiptStatus(line.poId, tx);
       return posted;
     });
   },

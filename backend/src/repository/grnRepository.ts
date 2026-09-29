@@ -1,7 +1,11 @@
 import { and, asc, count, desc, eq, ilike, inArray, sql } from "drizzle-orm";
 
 import { db } from "../db/client";
-import { itemMaster, locations } from "../db/schemas/02_procurement-catalog";
+import {
+  inventoryLedger,
+  itemMaster,
+  locations,
+} from "../db/schemas/02_procurement-catalog";
 import {
   grnCorrections,
   grnItems,
@@ -416,7 +420,66 @@ export const grnRepository = {
       return undefined;
     }
 
-    return { grn, items };
+    const corrected = await db
+      .select({
+        grnItemId: grnCorrections.grnItemId,
+        total: sql<number>`sum(${grnCorrections.qty})`,
+      })
+      .from(grnCorrections)
+      .where(
+        inArray(
+          grnCorrections.grnItemId,
+          items.map((i) => i.id),
+        ),
+      )
+      .groupBy(grnCorrections.grnItemId);
+    const correctedById = new Map(
+      corrected.map((r) => [r.grnItemId, Number(r.total)]),
+    );
+
+    return {
+      grn,
+      items: items.map((item) => {
+        const correctedQty = correctedById.get(item.id) ?? 0;
+        return {
+          ...item,
+          correctedQty,
+          // thousandths keep the subtraction exact (BR-GRN-35)
+          netAcceptedQty:
+            (Math.round(item.acceptedQty * 1000) -
+              Math.round(correctedQty * 1000)) /
+            1000,
+        };
+      }),
+    };
+  },
+
+  async sumCorrections(grnItemId: number, tx: Tx) {
+    const [row] = await tx
+      .select({ total: sql<number>`coalesce(sum(${grnCorrections.qty}), 0)` })
+      .from(grnCorrections)
+      .where(eq(grnCorrections.grnItemId, grnItemId));
+    return Number(row?.total ?? 0);
+  },
+
+  // Where and at what cost the line was posted (BR-GRN-32): its own grn /
+  // grn_bypass ledger row.
+  async findPostedRow(grnItemId: number, tx: Tx) {
+    const [row] = await tx
+      .select({
+        locationId: inventoryLedger.locationId,
+        unitCostPaise: inventoryLedger.unitCostPaise,
+      })
+      .from(inventoryLedger)
+      .where(
+        and(
+          eq(inventoryLedger.referenceLineId, grnItemId),
+          inArray(inventoryLedger.referenceType, ["grn", "grn_bypass"]),
+        ),
+      )
+      .orderBy(asc(inventoryLedger.id))
+      .limit(1);
+    return row;
   },
 
   async list(params: grnListQuerySchemaType) {
