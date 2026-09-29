@@ -1,7 +1,7 @@
 # Contract — subcontracting S1 (order + approval, company settings, item HSN)
 
 Base `/api`. All success bodies `{ success: true, data }` (+ `meta` on lists). Errors `{ success:false, message, code?, details? }`.
-Handlers return 501 `NOT_IMPLEMENTED` until the implement step. Query manifest: `bun run contract:query "<METHOD> <path>"`.
+Implemented (S1). Query manifest: `bun run contract:query "<METHOD> <path>"`.
 Qty are whole pieces (int). Money = integer paise. Dates are ISO strings.
 Names kept from the existing table: `rawQtyToIssue` = SEND qty, `expectedReturnQty` = RETURN qty, `serviceUnitPricePaise`, `serviceTaxPercentage` (GST %).
 
@@ -15,7 +15,7 @@ Names kept from the existing table: `rawQtyToIssue` = SEND qty, `expectedReturnQ
 | POST | /sco/:id/submit | `sco.manage` |
 | POST | /sco/:id/cancel | `sco.manage` |
 | GET | /company/settings | `sco.view` |
-| PATCH | /company/settings | `sco.loss_override` (owner only; provisional, see report Q1) |
+| PATCH | /company/settings | `company.manage` (owner only) |
 | PATCH | /asset/items/:id | `asset.manage` (existing; body now accepts `hsnCode`) |
 
 ## GET /sco/getscos
@@ -56,3 +56,8 @@ Body (strict, all required): `{ name (<=200), address (<=500), gstin (15 chars, 
 
 ## PATCH /asset/items/:id
 Existing body plus `hsnCode?: string | null` (1-20 chars; null clears). Item responses now include `hsnCode`.
+
+## Notes (implemented)
+- Error codes: 400 `SUPPLIER_INACTIVE`, `SCO_VENDOR_TYPE_INVALID`, `SCO_SAME_ITEM`, `SCO_RETURN_DATE_INVALID`, `SCO_SERVICE_NOT_OFFERED`, `ITEM_INACTIVE`; 409 `SCO_NOT_DRAFT`, `DOC_LOCKED_IN_APPROVAL`, `SCO_INVALID_TRANSITION`, `SCO_HAS_ISSUE`, `APPROVAL_ALREADY_OPEN`.
+- Approval: SCO amount = totalAmountPaise (incl. GST), category `subcontracting`; sent back / withdraw -> `draft`.
+- New permission key `company.manage` (owner seed only); new screen `/subcontracting` (key `sco.view`).

@@ -9,7 +9,8 @@ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 export async function allocateDocumentSequence(
   tx: Tx,
   docType: string,
-  actorId: number,
+  // null = no actor recorded on the counter row (SCO numbering, see scoRepository).
+  actorId: number | null,
   now: Date = new Date(),
 ) {
   const year = now.getUTCFullYear();

@@ -53,7 +53,11 @@ export const scoController = {
   },
 
   async submit(c: Context<AppEnv>) {
-    const data = await scoService.submit(parseId(c), parseActorId(c));
+    const data = await scoService.submit(
+      parseId(c),
+      parseActorId(c),
+      c.get("actor"),
+    );
     return c.json({ success: true, data });
   },
 

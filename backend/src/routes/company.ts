@@ -34,7 +34,7 @@ register({
 
 companyRouter.patch(
   COMPANY_ROUTES.settings,
-  requirePermission("sco.loss_override"),
+  requirePermission("company.manage"),
   asyncHandler(companySettingsController.upsert),
 );
 register({
@@ -43,7 +43,7 @@ register({
   tags: ["company"],
   summary:
     "Create or replace the single company-settings row (owner only, BR-SCO-09). All four fields required.",
-  auth: { type: "permission", key: "sco.loss_override" },
+  auth: { type: "permission", key: "company.manage" },
   request: { body: companySettingsUpsertSchema },
   responses: { "200": successResponse(companySettingsSchema) },
 });

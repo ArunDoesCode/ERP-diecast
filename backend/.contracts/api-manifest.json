@@ -1291,7 +1291,7 @@
       "summary": "Create or replace the single company-settings row (owner only, BR-SCO-09). All four fields required.",
       "auth": {
         "type": "permission",
-        "key": "sco.loss_override"
+        "key": "company.manage"
       },
       "request": {
         "body": {

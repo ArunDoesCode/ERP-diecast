@@ -1,19 +1,19 @@
-import { NotImplementedError } from "../lib/errors";
+import { companySettingsRepository } from "../repository/companySettingsRepository";
 import type {
   companySettingsSchemaType,
   companySettingsUpsertSchemaType,
 } from "../types/sco.types";
 
-// Contract step (S1): signatures only (BR-SCO-09).
+// BR-SCO-09: plant details for the job-work challan; one row, owner edits.
 export const companySettingsService = {
   async get(): Promise<companySettingsSchemaType | null> {
-    throw new NotImplementedError();
+    return companySettingsRepository.get();
   },
 
   async upsert(
-    _input: companySettingsUpsertSchemaType,
-    _actorId: number,
+    input: companySettingsUpsertSchemaType,
+    actorId: number,
   ): Promise<companySettingsSchemaType> {
-    throw new NotImplementedError();
+    return companySettingsRepository.upsert(input, actorId);
   },
 };
