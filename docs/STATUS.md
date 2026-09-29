@@ -26,7 +26,7 @@ Legend — Code: none / schema only / partial / full. Tests per module: see each
 ## Active pipelines
 | Feature | Branch | Phase | PR | Waiting on |
 |---|---|---|---|---|
-| subcontracting | claude/subcontracting-feature-b19136 | pr | (see PR) | your review + merge |
+| subcontracting | claude/subcontracting-feature-b19136 | pr | [#14](https://github.com/ArunDoesCode/ERP-diecast/pull/14) | your review + merge |
 
 ## Waiting on you
 - [ ] Review + merge the m1 PR. Run the manual UI checklist in it (includes SPEC-P3: approval
