@@ -5,6 +5,8 @@ import type {
 	PaginatedResponse,
 	PRCreatePayload,
 	PRDeletePayload,
+	PRDeleteResult,
+	PRLineCancelResult,
 	PRUpdatePayload,
 	PurchaseRequisition,
 	PurchaseRequisitionDetailPayload,
@@ -52,7 +54,7 @@ export function updatePurchaseRequisition(payload: PRUpdatePayload) {
 }
 
 export function deletePurchaseRequisition(payload: PRDeletePayload) {
-	return api.delete<ApiResult<PurchaseRequisition>, { reason: string }>(
+	return api.delete<PRDeleteResult, { reason: string }>(
 		API_ROUTES.purchaseRequisitions.remove(payload.prId),
 		{ reason: payload.reason },
 	);
@@ -63,7 +65,7 @@ export function cancelPurchaseRequisitionLine(
 	lineId: number,
 	reason: string,
 ) {
-	return api.post<ApiResult<unknown>, { reason: string }>(
+	return api.post<PRLineCancelResult, { reason: string }>(
 		API_ROUTES.purchaseRequisitions.cancelLine(prId, lineId),
 		{ reason },
 	);

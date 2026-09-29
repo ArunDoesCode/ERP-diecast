@@ -71,8 +71,8 @@ export function updatePurchaseOrder(payload: POUpdatePayload) {
 	);
 }
 
-export function cancelPurchaseOrder(poId: number, reason?: string) {
-	return api.delete<POCancelResult, { reason?: string }>(
+export function cancelPurchaseOrder(poId: number, reason: string) {
+	return api.delete<POCancelResult, { reason: string }>(
 		API_ROUTES.purchaseOrders.remove(poId),
 		{ reason },
 	);

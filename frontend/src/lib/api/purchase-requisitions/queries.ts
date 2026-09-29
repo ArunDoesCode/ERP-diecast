@@ -164,7 +164,7 @@ export function toPRUpdatePayload(input: {
 	type: PRUpdatePayload["type"];
 	saleOrderId: PRUpdatePayload["saleOrderId"];
 	assetId: PRUpdatePayload["assetId"];
-	status: PRUpdatePayload["status"];
+	originalAssetId: PRUpdatePayload["assetId"];
 	notes?: string;
 	originalItems: Array<{
 		id: number;
@@ -241,8 +241,10 @@ export function toPRUpdatePayload(input: {
 		prId: input.prId,
 		type: input.type,
 		saleOrderId: input.saleOrderId,
-		assetId: input.assetId,
-		status: input.status,
+		// Only send assetId when it changed (backend re-checks pr.link_machine).
+		...(input.assetId !== input.originalAssetId
+			? { assetId: input.assetId }
+			: {}),
 		notes: normalize(input.notes),
 		inserts,
 		updates,
@@ -271,6 +273,9 @@ export function useCancelPurchaseRequisitionLineMutation() {
 				queryClient.invalidateQueries({
 					queryKey: purchaseRequisitionKeys.detail(prId),
 				}),
+				queryClient.invalidateQueries({ queryKey: ["approval", "pending"] }),
+				queryClient.invalidateQueries({ queryKey: ["approval", "history"] }),
+				queryClient.invalidateQueries({ queryKey: ["purchase-orders"] }),
 			]);
 			toast.success("Line cancelled");
 		},

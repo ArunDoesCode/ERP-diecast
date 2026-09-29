@@ -114,7 +114,6 @@ export function createDefaults(): PRCreateFormInput {
 
 export function toEditDefaults(detail: {
 	prId: number;
-	status: PREditFormInput["status"];
 	notes?: string | null;
 	items: Array<{
 		id: number;
@@ -126,7 +125,6 @@ export function toEditDefaults(detail: {
 }): PREditFormInput {
 	return {
 		prId: detail.prId,
-		status: detail.status,
 		notes: detail.notes ?? "",
 		items:
 			detail.items.length > 0

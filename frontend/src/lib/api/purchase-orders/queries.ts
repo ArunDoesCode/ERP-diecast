@@ -155,7 +155,8 @@ function invalidatePOAndPR(
 		queryClient.invalidateQueries({
 			queryKey: purchaseOrderKeys.communications(poId),
 		}),
-		queryClient.invalidateQueries({ queryKey: ["approval"] }),
+		queryClient.invalidateQueries({ queryKey: ["approval", "pending"] }),
+		queryClient.invalidateQueries({ queryKey: ["approval", "history"] }),
 		queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.cards() }),
 		queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.detail(poId) }),
 		queryClient.invalidateQueries({
@@ -206,7 +207,7 @@ export function useCancelPurchaseOrderMutation() {
 	const queryClient = useQueryClient();
 
 	return useMutation({
-		mutationFn: (variables: { poId: number; prId?: number; reason?: string }) =>
+		mutationFn: (variables: { poId: number; prId?: number; reason: string }) =>
 			cancelPurchaseOrder(variables.poId, variables.reason),
 		onSuccess: async (result, variables) => {
 			if (!result.success) {

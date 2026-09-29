@@ -128,7 +128,8 @@ function CancelPOAlert({ poId, poNumber }: { poId: number; poNumber: string }) {
 				<AlertDialogHeader>
 					<AlertDialogTitle>Cancel {poNumber}?</AlertDialogTitle>
 					<AlertDialogDescription>
-						Lines return to pending for re-order. A reason is required.
+						Its PR lines are cancelled too, so a new PR is needed to order
+						again. A reason is required.
 					</AlertDialogDescription>
 				</AlertDialogHeader>
 				<Label htmlFor={`po-cancel-reason-${poId}`}>Reason</Label>

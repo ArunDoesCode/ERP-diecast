@@ -189,7 +189,6 @@ export const prCreateFormSchema = z.object({
 
 export const prEditFormSchema = z.object({
 	prId: z.coerce.number().int().positive(),
-	status: z.enum(prStatusValues),
 	notes: z.string().trim().optional().or(z.literal("")),
 	items: itemsArraySchema,
 });
@@ -214,9 +213,8 @@ export type PRUpdatePayload = {
 	prId: number;
 	type: PRType;
 	saleOrderId: number | null;
-	assetId: number | null;
+	assetId?: number | null;
 	notes?: string;
-	status: PRStatus;
 	inserts: Array<{
 		itemId: number;
 		requestedQty: number;
@@ -232,6 +230,13 @@ export type PRUpdatePayload = {
 		id: number;
 	}>;
 };
+
+// Backend shapes: DELETE /api/pr/deletepr/:id returns { pr }; line cancel returns { pr, item }.
+export type PRDeleteResult = ApiResult<{ pr: PurchaseRequisition }>;
+export type PRLineCancelResult = ApiResult<{
+	pr: PurchaseRequisition;
+	item: PurchaseRequisitionItem;
+}>;
 
 export type PRDeletePayload = {
 	prId: number;

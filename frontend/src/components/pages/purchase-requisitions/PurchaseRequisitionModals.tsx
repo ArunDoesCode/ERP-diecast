@@ -523,7 +523,6 @@ export function EditPurchaseRequisitionModal({
 		) as unknown as Resolver<PREditFormInput>,
 		defaultValues: {
 			prId: prId ?? 0,
-			status: "draft",
 			notes: "",
 			items: [
 				{
@@ -558,7 +557,6 @@ export function EditPurchaseRequisitionModal({
 		form.reset(
 			toEditDefaults({
 				prId: pr.id,
-				status: pr.status,
 				notes: pr.notes,
 				items: detail.items,
 			}),
@@ -607,7 +605,7 @@ export function EditPurchaseRequisitionModal({
 				type: pr?.type ?? "stock_reorder",
 				saleOrderId: pr?.saleOrderId ?? null,
 				assetId: pr?.assetId ?? null,
-				status: values.status,
+				originalAssetId: pr?.assetId ?? null,
 				notes: values.notes,
 				originalItems:
 					detail?.items.map((item) => ({
