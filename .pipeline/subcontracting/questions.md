@@ -10,3 +10,4 @@
 | 6 | Ledger referenceId challan or SCO? | coordinator | challan id | spec changelog |
 | 7 | Uneven send:return ratio, fractional raw pcs | Arun | do what other ERPs do → proportional on cumulative processed, round half up | spec changelog |
 | 8 | Close while a receipt is pending QA? | coordinator | 409 decide QA first | spec changelog |
+| 9 | material_received while QA pending? | coordinator (backend-dev question, test-writer test) | yes, all pieces covered by receipts; close waits for QA | spec changelog |
