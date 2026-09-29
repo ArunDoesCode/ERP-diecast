@@ -11,21 +11,11 @@ Type: defect · infra · feature · debt · idea.
 ## Open
 | ID | P | Type | Module | Item | Why / source | Raised |
 |---|---|---|---|---|---|---|
-| BL-001 | P1 | defect | purchase-requisition | Frontend `DELETE /pr/deletepr` sends id in body; backend route is `/pr/deletepr/:id` → 404 | repo review | 2026-09-27 |
-| BL-002 | P1 | decision | approval | `prType`→`subDocType` fixed (2026-09-27). **Open:** keep `isSaleOrderLinked` as a policy filter (dropdown commented out, backend supports it) — frontend now stops sending it (= any). Decide in approval spec: A keep both / B drop / C defer | CI fix | 2026-09-27 |
-| BL-004 | P1 | infra | auth-setup | `bootstrap-admin` script — `/auth/register` needs an existing super-admin/owner, empty DB can't create first user | workflow setup | 2026-09-27 |
-| BL-005 | P1 | infra | backend | `bun run db:reset` — drop → push → page access seed → approval policies → realistic fixtures | workflow setup | 2026-09-27 |
 | BL-010 | P2 | infra | frontend | Playwright for 5–8 golden paths | workflow setup | 2026-09-27 |
 | BL-011 | P2 | debt | backend | Switch `db:push` → generated migrations before UAT-1 (D-004) | decisions | 2026-09-27 |
 | BL-012 | P1 | infra | repo | Protect `main` on GitHub: require PR + CI jobs `backend`, `frontend` | workflow setup | 2026-09-27 |
 | BL-017 | P3 | feature | auth-setup | Operator QR login has no route — QR token issuance exists (`qr-token.ts`, `employeeService.regenerateQr`) but `/auth/login` is email+password only. Needed for floor PWA (later milestone) | module mapping (verified) | 2026-09-27 |
-| BL-019 | P2 | defect | purchase-requisition | `pr_item_status` values `ordered`/`closed`/`cancelled` are never written (only `pending`, `po_draft`) — PR lines never advance after PO receipt/close; header status is right via `recomputeHeaderStatusFromItems` (verify in PR spec) | module mapping | 2026-09-27 |
 | BL-023 | P3 | debt | approval | `ApprovalPoliciesView` edit-form effect: review deps/reset flow in approval spec (lint fixed by adding `policyForm.reset`) | CI fix | 2026-09-27 |
-| BL-024 | P1 | defect | auth-setup | Privilege escalation: an `owner` can register a `super-admin` via `/auth/register` (`routes/auth.ts:49`, `types/auth.types.ts:7-15`); also register doesn't set `createdBy` (`authService.ts:18-51`) | known-defects spec | 2026-09-27 |
-| BL-025 | P1 | defect | approval | Policy form labels amounts in ₹ but sends the typed number as paise → ₹50,000 saved as ₹500 (spec draft approval.md §12, verify) | approval spec draft | 2026-09-27 |
-| BL-026 | P1 | defect | purchase-requisition | `prService.update` has no status check and PATCH accepts `status` (`pending_approval`/`cancelled`) → edit after submit, approval bypass (purchase-requisition.md §12, verify) | PR spec draft | 2026-09-27 |
-| BL-028 | P2 | defect | approval | PO approval reject skips `setStatusCancelled` → PR lines stuck `po_draft`; PO/SCO always match category `any`, SCO amount 0 → seeded tooling/maintenance/SCO policies never match (approval.md §12, verify) | approval spec draft | 2026-09-27 |
-| BL-029 | P2 | defect | purchase-order | Cancelling a PO recomputes PR header without checking PR status → can resurrect a cancelled PR (purchase-requisition.md §12, verify) | PR spec draft | 2026-09-27 |
 | BL-030 | P2 | debt | purchase-requisition | `prService.update` writes lines one row at a time (`updatePrItemById`/`createPrItem` in loops) and is one ~200-line function — batch + split (audit P1.2, §4) | BL-021 audit | 2026-09-27 |
 | BL-032 | P3 | debt | suppliers | `supplierRepository.list` search = OR + ILIKE + EXISTS, no `pg_trgm` indexes (audit S2) | BL-021 audit | 2026-09-27 |
 | BL-033 | P3 | debt | suppliers | Item vs service create/batch-edit in `supplierService.ts` are near-duplicates (audit S4) | BL-021 audit | 2026-09-27 |
@@ -47,13 +37,38 @@ Type: defect · infra · feature · debt · idea.
 | BL-050 | P3 | debt | inventory | Stock list search `ilike %q%` can't use an index; add pg_trgm if items pass ~50k | m1-stock review PERF-23 | 2026-09-29 |
 | BL-051 | P3 | debt | backend | Move `likePattern` (escapes `\ % _`) to lib and use it in supplier/po/pr/grn/approval/employee searches | m1-stock review SEC-21 | 2026-09-29 |
 | BL-052 | P3 | defect | inventory | PATCH location with only `isVirtual` returns 200 and changes nothing but the audit stamp; return 400 on empty payload | m1-stock review CR-27 | 2026-09-29 |
-| BL-053 | P2 | defect | purchase-order | PO supplier picker should list only active suppliers (`status=active`, suppliers BR-SUP-24) — PO screen, auth session | m1-stock suppliers review | 2026-09-29 |
+| BL-053 | P2 | defect | purchase-order | PO supplier picker should list only active suppliers (`status=active`, suppliers BR-SUP-24). Today it loads the first 20 and hides inactive ones on the client | m1-stock suppliers review; checked 2026-09-29 | 2026-09-29 |
 | BL-054 | P3 | debt | suppliers | Batch edit runs ~3 queries per row (≤ 300 in one tx); `supplier_services.service_id` unindexed; GSTIN change to an invalid value keeps the old PAN in the form | m1-stock review PERF-41/42, CR-43 | 2026-09-29 |
 | BL-055 | P3 | debt | suppliers | Spec touch-up at next change: field caps (name 200, contact 200, phone 30, email 254, address 500, SKU 100, qty ≤ 1e9); history also tracks SKU/qty/unit/lead time (BR-SUP-10); single-row edit of unknown row → 404; BR-SUP-04 PAN refilled on GSTIN change | m1-stock review SPEC-41..45 | 2026-09-29 |
+| BL-056 | P2 | debt | auth-setup | `pages` / `role_pages` removed from the schema (S7) but no migration drops them; stale DBs keep them (also blocks `db:test:prepare` on an old test DB). Drop with the migrations switch | m1 SEC-12 | 2026-09-29 |
+| BL-057 | P3 | debt | auth-setup | Actor cache is per process (2 s TTL): with more than one instance, role/grant changes lag up to 2 s. Optional: one query per miss, share in-flight loads | m1 SEC-8, PERF-6 | 2026-09-29 |
+| BL-058 | P3 | defect | auth-setup | `authService.refresh` runs outside the revocation tx: a refresh racing a password reset can keep a session (ms window). Re-check active + password version before storing the token | m1 SEC-10 | 2026-09-29 |
+| BL-059 | P3 | defect | auth-setup | `employeeService.regenerateQr` gives a password-method employee a QR credential → 400 unless login method is QR. Do with BL-017 | m1 SEC-11 | 2026-09-29 |
+| BL-060 | P3 | debt | auth-setup | Access-log handler lives in `employeeController`; move to its own controller | m1 CR-6 | 2026-09-29 |
+| BL-061 | P3 | debt | backend | Lists use `count(*)` + OFFSET (access log also returns full before/after JSON). Fine now; keyset paging when tables pass ~100k rows | m1 PERF-3, PERF-10 | 2026-09-29 |
+| BL-062 | P3 | debt | auth-setup | `/auth/me` reads all screens + an extra employee query; screens tab loads every role; `listCatalog` read on every grants call — cache / merge queries | m1 PERF-7, 8, 9 | 2026-09-29 |
+| BL-063 | P3 | debt | frontend | Setup grant save invalidates 4 queries; Sidebar re-sorts screens every render (`useMemo`) | m1 PERF-11, 12 (auth review) | 2026-09-29 |
+| BL-064 | P3 | debt | purchase-order | `poRepository` throws HTTP `AppError`s and duplicates `assertEditable`; service should throw, repo return a sentinel | m1 CRP-5 | 2026-09-29 |
+| BL-065 | P2 | defect | approval | SCO submit has no row lock / re-check (PR and PO do). Fix in the subcontracting build | m1 CRP-9 | 2026-09-29 |
+| BL-066 | P3 | debt | purchase-order | PO create/update run queries per line, and the rate default calls `getLastRate` per line — batch (e.g. `DISTINCT ON`) | m1 PERF-03, PERF-05 | 2026-09-29 |
+| BL-067 | P3 | debt | backend | List `q` search uses leading-wildcard `ilike` (PR, PO, GRN number) — no index; add pg_trgm when lists grow. See BL-032, BL-050 | m1 PERF-09, PERF-M2 | 2026-09-29 |
+| BL-068 | P3 | debt | approval | `assertChainHasEligibleApprovers` runs one count per chain step; group into one query if touched | m1 PERF-11 (procurement review) | 2026-09-29 |
+| BL-069 | P2 | defect | inventory | `GET /asset/locations` needs `asset.manage`, but the stock-take / opening form is for `inventory.adjust` holders (owner has no `asset.manage`) → owner may not load the location list. Verify, then pick a key (auth-setup spec change) | m1 docs cleanup (route-key check) | 2026-09-29 |
+| BL-070 | P1 | feature | subcontracting | Build subcontracting (spec frozen v1): `/feature subcontracting` on a fresh branch from main after the m1 PR merges. Includes SCO parts of BR-INV-05/10, BR-SUP-06/07, BL-065 | m1 plan (next batch) | 2026-09-29 |
 
 ## Done
 | ID | Item | PR / commit | Closed |
 |---|---|---|---|
+| BL-001 | Fixed: frontend sends the id in the path plus a reason; one cancel path (BR-PR-39..47, BR-KD-01..13) | work/m1 2208a02, acd5c37 | 2026-09-29 |
+| BL-002 | Decided B: `isSaleOrderLinked` dropped from matching and the policy API (approval-policies BR-APR-15) | work/m1 966f37d, f1c9812 | 2026-09-29 |
+| BL-004 | Fixed: `bun run bootstrap-admin` creates the first super-admin (BR-KD-17..29) | work/m1 e4e94db | 2026-09-29 |
+| BL-005 | Fixed: `bun run db:reset` — guard, drop, push, seeds, fixtures via real services (BR-KD-30..46) | work/m1 24c5dd9, 4568e50 | 2026-09-29 |
+| BL-019 | Fixed: PO flows write PR line states `ordered` / `closed` / `cancelled` (BR-PR-25..36) | work/m1 a05dcff | 2026-09-29 |
+| BL-024 | Fixed: `/auth/register` retired; role assignment guarded (auth-setup BR-AUTH-16) | work/m1 b6a09c3, 990441d | 2026-09-29 |
+| BL-025 | Fixed: policy form shows ₹, sends paise | work/m1 3b23602 | 2026-09-29 |
+| BL-026 | Fixed: edit only in draft (`PR_NOT_EDITABLE`), PATCH rejects `status` (BR-PR-17) | work/m1 93164dc, f1c9812 | 2026-09-29 |
+| BL-028 | Fixed: PO reject cancels the PO and its PR lines; PO matched on total incl. GST (BR-APR-43) | work/m1 a05dcff | 2026-09-29 |
+| BL-029 | Fixed: PR header recompute only for approved / partial / fully ordered PRs | work/m1 a05dcff | 2026-09-29 |
 | BL-031 | Fixed: batch edit ≤ 100 rows, one tx, ordered row locks (BR-SUP-19..21) | work/m1-stock | 2026-09-29 |
 | BL-035 | Fixed: fixed plain error sentences per case, no DB text (BR-SUP-22) | work/m1-stock | 2026-09-29 |
 | BL-014 | Fixed: `postStock` updates item stock + moving average in the same tx as every ledger row (grn-stock BR-GRN-37/38/39) | work/m1-stock | 2026-09-29 |
@@ -72,4 +87,4 @@ Type: defect · infra · feature · debt · idea.
 | BL-018 | Confirmed + fixed: `authService.refresh` re-reads active employee + role + pages (401 if deactivated — was also refreshing forever). Regression test `src/service/authService.test.ts`. Also fixed test isolation: per-file `disconnectDb()` moved to a global afterAll in the test preload | PR #4 (fix), PR #6 (tests by test-writer) | 2026-09-27 |
 | BL-021 | Audit doc statuses verified against code: 13 resolved, 4 partial, 7 open, 1 frontend-only; status block at top. Open items not already tracked → BL-030..BL-037 | PR #4 | 2026-09-27 |
 
-Next free id: **BL-056**
+Next free id: **BL-071**

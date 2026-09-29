@@ -67,7 +67,7 @@ screen for stock-take and opening stock. All BR-INV-01..25 are built and tested
 - BR-INV-05 PO half (PR line approved before deactivation) → BL-046 (PO code, auth session). SCO part → subcontracting build.
 - `inventory_ref_type` values `pro`, `job_order_issue`, `scrap_dispatch` still unwritten.
 - Stock list search not indexable (BL-050). No reconciliation screen (BL-045).
-- `GET /asset/locations` needs `asset.manage` (contract S7), but the stock-take / opening form is for `inventory.adjust` holders (owner has no `asset.manage`) — check whether owner can load locations (BL-066).
+- `GET /asset/locations` needs `asset.manage` (contract S7), but the stock-take / opening form is for `inventory.adjust` holders (owner has no `asset.manage`) — check whether owner can load locations (BL-069).
 
 ## ERP benchmark (with links)
 - ERPNext: default stock UOM cannot change once any stock transaction exists — make a new item instead ([Frappe forum](https://discuss.frappe.io/t/forced-item-stock-uom-via-db-set-value-what-should-i-verify-afterward/163769), [ERPNext Item](https://manualpt.angolaerp.co.ao/docs/user/manual/en/stock/item)). Adopted as BR-INV-04.
