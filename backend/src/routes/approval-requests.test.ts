@@ -443,6 +443,10 @@ beforeAll(async () => {
       priority: PRIO_PO,
       docType: "po",
       subDocType: "any",
+      // Amount bound => specificity tier 3 (BR-APR-19); with the lowest priority number it beats any
+      // baseline "PO - ... Order" policy whatever the DB was seeded with. Fixture POs are Rs 5,000.
+      minAmountPaise: 1,
+      maxAmountPaise: 100_000_000,
       autoApprove: false,
       approvalLevels: 1,
       approvalChain: [roleStep(1, "sup")],
