@@ -458,6 +458,19 @@ describe("items: create and validation", () => {
     expect(ok.status).toBe(201);
     expect(ok.json.data.reorderLevel).toBe(12.345);
   });
+
+  test("BR-INV-07 editing reorder level: negative is 400 and unchanged; zero is ok", async () => {
+    const item = await mkItem();
+    const bad = await call("PATCH", `/items/${item.id}`, "back_office", {
+      reorderLevel: -5,
+    });
+    expect(bad.status).toBe(400);
+    const ok = await call("PATCH", `/items/${item.id}`, "back_office", {
+      reorderLevel: 0,
+    });
+    expect(ok.status).toBe(200);
+    expect(ok.json.data.reorderLevel).toBe(0);
+  });
 });
 
 describe("items: in use, deactivate, delete", () => {
@@ -1043,6 +1056,96 @@ describe("locations", () => {
       .from(inventoryLedger)
       .where(eq(inventoryLedger.locationId, loc.id));
     expect(rows.length).toBe(0);
+  });
+
+  test("BR-INV-13 changing another location to main_store is 409 and leaves its type", async () => {
+    const loc = await mkLocation({ type: "scrap_yard" });
+    const r = await call("PATCH", `/locations/${loc.id}`, "back_office", {
+      type: "main_store",
+    });
+    expect(r.status).toBe(409);
+    const [row] = await db
+      .select({ type: locations.type })
+      .from(locations)
+      .where(eq(locations.id, loc.id));
+    expect(row!.type).toBe("scrap_yard");
+  });
+
+  test("BR-INV-13 concurrent main_store creates are all 409 and none is added", async () => {
+    const count = async () =>
+      (
+        await db
+          .select({ id: locations.id })
+          .from(locations)
+          .where(eq(locations.type, "main_store"))
+      ).length;
+    const before = await count();
+    const rs = await Promise.all(
+      [1, 2, 3, 4].map(() =>
+        call("POST", "/locations", "back_office", {
+          name: uid(),
+          type: "main_store",
+        }),
+      ),
+    );
+    expect(rs.map((r) => r.status)).toEqual([409, 409, 409, 409]);
+    expect(await count()).toBe(before);
+  });
+
+  test("BR-INV-15 a deactivated location keeps its movement history", async () => {
+    const loc = await mkLocation();
+    const item = await mkItem();
+    await openingStock(item.id, loc.id, 7);
+    const off = await call("PATCH", `/locations/${loc.id}`, "back_office", {
+      isActive: false,
+    });
+    expect(off.status).toBe(200);
+    const rows = await db
+      .select()
+      .from(inventoryLedger)
+      .where(eq(inventoryLedger.locationId, loc.id));
+    expect(rows.length).toBe(1);
+    const list = await call(
+      "GET",
+      `/inventory/movements?itemId=${item.id}&locationId=${loc.id}`,
+      "owner",
+    );
+    expect(list.status).toBe(200);
+    expect(list.json.data.length).toBe(1);
+  });
+
+  test("BR-INV-15 a stock-take into an inactive location is 400 and posts nothing", async () => {
+    const loc = await mkLocation();
+    const item = await mkItem();
+    await openingStock(item.id, loc.id, 10);
+    await call("PATCH", `/locations/${loc.id}`, "back_office", {
+      isActive: false,
+    });
+    const r = await call("POST", "/inventory/movements", "owner", {
+      itemId: item.id,
+      locationId: loc.id,
+      referenceType: "stock_adjustment",
+      countedQty: 4,
+      reason: "count",
+    });
+    expect(r.status).toBe(400);
+    const rows = await db
+      .select()
+      .from(inventoryLedger)
+      .where(eq(inventoryLedger.locationId, loc.id));
+    expect(rows.length).toBe(1);
+  });
+
+  test("BR-INV-15 a reactivated location takes postings again", async () => {
+    const loc = await mkLocation();
+    const item = await mkItem();
+    await call("PATCH", `/locations/${loc.id}`, "back_office", {
+      isActive: false,
+    });
+    await call("PATCH", `/locations/${loc.id}`, "back_office", {
+      isActive: true,
+    });
+    await openingStock(item.id, loc.id, 3);
   });
 });
 

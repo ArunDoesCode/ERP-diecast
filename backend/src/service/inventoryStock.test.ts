@@ -891,6 +891,16 @@ describe("last rate (BR-INV-24)", () => {
     expect(r.json.data).toEqual({ ratePaise: 240, source: "supplier_catalog" });
   });
 
+  test("BR-INV-24 another item's PO from the same supplier is ignored", async () => {
+    const item = await mkItem();
+    const otherItem = await mkItem();
+    const sup = await mkSupplier();
+    await mkPo(sup, otherItem.id, 999, "approved");
+    await addCatalog(sup, item.id, 240);
+    const r = await lastRate(item.id, sup);
+    expect(r.json.data).toEqual({ ratePaise: 240, source: "supplier_catalog" });
+  });
+
   test("BR-INV-24 no PO, no catalog, average > 0 gives the item average", async () => {
     const item = await mkItem({ standardRatePaise: 24000 });
     const loc = await mkLocation();
