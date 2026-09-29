@@ -696,6 +696,18 @@ export function EditPurchaseRequisitionModal({
 													{ minimumFractionDigits: 2 },
 												)}
 											</p>
+											{detail.items.some((item) => item.noCostHistory) ? (
+												<p className="text-xs">
+													Estimate uses standard rate for:{" "}
+													{detail.items
+														.filter((item) => item.noCostHistory)
+														.map(
+															(item) => item.itemName ?? `Item ${item.itemId}`,
+														)
+														.join(", ")}{" "}
+													(no cost history yet).
+												</p>
+											) : null}
 										</div>
 										<Badge
 											variant={statusBadgeStyle.variant}

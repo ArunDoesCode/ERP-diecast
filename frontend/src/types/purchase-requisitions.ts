@@ -99,6 +99,8 @@ export interface PurchaseRequisitionItem {
 	expectedDate: string | null;
 	status?: PRItemStatus;
 	estRatePaise?: number;
+	/** BR-PR-14: true when the estimate used the item's standard rate (average cost 0). */
+	noCostHistory?: boolean;
 	linkedPoId?: number | null;
 	linkedPoNumber?: string | null;
 	defaultSupplierId?: number | null;
