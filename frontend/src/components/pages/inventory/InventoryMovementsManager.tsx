@@ -17,7 +17,6 @@ import {
 	type SearchableSelectOption,
 } from "@/components/common/SearchableSelect";
 import { InventoryBackButton } from "@/components/pages/inventory/InventoryBackButton";
-
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -43,17 +42,21 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import {
 	useCreateMovementMutation,
+	useItemsQuery,
+	useLocationsQuery,
 	useMovementsQuery,
 } from "@/lib/api/asset/queries";
 import {
 	type AssetMovement,
 	type AssetMovementCreatePayload,
+	type AssetMovementFormValues,
 	type AssetReferenceType,
 	type AssetTransactionType,
 	assetManualReferenceTypeValues,
-	assetMovementCreateSchema,
+	assetMovementFormSchema,
 } from "@/types/asset";
 
 const REFERENCE_TYPE_LABEL: Record<AssetReferenceType, string> = {
@@ -81,27 +84,135 @@ const TRANSACTION_TYPE_LABEL: Record<AssetTransactionType, string> = {
 	adjustment: "Adjustment",
 };
 
-function toItemOption(movement: AssetMovement): SearchableSelectOption {
-	return {
-		value: String(movement.itemId),
-		label: movement.itemName,
-		secondaryLabel: `${movement.itemSku} • ${movement.itemUom}`,
-	};
+function sourceLabel(movement: AssetMovement) {
+	const label = REFERENCE_TYPE_LABEL[movement.referenceType];
+	const source = movement.sourceDocument;
+	if (!source || source.id === 0) return `${label} (manual)`;
+	return `${label} ${source.number ?? `#${source.id}`}`;
 }
 
 function toMovementPayload(
-	values: AssetMovementCreatePayload,
+	values: AssetMovementFormValues,
 ): AssetMovementCreatePayload {
+	const batchNumber = values.batchNumber?.trim()
+		? values.batchNumber.trim()
+		: null;
+	const unitCostPaise =
+		values.unitCost === undefined
+			? undefined
+			: Math.round(values.unitCost * 100);
+
+	if (values.referenceType === "opening_stock") {
+		return {
+			itemId: values.itemId,
+			locationId: values.locationId,
+			referenceType: "opening_stock",
+			qty: values.quantity,
+			unitCostPaise: unitCostPaise ?? 0,
+			reason: values.reason.trim(),
+			batchNumber,
+		};
+	}
+
 	return {
 		itemId: values.itemId,
 		locationId: values.locationId,
-		batchNumber: values.batchNumber?.trim() ? values.batchNumber.trim() : null,
-		referenceType: values.referenceType,
-		quantityChange: values.quantityChange,
-		// Stock-out is valued at the current average; cost is not sent.
-		unitCostPaise: values.quantityChange > 0 ? values.unitCostPaise : undefined,
+		referenceType: "stock_adjustment",
+		countedQty: values.quantity,
+		unitCostPaise,
 		reason: values.reason.trim(),
+		batchNumber,
 	};
+}
+
+function ItemPicker({
+	value,
+	onChange,
+	placeholder,
+}: {
+	value: number | undefined;
+	onChange: (itemId: number) => void;
+	placeholder: string;
+}) {
+	const [search, setSearch] = useState("");
+	const debounced = useDebouncedValue(search, 350);
+	const itemsQuery = useItemsQuery({
+		page: 1,
+		pageSize: 20,
+		q: debounced || undefined,
+	});
+
+	const options = useMemo(() => {
+		const list: SearchableSelectOption[] = (itemsQuery.data?.data ?? []).map(
+			(item) => ({
+				value: String(item.id),
+				label: item.name,
+				secondaryLabel: `${item.sku} • ${item.uom}${item.isActive ? "" : " • inactive"}`,
+			}),
+		);
+		if (value && !list.some((option) => option.value === String(value))) {
+			list.unshift({ value: String(value), label: `Item #${value}` });
+		}
+		return list;
+	}, [itemsQuery.data, value]);
+
+	return (
+		<SearchableSelect
+			value={value ? String(value) : undefined}
+			options={options}
+			onValueChange={(next) => onChange(Number(next))}
+			searchValue={search}
+			onSearchChange={setSearch}
+			placeholder={placeholder}
+			searchPlaceholder="Search item"
+			emptyText="No items found"
+			isLoading={itemsQuery.isLoading}
+		/>
+	);
+}
+
+function LocationPicker({
+	value,
+	onChange,
+}: {
+	value: number | undefined;
+	onChange: (locationId: number) => void;
+}) {
+	const [search, setSearch] = useState("");
+	const debounced = useDebouncedValue(search, 350);
+	const locationsQuery = useLocationsQuery({
+		page: 1,
+		pageSize: 20,
+		q: debounced || undefined,
+		isActive: true,
+	});
+
+	const options = useMemo(() => {
+		const list: SearchableSelectOption[] = (
+			locationsQuery.data?.data ?? []
+		).map((location) => ({
+			value: String(location.id),
+			label: location.name,
+		}));
+		if (value && !list.some((option) => option.value === String(value))) {
+			list.unshift({ value: String(value), label: `Location #${value}` });
+		}
+		return list;
+	}, [locationsQuery.data, value]);
+
+	return (
+		<SearchableSelect
+			value={value ? String(value) : undefined}
+			options={options}
+			onValueChange={(next) => onChange(Number(next))}
+			searchValue={search}
+			onSearchChange={setSearch}
+			placeholder="Select location"
+			searchPlaceholder="Search location"
+			emptyText="No locations found"
+			isLoading={locationsQuery.isLoading}
+		/>
+	);
 }
 
 type MovementCreateFormProps = {
@@ -111,20 +222,23 @@ type MovementCreateFormProps = {
 function MovementCreateForm({ onDone }: MovementCreateFormProps) {
 	const createMovementMutation = useCreateMovementMutation();
 
-	const form = useForm<AssetMovementCreatePayload>({
-		resolver: zodResolver(assetMovementCreateSchema),
+	const form = useForm<AssetMovementFormValues>({
+		resolver: zodResolver(assetMovementFormSchema),
 		defaultValues: {
-			itemId: 0,
-			locationId: 0,
-			batchNumber: null,
 			referenceType: "stock_adjustment",
-			quantityChange: 0,
-			unitCostPaise: undefined,
+			itemId: undefined,
+			locationId: undefined,
+			quantity: undefined,
+			unitCost: undefined,
+			batchNumber: null,
 			reason: "",
 		},
 	});
 
-	function onSubmit(values: AssetMovementCreatePayload) {
+	const referenceType = form.watch("referenceType");
+	const isOpening = referenceType === "opening_stock";
+
+	function onSubmit(values: AssetMovementFormValues) {
 		createMovementMutation.mutate(toMovementPayload(values), {
 			onSuccess: () => onDone(),
 		});
@@ -133,54 +247,6 @@ function MovementCreateForm({ onDone }: MovementCreateFormProps) {
 	return (
 		<Form {...form}>
 			<form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
-				<FormField
-					control={form.control}
-					name="itemId"
-					render={({ field }) => (
-						<FormItem className="min-h-19 mt-2">
-							<FormControl>
-								<FloatingLabelInput
-									id="movement-item-id"
-									label="Item ID"
-									type="number"
-									name={field.name}
-									value={field.value}
-									onBlur={field.onBlur}
-									ref={field.ref}
-									onChange={(event) =>
-										field.onChange(event.target.valueAsNumber)
-									}
-								/>
-							</FormControl>
-							<FormMessage />
-						</FormItem>
-					)}
-				/>
-
-				<FormField
-					control={form.control}
-					name="locationId"
-					render={({ field }) => (
-						<FormItem className="min-h-19">
-							<FormControl>
-								<FloatingLabelInput
-									id="movement-location-id"
-									label="Location ID"
-									type="number"
-									name={field.name}
-									value={field.value}
-									onBlur={field.onBlur}
-									ref={field.ref}
-									onChange={(event) =>
-										field.onChange(event.target.valueAsNumber)
-									}
-								/>
-							</FormControl>
-							<FormMessage />
-						</FormItem>
-					)}
-				/>
-
 				<FormField
 					control={form.control}
 					name="referenceType"
@@ -213,20 +279,58 @@ function MovementCreateForm({ onDone }: MovementCreateFormProps) {
 
 				<FormField
 					control={form.control}
-					name="quantityChange"
+					name="itemId"
+					render={({ field }) => (
+						<FormItem className="min-h-19">
+							<FormLabel>Item</FormLabel>
+							<FormControl>
+								<ItemPicker
+									value={field.value}
+									onChange={field.onChange}
+									placeholder="Select item"
+								/>
+							</FormControl>
+							<FormMessage />
+						</FormItem>
+					)}
+				/>
+
+				<FormField
+					control={form.control}
+					name="locationId"
+					render={({ field }) => (
+						<FormItem className="min-h-19">
+							<FormLabel>Location</FormLabel>
+							<FormControl>
+								<LocationPicker value={field.value} onChange={field.onChange} />
+							</FormControl>
+							<FormMessage />
+						</FormItem>
+					)}
+				/>
+
+				<FormField
+					control={form.control}
+					name="quantity"
 					render={({ field }) => (
 						<FormItem className="min-h-19">
 							<FormControl>
 								<FloatingLabelInput
-									id="movement-quantity-change"
-									label="Quantity change (+ in, - out)"
+									id="movement-quantity"
+									label={isOpening ? "Opening quantity" : "Counted quantity"}
 									type="number"
+									step="0.001"
+									min="0"
 									name={field.name}
-									value={field.value}
+									value={field.value ?? ""}
 									onBlur={field.onBlur}
 									ref={field.ref}
 									onChange={(event) =>
-										field.onChange(event.target.valueAsNumber)
+										field.onChange(
+											event.target.value === ""
+												? undefined
+												: event.target.valueAsNumber,
+										)
 									}
 								/>
 							</FormControl>
@@ -237,14 +341,20 @@ function MovementCreateForm({ onDone }: MovementCreateFormProps) {
 
 				<FormField
 					control={form.control}
-					name="unitCostPaise"
+					name="unitCost"
 					render={({ field }) => (
 						<FormItem className="min-h-19">
 							<FormControl>
 								<FloatingLabelInput
 									id="movement-unit-cost"
-									label="Unit cost (paise) - required for stock-in"
+									label={
+										isOpening
+											? "Rate per unit (₹)"
+											: "Cost per unit (₹) - needed if counted is more than balance"
+									}
 									type="number"
+									step="0.01"
+									min="0"
 									name={field.name}
 									value={field.value ?? ""}
 									onBlur={field.onBlur}
@@ -312,7 +422,11 @@ function MovementCreateForm({ onDone }: MovementCreateFormProps) {
 					type="submit"
 					disabled={createMovementMutation.isPending}
 				>
-					{createMovementMutation.isPending ? "Saving..." : "Create movement"}
+					{createMovementMutation.isPending
+						? "Saving..."
+						: isOpening
+							? "Post opening stock"
+							: "Post stock-take"}
 				</Button>
 			</form>
 		</Form>
@@ -324,7 +438,6 @@ export function InventoryMovementsManager() {
 		pageIndex: 0,
 		pageSize: 10,
 	});
-	const [comboboxSearch, setComboboxSearch] = useState("");
 	const [selectedItemId, setSelectedItemId] = useState<number | undefined>();
 	const [createOpen, setCreateOpen] = useState(false);
 	const [detailMovement, setDetailMovement] = useState<AssetMovement | null>(
@@ -339,23 +452,6 @@ export function InventoryMovementsManager() {
 
 	const movements = movementsQuery.data?.data ?? [];
 	const meta = movementsQuery.data?.meta;
-
-	const itemOptions = useMemo(() => {
-		const filtered = movements.filter((movement) => {
-			if (!comboboxSearch.trim()) return true;
-			const query = comboboxSearch.toLowerCase();
-			return (
-				movement.itemName.toLowerCase().includes(query) ||
-				movement.itemSku.toLowerCase().includes(query)
-			);
-		});
-
-		const dedup = new Map<string, SearchableSelectOption>();
-		for (const movement of filtered) {
-			dedup.set(String(movement.itemId), toItemOption(movement));
-		}
-		return Array.from(dedup.values());
-	}, [movements, comboboxSearch]);
 
 	const columns = useMemo<ColumnDef<AssetMovement>[]>(
 		() => [
@@ -394,6 +490,11 @@ export function InventoryMovementsManager() {
 				},
 			},
 			{
+				id: "source",
+				header: "Source",
+				cell: ({ row }) => sourceLabel(row.original),
+			},
+			{
 				accessorKey: "quantityChange",
 				header: ({ column }) => (
 					<DataTableColumnHeader column={column} title="Qty Change" />
@@ -428,19 +529,13 @@ export function InventoryMovementsManager() {
 			<div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
 				<div className="flex w-full gap-2 sm:max-w-lg">
 					<div className="flex-1">
-						<SearchableSelect
-							value={selectedItemId ? String(selectedItemId) : undefined}
-							options={itemOptions}
-							onValueChange={(value) => {
-								setSelectedItemId(Number(value));
+						<ItemPicker
+							value={selectedItemId}
+							onChange={(itemId) => {
+								setSelectedItemId(itemId);
 								setPagination((prev) => ({ ...prev, pageIndex: 0 }));
 							}}
-							searchValue={comboboxSearch}
-							onSearchChange={setComboboxSearch}
 							placeholder="Filter by item"
-							searchPlaceholder="Search item from current page"
-							emptyText="No items found"
-							isLoading={movementsQuery.isLoading}
 						/>
 					</div>
 
@@ -449,7 +544,6 @@ export function InventoryMovementsManager() {
 						variant="outline"
 						onClick={() => {
 							setSelectedItemId(undefined);
-							setComboboxSearch("");
 							setPagination((prev) => ({ ...prev, pageIndex: 0 }));
 						}}
 					>
@@ -459,7 +553,7 @@ export function InventoryMovementsManager() {
 
 				<Button onClick={() => setCreateOpen(true)}>
 					<IconPlus className="size-3.5" />
-					Create movement
+					Stock-take / opening stock
 				</Button>
 			</div>
 
@@ -468,13 +562,17 @@ export function InventoryMovementsManager() {
 			<Dialog open={createOpen} onOpenChange={setCreateOpen}>
 				<DialogContent className="sm:max-w-xl">
 					<DialogHeader>
-						<DialogTitle>Create movement</DialogTitle>
+						<DialogTitle>Manual stock entry</DialogTitle>
 						<DialogDescription>
-							Create inventory movement entry.
+							Stock-take posts the difference between your count and the current
+							balance. Opening stock is only for an item and location with no
+							movements yet.
 						</DialogDescription>
 					</DialogHeader>
 
-					<MovementCreateForm onDone={() => setCreateOpen(false)} />
+					{createOpen ? (
+						<MovementCreateForm onDone={() => setCreateOpen(false)} />
+					) : null}
 				</DialogContent>
 			</Dialog>
 
@@ -486,10 +584,9 @@ export function InventoryMovementsManager() {
 			>
 				<DialogContent className="sm:max-w-lg">
 					<DialogHeader>
-						<DialogTitle>Edit movement</DialogTitle>
+						<DialogTitle>Movement details</DialogTitle>
 						<DialogDescription>
-							Read-only edit modal. Update endpoint is not available in API
-							contract.
+							Stock movements are read-only and cannot be edited.
 						</DialogDescription>
 					</DialogHeader>
 
@@ -508,10 +605,15 @@ export function InventoryMovementsManager() {
 								{TRANSACTION_TYPE_LABEL[detailMovement.transactionType]}
 							</p>
 							<p>
-								<span className="font-medium">Reference:</span>{" "}
-								{REFERENCE_TYPE_LABEL[detailMovement.referenceType]} #
-								{detailMovement.referenceId}
+								<span className="font-medium">Source:</span>{" "}
+								{sourceLabel(detailMovement)}
 							</p>
+							{detailMovement.notes ? (
+								<p>
+									<span className="font-medium">Reason / notes:</span>{" "}
+									{detailMovement.notes}
+								</p>
+							) : null}
 							<p>
 								<span className="font-medium">Quantity Change:</span>{" "}
 								{detailMovement.quantityChange}

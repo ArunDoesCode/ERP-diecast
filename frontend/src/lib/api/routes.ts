@@ -102,6 +102,7 @@ export const API_ROUTES = {
 				`${API_Header.asset}/locations/${locationId}`,
 		},
 		inventory: {
+			stock: `${API_Header.asset}/inventory/stock`,
 			movements: {
 				list: `${API_Header.asset}/inventory/movements`,
 				create: `${API_Header.asset}/inventory/movements`,

@@ -17,7 +17,7 @@ import {
 	type SearchableSelectOption,
 } from "@/components/common/SearchableSelect";
 import { InventoryBackButton } from "@/components/pages/inventory/InventoryBackButton";
-
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -45,7 +45,7 @@ import {
 import {
 	type AssetService,
 	type AssetServiceCreatePayload,
-	assetServiceCreateSchema,
+	assetServiceFormSchema,
 } from "@/types/asset";
 
 type ServiceModalState =
@@ -61,6 +61,8 @@ function toServiceOption(service: AssetService): SearchableSelectOption {
 	};
 }
 
+type ServiceFormValues = AssetServiceCreatePayload & { isActive: boolean };
+
 function toServicePayload(
 	values: AssetServiceCreatePayload,
 ): AssetServiceCreatePayload {
@@ -70,7 +72,6 @@ function toServicePayload(
 		description: values.description?.trim() ? values.description.trim() : null,
 		defaultUom: values.defaultUom.trim(),
 		sacCode: values.sacCode?.trim() ? values.sacCode.trim() : null,
-		isActive: values.isActive,
 	};
 }
 
@@ -89,8 +90,8 @@ function ServiceEditorForm({ mode, service, onDone }: ServiceEditorFormProps) {
 			? createServiceMutation.isPending
 			: updateServiceMutation.isPending;
 
-	const form = useForm<AssetServiceCreatePayload>({
-		resolver: zodResolver(assetServiceCreateSchema),
+	const form = useForm<ServiceFormValues>({
+		resolver: zodResolver(assetServiceFormSchema),
 		defaultValues:
 			mode === "edit" && service
 				? {
@@ -99,7 +100,7 @@ function ServiceEditorForm({ mode, service, onDone }: ServiceEditorFormProps) {
 						description: service.description,
 						defaultUom: service.defaultUom,
 						sacCode: service.sacCode,
-						isActive: service.isActive ?? true,
+						isActive: service.isActive,
 					}
 				: {
 						code: "",
@@ -111,7 +112,7 @@ function ServiceEditorForm({ mode, service, onDone }: ServiceEditorFormProps) {
 					},
 	});
 
-	function onSubmit(values: AssetServiceCreatePayload) {
+	function onSubmit(values: ServiceFormValues) {
 		const payload = toServicePayload(values);
 
 		if (mode === "create") {
@@ -121,7 +122,10 @@ function ServiceEditorForm({ mode, service, onDone }: ServiceEditorFormProps) {
 
 		if (!service) return;
 		updateServiceMutation.mutate(
-			{ serviceId: service.id, payload },
+			{
+				serviceId: service.id,
+				payload: { ...payload, isActive: values.isActive },
+			},
 			{ onSuccess: onDone },
 		);
 	}
@@ -129,22 +133,23 @@ function ServiceEditorForm({ mode, service, onDone }: ServiceEditorFormProps) {
 	return (
 		<Form {...form}>
 			<form className="" onSubmit={form.handleSubmit(onSubmit)}>
-				<FormField
-					control={form.control}
-					name="isActive"
-					render={({ field }) => (
-						<FormItem className="flex flex-row items-center justify-end gap-2 -translate-y-3.5">
-							<FormLabel>Active</FormLabel>
-							<FormControl>
-								<Switch
-									checked={field.value ?? false}
-									onCheckedChange={field.onChange}
-									aria-label="Toggle service active status"
-								/>
-							</FormControl>
-						</FormItem>
-					)}
-				/>
+				{mode === "edit" ? (
+					<FormField
+						control={form.control}
+						name="isActive"
+						render={({ field }) => (
+							<FormItem className="flex flex-row items-center justify-end gap-2 -translate-y-3.5">
+								<FormLabel>Active</FormLabel>
+								<FormControl>
+									<Switch
+										checked={field.value}
+										onCheckedChange={field.onChange}
+									/>
+								</FormControl>
+							</FormItem>
+						)}
+					/>
+				) : null}
 
 				<div className="grid grid-cols-2 gap-4">
 					<FormField
@@ -206,7 +211,9 @@ function ServiceEditorForm({ mode, service, onDone }: ServiceEditorFormProps) {
 								<FormControl>
 									<FloatingLabelInput
 										id="service-sac"
-										label="SAC code (optional)"
+										label="SAC code (6 digits, starts 99)"
+										inputMode="numeric"
+										maxLength={6}
 										name={field.name}
 										value={field.value ?? ""}
 										onBlur={field.onBlur}
@@ -319,6 +326,16 @@ export function InventoryServicesManager() {
 					<DataTableColumnHeader column={column} title="SAC" />
 				),
 				cell: ({ getValue }) => getValue<string | null>() || "—",
+			},
+			{
+				accessorKey: "isActive",
+				header: "Status",
+				cell: ({ getValue }) =>
+					getValue<boolean>() ? (
+						<Badge variant="secondary">Active</Badge>
+					) : (
+						<Badge variant="outline">Inactive</Badge>
+					),
 			},
 		],
 		[],

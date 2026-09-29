@@ -24,6 +24,7 @@ import type {
 	AssetServiceCreatePayload,
 	AssetServiceListParams,
 	AssetServiceUpdatePayload,
+	AssetStockListParams,
 } from "@/types/asset";
 
 import {
@@ -37,6 +38,7 @@ import {
 	getMachines,
 	getMovements,
 	getServices,
+	getStock,
 	updateItem,
 	updateLocation,
 	updateMachine,
@@ -60,6 +62,10 @@ export const assetKeys = {
 		params
 			? (["assets", "items", params] as const)
 			: (["assets", "items"] as const),
+	stock: (params?: AssetStockListParams) =>
+		params
+			? (["assets", "stock", params] as const)
+			: (["assets", "stock"] as const),
 	services: (params?: AssetServiceListParams) =>
 		params
 			? (["assets", "services", params] as const)
@@ -177,12 +183,21 @@ export function useCreateMovementMutation() {
 			await Promise.all([
 				queryClient.invalidateQueries({ queryKey: assetKeys.movements() }),
 				queryClient.invalidateQueries({ queryKey: assetKeys.items() }),
+				queryClient.invalidateQueries({ queryKey: assetKeys.stock() }),
 			]);
-			toast.success("Movement created");
+			toast.success("Stock updated");
 		},
 		onError: (error) => {
 			toast.error(errorMessage(error, "Failed to create movement"));
 		},
+	});
+}
+
+export function useStockQuery(params?: AssetStockListParams) {
+	return useQuery({
+		queryKey: assetKeys.stock(params),
+		queryFn: () => getStock(params),
+		placeholderData: keepPreviousData,
 	});
 }
 
@@ -221,7 +236,10 @@ export function useUpdateItemMutation() {
 			payload: AssetItemUpdatePayload;
 		}) => updateItem(itemId, payload),
 		onSuccess: async () => {
-			await queryClient.invalidateQueries({ queryKey: assetKeys.items() });
+			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: assetKeys.items() }),
+				queryClient.invalidateQueries({ queryKey: assetKeys.stock() }),
+			]);
 			toast.success("Item updated");
 		},
 		onError: (error) => {
