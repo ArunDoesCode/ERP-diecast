@@ -25,3 +25,11 @@ Then: known-defects, purchase-requisition, approval(+policies), purchase-order �
 | PR-S1 | PR cancel | BR-PR-39, 41, 42, 43, 46 (cancel), 47; BR-KD-01..10, 13, 16 | one cancel path `DELETE /api/pr/deletepr/:id` + reason; audit cols; row lock; approval cancel in same tx; frontend BL-001 fix |
 | PR-S2 | PR create / edit / submit | BR-PR-01, 02, 06, 08, 11, 14, 15, 17, 19, 21, 45, 46, 47 | draft-only edits (PR_NOT_EDITABLE), requester-only, standard-rate estimate, 3-decimal qty |
 | PR-S3 | PR line states ↔ PO | BR-PR-25, 28, 30, 31, 32, 33, 36 | built with purchase-order module (PO writes drive PR lines) |
+
+## approval + approval-policies + purchase-order slices (explorer: reports/41-explorer.md)
+| # | Slice | BRs | Notes |
+|---|---|---|---|
+| APR-S1 | Policy admin + matching | BR-APR-01..03, 05..11, 13..16, 18, 19, 21, 22, 57..60 | ₹ vs paise form bug (BL-025); fallback chain moved to seed data (F-APR-1) |
+| APR-S2 | Request flow | BR-APR-23, 24, 26..31, 33, 35, 37, 39, 40, 42, 43, 45..48, 50..52, 54, 61 | approve/reject/send-back/withdraw, required comments, trail, mirrors, inbox, history endpoint |
+| PO-S1 | PO create/edit/submit/cancel/reject + PR line states | BR-PO-01..07, 11, 12, 20..23; BR-PR-25, 28, 30, 31, 33, 36 | PO reject/cancel cancels PR lines (approval Q4=B) |
+| PO-S2 | PO send/logs/delay/overdue/invoice/close/short-close/receipt | BR-PO-08..10, 13..19; BR-PR-32 | receipt status from GRN postings (stock branch) — finish after merge |

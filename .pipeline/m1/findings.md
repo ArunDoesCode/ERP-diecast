@@ -38,3 +38,6 @@
 | SEC-11 | security 37 | employeeService.regenerateQr | QR credential issued to password-method employee; QR login not built (BL-017) | backlog (fix with BL-017) | backlog |
 | F-TEST-12 | backend-dev 38 | backend/src/routes/pr-machine.test.ts "updating a PR to add a machine" | edited by a non-requester; BR-PR-17 = requester or super-admin only → fixture must have the requester edit | fix now (test-writer) | open |
 | CR-8-T | backend-dev 35 | backend/src/repository/approvalRepository.test.ts:173 | calls submitRequest with 2 args; CR-8 makes the actor required → pass an actor | fix now (test-writer), then backend one-liner | open |
+| CR-8-L | coordinator | backend/src/service/approvalService.ts:415-417 | biome format error after CR-8 commit (lint fails) | fix now (backend-dev) | fixed |
+| FE-SA | frontend-dev 40 | /auth/me + PR screens | no super-admin flag in UI → super-admin cannot edit PRs from the UI (backend allows, BR-PR-17) | S7: /auth/me returns isSuperAdmin; PR edit uses it | open |
+| FE-INACTIVE | frontend-dev 40 | PR item picker (useAssetItemsLookupQuery) | unverified that lookup excludes inactive items (backend rejects PR_INVALID_ITEM) | check after stock merge | open |
