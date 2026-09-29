@@ -44,3 +44,6 @@ you hit that the next developer should know (these go into the map's gotchas, no
 Fix only the finding ids in the brief. For each: what changed, file:line. Don't touch unrelated code.
 
 Return the protocol block.
+
+## Code lookup
+- Before changing an unfamiliar symbol, one `codegraph_explore` on it (callers + blast radius + covering tests); Read only the files you edit. After your own edits trust Read, not the index. See PROTOCOL → Code lookup.

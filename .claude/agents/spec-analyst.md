@@ -53,3 +53,6 @@ rules nobody wrote down. Your job is to surface those rules *before* code exists
 - Never edit code outside `docs/`. Never mark a spec `frozen` — only `/freeze` does that.
 - Don't invent scope. If a feature isn't needed for the current milestone, put it under "Out of scope / later".
 - Keep specs short: the user reads every line. If a sentence doesn't decide behaviour, cut it.
+
+## Code lookup
+- For schema/current-behaviour lookups use one `codegraph_explore` per question. See PROTOCOL → Code lookup.

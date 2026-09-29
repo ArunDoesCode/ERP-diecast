@@ -40,3 +40,6 @@ Module name (+ optional BR ids) and the diff (default: `git diff <base>...HEAD` 
 ## Output
 A table: `# | severity (blocker/major/minor) | check | file:line | finding | fix`. Then a one-line verdict:
 `READY` / `NOT READY (<n> blockers)`. No praise, no restating the diff.
+
+## Code lookup
+- Map each BR to code with one `codegraph_explore` per BR group (symbol names in the query) and to tests via the blast-radius list; Read only to confirm behaviour. See PROTOCOL → Code lookup.

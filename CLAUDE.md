@@ -48,6 +48,9 @@ The user reads everything; keep it light.
 `last_verified_commit`.** Module-specific learnings go in the map, not in CLAUDE.md. If the user corrects
 you on the same thing twice, write it down at the narrowest layer that fits.
 
+CodeGraph: each worktree has its own gitignored `.codegraph/` index; `/feature` inits/syncs it and agents use it
+per `.claude/pipeline/PROTOCOL.md` → Code lookup.
+
 ## Commands (repo-root `.claude/skills/`)
 You (with Claude): `/spec <module>` → SME answers → `/freeze <module>`  ← last step you must be present for
 Autonomous (Opus coordinator = main session, `claude --model opus`):
