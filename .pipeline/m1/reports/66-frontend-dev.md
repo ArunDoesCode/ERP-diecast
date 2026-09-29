@@ -27,3 +27,6 @@ tsc + lint clean.
 ## Backend needs
 - Confirm `GET /asset/items?isActive=true` accepts the string "true". `isActive` also on `/asset/locations` (not used by FE yet).
 - `/auth/me` + login must return `isSuperAdmin` (backend-dev in progress); until then it reads undefined -> false.
+
+## Addendum: SPEC-M1 / CR-M1 (BR-PR-14)
+Fixed in the commit after b6198e2. `noCostHistory?: boolean` added to `PurchaseRequisitionItem`; the PR edit dialog header lists items that use the standard rate under the Estimate line ("Estimate uses standard rate for: X (no cost history yet)"). tsc + lint clean.

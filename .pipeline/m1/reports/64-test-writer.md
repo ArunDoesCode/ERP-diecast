@@ -29,3 +29,6 @@ Permissions-matrix: dropped the 6 parity rows for routes removed in S7 (BR-AUTH-
 
 ## MRG-T4 (appended)
 db-reset.test.ts BR-KD-46: replaced "stock and average cost 0" with "currentStock equals ledger sum per item, and some stock exists" (known-defects v4). Full run: 1154 pass, 0 fail, 31 files; typecheck 0 errors (BR-PR-14 and db-reset now green as code rows landed).
+
+## SPEC-P3 (appended)
+Manual UI checklist written: .pipeline/m1/manual-ui-checklist.md (8 sections: grants gating, roles, screens, isSuperAdmin, Cancel PR BR-KD-16/BR-PR-39, BR-PR-14 note, BR-APR-57..60, PO screens). Links the m1-stock checklist for grn/inventory/suppliers.

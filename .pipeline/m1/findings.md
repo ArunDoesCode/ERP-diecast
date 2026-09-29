@@ -60,7 +60,7 @@
 | SEC-P4 | security 57 | pr.types notes, prService saleOrderId | notes ≤2000, sale order exists (PR v2) | fix now — test first | fixed (f1c9812/9c2998e) |
 | CRP-8/SPEC-P5 | code 56, spec 59 | poService confirmSupplier | confirmation method enum (PO v2) | fix now — test first | fixed (f1c9812/9c2998e) |
 | CRP-6, CRP-7, CRP-10, PERF-04, PERF-06, PERF-07, PERF-08 | code 56, perf 58 | backend PR/PO | typed errors, shared reason parser (400 on bad JSON), dead code, batch PR-line updates, indexes | fix now (backend) | fixed (f1c9812/9c2998e) |
-| SPEC-P3 | spec 59 | frontend | BR-APR-57..60, UI half of BR-PR-39, BR-KD-16 untested | manual UI checklist in the PR | open |
+| SPEC-P3 | spec 59 | frontend | BR-APR-57..60, UI half of BR-PR-39, BR-KD-16 untested | manual UI checklist in the PR | fixed (manual-ui-checklist.md) |
 | SPEC-P6, SPEC-P9 | spec 59 | specs | undocumented codes; BR-PR-46 via PO record | fixed in spec changelogs (PR v2, PO v2, approval v2) | fixed |
 | SPEC-P8 | spec 59 | reports | contamination line missing in 3 reports | noted: briefs are pointer-only template calls, recorded in the coordinator transcript | rejected |
 | CRP-5, CRP-9, PERF-03, PERF-05, PERF-09, PERF-10, PERF-11, SPEC-P10 | code 56, perf 58, spec 59 | various | repo layering, SCO submit lock (M2), minor batching, trigram search, rate suggestion (after merge) | backlog / after merge | backlog |
