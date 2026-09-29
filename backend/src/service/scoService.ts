@@ -1,10 +1,10 @@
 import { db } from "../db/client";
-import type { Actor } from "../lib/auth-middleware";
+import { type Actor, can } from "../lib/auth-middleware";
 import {
   BadRequestError,
   ConflictError,
+  ForbiddenError,
   NotFoundError,
-  NotImplementedError,
 } from "../lib/errors";
 import { qtyAtVendor } from "../lib/sco-math";
 import { approvalRepository } from "../repository/approvalRepository";
@@ -16,6 +16,7 @@ import {
   scoRepository,
   type Tx,
 } from "../repository/scoRepository";
+import { postStock } from "../repository/stockPostingRepository";
 import type {
   cancelScoSchemaType,
   closeScoSchemaType,
@@ -323,16 +324,110 @@ export const scoService = {
     return loadDetails(id);
   },
 
-  // BR-SCO-20: draft / pending_approval / approved with nothing issued; reason
-  // always; the open approval request is cancelled in the same transaction.
-  // BR-SCO-19, 24: contract stub, logic lands in S4 implement.
+  // BR-SCO-19, 24, 25: close from material_issued / material_received. Whatever
+  // is still at the vendor is written off from the vendor location at issue
+  // cost (owner + reason); un-issued qty is dropped. One transaction, SCO locked first.
   async close(
-    _id: number,
-    _input: closeScoSchemaType,
-    _actorId: number,
-    _actor: Actor,
+    id: number,
+    input: closeScoSchemaType,
+    actorId: number,
+    actor: Actor,
   ): Promise<scoDetailsSchemaType> {
-    throw new NotImplementedError("SCO close is not implemented yet");
+    return db.transaction(async (tx) => {
+      const locked = await scoRepository.lockById(id, tx);
+      if (!locked) {
+        throw new NotFoundError("Subcontracting order not found");
+      }
+      if (
+        locked.status !== "material_issued" &&
+        locked.status !== "material_received"
+      ) {
+        throw new ConflictError(
+          `A subcontracting order in status ${locked.status} cannot be closed`,
+          "SCO_INVALID_TRANSITION",
+        );
+      }
+      const lines = await scoRepository.findLines(id, tx);
+      if (lines.some((line) => line.pendingQaQty > 0)) {
+        throw new ConflictError(
+          "A receipt is still waiting for QA; decide QA first",
+          "SCO_QA_PENDING",
+        );
+      }
+
+      const losses = lines
+        .map((line) => ({ line, qty: qtyAtVendor(line) }))
+        .filter((l) => l.qty > 0);
+      if (losses.length > 0) {
+        if (!can(actor, "sco.loss_override")) {
+          throw new ForbiddenError(
+            "Only the owner can close an order with material lost at the vendor",
+          );
+        }
+        if (!input.reason) {
+          throw new BadRequestError(
+            "A reason is required when material is left at the vendor",
+            "SCO_CLOSE_REASON_REQUIRED",
+          );
+        }
+        const vendorLocation = await scoReceiptRepository.findVendorLocation(
+          locked.vendorId,
+          tx,
+        );
+        if (!vendorLocation) {
+          throw new ConflictError("Vendor location is not set up");
+        }
+        for (const { line, qty } of losses) {
+          const open = await scoReceiptRepository.lockOpenChallanLines(
+            line.id,
+            tx,
+          );
+          let left = qty;
+          let value = 0;
+          let heat: string | null = null;
+          for (const cl of open) {
+            if (left <= 0) break;
+            const take = Math.min(cl.qty - cl.settledQty, left);
+            if (take <= 0) continue;
+            left -= take;
+            value += take * cl.unitIssueCostPaise;
+            heat = heat ?? cl.heatNumber;
+            await scoReceiptRepository.addSettledQty(cl.id, take, tx);
+          }
+          const costed = qty - left;
+          await postStock(tx, {
+            itemId: line.rawItemId,
+            locationId: vendorLocation.id,
+            transactionType: "out",
+            referenceType: "sco_loss",
+            referenceId: id,
+            referenceLineId: line.id,
+            batchNumber: heat ?? line.rawItemBatch ?? null,
+            quantityChange: -qty,
+            unitCostPaise: costed > 0 ? Math.round(value / costed) : 0,
+            averageEffect: "none",
+            notes: input.reason,
+            createdBy: actorId,
+          });
+          await scoReceiptRepository.addCounters(line.id, { lossQty: qty }, tx);
+        }
+      }
+
+      const now = new Date();
+      await scoRepository.updateHeader(
+        id,
+        {
+          status: "closed",
+          closedBy: actorId,
+          closedAt: now,
+          closeReason: input.reason ?? null,
+          lastUpdatedBy: actorId,
+          lastUpdatedAt: now,
+        },
+        tx,
+      );
+      return loadDetails(id, tx);
+    });
   },
 
   async cancel(

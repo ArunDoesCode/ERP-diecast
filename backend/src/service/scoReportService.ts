@@ -1,4 +1,4 @@
-import { NotImplementedError } from "../lib/errors";
+import { scoReportRepository } from "../repository/scoReportRepository";
 import type {
   lossLogQuerySchemaType,
   lossLogRowSchemaType,
@@ -11,17 +11,27 @@ type Paginated<T> = {
   meta: { page: number; pageSize: number; total: number; totalPages: number };
 };
 
-// S4 reports: contract stubs, logic lands in S4 implement.
+function meta(page: number, pageSize: number, total: number) {
+  return {
+    page,
+    pageSize,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+  };
+}
+
 export const scoReportService = {
   async vendorStock(
-    _query: vendorStockQuerySchemaType,
+    query: vendorStockQuerySchemaType,
   ): Promise<Paginated<vendorStockRowSchemaType>> {
-    throw new NotImplementedError("Vendor stock report is not implemented yet");
+    const { rows, total } = await scoReportRepository.vendorStock(query);
+    return { data: rows, meta: meta(query.page, query.pageSize, total) };
   },
 
   async lossLog(
-    _query: lossLogQuerySchemaType,
+    query: lossLogQuerySchemaType,
   ): Promise<Paginated<lossLogRowSchemaType>> {
-    throw new NotImplementedError("Loss log is not implemented yet");
+    const { rows, total } = await scoReportRepository.lossLog(query);
+    return { data: rows, meta: meta(query.page, query.pageSize, total) };
   },
 };

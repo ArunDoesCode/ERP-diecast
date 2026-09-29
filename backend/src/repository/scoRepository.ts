@@ -5,8 +5,10 @@ import {
   desc,
   eq,
   getTableColumns,
+  gte,
   ilike,
   inArray,
+  lt,
   or,
   sql,
 } from "drizzle-orm";
@@ -86,6 +88,13 @@ export function computeScoTotalsPaise(
   };
 }
 
+// Inclusive upper bound for a `createdTo` filter: a bare date (midnight UTC)
+// means the whole day, so the exclusive bound is the next midnight.
+export function endOfDayBound(date: Date): Date {
+  const isMidnight = date.getTime() % 86_400_000 === 0;
+  return isMidnight ? new Date(date.getTime() + 86_400_000) : date;
+}
+
 export type PreparedScoLine = Omit<ScoItemInsert, "scoId">;
 
 export const scoRepository = {
@@ -109,6 +118,12 @@ export const scoRepository = {
             ilike(subcontractingOrders.scoNumber, `%${params.q}%`),
             ilike(supplierMaster.name, `%${params.q}%`),
           )
+        : undefined,
+      params.createdFrom
+        ? gte(subcontractingOrders.createdAt, params.createdFrom)
+        : undefined,
+      params.createdTo
+        ? lt(subcontractingOrders.createdAt, endOfDayBound(params.createdTo))
         : undefined,
     );
 

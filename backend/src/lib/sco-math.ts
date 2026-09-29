@@ -34,8 +34,9 @@ export function qtyAtVendor(line: LineCounters): number {
   );
 }
 
-// BR-SCO-18: nothing left at the vendor when pending-QA pieces still count as there.
+// BR-SCO-18: nothing left at the vendor. Pieces received and waiting for QA are
+// already back with us, so they do not count as at the vendor (S4: close is
+// blocked separately while QA is pending, BR-SCO-19).
 export function nothingLeftAtVendor(line: LineCounters): boolean {
-  if (line.pendingQaQty > 0) return false;
   return qtyAtVendor(line) === 0;
 }

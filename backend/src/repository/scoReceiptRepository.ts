@@ -258,6 +258,7 @@ export const scoReceiptRepository = {
       pendingQaQty?: number;
       acceptedQty?: number;
       rejectedQty?: number;
+      lossQty?: number;
     },
     tx: Tx,
   ) {
@@ -269,6 +270,7 @@ export const scoReceiptRepository = {
         pendingQaQty: sql`${t.pendingQaQty} + ${delta.pendingQaQty ?? 0}`,
         acceptedQty: sql`${t.acceptedQty} + ${delta.acceptedQty ?? 0}`,
         rejectedQty: sql`${t.rejectedQty} + ${delta.rejectedQty ?? 0}`,
+        lossQty: sql`${t.lossQty} + ${delta.lossQty ?? 0}`,
       })
       .where(eq(t.id, scoItemId));
   },
