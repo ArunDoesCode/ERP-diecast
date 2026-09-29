@@ -107,3 +107,4 @@ None open.
 - 2026-09-29 — frozen v1 (all questions answered by Arun)
 - 2026-09-29 — v2 clarified during build (Arun): plant details live in a new one-row `company_settings` table; `hsn_code` added to item master; missing plant details or HSN → challan 400 (BR-SCO-09). No other rule changed.
 - 2026-09-29 — clarified during build (S2): challan date is optional (default today); per-line heat number optional (default = the SCO line heat/batch). No rule changed.
+- 2026-09-29 — clarified during build (S2): BR-SCO-07 vs BR-SCO-24 — qty over what is left when the request arrives → 400; qty that was valid on arrival but lost a race (over after the SCO lock) → 409. Ledger `sco_issue` rows reference the challan (challan id), SCO id kept on the row context.
