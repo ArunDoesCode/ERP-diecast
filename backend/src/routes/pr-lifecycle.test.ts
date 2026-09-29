@@ -142,7 +142,7 @@ const submit = (tag: string, prId: number) =>
 const act = (
   tag: string,
   requestId: number,
-  action: "approve" | "reject" | "sent_back" | "cancel",
+  action: "approve" | "reject" | "sent_back" | "withdraw",
 ) =>
   call(tag, "POST", `/api/approval/actOnRequest/${requestId}`, {
     action,
@@ -690,7 +690,7 @@ describe("BR-PR-21 approval outcomes", () => {
   test("BR-PR-21 requester withdraws -> draft, request cancelled", async () => {
     const prId = await createOk("a");
     const reqId = await submitOk("a", prId);
-    expect((await act("a", reqId, "cancel")).status).toBe(200);
+    expect((await act("a", reqId, "withdraw")).status).toBe(200);
     expect((await prRow(prId))?.status).toBe("draft");
     const [req] = await db
       .select()
