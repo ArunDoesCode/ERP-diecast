@@ -3,7 +3,11 @@ import { z } from "zod";
 
 import { approvalController } from "../controller/approvalController";
 import { asyncHandler } from "../lib/async-handler";
-import { requireAuth, requirePermission } from "../lib/auth-middleware";
+import {
+  requireAnyPermission,
+  requireAuth,
+  requirePermission,
+} from "../lib/auth-middleware";
 import { paginatedResponse, successResponse } from "../lib/response-schemas";
 import { register } from "../lib/route-registry";
 import type { AppEnv } from "../lib/types";
@@ -32,7 +36,7 @@ approvalRouter.use("*", requireAuth);
 
 approvalRouter.get(
   APPROVAL_ROUTES.getPolicies,
-  requirePermission("approval.policy.view"),
+  requireAnyPermission("approval.policy.view", "approval.policy.manage"),
   asyncHandler(approvalController.getPolicies),
 );
 register({
@@ -40,7 +44,11 @@ register({
   path: `${APPROVAL_BASE_PATH}${APPROVAL_ROUTES.getPolicies}`,
   tags: ["approval"],
   summary: "List approval policies, paginated.",
-  auth: { type: "permission", key: "approval.policy.view" },
+  auth: {
+    type: "permission",
+    key: "approval.policy.view",
+    alsoKeys: ["approval.policy.manage"],
+  },
   request: { query: approvalPolicyListQuerySchema },
   responses: { "200": paginatedResponse(approvalPolicySchema) },
   pagination: {
@@ -51,7 +59,7 @@ register({
 
 approvalRouter.get(
   APPROVAL_ROUTES.getPolicyDetails,
-  requirePermission("approval.policy.view"),
+  requireAnyPermission("approval.policy.view", "approval.policy.manage"),
   asyncHandler(approvalController.getPolicyDetails),
 );
 register({
@@ -59,7 +67,11 @@ register({
   path: `${APPROVAL_BASE_PATH}${APPROVAL_ROUTES.getPolicyDetails}`,
   tags: ["approval"],
   summary: "Get a single approval policy's full definition.",
-  auth: { type: "permission", key: "approval.policy.view" },
+  auth: {
+    type: "permission",
+    key: "approval.policy.view",
+    alsoKeys: ["approval.policy.manage"],
+  },
   responses: { "200": successResponse(approvalPolicySchema) },
 });
 

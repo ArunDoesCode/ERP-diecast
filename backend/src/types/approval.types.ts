@@ -175,21 +175,18 @@ export const createApprovalPolicySchema = createInsertSchema(approvalPolicies, {
     priority: true,
     docType: true,
     autoApprove: true,
-    approvalChain: true,
   })
   .extend({
+    // BR-APR-05: an auto-approve policy sends no chain (levels = 0); an
+    // auto-approve-off policy needs at least one step (checked below).
+    approvalChain: approvalChainOrEmptySchema.default([]),
     // These columns are nullable with no default, so drizzle-zod's insert
     // schema derives them as `.optional().nullable()`. The create contract
     // only ever accepts omission (never an explicit null), so they're kept
     // hand-authored here instead of silently widening the accepted shape.
     description: z.string().optional(),
     subDocType: z.enum(procurementCategoryEnum.enumValues).default("any"),
-    // TODO(build APR-S1, BR-APR-15): `isSaleOrderLinked` is dropped and must
-    // stop being accepted. BR-APR-05: `approvalChain` becomes optional (an
-    // auto-approve policy sends none); empty/omitted with autoApprove off = 400.
-    // Kept type-compatible here because the service is not touched in the
-    // contract step.
-    isSaleOrderLinked: z.boolean().optional(),
+    // BR-APR-15: `isSaleOrderLinked` is gone; a stray value is ignored (never stored).
     // Whole paise (BR-APR-06). The form takes rupees (up to 2 decimals) and
     // sends rupees x 100 (BL-025 is a frontend bug: it must not send rupees).
     minAmountPaise: z.coerce
@@ -260,11 +257,14 @@ export const updateApprovalPolicySchema = createUpdateSchema(approvalPolicies, {
     isActive: true,
     priority: true,
     subDocType: true,
-    isSaleOrderLinked: true,
     minAmountPaise: true,
     maxAmountPaise: true,
     autoApprove: true,
     approvalChain: true,
+  })
+  .extend({
+    // BR-APR-11: the doc type is fixed after create; any value sent is a 400.
+    docType: z.never({ error: "docType cannot be changed" }).optional(),
   })
   .superRefine((data, ctx) => {
     const hasAnyField =
@@ -273,7 +273,6 @@ export const updateApprovalPolicySchema = createUpdateSchema(approvalPolicies, {
       data.isActive !== undefined ||
       data.priority !== undefined ||
       data.subDocType !== undefined ||
-      data.isSaleOrderLinked !== undefined ||
       data.minAmountPaise !== undefined ||
       data.maxAmountPaise !== undefined ||
       data.autoApprove !== undefined ||
@@ -346,10 +345,11 @@ export const approvalActionSchema = z.enum([
 
 // `notes` (the typed comment) is REQUIRED for approve / reject / sent_back
 // (BR-APR-37): the service answers 400 `APPROVAL_NOTES_REQUIRED` (not a Zod
-// error, so the code is stable). Optional for withdraw / cancel (BR-APR-39).
+// error, so the code is stable) — hence no `.min(1)` here. Optional for
+// withdraw / cancel (BR-APR-39).
 export const approvalActionRequestSchema = z.object({
   action: approvalActionSchema,
-  notes: z.string().trim().min(1).optional(),
+  notes: z.string().optional(),
 });
 
 export type approvalActionRequestSchemaType = z.infer<

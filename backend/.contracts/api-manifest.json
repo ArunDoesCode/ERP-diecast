@@ -17,7 +17,10 @@
       "summary": "List approval policies, paginated.",
       "auth": {
         "type": "permission",
-        "key": "approval.policy.view"
+        "key": "approval.policy.view",
+        "alsoKeys": [
+          "approval.policy.manage"
+        ]
       },
       "request": {
         "query": {
@@ -63,7 +66,10 @@
       "summary": "Get a single approval policy's full definition.",
       "auth": {
         "type": "permission",
-        "key": "approval.policy.view"
+        "key": "approval.policy.view",
+        "alsoKeys": [
+          "approval.policy.manage"
+        ]
       },
       "request": {},
       "responses": {
@@ -113,7 +119,6 @@
           "approvalChain": "array<object>.required",
           "description": "string.optional",
           "subDocType": "enum:any,sale_order,stock_reorder,maintenance,tooling,subcontracting,misc.required",
-          "isSaleOrderLinked": "boolean.optional",
           "minAmountPaise": "integer.nonnegative.nullable.optional",
           "maxAmountPaise": "integer.nonnegative.nullable.optional"
         }
@@ -162,11 +167,11 @@
           "isActive": "boolean.optional",
           "priority": "integer.positive.optional",
           "subDocType": "enum:any,sale_order,stock_reorder,maintenance,tooling,subcontracting,misc.optional",
-          "isSaleOrderLinked": "boolean.nullable.optional",
           "minAmountPaise": "integer.nonnegative.nullable.optional",
           "maxAmountPaise": "integer.nonnegative.nullable.optional",
           "autoApprove": "boolean.optional",
-          "approvalChain": "array<object>.optional"
+          "approvalChain": "array<object>.optional",
+          "docType": "unknown.optional"
         }
       },
       "responses": {
@@ -305,7 +310,7 @@
       "request": {
         "body": {
           "action": "enum:approve,reject,sent_back,cancel,withdraw.required",
-          "notes": "string.nonempty.optional"
+          "notes": "string.optional"
         }
       },
       "responses": {

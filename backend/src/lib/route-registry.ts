@@ -7,7 +7,12 @@ export type AuthRequirement =
   | { type: "any-authenticated" }
   | { type: "roles"; roles: Role[] } // legacy; removed once every router uses "permission"
   /** BR-AUTH-09/10: exactly one key; super-admin bypasses (BR-AUTH-18). */
-  | { type: "permission"; key: PermissionKey };
+  | {
+      type: "permission";
+      key: PermissionKey;
+      /** Extra keys that also admit the caller (e.g. `.manage` admits a `.view` route). */
+      alsoKeys?: PermissionKey[];
+    };
 
 export type RouteDescriptor = {
   method: "GET" | "POST" | "PATCH" | "DELETE";

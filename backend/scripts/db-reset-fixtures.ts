@@ -314,6 +314,7 @@ export async function runFixtures(opts: {
     return approvalService.submitRequest(
       { docType: "pr", docId: pr.id },
       userId[pr.requester],
+      actors[pr.requester],
     );
   }
   async function approvedPr(
@@ -484,6 +485,7 @@ export async function runFixtures(opts: {
     return approvalService.submitRequest(
       { docType: "po", docId: po.id },
       userId.back_office,
+      actors.back_office,
     );
   }
   async function approvePo(po: Po, note: string) {

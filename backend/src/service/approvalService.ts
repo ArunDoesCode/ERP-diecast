@@ -4,6 +4,7 @@ import {
   BadRequestError,
   ConflictError,
   ForbiddenError,
+  InternalServerError,
   NotFoundError,
 } from "../lib/errors";
 import { approvalRepository } from "../repository/approvalRepository";
@@ -85,13 +86,31 @@ function currentApproverFields(chain: approvalChainSchemaType, level: number) {
       };
 }
 
+// Drizzle wraps driver errors in a DrizzleQueryError whose `cause` is the
+// Postgres error, so walk the cause chain to find the 23505 code.
 function isUniqueViolation(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === "23505"
-  );
+  let current: unknown = error;
+  for (let depth = 0; depth < 5 && current; depth += 1) {
+    if (
+      typeof current === "object" &&
+      "code" in current &&
+      current.code === "23505"
+    ) {
+      return true;
+    }
+    current =
+      typeof current === "object" && "cause" in current
+        ? current.cause
+        : undefined;
+  }
+  return false;
+}
+
+const POLICY_SLOT_TAKEN_MESSAGE =
+  "An active policy with the same priority, doc type and category already exists";
+
+function slotTakenError() {
+  return new ConflictError(POLICY_SLOT_TAKEN_MESSAGE, "POLICY_PRIORITY_TAKEN");
 }
 
 function toTrailAction(action: approvalActionRequestSchemaType["action"]) {
@@ -149,30 +168,25 @@ async function assertChainHasEligibleApprovers(chain: approvalChainSchemaType) {
   for (const step of chain) {
     if (step.approverType === "role") {
       const roleName = step.role;
-      if (!roleName) {
-        throw new BadRequestError("Approval chain role is missing");
-      }
-
-      const activeCount =
-        await approvalRepository.countActiveEmployeesByRoleName(roleName);
+      const activeCount = roleName
+        ? await approvalRepository.countActiveEmployeesByRoleName(roleName)
+        : 0;
       if (activeCount === 0) {
         throw new BadRequestError(
-          `No active employees found for role ${roleName}`,
+          `Approval step ${step.level} has no active employee with role ${roleName ?? "(missing)"}`,
+          "APPROVAL_NO_ELIGIBLE_APPROVER",
         );
       }
       continue;
     }
 
-    const employeeId = step.employeeId;
-    if (!employeeId) {
-      throw new BadRequestError("Approval chain specific approver is missing");
-    }
-
-    const approver =
-      await approvalRepository.findEmployeeWithRoleById(employeeId);
+    const approver = step.employeeId
+      ? await approvalRepository.findEmployeeWithRoleById(step.employeeId)
+      : undefined;
     if (!approver?.isActive) {
       throw new BadRequestError(
-        `Specific approver ${employeeId} is missing or inactive`,
+        `Approval step ${step.level} names employee ${step.employeeId ?? "(missing)"}, who is missing or inactive`,
+        "APPROVAL_NO_ELIGIBLE_APPROVER",
       );
     }
   }
@@ -237,7 +251,6 @@ export const approvalService = {
       priority: input.priority,
       docType: input.docType,
       subDocType: input.subDocType,
-      isSaleOrderLinked: input.isSaleOrderLinked ?? null,
       minAmountPaise: input.minAmountPaise ?? null,
       maxAmountPaise: input.maxAmountPaise ?? null,
       autoApprove: input.autoApprove ?? false,
@@ -252,9 +265,7 @@ export const approvalService = {
       return row;
     } catch (error) {
       if (isUniqueViolation(error)) {
-        throw new ConflictError(
-          "Active policy with same priority and docType already exists",
-        );
+        throw slotTakenError();
       }
       throw error;
     }
@@ -270,6 +281,33 @@ export const approvalService = {
       throw new NotFoundError("Approval policy not found");
     }
 
+    // BR-APR-05 / 06: the checks run on the stored values plus the change.
+    const effectiveMin =
+      input.minAmountPaise !== undefined
+        ? input.minAmountPaise
+        : existing.minAmountPaise;
+    const effectiveMax =
+      input.maxAmountPaise !== undefined
+        ? input.maxAmountPaise
+        : existing.maxAmountPaise;
+    if (
+      effectiveMin !== null &&
+      effectiveMax !== null &&
+      effectiveMax <= effectiveMin
+    ) {
+      throw new BadRequestError(
+        "maxAmountPaise must be greater than minAmountPaise",
+      );
+    }
+
+    const effectiveAutoApprove = input.autoApprove ?? existing.autoApprove;
+    const effectiveChain = input.approvalChain ?? existing.approvalChain;
+    if (!effectiveAutoApprove && effectiveChain.length === 0) {
+      throw new BadRequestError(
+        "approvalChain needs at least one step unless autoApprove",
+      );
+    }
+
     const data = {
       ...(input.name !== undefined ? { name: input.name } : {}),
       ...(input.description !== undefined
@@ -279,9 +317,6 @@ export const approvalService = {
       ...(input.priority !== undefined ? { priority: input.priority } : {}),
       ...(input.subDocType !== undefined
         ? { subDocType: input.subDocType }
-        : {}),
-      ...(input.isSaleOrderLinked !== undefined
-        ? { isSaleOrderLinked: input.isSaleOrderLinked }
         : {}),
       ...(input.minAmountPaise !== undefined
         ? { minAmountPaise: input.minAmountPaise }
@@ -310,9 +345,7 @@ export const approvalService = {
       return row;
     } catch (error) {
       if (isUniqueViolation(error)) {
-        throw new ConflictError(
-          "Active policy with same priority and docType already exists",
-        );
+        throw slotTakenError();
       }
       throw error;
     }
@@ -360,17 +393,15 @@ export const approvalService = {
         (await approvalRepository.findMatchingActivePolicy({
           docType: input.docType,
           subDocType: doc.subDocType,
-          isSaleOrderLinked: doc.isSaleOrderLinked,
           amountPaise,
-        })) ??
-        (await approvalRepository.findOrCreateFallbackPolicy(
-          input.docType,
-          actorId,
-        ));
+        })) ?? (await approvalRepository.findFallbackPolicy(input.docType));
       if (!matched) {
-        throw new BadRequestError("Unable to resolve approval policy");
+        // BR-APR-22: the fallback lives in seed data; missing = setup error.
+        throw new InternalServerError(
+          "Approval fallback policy is not configured",
+          "APPROVAL_FALLBACK_MISSING",
+        );
       }
-      await assertChainHasEligibleApprovers(matched.approvalChain);
       return matched;
     };
 
@@ -394,6 +425,18 @@ export const approvalService = {
       if (input.docType === "pr") {
         const locked = await prRepository.findPrByIdForUpdate(input.docId, tx);
         if (!locked || !canSubmitForApproval(locked.status)) {
+          // A racing submit that committed first is the more specific answer (BR-APR-26).
+          const raced = await approvalRepository.findPendingRequestByDoc(
+            input.docType,
+            input.docId,
+            tx,
+          );
+          if (raced) {
+            throw new ConflictError(
+              "Document already has an open approval request",
+              "APPROVAL_ALREADY_OPEN",
+            );
+          }
           throw new ConflictError(
             `Cannot submit PR for approval from status ${locked?.status ?? "missing"}`,
             "APPROVAL_INVALID_SOURCE_STATUS",
@@ -412,9 +455,16 @@ export const approvalService = {
 
       const chain = policy.approvalChain;
 
+      // BR-APR-28 / 61: an auto-approve policy, or a requester who holds
+      // approval.auto_approve_own, skips the chain.
       const autoApproved =
         policy.autoApprove === true || can(actor, "approval.auto_approve_own");
       const now = new Date();
+
+      // BR-APR-23: not checked when the request is auto-approved.
+      if (!autoApproved) {
+        await assertChainHasEligibleApprovers(chain);
+      }
 
       const approverFields = autoApproved
         ? { currentApproverRole: null, currentApproverEmployeeId: null }
@@ -473,7 +523,9 @@ export const approvalService = {
             level: createdRequest.totalLevels,
             action: "auto_approved",
             actionBy: actorId,
-            notes: "Auto-approved by policy",
+            notes: policy.autoApprove
+              ? `Auto-approved by policy ${policy.name}`
+              : "Auto-approved: own request",
           },
           tx,
         );
@@ -557,6 +609,20 @@ export const approvalService = {
     input: approvalActionRequestSchemaType,
     actorId: number,
   ) {
+    // BR-APR-37: approve, reject and send back need a typed comment.
+    const notes = input.notes?.trim() ? input.notes.trim() : null;
+    if (
+      notes === null &&
+      (input.action === "approve" ||
+        input.action === "reject" ||
+        input.action === "sent_back")
+    ) {
+      throw new BadRequestError(
+        "A comment is required to approve, reject or send back",
+        "APPROVAL_NOTES_REQUIRED",
+      );
+    }
+
     return db.transaction(async (tx) => {
       await approvalRepository.lockRequestById(requestId, tx);
 
@@ -588,6 +654,21 @@ export const approvalService = {
           request.currentLevel,
           actorId,
         );
+
+        // BR-APR-33: one employee cannot approve two levels of one request.
+        if (
+          input.action === "approve" &&
+          (await approvalRepository.hasEmployeeApproved(
+            request.id,
+            actorId,
+            tx,
+          ))
+        ) {
+          throw new ForbiddenError(
+            "You already approved a level of this request",
+            "APPROVAL_ALREADY_ACTED",
+          );
+        }
       }
 
       let nextStatus: ApprovalRequestStatus = request.status;
@@ -646,7 +727,7 @@ export const approvalService = {
           level: request.currentLevel,
           action: toTrailAction(input.action),
           actionBy: actorId,
-          notes: input.notes ?? null,
+          notes,
         },
         tx,
       );
@@ -704,40 +785,21 @@ export const approvalService = {
       }
 
       if (request.docType === "sco") {
-        if (input.action === "withdraw") {
-          await approvalRepository.updateScoApprovalMirror(
-            request.docId,
-            { status: "draft" },
-            tx,
-          );
-        } else if (nextStatus === "approved") {
-          await approvalRepository.updateScoApprovalMirror(
-            request.docId,
-            { status: "approved" },
-            tx,
-          );
-        }
+        // BR-APR-42: an SCO is never left at require_more_info; send back and
+        // withdraw both return it to draft. Approve at a middle level keeps it pending.
+        const scoStatus =
+          input.action === "withdraw" || nextStatus === "require_more_info"
+            ? "draft"
+            : nextStatus === "approved" ||
+                nextStatus === "rejected" ||
+                nextStatus === "cancelled"
+              ? nextStatus
+              : undefined;
 
-        if (nextStatus === "rejected") {
+        if (scoStatus) {
           await approvalRepository.updateScoApprovalMirror(
             request.docId,
-            { status: "rejected" },
-            tx,
-          );
-        }
-
-        if (nextStatus === "require_more_info") {
-          await approvalRepository.updateScoApprovalMirror(
-            request.docId,
-            { status: "require_more_info" },
-            tx,
-          );
-        }
-
-        if (nextStatus === "cancelled" && input.action !== "withdraw") {
-          await approvalRepository.updateScoApprovalMirror(
-            request.docId,
-            { status: "cancelled" },
+            { status: scoStatus },
             tx,
           );
         }
@@ -803,5 +865,46 @@ export const approvalService = {
     await assertCanReadRequest(request, actor);
 
     return request;
+  },
+
+  async getApprovalHistory(
+    params: approvalDocLookupParamSchemaType,
+    actor: ActorContext,
+  ) {
+    const doc = await approvalRepository.findDocumentContext(
+      params.docType,
+      params.docId,
+    );
+    if (!doc) {
+      throw new NotFoundError("Source document not found");
+    }
+
+    const history = await approvalRepository.listRequestsWithTrailByDoc(
+      params.docType,
+      params.docId,
+    );
+    if (history.length === 0) {
+      return [];
+    }
+
+    // BR-APR-51: show the requests this caller may read; none readable = 403.
+    const readable: typeof history = [];
+    let denied: unknown;
+    for (const item of history) {
+      try {
+        await assertCanReadRequest(item, actor);
+        readable.push(item);
+      } catch (error) {
+        if (!(error instanceof ForbiddenError)) {
+          throw error;
+        }
+        denied = error;
+      }
+    }
+    if (readable.length === 0 && denied) {
+      throw denied;
+    }
+
+    return readable;
   },
 };

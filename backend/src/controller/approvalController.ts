@@ -1,6 +1,6 @@
 import type { Context } from "hono";
 
-import { AppError, UnauthorizedError } from "../lib/errors";
+import { UnauthorizedError } from "../lib/errors";
 import type { AppEnv } from "../lib/types";
 import { approvalService } from "../service/approvalService";
 import {
@@ -123,8 +123,13 @@ export const approvalController = {
     return c.json({ success: true, data });
   },
 
-  // CONTRACT stub (APR-S2, BR-APR-54): logic lands in the build step.
-  async getApprovalHistory(_c: Context<AppEnv>) {
-    throw new AppError("Not implemented", 501, "NOT_IMPLEMENTED");
+  async getApprovalHistory(c: Context<AppEnv>) {
+    const params = approvalDocLookupParamSchema.parse({
+      docType: c.req.param("docType"),
+      docId: c.req.param("docId"),
+    });
+    const actor = parseActor(c);
+    const data = await approvalService.getApprovalHistory(params, actor);
+    return c.json({ success: true, data });
   },
 };

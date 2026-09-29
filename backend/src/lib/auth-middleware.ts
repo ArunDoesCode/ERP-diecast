@@ -139,6 +139,26 @@ export function requirePermission(
   };
 }
 
+/**
+ * Like `requirePermission`, but holding any one of `keys` is enough
+ * (e.g. approval.policy.manage also admits the .view routes, BR-APR-01).
+ * The 403 body carries the first key, the one the route is documented with.
+ */
+export function requireAnyPermission(
+  ...keys: [PermissionKey, ...PermissionKey[]]
+): MiddlewareHandler<AppEnv> {
+  return async (c, next) => {
+    await requireAuth(c, async () => {});
+    const actor = c.get("actor");
+    if (!keys.some((key) => can(actor, key))) {
+      throw new ForbiddenError("Permission denied", "PERMISSION_DENIED", {
+        key: keys[0],
+      });
+    }
+    await next();
+  };
+}
+
 /** Legacy role-name guard, kept until the other branch stops using it. */
 export function requireRole(...allowed: Role[]): MiddlewareHandler<AppEnv> {
   return async (c, next) => {

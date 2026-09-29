@@ -31,6 +31,9 @@ try {
   );
   await syncCatalog();
   await seedGrants();
+  // BR-APR-22: the built-in fallback approval policy is seed data the code only reads.
+  const { seedFallbackPolicies } = await import("./seed-approval-policies");
+  await seedFallbackPolicies(null);
   const { disconnectDb } = await import("../src/db/client");
   await disconnectDb();
   console.log(
