@@ -1,6 +1,6 @@
 ---
 module: subcontracting
-spec: docs/specs/subcontracting.md (v2, frozen)
+spec: docs/specs/subcontracting.md (v3, frozen)
 last_verified_commit: de0fcfc
 last_verified_on: 2026-09-29
 depends_on: [suppliers, inventory, approval, grn]
@@ -44,6 +44,9 @@ Endpoints and payloads: `.pipeline/subcontracting/contract.md`, or `bun run cont
 - Drizzle subqueries need unique column aliases; `db:push` asks interactively about renames — old empty `subcontracting_grn*` tables were dropped once (dev DB: `drop table subcontracting_grn_items, subcontracting_grns cascade` before `db:push`, if it has no rows).
 - Loss write-off also raises `settledQty` on open challan lines with no settlement row (keeps ITC-04 data honest); there is no SCO delete route (404).
 - Receipt statuses (`pending_qa`, `accepted`, `partial_accepted`, `rejected`) and receipt number `SCO-GRN-<period>-<seq>` are build choices, not in the spec.
+- Challan date: future → 400 (`SCO_CHALLAN_DATE_FUTURE`, UTC day) — the picker uses local day, so 00:00–05:30 IST mismatches (BL-079).
+- Post stock lines in item-id order in every multi-line path (receipt, QA, close, challan) or two SCOs sharing items can deadlock (PERF-5).
+- QA/unprocessed issue cost comes only from the `processed_qty` part of settlements; mixing lots of different cost once skewed it (CR-1, `scoReceiptCost.test.ts`).
 - Scrap yard = first `scrap_yard` location; missing → 409 at QA when there are rejects.
 
 ## Tests
@@ -85,4 +88,4 @@ GST sources: [TaxGuru Sec 143](https://taxguru.in/goods-and-service-tax/job-work
 | Date | PR / commit | Change |
 |---|---|---|
 | 2026-09-29 | — | Map created with spec draft v0 (schema only, no feature code) |
-| 2026-09-29 | PR feature/subcontracting | Built S1–S4 to spec v2; review round 1 fixes (CR-1 cost, indexes, deadlock order) |
+| 2026-09-29 | PR #14 (0c84bea) | Built S1–S4 to spec v2; review fixes (CR-1 cost, indexes, deadlock order); v3: future challan date → 400 |
