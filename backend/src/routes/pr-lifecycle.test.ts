@@ -380,6 +380,21 @@ describe("BR-PR-02 header checks", () => {
     expect((await create("a", { notes: "" })).status).toBe(400);
   });
 
+  test("BR-PR-02 (v2) notes of 2000 characters are accepted, 2001 -> 400", async () => {
+    expect((await create("a", { notes: "n".repeat(2000) })).status).toBe(201);
+    expect((await create("a", { notes: "n".repeat(2001) })).status).toBe(400);
+  });
+
+  test("BR-PR-02 (v2) editing notes to 2001 characters -> 400, notes unchanged", async () => {
+    const prId = await createOk("a");
+    const res = await edit("a", prId, { notes: "n".repeat(2001) });
+    expect(res.status).toBe(400);
+    expect((await prRow(prId))?.notes).toBe("TEST_prlife note");
+    expect((await edit("a", prId, { notes: "n".repeat(2000) })).status).toBe(
+      200,
+    );
+  });
+
   test("BR-PR-02 saleOrderId is stored as sent, unchecked", async () => {
     const res = await create("a", { type: "sale_order", saleOrderId: 42 });
     expect(res.status).toBe(201);
@@ -559,6 +574,14 @@ describe("BR-PR-15 edit only in draft", () => {
     expect(res.status).toBe(400);
     expect((await json(res)).code).toBe("PR_STATUS_VIA_ACTION");
     expect((await prRow(prId))?.status).toBe("draft");
+  });
+
+  test("BR-PR-15 (v2) PATCH resending the current status 'draft' is still 400 PR_STATUS_VIA_ACTION", async () => {
+    const prId = await createOk("a");
+    const res = await edit("a", prId, { status: "draft", notes: "resent" });
+    expect(res.status).toBe(400);
+    expect((await json(res)).code).toBe("PR_STATUS_VIA_ACTION");
+    expect((await prRow(prId))?.notes).toBe("TEST_prlife note");
   });
 
   test("BR-PR-15 deleting the only line -> 400 PR_MIN_ONE_LINE", async () => {

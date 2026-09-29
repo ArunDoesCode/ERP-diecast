@@ -1069,6 +1069,40 @@ describe("BR-APR-15 sale-order flag dropped", () => {
     }
   });
 
+  test("BR-APR-15 (v2) the policy API never returns isSaleOrderLinked (create, details, list, edit)", async () => {
+    const created = await createPolicy("super");
+    expect(created.status).toBe(201);
+    const createdBody = await json(created);
+    const id = createdBody.data?.id as number;
+    expect(JSON.stringify(createdBody)).not.toContain("isSaleOrderLinked");
+
+    const details = await call(
+      "super",
+      "GET",
+      `/api/approval/getPolicyDetails/${id}`,
+    );
+    expect(details.status).toBe(200);
+    expect(JSON.stringify(await json(details))).not.toContain(
+      "isSaleOrderLinked",
+    );
+
+    const list = await call(
+      "super",
+      "GET",
+      "/api/approval/getPolicies?pageSize=100",
+    );
+    expect(list.status).toBe(200);
+    expect(JSON.stringify(await json(list))).not.toContain("isSaleOrderLinked");
+
+    const edited = await patchPolicy("super", id, {
+      name: "TEST_aprpol_noflag",
+    });
+    expect(edited.status).toBe(200);
+    expect(JSON.stringify(await json(edited))).not.toContain(
+      "isSaleOrderLinked",
+    );
+  });
+
   test("BR-APR-15 flag does not take part in matching; sale_order category does (PR sale_order 30,000 rupees)", async () => {
     const fast = await insPolicy({
       docType: "pr",

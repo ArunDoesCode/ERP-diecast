@@ -20,6 +20,8 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import postgres from "postgres";
 
 const SCRATCH = "diecast_kd_reset_test";
+// A local DB whose name is not "diecast" and does not end in "_test": needs DB_RESET_CONFIRM (v3).
+const GUARD = "diecast_kd_reset_guard";
 const BACKEND = new URL("..", import.meta.url).pathname;
 const SEED_PASSWORD = "kd-Seed-Pass-4471";
 
@@ -36,8 +38,10 @@ function withHost(url: string, host: string): string {
 
 const baseUrl = process.env.DATABASE_URL as string; // preload = DATABASE_URL_TEST
 const scratchUrl = withDb(baseUrl, SCRATCH);
+const guardUrl = withDb(baseUrl, GUARD);
 const dbPassword = decodeURIComponent(new URL(baseUrl).password);
 let sql: ReturnType<typeof postgres>;
+let guardSql: ReturnType<typeof postgres>;
 
 type Run = { code: number; out: string };
 
@@ -57,9 +61,9 @@ function assertScratchOnly(dbUrl: string) {
   }
   if (!LOCAL_HOSTS.has(u.hostname)) return; // remote: must be refused / cannot reach a local DB
   const db = u.pathname.replace(/^\//, "");
-  if (db !== SCRATCH) {
+  if (db !== SCRATCH && db !== GUARD) {
     throw new Error(
-      `db-reset.test: refusing to run db:reset against local database "${db}"; only "${SCRATCH}" is allowed`,
+      `db-reset.test: refusing to run db:reset against local database "${db}"; only "${SCRATCH}" and "${GUARD}" are allowed`,
     );
   }
 }
@@ -145,14 +149,19 @@ beforeAll(async () => {
   const admin = postgres(withDb(baseUrl, "postgres"), { max: 1 });
   await admin.unsafe(`DROP DATABASE IF EXISTS ${SCRATCH} WITH (FORCE)`);
   await admin.unsafe(`CREATE DATABASE ${SCRATCH}`);
+  await admin.unsafe(`DROP DATABASE IF EXISTS ${GUARD} WITH (FORCE)`);
+  await admin.unsafe(`CREATE DATABASE ${GUARD}`);
   await admin.end({ timeout: 5 });
   sql = postgres(scratchUrl, { max: 2, onnotice: () => {} });
+  guardSql = postgres(guardUrl, { max: 2, onnotice: () => {} });
 }, 60_000);
 
 afterAll(async () => {
   await sql?.end({ timeout: 5 });
+  await guardSql?.end({ timeout: 5 });
   const admin = postgres(withDb(baseUrl, "postgres"), { max: 1 });
   await admin.unsafe(`DROP DATABASE IF EXISTS ${SCRATCH} WITH (FORCE)`);
+  await admin.unsafe(`DROP DATABASE IF EXISTS ${GUARD} WITH (FORCE)`);
   await admin.end({ timeout: 5 });
 });
 
@@ -212,6 +221,73 @@ describe("db:reset guard (BR-KD-30)", () => {
   });
 });
 
+describe("db:reset local guard needs DB_RESET_CONFIRM for unusual targets (BR-KD-30, v3)", () => {
+  async function plantGuardSentinel() {
+    await guardSql.unsafe(`DROP SCHEMA IF EXISTS public CASCADE`);
+    await guardSql.unsafe(`CREATE SCHEMA public`);
+    await guardSql.unsafe(`CREATE TABLE public.kd_old_data (x int)`);
+    await guardSql.unsafe(`INSERT INTO public.kd_old_data VALUES (42)`);
+  }
+  async function guardSentinelIntact() {
+    try {
+      const rows = await guardSql`SELECT x FROM public.kd_old_data`;
+      return rows.length === 1 && rows[0].x === 42;
+    } catch {
+      return false;
+    }
+  }
+
+  test("BR-KD-30 local DB not named diecast and not ending _test, no DB_RESET_CONFIRM -> exit 2, data untouched", async () => {
+    await plantGuardSentinel();
+    const r = await run([], {}, guardUrl);
+    expect(r.code).toBe(2);
+    expect(await guardSentinelIntact()).toBe(true);
+  });
+
+  test("BR-KD-30 same target with a wrong DB_RESET_CONFIRM -> exit 2, data untouched", async () => {
+    await plantGuardSentinel();
+    const r = await run(
+      ["--allow-remote"],
+      { DB_RESET_CONFIRM: "somethingelse" },
+      guardUrl,
+    );
+    expect(r.code).toBe(2);
+    expect(await guardSentinelIntact()).toBe(true);
+  });
+
+  test("BR-KD-30 local port other than 5432/5433 without DB_RESET_CONFIRM -> exit 2 before connecting (ssh tunnel case)", async () => {
+    const tunnel = withHost(scratchUrl, "localhost").replace(
+      /:\d+\//,
+      ":15432/",
+    );
+    const r = await run([], {}, tunnel);
+    expect(r.code).toBe(2);
+    expect(r.out).not.toMatch(/ECONNREFUSED|ETIMEDOUT/);
+  });
+
+  test("BR-KD-30 local DB not named diecast/_test with matching DB_RESET_CONFIRM -> guard passes and the reset runs", async () => {
+    await plantGuardSentinel();
+    const r = await run(
+      ["--no-fixtures", "--allow-remote"],
+      { DB_RESET_CONFIRM: GUARD },
+      guardUrl,
+    );
+    expect(r.code).toBe(0);
+    const gone = await guardSql`SELECT to_regclass('public.kd_old_data') AS t`;
+    expect(gone[0].t).toBeNull();
+  }, 240_000);
+
+  test("BR-KD-30 after a run with --allow-remote the summary says to rotate the seed admin password now", async () => {
+    const r = await run(
+      ["--no-fixtures", "--allow-remote"],
+      { DB_RESET_CONFIRM: SCRATCH },
+      scratchUrl,
+    );
+    expect(r.code).toBe(0);
+    expect(r.out).toMatch(/rotate the seed admin password now/i);
+  }, 240_000);
+});
+
 describe("db:reset inputs and output before any write (BR-KD-33)", () => {
   test("BR-KD-33 missing SEED_USER_PASSWORD -> exit 4, old data still there", async () => {
     await plantSentinel();
@@ -262,6 +338,10 @@ describe("db:reset --no-fixtures (BR-KD-35, 40)", () => {
     expect(r.code).toBe(0);
     expect(r.out).toContain("***");
     if (dbPassword.length >= 4) expect(r.out).not.toContain(dbPassword);
+  });
+
+  test("BR-KD-30 a run without --allow-remote does not print the rotate-password warning", () => {
+    expect(r.out).not.toMatch(/rotate the seed admin password now/i);
   });
 
   test("BR-KD-35 drops the public schema only, never the database", async () => {
@@ -316,7 +396,12 @@ describe("db:reset --no-fixtures (BR-KD-35, 40)", () => {
 
   test("BR-KD-35 a failing step exits 1 (unreachable DB on localhost)", async () => {
     const dead = withHost(scratchUrl, "localhost").replace(/:\d+\//, ":1/");
-    const r2 = await run(["--no-fixtures"], {}, dead);
+    // v3: a local port other than 5432/5433 needs DB_RESET_CONFIRM; with it the guard passes and connecting fails.
+    const r2 = await run(
+      ["--no-fixtures", "--allow-remote"],
+      { DB_RESET_CONFIRM: SCRATCH },
+      dead,
+    );
     expect(r2.code).toBe(1);
   }, 60_000);
 });

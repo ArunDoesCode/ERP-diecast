@@ -222,7 +222,7 @@ async function submitOk(tag: string, docType: "pr" | "po", docId: number) {
 const act = (
   tag: string,
   requestId: number,
-  action: "approve" | "reject" | "sent_back" | "withdraw" | "cancel",
+  action: "approve" | "reject" | "sent_back" | "withdraw",
   ...rest: [notes?: string]
 ) => {
   // Argument omitted -> default note; explicit undefined -> no notes field sent.
@@ -388,6 +388,8 @@ beforeAll(async () => {
   await makeRole("viewall", ["approval.view_all"]);
   await makeRole("vothers", ["approval.view_others_pending"]);
   await makeRole("ghost", []); // nobody active holds this role
+  await makeRole("pronly", ["pr.manage"]);
+  await makeRole("poonly", ["po.manage"]);
 
   await makeUser("req", "req");
   await makeUser("req2", "req");
@@ -400,6 +402,8 @@ beforeAll(async () => {
   await makeUser("viewer", "viewall");
   await makeUser("vothers", "vothers");
   await makeUser("inactive", "other", false);
+  await makeUser("pronly", "pronly");
+  await makeUser("poonly", "poonly");
 
   const base = { isActive: true, createdBy: emp.req, lastUpdatedBy: emp.req };
   await db.insert(approvalPolicies).values([
@@ -507,6 +511,54 @@ describe("BR-APR-24 creator only, draft only", () => {
     expect(res.status).toBe(409);
     expect((await json(res)).code).toBe("APPROVAL_INVALID_SOURCE_STATUS");
     expect((await requestsOf("pr", pr.id)).length).toBe(1);
+  });
+
+  test("BR-APR-24 (v2) PR creator without pr.manage submits -> 403, nothing created", async () => {
+    await setPolicy(PRIO_MISC, [roleStep(1, "sup")]);
+    const pr = await mkPr("poonly");
+    const res = await submit("poonly", "pr", pr.id);
+    expect(res.status).toBe(403);
+    expect((await requestsOf("pr", pr.id)).length).toBe(0);
+    expect((await prRow(pr.id))?.status).toBe("draft");
+  });
+
+  test("BR-APR-24 (v2) PO creator without po.manage submits -> 403, nothing created", async () => {
+    const po = await mkPo("pronly");
+    const res = await submit("pronly", "po", po.id);
+    expect(res.status).toBe(403);
+    expect((await requestsOf("po", po.id)).length).toBe(0);
+    expect((await poRow(po.id))?.status).toBe("draft");
+  });
+
+  test("BR-APR-24 (v2) creator holding the matching key (pr.manage only) can submit a PR", async () => {
+    await setPolicy(PRIO_MISC, [roleStep(1, "sup")]);
+    const pr = await mkPr("pronly");
+    expect((await submit("pronly", "pr", pr.id)).status).toBe(201);
+  });
+});
+
+describe("BR-APR (v2) there is no approval cancel action", () => {
+  test("actOnRequest action 'cancel' -> 400, request stays pending, PR untouched", async () => {
+    await setPolicy(PRIO_MISC, [roleStep(1, "sup")]);
+    const pr = await mkPr("req");
+    const reqId = await submitOk("req", "pr", pr.id);
+    for (const who of ["req", "supA"]) {
+      const res = await call(
+        who,
+        "POST",
+        `/api/approval/actOnRequest/${reqId}`,
+        {
+          action: "cancel",
+          notes: "TEST_aprreq no cancel action",
+        },
+      );
+      expect(res.status).toBe(400);
+    }
+    expect((await reqRow(reqId))?.status).toBe("pending_approval");
+    const row = await prRow(pr.id);
+    expect(row?.status).toBe("pending_approval");
+    expect(row?.cancelledAt).toBeNull();
+    expect((await trails(reqId)).map((t) => t.action)).toEqual(["submitted"]);
   });
 });
 

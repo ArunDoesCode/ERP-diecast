@@ -64,3 +64,4 @@
 | SPEC-P6, SPEC-P9 | spec 59 | specs | undocumented codes; BR-PR-46 via PO record | fixed in spec changelogs (PR v2, PO v2, approval v2) | fixed |
 | SPEC-P8 | spec 59 | reports | contamination line missing in 3 reports | noted: briefs are pointer-only template calls, recorded in the coordinator transcript | rejected |
 | CRP-5, CRP-9, PERF-03, PERF-05, PERF-09, PERF-10, PERF-11, SPEC-P10 | code 56, perf 58, spec 59 | various | repo layering, SCO submit lock (M2), minor batching, trigram search, rate suggestion (after merge) | backlog / after merge | backlog |
+| FE-LABEL | frontend-dev 61 | PurchaseOrderTrackingCards | shows raw confirmation method (in_person) | fix in final UI pass | open |

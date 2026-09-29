@@ -21,3 +21,4 @@
 | 17 | test-writer (36) | resubmit code / withdraw call / standard rate test | APPROVAL_ALREADY_OPEN; actOnRequest action "withdraw" → PR draft; after stock merge | contract PR-S2 |
 | 18 | backend-dev (38) | super-admin submit/withdraw? | no — spec: requester only (BR-APR-24/39, BR-PR-17); super-admin may edit | spec |
 | 19 | backend-dev (44) | PO rate/GST/terms prefill source; new route names | frontend prefill from supplier endpoints + backend fills omitted defaults; routes confirmed | contract APR/PO |
+| 20 | test-writer (60) | saleOrderId must exist? unusual local target flags? | drop until M4 (no table); DB_RESET_CONFIRM alone for local, --allow-remote for non-local | PR v2, known-defects v3 |

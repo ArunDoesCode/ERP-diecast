@@ -1738,6 +1738,33 @@ describe("BR-PO-17 supplier confirmation, reminders, escalations are log rows", 
     expect((await poRow(po.poId)).status).toBe("dispatched");
   });
 
+  test.each(["phone", "email", "whatsapp", "in_person"] as const)(
+    "BR-PO-17 (v2) confirmation method %s is accepted and becomes the log row's channel",
+    async (method) => {
+      const po = await mkDispatchedPo();
+      const res = await call("buyer", "POST", `/api/po/${po.poId}/confirm`, {
+        confirmationMethod: method,
+      });
+      expect(res.status).toBe(200);
+      const c = (await comms(po.poId)).filter((r) => r.type === "confirmation");
+      expect(c.length).toBe(1);
+      expect(c[0]?.channel).toBe(method);
+    },
+  );
+
+  test("BR-PO-17 (v2) a confirmation method outside phone/email/whatsapp/in_person -> 400, nothing logged", async () => {
+    const po = await mkDispatchedPo();
+    const before = (await comms(po.poId)).length;
+    for (const bad of ["carrier_pigeon", "", "PHONE"]) {
+      const res = await call("buyer", "POST", `/api/po/${po.poId}/confirm`, {
+        confirmationMethod: bad,
+      });
+      expect(res.status).toBe(400);
+    }
+    expect((await comms(po.poId)).length).toBe(before);
+    expect((await poRow(po.poId)).status).toBe("dispatched");
+  });
+
   test("BR-PO-17 reminder on partial_received is allowed", async () => {
     const po = await mkDispatchedPo();
     await setPo(po.poId, { status: "partial_received" });
@@ -2474,4 +2501,33 @@ describe("BR-PR-33 / BR-PR-46 PR line cancel", () => {
     );
     expect(it.cancelReason).toBe("vendor gone");
   });
+});
+
+describe("BR-PR-47 PR line cancel and PO cancel at once (no deadlock)", () => {
+  for (const mode of ["draft", "approved"] as const) {
+    test(`BR-PR-47 cancelling the ${mode} PO while cancelling another line of its PR: both 200, no 500, PR ends cancelled`, async () => {
+      for (let round = 0; round < 6; round++) {
+        const pr = await mkPr({
+          lines: [
+            ["a", 10],
+            ["b", 3],
+          ],
+        });
+        const onPo = { prId: pr.prId, line: { a: pr.line.a as number } };
+        const po =
+          mode === "draft"
+            ? await mkDraftPo({ pr: onPo })
+            : await mkApprovedPo({ pr: onPo });
+        const [rPo, rLine] = await Promise.all([
+          cancelPo(po.poId, "wrong supplier"),
+          cancelLine(pr.prId, pr.line.b as number, "not needed now"),
+        ]);
+        expect([rPo.status, rLine.status]).toEqual([200, 200]);
+        expect((await poRow(po.poId)).status).toBe("cancelled");
+        expect((await prLine(pr.line.a as number)).status).toBe("cancelled");
+        expect((await prLine(pr.line.b as number)).status).toBe("cancelled");
+        expect((await prRow(pr.prId)).status).toBe("cancelled");
+      }
+    });
+  }
 });

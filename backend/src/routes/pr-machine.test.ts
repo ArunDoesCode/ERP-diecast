@@ -31,6 +31,7 @@ const emp = {} as Record<string, number>;
 const token = {} as Record<string, string>;
 let itemId: number;
 let machineId: number;
+let otherMachineId: number;
 let seededPrId: number;
 
 async function makeRole(name: string, keys: string[]) {
@@ -132,9 +133,14 @@ beforeAll(async () => {
     .insert(machines)
     .values({ name: "TEST_prmach_machine" })
     .returning({ id: machines.id });
-  if (!it || !m) throw new Error("Fixture setup failed");
+  const [m2] = await db
+    .insert(machines)
+    .values({ name: "TEST_prmach_machine2" })
+    .returning({ id: machines.id });
+  if (!it || !m || !m2) throw new Error("Fixture setup failed");
   itemId = it.id;
   machineId = m.id;
+  otherMachineId = m2.id;
 
   await makeUser(
     "linker",
@@ -270,5 +276,60 @@ describe("BR-AUTH-26 saving a PR with a machine", () => {
       assetId: machineId,
     });
     expect(res.status).toBe(200);
+  });
+});
+
+describe("BR-AUTH-26 (v2) key is checked only when the machine is added or changed", () => {
+  async function prWithMachine(requester: string, prNumber: string) {
+    const [pr] = await db
+      .insert(purchaseRequests)
+      .values({
+        prNumber,
+        type: "tooling",
+        requestedBy: emp[requester] as number,
+        assetId: machineId,
+        notes: "TEST_prmach seed with machine",
+      })
+      .returning({ id: purchaseRequests.id });
+    if (!pr) throw new Error("Fixture setup: PR with machine failed");
+    return pr.id;
+  }
+  const machineOf = async (id: number) =>
+    (
+      await db
+        .select({ assetId: purchaseRequests.assetId })
+        .from(purchaseRequests)
+        .where(eq(purchaseRequests.id, id))
+    )[0]?.assetId;
+
+  test("BR-AUTH-26 edit resends the same machine without pr.link_machine -> 200, machine kept", async () => {
+    const id = await prWithMachine("plain", "TEST_PRMACH_PR3");
+    const res = await call("plain", "PATCH", "/api/pr/updatepr", {
+      prId: id,
+      assetId: machineId,
+      notes: "TEST_prmach edited notes",
+    });
+    expect(res.status).toBe(200);
+    expect(await machineOf(id)).toBe(machineId);
+  });
+
+  test("BR-AUTH-26 edit changes to a different machine without pr.link_machine -> 403, machine kept", async () => {
+    const id = await prWithMachine("plain", "TEST_PRMACH_PR4");
+    const res = await call("plain", "PATCH", "/api/pr/updatepr", {
+      prId: id,
+      assetId: otherMachineId,
+    });
+    expect(res.status).toBe(403);
+    expect(await machineOf(id)).toBe(machineId);
+  });
+
+  test("BR-AUTH-26 edit not mentioning the machine without pr.link_machine -> 200", async () => {
+    const id = await prWithMachine("plain", "TEST_PRMACH_PR5");
+    const res = await call("plain", "PATCH", "/api/pr/updatepr", {
+      prId: id,
+      notes: "TEST_prmach only notes",
+    });
+    expect(res.status).toBe(200);
+    expect(await machineOf(id)).toBe(machineId);
   });
 });
