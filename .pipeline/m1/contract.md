@@ -112,3 +112,53 @@ Note: the explorer parity table used older paths (`/pr/list`, `/grn/list`...); t
 ## Open questions (spec is silent)
 1. `GET /asset/machines` is allowed today for bo (`asset.manage`) and, after BR-AUTH-26, fs (`pr.link_machine`). BR-AUTH-10 says one key per route. Options: (A) allow `asset.manage` OR `pr.link_machine` via a service-level check, route declared `any-authenticated`; (B) also seed `pr.link_machine` to bo. Recommend A (seed test needs bo and fs both allowed, spec seed table says bo lacks `pr.link_machine`).
 2. `GET /setup/modules` and `/setup/pages*`: no key in spec. Assumed `setup.roles.manage` (super-admin only, same as today).
+
+---
+
+# S6 — role editor, screens admin, guardrails, access log (contract; handlers return 501)
+
+Base `/api/setup`. Envelope `{ success:true, data }`; lists `{ success:true, data, meta:{page,pageSize,total,totalPages} }`. Errors `{ success:false, message, code }`. Path params are numeric ids except `:key` on screens (string). Every route needs a bearer token (401 first, BR-AUTH-23) and the key shown (403 `PERMISSION_DENIED` + `key`; super-admin passes). Body validation failure = 400.
+
+Decision: extended the existing `/setup/roles` and `/setup/employees` routes; added `/setup/screens` and `/setup/access-log`.
+
+## Old endpoints (kept unchanged until S7, then deleted)
+| Old | Becomes |
+|---|---|
+| GET/POST/PATCH/DELETE `/setup/pages*` | `GET /setup/screens`, `PATCH /setup/screens/:key` (no create/delete, BR-AUTH-06) |
+| GET `/setup/permissions` (role_pages) | `GET /setup/roles/:id/grants` and `GET /setup/screens` (`roleIds`) |
+| POST `/setup/roles/:roleId/permissions` (page-id diff) | `POST /setup/roles/:id/grants` (key diff) |
+| GET `/setup/modules` | unchanged; screens use free-text `menuGroup` |
+`GET /setup/roles` row gains fields (extra only). Existing role routes keep their paths and gain the error codes below.
+
+## Roles (key `setup.roles.manage`, super-admin only, BR-AUTH-07)
+| Method + path | Request | Response 2xx | Errors |
+|---|---|---|---|
+| GET `/roles?page&pageSize&sortBy=name&sortDir` | pagination | 200 paginated `{ id, name, isSystem, isSuperAdmin, keyCount, employeeCount }` (employeeCount = active employees) | - |
+| POST `/roles` | `{ name }` | 201 `{ id, name, isSystem:false }` | 409 `CONFLICT` duplicate name |
+| POST `/roles/:id/copy` (BR-25) | `{ name }` | 201 role (isSystem false, same keys as source) | 404 `NOT_FOUND`; 403 `SYSTEM_ROLE_PROTECTED` (source is super-admin); 409 `CONFLICT` |
+| PATCH `/roles/:id` (rename) | `{ name }` | 200 role | 403 `SYSTEM_ROLE_PROTECTED` (any system role, BR-18); 409 `ROLE_IN_APPROVAL_CHAIN` (BR-19); 409 `CONFLICT`; 404 |
+| DELETE `/roles/:id` | - | 200 `{ success:true }` | 403 `SYSTEM_ROLE_PROTECTED`; 409 `ROLE_HAS_EMPLOYEES` (active employees); 409 `ROLE_IN_APPROVAL_CHAIN`; 404 |
+| GET `/roles/:id/grants` | - | 200 `{ roleId, roleName, isSystem, isSuperAdmin, readOnly, keys:[{ key, module, label, description, grantable, granted }] }` - whole catalog. Super-admin: `readOnly:true`, all `granted:true` | 404 |
+| POST `/roles/:id/grants` | `{ added: string[], removed: string[] }` (keys; at least one non-empty) | 200 same shape as GET grants (fresh) | 400 `KEY_NOT_GRANTABLE` (`setup.roles.manage`, BR-07); 400 `UNKNOWN_KEY`; 403 `SYSTEM_ROLE_PROTECTED` (super-admin role); 404. All-or-nothing transaction. |
+Check order for role writes: role exists (404) -> system-role rule (403) -> body/state rule (400/409). Other system roles (owner etc.): grants editable, rename/delete 403.
+
+## Screens (key `setup.roles.manage`, BR-AUTH-15)
+| Method + path | Request | Response | Errors |
+|---|---|---|---|
+| GET `/screens` (not paginated: bounded, from code) | - | 200 array `{ key, path, permissionKey: string\|null, label, sortOrder, menuGroup, roleIds:number[] }`, ordered menuGroup, sortOrder, key. `roleIds` = roles holding the key (super-admin never listed) | - |
+| PATCH `/screens/:key` | `{ label?, sortOrder?, menuGroup? }` strict, at least one | 200 screen | 404 unknown key; 400 any other field |
+| POST `/screens/:key/roles` | `{ added: roleId[], removed: roleId[] }` (at least one) | 200 screen (fresh `roleIds`) | 404 screen/role; 400 `SCREEN_HAS_NO_KEY` (permissionKey null); 400 `KEY_NOT_GRANTABLE` (setup screen); 403 `SYSTEM_ROLE_PROTECTED` (super-admin role). Ticking = granting the screen's key, identical to the grants endpoint. |
+
+## Employees (key `setup.employees.manage`)
+| Method + path | Request | Response | Errors |
+|---|---|---|---|
+| GET `/employees/assignable-roles` (not paginated) | - | 200 array `{ id, name }`: super-admin = all roles; others = roles whose keys they all hold, never super-admin (BR-16) | - |
+| PATCH `/employees/:id/role` | `{ roleId }` strict (`roleIds` or extra fields = 400, BR-08) | 200 employee | 404 employee/role; 403 `ROLE_NOT_ASSIGNABLE` (BR-16; code chosen by dev, see report); 409 `LAST_ADMIN` (BR-17) |
+| DELETE `/employees/:id` (deactivate, existing) | - | 200 `{success:true}` | 409 `LAST_ADMIN` (BR-17); 404 |
+Existing `PATCH /employees/:id` and `POST /employees` also carry `roleId`; the S6 build must apply the same BR-16 / BR-17 checks there.
+
+## Access log (key `setup.roles.manage`, read-only, BR-AUTH-20)
+GET `/access-log?page&pageSize&sortBy=at|action|actorId&sortDir` -> 200 paginated `{ id, at (ISO string), actorId|null, actorName|null, action, target, before: json|null, after: json|null }`. Default sortDir is `asc` (pagination skill); UI sends `sortBy=at&sortDir=desc`. No POST/PATCH/DELETE exists. Each S6 write appends one row (`action` e.g. `role.create`, `role.copy`, `role.rename`, `role.delete`, `role.grants`, `screen.update`, `employee.role`, `employee.deactivate`).
+
+## Error codes (new in S6)
+`SYSTEM_ROLE_PROTECTED` 403, `ROLE_HAS_EMPLOYEES` 409, `ROLE_IN_APPROVAL_CHAIN` 409, `LAST_ADMIN` 409, `KEY_NOT_GRANTABLE` 400, `UNKNOWN_KEY` 400, `SCREEN_HAS_NO_KEY` 400, `ROLE_NOT_ASSIGNABLE` 403. Existing: `PERMISSION_DENIED` 403 (with `key`), `NOT_FOUND`, `CONFLICT`. Stubs currently return 501 `NOT_IMPLEMENTED`.
