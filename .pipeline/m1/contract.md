@@ -168,3 +168,8 @@ GET `/access-log?page&pageSize&sortBy=at|action|actorId&sortDir` -> 200 paginate
 - Response 200 `{ success, data: { pr } }`; `pr` and `GET /api/pr/getprdetails/:id` carry `cancelledBy` (employee id), `cancelledByName`, `cancelledAt` (ISO), `cancelReason` (BR-PR-46, BR-KD-08).
 - Error codes per spec: BR-PR-39 / 41 / 42 / 43 / 47 (use the PR spec's codes; known-defects references them).
 - Tests are HTTP-level through `createApp().request()` with real logins; the forced "trail insert fails" sub-case of BR-PR-42 is a known gap (no production hook).
+
+## PR-S2 — decisions
+- Second submit while an approval request is open → 409 `APPROVAL_ALREADY_OPEN` (BR-PR-19, the specific case wins); any other non-draft source → `APPROVAL_INVALID_SOURCE_STATUS` (BR-APR-24).
+- Withdraw (BR-PR-21): `POST /api/approval/actOnRequest/:id` with `action: "withdraw"` — requester only; request → cancelled with a trail row; PR → `draft`. `action: "cancel"` is not the PR-withdraw path.
+- BR-PR-14 (standard rate required) tests wait for the inventory item `standard_rate` column (work/m1-stock merge).

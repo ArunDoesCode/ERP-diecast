@@ -31,5 +31,6 @@
 | SPEC-2 | spec 30 | approvalRepository.ts:394 | = F-APR-1 | approval module | open |
 | SPEC-5, SEC-9 | spec 30, security 28 | legacy role_pages routes | S7 | S7 | open |
 | SPEC-6 | spec 30 | authService.refresh | harmless | reject (no spec rule, no risk) | rejected |
-| F-TEST-10 | backend-dev 25 | backend/scripts/db-reset.test.ts | running the full suite while db:reset is unbuilt/red wipes the shared diecast_test seed → 40 unrelated failures; db:reset tests must only ever target their own scratch DB (known-defects BR-KD-30 guard + test isolation) | fix now (test-writer) | open |
-| F-TEST-11 | backend-dev 25 | backend/src/routes/pr-cancel.test.ts "BR-PR-41 missing reason on an approved PR" | helper default param turns undefined into a valid reason → test can never pass; send no reason (null / no body) | fix now (test-writer) | open |
+| F-TEST-10 | backend-dev 25 | backend/scripts/db-reset.test.ts | running the full suite while db:reset is unbuilt/red wipes the shared diecast_test seed → 40 unrelated failures; db:reset tests must only ever target their own scratch DB (known-defects BR-KD-30 guard + test isolation) | fix now (test-writer) | fixed |
+| F-TEST-11 | backend-dev 25 | backend/src/routes/pr-cancel.test.ts "BR-PR-41 missing reason on an approved PR" | helper default param turns undefined into a valid reason → test can never pass; send no reason (null / no body) | fix now (test-writer) | fixed |
+| TEST-36-W | coordinator | backend/src/routes/pr-lifecycle.test.ts withdraw test | uses action "cancel"; contract PR-S2 says action "withdraw" | fix now (test-writer) | open |
