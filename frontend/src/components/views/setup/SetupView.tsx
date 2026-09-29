@@ -3,22 +3,27 @@
 import Link from "next/link";
 import { useQueryState } from "nuqs";
 import { useState } from "react";
+import { AccessLogTab } from "@/components/pages/setup/access-log/AccessLogTab";
 import { EmployeesTab } from "@/components/pages/setup/employees/EmployeesTab";
 import { PagesTab } from "@/components/pages/setup/pages/PagesTab";
 import { PermissionsTab } from "@/components/pages/setup/permissions/PermissionsTab";
 import { RolesTab } from "@/components/pages/setup/roles/RolesTab";
+import { ScreensTab } from "@/components/pages/setup/screens/ScreensTab";
 import {
 	SetupDialog,
 	type SetupModalState,
 } from "@/components/pages/setup/shared/SetupDialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useCan } from "@/hooks/use-can";
 import type { Employee, Page, Role } from "@/types/setup";
 
 type SetupEntity = "employee" | "role" | "page";
 
 const SetupView = () => {
 	const [tab, setTab] = useQueryState("tab", { defaultValue: "employees" });
+	const canManageRoles = useCan("setup.roles.manage");
+	const canManageEmployees = useCan("setup.employees.manage");
 	const [modal, setModal] = useState<SetupModalState>({ open: false });
 
 	function openCreate(entity: SetupEntity) {
@@ -50,23 +55,43 @@ const SetupView = () => {
 
 			<Tabs value={tab} onValueChange={setTab}>
 				<TabsList>
-					<TabsTrigger value="employees">Employees</TabsTrigger>
-					<TabsTrigger value="roles">Roles</TabsTrigger>
+					{canManageEmployees && (
+						<TabsTrigger value="employees">Employees</TabsTrigger>
+					)}
+					{canManageRoles && <TabsTrigger value="roles">Roles</TabsTrigger>}
+					{canManageRoles && <TabsTrigger value="screens">Screens</TabsTrigger>}
+					{canManageRoles && (
+						<TabsTrigger value="access-log">Access log</TabsTrigger>
+					)}
 					<TabsTrigger value="pages">Pages</TabsTrigger>
 					<TabsTrigger value="permissions">Permissions</TabsTrigger>
 				</TabsList>
-				<TabsContent value="employees">
-					<EmployeesTab
-						onCreateEmployee={() => openCreate("employee")}
-						onEditEmployee={openEditEmployee}
-					/>
-				</TabsContent>
-				<TabsContent value="roles">
-					<RolesTab
-						onCreateRole={() => openCreate("role")}
-						onEditRole={openEditRole}
-					/>
-				</TabsContent>
+				{canManageEmployees && (
+					<TabsContent value="employees">
+						<EmployeesTab
+							onCreateEmployee={() => openCreate("employee")}
+							onEditEmployee={openEditEmployee}
+						/>
+					</TabsContent>
+				)}
+				{canManageRoles && (
+					<TabsContent value="roles">
+						<RolesTab
+							onCreateRole={() => openCreate("role")}
+							onEditRole={openEditRole}
+						/>
+					</TabsContent>
+				)}
+				{canManageRoles && (
+					<TabsContent value="screens">
+						<ScreensTab />
+					</TabsContent>
+				)}
+				{canManageRoles && (
+					<TabsContent value="access-log">
+						<AccessLogTab />
+					</TabsContent>
+				)}
 				<TabsContent value="pages">
 					<PagesTab
 						onCreatePage={() => openCreate("page")}

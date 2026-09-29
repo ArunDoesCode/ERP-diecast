@@ -9,20 +9,26 @@ import {
 } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { ApiClientError } from "@/lib/api/client";
 import type {
+	AccessLogListParams,
 	EmployeeInput,
 	EmployeeListParams,
 	EmployeeSearchParams,
 	PageInput,
 	PageListParams,
+	RoleGrantsDiff,
 	RoleInput,
 	RoleListParams,
 	RolePage,
 	RolePermissionDiff,
+	ScreenRolesDiff,
+	ScreenUpdateInput,
 } from "@/types/setup";
 
+import { setupErrorMessage } from "./error-messages";
 import {
+	assignEmployeeRole,
+	copyRole,
 	createEmployee,
 	createPage,
 	createRole,
@@ -30,16 +36,23 @@ import {
 	deletePage,
 	deleteRole,
 	generateEmployeeQr,
+	getAccessLog,
+	getAssignableRoles,
 	getEmployees,
 	getModules,
 	getPages,
 	getPermissionGrants,
+	getRoleGrants,
 	getRoles,
+	getScreens,
 	searchEmployees,
 	updateEmployee,
 	updatePage,
 	updateRole,
+	updateRoleGrants,
 	updateRolePermissions,
+	updateScreen,
+	updateScreenRoles,
 } from "./fetchers";
 
 export const setupKeys = {
@@ -59,11 +72,16 @@ export const setupKeys = {
 			? (["setup", "pages", params] as const)
 			: (["setup", "pages"] as const),
 	permissionGrants: () => ["setup", "permissions"] as const,
+	roleGrants: (id: number) => ["setup", "role-grants", id] as const,
+	screens: () => ["setup", "screens"] as const,
+	accessLog: (params?: AccessLogListParams) =>
+		params
+			? (["setup", "access-log", params] as const)
+			: (["setup", "access-log"] as const),
+	assignableRoles: () => ["setup", "assignable-roles"] as const,
 };
 
-function errorMessage(error: unknown, fallback: string) {
-	return error instanceof ApiClientError ? error.message : fallback;
-}
+const errorMessage = setupErrorMessage;
 
 // Roles/Employees/Pages/Modules are cross-referenced by nearly every Setup tab
 // (e.g. EmployeeTable resolves role names, RoleTable counts employees,
@@ -351,6 +369,129 @@ export function useUpdateRolePermissionsMutation() {
 		},
 		onSettled: () => {
 			queryClient.invalidateQueries({ queryKey: setupKeys.permissionGrants() });
+		},
+	});
+}
+
+// ---- S6: role editor, screens, access log, role assignment ----
+
+const ACCESS_LOG_KEY = ["setup", "access-log"] as const;
+
+export function useCopyRoleMutation() {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: ({ id, input }: { id: number; input: RoleInput }) =>
+			copyRole(id, input),
+		onSuccess: async () => {
+			await queryClient.invalidateQueries({ queryKey: setupKeys.roles() });
+			await queryClient.invalidateQueries({ queryKey: ACCESS_LOG_KEY });
+			toast.success("Role copied");
+		},
+		onError: (error) => {
+			toast.error(errorMessage(error, "Failed to copy role"));
+		},
+	});
+}
+
+export function useRoleGrantsQuery(id: number | null) {
+	return useQuery({
+		queryKey: setupKeys.roleGrants(id ?? 0),
+		queryFn: () => getRoleGrants(id as number),
+		enabled: id !== null,
+	});
+}
+
+export function useUpdateRoleGrantsMutation() {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: ({ id, diff }: { id: number; diff: RoleGrantsDiff }) =>
+			updateRoleGrants(id, diff),
+		onSuccess: async (_data, { id }) => {
+			await queryClient.invalidateQueries({
+				queryKey: setupKeys.roleGrants(id),
+			});
+			await queryClient.invalidateQueries({ queryKey: setupKeys.roles() });
+			await queryClient.invalidateQueries({ queryKey: setupKeys.screens() });
+			await queryClient.invalidateQueries({ queryKey: ACCESS_LOG_KEY });
+			toast.success("Access saved");
+		},
+		onError: (error) => {
+			toast.error(errorMessage(error, "Failed to save access"));
+		},
+	});
+}
+
+export function useScreensQuery() {
+	return useQuery({ queryKey: setupKeys.screens(), queryFn: getScreens });
+}
+
+export function useUpdateScreenMutation() {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: ({ key, input }: { key: string; input: ScreenUpdateInput }) =>
+			updateScreen(key, input),
+		onSuccess: async () => {
+			await queryClient.invalidateQueries({ queryKey: setupKeys.screens() });
+			await queryClient.invalidateQueries({ queryKey: ACCESS_LOG_KEY });
+			toast.success("Screen updated");
+		},
+		onError: (error) => {
+			toast.error(errorMessage(error, "Failed to update screen"));
+		},
+	});
+}
+
+export function useUpdateScreenRolesMutation() {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: ({ key, diff }: { key: string; diff: ScreenRolesDiff }) =>
+			updateScreenRoles(key, diff),
+		onSuccess: async () => {
+			await queryClient.invalidateQueries({ queryKey: setupKeys.screens() });
+			await queryClient.invalidateQueries({ queryKey: setupKeys.roles() });
+			await queryClient.invalidateQueries({ queryKey: ACCESS_LOG_KEY });
+			toast.success("Screen access updated");
+		},
+		onError: (error) => {
+			toast.error(errorMessage(error, "Failed to update screen access"));
+		},
+	});
+}
+
+export function useAccessLogQuery(params: AccessLogListParams) {
+	return useQuery({
+		queryKey: setupKeys.accessLog(params),
+		queryFn: () => getAccessLog(params),
+		placeholderData: keepPreviousData,
+	});
+}
+
+export function useAssignableRolesQuery() {
+	return useQuery({
+		queryKey: setupKeys.assignableRoles(),
+		queryFn: getAssignableRoles,
+		staleTime: REFERENCE_STALE_TIME_MS,
+	});
+}
+
+export function useAssignEmployeeRoleMutation() {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: ({ id, roleId }: { id: number; roleId: number }) =>
+			assignEmployeeRole(id, roleId),
+		onSuccess: async () => {
+			await queryClient.invalidateQueries({ queryKey: setupKeys.employees() });
+			await queryClient.invalidateQueries({ queryKey: setupKeys.roles() });
+			await queryClient.invalidateQueries({ queryKey: ACCESS_LOG_KEY });
+			toast.success("Role changed");
+		},
+		onError: (error) => {
+			toast.error(errorMessage(error, "Failed to change role"));
 		},
 	});
 }

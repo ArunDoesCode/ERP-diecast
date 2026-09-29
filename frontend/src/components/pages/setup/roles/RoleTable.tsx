@@ -13,6 +13,8 @@ import { useMemo, useState } from "react";
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
 import { DataTable } from "@/components/common/DataTable";
 import { DataTableColumnHeader } from "@/components/common/DataTableColumnHeader";
+import { RoleCopyDialog } from "@/components/pages/setup/roles/RoleCopyDialog";
+import { RoleGrantsEditor } from "@/components/pages/setup/roles/RoleGrantsEditor";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,11 +23,7 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-	useDeleteRoleMutation,
-	useEmployeesQuery,
-	useRolesQuery,
-} from "@/lib/api/setup/queries";
+import { useDeleteRoleMutation, useRolesQuery } from "@/lib/api/setup/queries";
 import type { Role, RoleSortField } from "@/types/setup";
 
 type RoleTableProps = {
@@ -47,19 +45,15 @@ export function RoleTable({ onEditRole }: RoleTableProps) {
 		sortBy: sortColumn?.id as RoleSortField | undefined,
 		sortDir: sortColumn?.desc ? "desc" : "asc",
 	});
-	const employeesQuery = useEmployeesQuery();
 	const deleteRoleMutation = useDeleteRoleMutation();
 	const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
+	const [roleToCopy, setRoleToCopy] = useState<Role | null>(null);
+	const [grantsRoleId, setGrantsRoleId] = useState<number | null>(null);
 
 	const roles = rolesQuery.data?.data ?? [];
 	const meta = rolesQuery.data?.meta;
-	const employees = employeesQuery.data?.data ?? [];
 
 	const columns = useMemo<ColumnDef<Role>[]>(() => {
-		function countEmployees(roleId: number) {
-			return employees.filter((employee) => employee.roleId === roleId).length;
-		}
-
 		return [
 			{
 				accessorKey: "name",
@@ -69,16 +63,26 @@ export function RoleTable({ onEditRole }: RoleTableProps) {
 				cell: ({ row }) => (
 					<span className="flex items-center gap-2">
 						{row.original.name}
-						{row.original.isSystem && <Badge variant="secondary">System</Badge>}
+						{row.original.isSystem && (
+							<Badge variant="secondary">System (locked)</Badge>
+						)}
 					</span>
 				),
 			},
 			{
+				id: "keyCount",
+				header: "Permissions",
+				cell: ({ row }) =>
+					row.original.isSuperAdmin
+						? "All access"
+						: (row.original.keyCount ?? 0),
+				// backend only sorts roles by "name"
+				enableSorting: false,
+			},
+			{
 				id: "employeeCount",
-				accessorFn: (row) => countEmployees(row.id),
-				header: "Employee Count",
-				// backend roleListQuerySchema only supports sorting by "name" — this is a
-				// derived/computed column, not sortable server-side.
+				header: "Employees",
+				cell: ({ row }) => row.original.employeeCount ?? 0,
 				enableSorting: false,
 			},
 			{
@@ -96,9 +100,21 @@ export function RoleTable({ onEditRole }: RoleTableProps) {
 								</Button>
 							</DropdownMenuTrigger>
 							<DropdownMenuContent align="end">
-								<DropdownMenuItem onSelect={() => onEditRole(role)}>
-									Edit
-								</DropdownMenuItem>
+								{!role.isSuperAdmin && (
+									<DropdownMenuItem onSelect={() => setGrantsRoleId(role.id)}>
+										Edit access
+									</DropdownMenuItem>
+								)}
+								{!role.isSystem && (
+									<DropdownMenuItem onSelect={() => onEditRole(role)}>
+										Rename
+									</DropdownMenuItem>
+								)}
+								{!role.isSuperAdmin && (
+									<DropdownMenuItem onSelect={() => setRoleToCopy(role)}>
+										Copy
+									</DropdownMenuItem>
+								)}
 								{!role.isSystem && (
 									<DropdownMenuItem
 										variant="destructive"
@@ -113,7 +129,7 @@ export function RoleTable({ onEditRole }: RoleTableProps) {
 				},
 			},
 		];
-	}, [employees, onEditRole]);
+	}, [onEditRole]);
 
 	const table = useReactTable({
 		data: roles,
@@ -133,6 +149,12 @@ export function RoleTable({ onEditRole }: RoleTableProps) {
 	return (
 		<>
 			<DataTable table={table} isLoading={rolesQuery.isLoading} />
+
+			<RoleGrantsEditor
+				roleId={grantsRoleId}
+				onClose={() => setGrantsRoleId(null)}
+			/>
+			<RoleCopyDialog role={roleToCopy} onClose={() => setRoleToCopy(null)} />
 
 			<ConfirmDeleteDialog
 				open={roleToDelete !== null}

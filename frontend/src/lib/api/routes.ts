@@ -28,12 +28,24 @@ export const API_ROUTES = {
 			update: (id: number) => `${API_Header.setup}/employees/${id}`,
 			remove: (id: number) => `${API_Header.setup}/employees/${id}`,
 			generateQr: (id: number) => `${API_Header.setup}/employees/${id}/qr`,
+			assignableRoles: `${API_Header.setup}/employees/assignable-roles`,
+			assignRole: (id: number) => `${API_Header.setup}/employees/${id}/role`,
 		},
 		roles: {
 			list: `${API_Header.setup}/roles`,
 			create: `${API_Header.setup}/roles`,
 			update: (id: number) => `${API_Header.setup}/roles/${id}`,
 			remove: (id: number) => `${API_Header.setup}/roles/${id}`,
+			copy: (id: number) => `${API_Header.setup}/roles/${id}/copy`,
+			grants: (id: number) => `${API_Header.setup}/roles/${id}/grants`,
+		},
+		screens: {
+			list: `${API_Header.setup}/screens`,
+			update: (key: string) => `${API_Header.setup}/screens/${key}`,
+			roles: (key: string) => `${API_Header.setup}/screens/${key}/roles`,
+		},
+		accessLog: {
+			list: `${API_Header.setup}/access-log`,
 		},
 		pages: {
 			list: `${API_Header.setup}/pages`,

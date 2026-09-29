@@ -1,6 +1,9 @@
 import { api } from "@/lib/api/client";
 import { API_ROUTES } from "@/lib/api/routes";
 import type {
+	AccessLogEntry,
+	AccessLogListParams,
+	AssignableRole,
 	Employee,
 	EmployeeInput,
 	EmployeeListParams,
@@ -11,10 +14,15 @@ import type {
 	PageListParams,
 	PaginatedResponse,
 	Role,
+	RoleGrants,
+	RoleGrantsDiff,
 	RoleInput,
 	RoleListParams,
 	RolePage,
 	RolePermissionDiff,
+	Screen,
+	ScreenRolesDiff,
+	ScreenUpdateInput,
 } from "@/types/setup";
 
 // Standard backend envelope: every 2xx response is `{ success: true, data }`
@@ -93,4 +101,42 @@ export const updateRolePermissions = (
 	api.post<Ok<RolePage[]>, RolePermissionDiff>(
 		API_ROUTES.setup.permissions.updateForRole(roleId),
 		diff,
+	);
+
+// ---- S6: role grants, copy, screens, access log, role assignment ----
+
+export const copyRole = (id: number, input: RoleInput) =>
+	api.post<Ok<Role>, RoleInput>(API_ROUTES.setup.roles.copy(id), input);
+export const getRoleGrants = (id: number) =>
+	api.get<Ok<RoleGrants>>(API_ROUTES.setup.roles.grants(id));
+export const updateRoleGrants = (id: number, diff: RoleGrantsDiff) =>
+	api.post<Ok<RoleGrants>, RoleGrantsDiff>(
+		API_ROUTES.setup.roles.grants(id),
+		diff,
+	);
+
+export const getScreens = () =>
+	api.get<Ok<Screen[]>>(API_ROUTES.setup.screens.list);
+export const updateScreen = (key: string, input: ScreenUpdateInput) =>
+	api.patch<Ok<Screen>, ScreenUpdateInput>(
+		API_ROUTES.setup.screens.update(key),
+		input,
+	);
+export const updateScreenRoles = (key: string, diff: ScreenRolesDiff) =>
+	api.post<Ok<Screen>, ScreenRolesDiff>(
+		API_ROUTES.setup.screens.roles(key),
+		diff,
+	);
+
+export const getAccessLog = (params?: AccessLogListParams) =>
+	api.get<PaginatedResponse<AccessLogEntry>>(
+		`${API_ROUTES.setup.accessLog.list}${toQueryString(params)}`,
+	);
+
+export const getAssignableRoles = () =>
+	api.get<Ok<AssignableRole[]>>(API_ROUTES.setup.employees.assignableRoles);
+export const assignEmployeeRole = (id: number, roleId: number) =>
+	api.patch<Ok<Employee>, { roleId: number }>(
+		API_ROUTES.setup.employees.assignRole(id),
+		{ roleId },
 	);
