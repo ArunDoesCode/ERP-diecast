@@ -59,6 +59,7 @@ Type: defect · infra · feature · debt · idea.
 | BL-076 | P3 | defect | subcontracting | QA issue cost when processed part maps to 0 raw pieces (ratio < 1): fall back to all-segments cost; needs a ratio<1 test | SPEC-7 | 2026-09-29 |
 | BL-077 | P3 | debt | subcontracting | Dead `!submitKey` guard in approvalService; receipt line rows inserted in item-id order | CR-9, CR-10 | 2026-09-29 |
 | BL-078 | P3 | debt | subcontracting | Reports: vendor-stock sums the ledger per request; SCO `q` search has no trigram index; inventory invalidation refetches broadly. Fine now; revisit at scale | PERF-2, 6, 7 | 2026-09-29 |
+| BL-079 | P3 | defect | subcontracting | Challan date rule is UTC, date picker max is local: between 00:00 and 05:30 IST the picker allows today's date but the server rejects it (400). Pick one day rule (IST for the plant) in server + UI | v3 build (SCO_CHALLAN_DATE_FUTURE) | 2026-09-29 |
 
 ## Done
 | ID | Item | PR / commit | Closed |

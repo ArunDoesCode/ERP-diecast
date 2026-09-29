@@ -2,7 +2,7 @@
   "feature": "subcontracting",
   "branch": "claude/subcontracting-feature-b19136",
   "base": "main",
-  "phase": "pr-feedback",
+  "phase": "pr",
   "spec": "docs/specs/subcontracting.md v2",
   "slices": ["S1","S2","S3","S4"],
   "currentSlice": "S4",
