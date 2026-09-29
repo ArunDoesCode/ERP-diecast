@@ -1,5 +1,7 @@
+import type { Actor } from "../lib/auth-middleware";
 import {
   ConflictError,
+  ForbiddenError,
   InternalServerError,
   NotFoundError,
 } from "../lib/errors";
@@ -207,7 +209,18 @@ export const assetService = {
     return created;
   },
 
-  async listMachines(params: assetMachineListQuerySchemaType) {
+  async listMachines(params: assetMachineListQuerySchemaType, actor: Actor) {
+    // Route is any-authenticated: the machine list serves asset admins and PR
+    // authors who may link a machine (BR-AUTH-26, questions.md #6).
+    if (
+      !actor.isSuperAdmin &&
+      !actor.permissions.has("asset.manage") &&
+      !actor.permissions.has("pr.link_machine")
+    ) {
+      throw new ForbiddenError("Permission denied", "PERMISSION_DENIED", {
+        key: "asset.manage",
+      });
+    }
     const { rows, total } = await assetRepository.listMachines(params);
     return {
       data: rows,

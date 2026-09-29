@@ -1,3 +1,4 @@
+import { invalidateRole } from "../lib/auth-middleware";
 import { ConflictError, ForbiddenError, NotFoundError } from "../lib/errors";
 import { roleRepository } from "../repository/roleRepository";
 import type {
@@ -40,6 +41,7 @@ export const roleService = {
     if (!updated) {
       throw new NotFoundError("Role not found");
     }
+    invalidateRole(id);
     return updated;
   },
 
@@ -64,5 +66,6 @@ export const roleService = {
     }
 
     await roleRepository.remove(id);
+    invalidateRole(id);
   },
 };

@@ -110,6 +110,11 @@ export const syncCatalog: SyncCatalogFn = async () =>
 
 /** Insert missing seed grants for roles that exist; never removes or edits (BR-AUTH-21/24). */
 export const seedGrants: SeedGrantsFn = async () => {
+  // The seed roles are the system roles: protected from rename/delete (BR-AUTH-18).
+  await db
+    .update(roles)
+    .set({ isSystem: true })
+    .where(inArray(roles.name, Object.keys(SEED_GRANTS)));
   const roleRows = await db.select().from(roles);
   const idByName = new Map(roleRows.map((r) => [r.name, r.id]));
   const values: { roleId: number; permissionKey: string }[] = [];

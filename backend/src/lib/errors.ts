@@ -1,12 +1,20 @@
 export class AppError extends Error {
   readonly statusCode: number;
   readonly code: string;
+  /** Extra fields spread into the error response body (e.g. `key` on 403). */
+  readonly details: Record<string, unknown> | undefined;
 
-  constructor(message: string, statusCode: number, code: string) {
+  constructor(
+    message: string,
+    statusCode: number,
+    code: string,
+    details?: Record<string, unknown>,
+  ) {
     super(message);
     this.name = "AppError";
     this.statusCode = statusCode;
     this.code = code;
+    this.details = details;
   }
 }
 
@@ -17,8 +25,12 @@ export class NotFoundError extends AppError {
 }
 
 export class ForbiddenError extends AppError {
-  constructor(message = "Forbidden", code = "FORBIDDEN") {
-    super(message, 403, code);
+  constructor(
+    message = "Forbidden",
+    code = "FORBIDDEN",
+    details?: Record<string, unknown>,
+  ) {
+    super(message, 403, code, details);
   }
 }
 

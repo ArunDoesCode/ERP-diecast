@@ -224,6 +224,7 @@ export type RoleSeedName =
 export const SEED_GRANTS: Record<RoleSeedName, PermissionKey[]> = {
   "super-admin": [],
   owner: [
+    "pr.link_machine",
     "employees.directory.view",
     "inventory.adjust",
     "inventory.view",
@@ -247,6 +248,7 @@ export const SEED_GRANTS: Record<RoleSeedName, PermissionKey[]> = {
     "sco.loss_override",
   ],
   back_office: [
+    "pr.link_machine",
     "asset.manage",
     "inventory.adjust",
     "inventory.view",

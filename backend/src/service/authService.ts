@@ -1,63 +1,53 @@
+import { type Actor, loadActor } from "../lib/auth-middleware";
 import { env } from "../lib/env";
+import { UnauthorizedError } from "../lib/errors";
 import {
-  BadRequestError,
-  ConflictError,
-  UnauthorizedError,
-} from "../lib/errors";
-import {
-  type Role,
   sha256,
   signAccessToken,
   signRefreshToken,
   verifyRefreshToken,
 } from "../lib/token";
 import { authRepository } from "../repository/authRepository";
-import type { registerSchemaType } from "../types/auth.types";
 
 export const authService = {
-  async register(data: registerSchemaType) {
-    // Verify role exists
-    const role = await authRepository.getRoleByName(data.role);
-    if (!role) {
-      throw new BadRequestError("Invalid role");
-    }
-
-    // Check email doesn't exist
-    const existing = await authRepository.getEmployeeByEmail(data.email);
-    if (existing) {
-      throw new ConflictError("Email already exists", "EMAIL_EXISTS");
-    }
-
-    // Hash password and create employee
-    const passwordHash = await Bun.password.hash(data.password);
-    const employeeData: {
-      name: string;
-      email: string;
-      phone?: string;
-      roleId: number;
-      passwordHash: string;
-    } = {
-      name: data.name,
-      email: data.email,
-      passwordHash,
-      roleId: role.id,
+  /** BR-AUTH-13: the shape returned by `/auth/me` and login `user`. */
+  async getSessionUser(actor: Actor, email?: string | null) {
+    const [rows, emailRow] = await Promise.all([
+      authRepository.listScreens(),
+      email === undefined
+        ? authRepository.getEmployeeRoleById(actor.id)
+        : Promise.resolve(undefined),
+    ]);
+    const screens = rows
+      .filter(
+        (r) =>
+          actor.isSuperAdmin ||
+          r.permissionKey === null ||
+          actor.permissions.has(r.permissionKey as never),
+      )
+      .map(({ key, path, label, menuGroup, sortOrder }) => ({
+        key,
+        path,
+        label,
+        menuGroup,
+        sortOrder,
+      }));
+    return {
+      id: actor.id,
+      name: actor.name,
+      email: email === undefined ? (emailRow?.email ?? null) : email,
+      role: actor.roleName,
+      permissions: [...actor.permissions],
+      screens,
     };
-    if (data.phone) {
-      employeeData.phone = data.phone;
-    }
-    const employee = await authRepository.createEmployee(employeeData);
-
-    return employee;
   },
 
   async login(email: string, password: string) {
-    // Get employee with role
     const employee = await authRepository.getEmployeeWithRoleByEmail(email);
     if (!employee || !employee.passwordHash) {
       throw new UnauthorizedError("Invalid credentials", "INVALID_CREDENTIALS");
     }
 
-    // Verify password
     const isValidPassword = await Bun.password.verify(
       password,
       employee.passwordHash,
@@ -66,41 +56,26 @@ export const authService = {
       throw new UnauthorizedError("Invalid credentials", "INVALID_CREDENTIALS");
     }
 
-    // Get allowed pages
-    const allowedPages = await authRepository.getPagesByRoleId(employee.roleId);
+    const actor = await loadActor(employee.id);
+    if (!actor?.isActive) {
+      throw new UnauthorizedError("Invalid credentials", "INVALID_CREDENTIALS");
+    }
 
-    // Generate tokens
-    const payload = {
-      userId: employee.id,
-      userName: employee.name,
-      role: employee.roleName as Role,
-      allowedPages,
-    };
-
+    // Token carries identity only; role and keys are read per request (BR-AUTH-12).
+    const payload = { userId: employee.id, userName: employee.name };
     const accessToken = await signAccessToken(payload);
     const refreshToken = await signRefreshToken(payload);
-
-    // Store refresh token
-    const refreshExpiry = new Date(
-      Date.now() + env.REFRESH_TOKEN_TTL_SECONDS * 1000,
-    );
 
     await authRepository.storeRefreshToken({
       employeeId: employee.id,
       tokenHash: await sha256(refreshToken),
-      expiresAt: refreshExpiry,
+      expiresAt: new Date(Date.now() + env.REFRESH_TOKEN_TTL_SECONDS * 1000),
     });
 
     return {
       accessToken,
       refreshToken,
-      user: {
-        id: employee.id,
-        name: employee.name,
-        email: employee.email,
-        role: employee.roleName,
-        allowedPages,
-      },
+      user: await this.getSessionUser(actor, employee.email),
     };
   },
 
@@ -122,8 +97,8 @@ export const authService = {
     // Delete old refresh token
     await authRepository.deleteRefreshToken(token.id);
 
-    // Re-read role and pages so role/permission changes and deactivation take
-    // effect on the next refresh, not only after a full re-login (BL-018).
+    // Re-read the employee (BR-AUTH-01/02): deactivation blocks refresh, and the
+    // new tokens carry the current name.
     const employee = await authRepository.getActiveEmployeeWithRoleById(
       Number(payload.userId),
     );
@@ -132,12 +107,7 @@ export const authService = {
     }
 
     // Generate new tokens
-    const nextPayload = {
-      userId: employee.id,
-      userName: employee.name,
-      role: employee.roleName as Role,
-      allowedPages: await authRepository.getPagesByRoleId(employee.roleId),
-    };
+    const nextPayload = { userId: employee.id, userName: employee.name };
 
     const newAccessToken = await signAccessToken(nextPayload);
     const newRefreshToken = await signRefreshToken(nextPayload);

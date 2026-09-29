@@ -2,9 +2,8 @@ import { Hono } from "hono";
 
 import { supplierController } from "../controller/supplierController";
 import { asyncHandler } from "../lib/async-handler";
-import { requireAuth, requireRole } from "../lib/auth-middleware";
+import { requirePermission } from "../lib/auth-middleware";
 import { paginatedResponse, successResponse } from "../lib/response-schemas";
-import type { AuthRequirement } from "../lib/route-registry";
 import { register } from "../lib/route-registry";
 import type { AppEnv } from "../lib/types";
 import {
@@ -28,17 +27,12 @@ import { END_POINTS } from "./end-points";
 
 const SUPPLIER_ROUTES = END_POINTS.supplier;
 const SUPPLIER_BASE_PATH = "/api/supplier";
-const SUPPLIER_AUTH: AuthRequirement = {
-  type: "roles",
-  roles: ["super-admin", "back_office"],
-};
 
 const supplierRouter = new Hono<AppEnv>();
 
-supplierRouter.use("*", requireAuth, requireRole("super-admin", "back_office"));
-
 supplierRouter.get(
   SUPPLIER_ROUTES.listSuppliers,
+  requirePermission("supplier.view"),
   asyncHandler(supplierController.list),
 );
 register({
@@ -46,7 +40,7 @@ register({
   path: `${SUPPLIER_BASE_PATH}${SUPPLIER_ROUTES.listSuppliers}`,
   tags: ["supplier"],
   summary: "List suppliers, paginated.",
-  auth: SUPPLIER_AUTH,
+  auth: { type: "permission", key: "supplier.view" },
   request: { query: supplierListQuerySchema },
   responses: { "200": paginatedResponse(supplierSchema) },
   pagination: {
@@ -57,6 +51,7 @@ register({
 
 supplierRouter.get(
   SUPPLIER_ROUTES.listItems,
+  requirePermission("supplier.view"),
   asyncHandler(supplierController.listItems),
 );
 register({
@@ -64,7 +59,7 @@ register({
   path: `${SUPPLIER_BASE_PATH}${SUPPLIER_ROUTES.listItems}`,
   tags: ["supplier"],
   summary: "List a supplier's item catalog entries, paginated.",
-  auth: SUPPLIER_AUTH,
+  auth: { type: "permission", key: "supplier.view" },
   request: { query: supplierItemListQuerySchema },
   responses: { "200": paginatedResponse(supplierItemSchema) },
   pagination: { sortableFields: [], searchable: true },
@@ -72,6 +67,7 @@ register({
 
 supplierRouter.get(
   SUPPLIER_ROUTES.listServices,
+  requirePermission("supplier.view"),
   asyncHandler(supplierController.listServices),
 );
 register({
@@ -79,7 +75,7 @@ register({
   path: `${SUPPLIER_BASE_PATH}${SUPPLIER_ROUTES.listServices}`,
   tags: ["supplier"],
   summary: "List a supplier's service catalog entries, paginated.",
-  auth: SUPPLIER_AUTH,
+  auth: { type: "permission", key: "supplier.view" },
   request: { query: supplierServiceListQuerySchema },
   responses: { "200": paginatedResponse(supplierServiceSchema) },
   pagination: { sortableFields: [], searchable: true },
@@ -87,6 +83,7 @@ register({
 
 supplierRouter.get(
   SUPPLIER_ROUTES.detail,
+  requirePermission("supplier.view"),
   asyncHandler(supplierController.getDetails),
 );
 register({
@@ -94,12 +91,13 @@ register({
   path: `${SUPPLIER_BASE_PATH}${SUPPLIER_ROUTES.detail}`,
   tags: ["supplier"],
   summary: "Get a supplier's master record plus item/service counts.",
-  auth: SUPPLIER_AUTH,
+  auth: { type: "permission", key: "supplier.view" },
   responses: { "200": successResponse(supplierDetailSchema) },
 });
 
 supplierRouter.post(
   SUPPLIER_ROUTES.createSupplier,
+  requirePermission("supplier.manage"),
   asyncHandler(supplierController.create),
 );
 register({
@@ -107,13 +105,14 @@ register({
   path: `${SUPPLIER_BASE_PATH}${SUPPLIER_ROUTES.createSupplier}`,
   tags: ["supplier"],
   summary: "Create a supplier, optionally seeding its item catalog.",
-  auth: SUPPLIER_AUTH,
+  auth: { type: "permission", key: "supplier.manage" },
   request: { body: supplierCreateSchema },
   responses: { "201": successResponse(supplierSchema) },
 });
 
 supplierRouter.post(
   SUPPLIER_ROUTES.createItem,
+  requirePermission("supplier.manage"),
   asyncHandler(supplierController.createItem),
 );
 register({
@@ -121,13 +120,14 @@ register({
   path: `${SUPPLIER_BASE_PATH}${SUPPLIER_ROUTES.createItem}`,
   tags: ["supplier"],
   summary: "Add a single item catalog entry to a supplier.",
-  auth: SUPPLIER_AUTH,
+  auth: { type: "permission", key: "supplier.manage" },
   request: { body: supplierItemCreateSchema },
   responses: { "201": successResponse(supplierItemSchema) },
 });
 
 supplierRouter.post(
   SUPPLIER_ROUTES.createService,
+  requirePermission("supplier.manage"),
   asyncHandler(supplierController.createService),
 );
 register({
@@ -135,13 +135,14 @@ register({
   path: `${SUPPLIER_BASE_PATH}${SUPPLIER_ROUTES.createService}`,
   tags: ["supplier"],
   summary: "Add a single service catalog entry to a supplier.",
-  auth: SUPPLIER_AUTH,
+  auth: { type: "permission", key: "supplier.manage" },
   request: { body: supplierServiceCreateSchema },
   responses: { "201": successResponse(supplierServiceSchema) },
 });
 
 supplierRouter.patch(
   SUPPLIER_ROUTES.updateSupplier,
+  requirePermission("supplier.manage"),
   asyncHandler(supplierController.update),
 );
 register({
@@ -150,13 +151,14 @@ register({
   tags: ["supplier"],
   summary:
     "Update a supplier — discriminated by mode: master fields or a single supplier-item row.",
-  auth: SUPPLIER_AUTH,
+  auth: { type: "permission", key: "supplier.manage" },
   request: { body: supplierUpdateSchema },
   responses: { "200": successResponse(supplierSchema) },
 });
 
 supplierRouter.patch(
   SUPPLIER_ROUTES.editItem,
+  requirePermission("supplier.manage"),
   asyncHandler(supplierController.editItem),
 );
 register({
@@ -164,7 +166,7 @@ register({
   path: `${SUPPLIER_BASE_PATH}${SUPPLIER_ROUTES.editItem}`,
   tags: ["supplier"],
   summary: "Batch-edit one or more of a supplier's item catalog entries.",
-  auth: SUPPLIER_AUTH,
+  auth: { type: "permission", key: "supplier.manage" },
   request: { body: supplierItemBatchEditSchema },
   responses: { "200": supplierItemEditResponseSchema },
   notes: [
@@ -174,6 +176,7 @@ register({
 
 supplierRouter.patch(
   SUPPLIER_ROUTES.editService,
+  requirePermission("supplier.manage"),
   asyncHandler(supplierController.editService),
 );
 register({
@@ -181,7 +184,7 @@ register({
   path: `${SUPPLIER_BASE_PATH}${SUPPLIER_ROUTES.editService}`,
   tags: ["supplier"],
   summary: "Batch-edit one or more of a supplier's service catalog entries.",
-  auth: SUPPLIER_AUTH,
+  auth: { type: "permission", key: "supplier.manage" },
   request: { body: supplierServiceBatchEditSchema },
   responses: { "200": supplierServiceEditResponseSchema },
   notes: [

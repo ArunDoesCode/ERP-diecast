@@ -1,45 +1,17 @@
 import { and, eq, gt } from "drizzle-orm";
 
 import { db } from "../db/client";
-import { pages, refreshTokens, rolePages, roles } from "../db/schemas/01_auth";
+import {
+  pages,
+  refreshTokens,
+  rolePages,
+  rolePermissions,
+  roles,
+  screens,
+} from "../db/schemas/01_auth";
 import { employees } from "../db/schemas/03_hcm";
 
-type CreateEmployeeInput = {
-  name: string;
-  email: string;
-  phone?: string;
-  roleId: number;
-  passwordHash: string;
-};
-
 export const authRepository = {
-  async getRoleByName(roleName: string) {
-    const [role] = await db
-      .select()
-      .from(roles)
-      .where(eq(roles.name, roleName))
-      .limit(1);
-    return role;
-  },
-
-  async getEmployeeByEmail(email: string) {
-    const [employee] = await db
-      .select({ id: employees.id })
-      .from(employees)
-      .where(eq(employees.email, email))
-      .limit(1);
-    return employee;
-  },
-
-  async createEmployee(data: CreateEmployeeInput) {
-    const [employee] = await db.insert(employees).values(data).returning({
-      id: employees.id,
-      name: employees.name,
-      email: employees.email,
-    });
-    return employee;
-  },
-
   async getEmployeeWithRoleByEmail(email: string) {
     const [row] = await db
       .select({
@@ -70,6 +42,47 @@ export const authRepository = {
       .where(and(eq(employees.id, id), eq(employees.isActive, true)))
       .limit(1);
     return row;
+  },
+
+  /** Employee + role regardless of active flag (BR-AUTH-12 decides in the caller). */
+  async getEmployeeRoleById(id: number) {
+    const [row] = await db
+      .select({
+        id: employees.id,
+        name: employees.name,
+        email: employees.email,
+        isActive: employees.isActive,
+        roleId: employees.roleId,
+        roleName: roles.name,
+        roleIsSystem: roles.isSystem,
+      })
+      .from(employees)
+      .innerJoin(roles, eq(roles.id, employees.roleId))
+      .where(eq(employees.id, id))
+      .limit(1);
+    return row;
+  },
+
+  async getPermissionKeysByRoleId(roleId: number) {
+    const rows = await db
+      .select({ key: rolePermissions.permissionKey })
+      .from(rolePermissions)
+      .where(eq(rolePermissions.roleId, roleId));
+    return rows.map((r) => r.key);
+  },
+
+  async listScreens() {
+    return db
+      .select({
+        key: screens.key,
+        path: screens.path,
+        label: screens.label,
+        menuGroup: screens.menuGroup,
+        sortOrder: screens.sortOrder,
+        permissionKey: screens.permissionKey,
+      })
+      .from(screens)
+      .orderBy(screens.sortOrder, screens.key);
   },
 
   async getPagesByRoleId(roleId: number) {

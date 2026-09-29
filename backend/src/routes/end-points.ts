@@ -6,7 +6,6 @@
  */
 export const END_POINTS = {
   auth: {
-    register: "/register",
     login: "/login",
     refresh: "/refresh",
     logout: "/logout",

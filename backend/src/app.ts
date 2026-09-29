@@ -48,7 +48,12 @@ export function createApp() {
   app.onError((error, c) => {
     if (error instanceof AppError) {
       return c.json(
-        { success: false, message: error.message, code: error.code },
+        {
+          ...error.details,
+          success: false,
+          message: error.message,
+          code: error.code,
+        },
         error.statusCode as ContentfulStatusCode,
       );
     }

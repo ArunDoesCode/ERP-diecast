@@ -1,45 +1,9 @@
 import type { MiddlewareHandler } from "hono";
+import { authRepository } from "../repository/authRepository";
 import { ForbiddenError, UnauthorizedError } from "./errors";
-import type { PermissionKey } from "./permissions";
+import { PERMISSION_KEYS, type PermissionKey } from "./permissions";
 import { type Role, verifyAccessToken } from "./token";
 import type { AppEnv } from "./types";
-
-export const requireAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
-  const authHeader = c.req.header("authorization");
-  const token = authHeader?.startsWith("Bearer ")
-    ? authHeader.slice("Bearer ".length)
-    : undefined;
-
-  if (!token) {
-    throw new UnauthorizedError("Unauthorized");
-  }
-
-  let payload: Awaited<ReturnType<typeof verifyAccessToken>>;
-  try {
-    payload = await verifyAccessToken(token);
-  } catch {
-    throw new UnauthorizedError("Invalid access token");
-  }
-
-  c.set("user", payload);
-  await next();
-};
-
-export function requireRole(...allowed: Role[]): MiddlewareHandler<AppEnv> {
-  return async (c, next) => {
-    const user = c.get("user");
-    if (!allowed.includes(user.role)) {
-      throw new ForbiddenError("Forbidden");
-    }
-
-    await next();
-  };
-}
-
-// ---------------------------------------------------------------------------
-// S3 contract (auth-setup BR-AUTH-09, 12, 18, 23). Signatures only: nothing
-// calls these yet and no router is switched. Implemented in the S3 build.
-// ---------------------------------------------------------------------------
 
 /**
  * The caller as read from the DB on every request (BR-AUTH-12), never from
@@ -64,26 +28,113 @@ export type InvalidateActorFn = (employeeId: number) => void;
 /** Drops every cached actor holding this role (grant change, role delete). */
 export type InvalidateRoleFn = (roleId: number) => void;
 
-export const loadActor: LoadActorFn = async () => {
-  throw new Error("not implemented (S3)");
+const ACTOR_CACHE_TTL_MS = 2000;
+const actorCache = new Map<number, { actor: Actor; expiresAt: number }>();
+
+export const loadActor: LoadActorFn = async (employeeId) => {
+  const hit = actorCache.get(employeeId);
+  if (hit && hit.expiresAt > Date.now()) return hit.actor;
+
+  const row = await authRepository.getEmployeeRoleById(employeeId);
+  if (!row) {
+    actorCache.delete(employeeId);
+    return null;
+  }
+  const isSuperAdmin = row.roleName === "super-admin";
+  const permissions = new Set<PermissionKey>(
+    isSuperAdmin
+      ? PERMISSION_KEYS
+      : ((await authRepository.getPermissionKeysByRoleId(
+          row.roleId,
+        )) as PermissionKey[]),
+  );
+  const actor: Actor = {
+    id: row.id,
+    name: row.name,
+    roleId: row.roleId,
+    roleName: row.roleName,
+    isSuperAdmin,
+    isActive: row.isActive,
+    permissions,
+  };
+  actorCache.set(employeeId, {
+    actor,
+    expiresAt: Date.now() + ACTOR_CACHE_TTL_MS,
+  });
+  return actor;
 };
-export const invalidateActor: InvalidateActorFn = () => {
-  throw new Error("not implemented (S3)");
+
+export const invalidateActor: InvalidateActorFn = (employeeId) => {
+  actorCache.delete(employeeId);
 };
-export const invalidateRole: InvalidateRoleFn = () => {
-  throw new Error("not implemented (S3)");
+
+export const invalidateRole: InvalidateRoleFn = (roleId) => {
+  for (const [id, entry] of actorCache) {
+    if (entry.actor.roleId === roleId) actorCache.delete(id);
+  }
+};
+
+/**
+ * Token check (401) then actor load (missing or inactive => 401, BR-AUTH-12).
+ * Sets `user` and `actor` on the context; runs once per request.
+ */
+export const requireAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
+  if (!c.get("actor")) {
+    const authHeader = c.req.header("authorization");
+    const token = authHeader?.startsWith("Bearer ")
+      ? authHeader.slice("Bearer ".length)
+      : undefined;
+
+    if (!token) {
+      throw new UnauthorizedError("Unauthorized");
+    }
+
+    let payload: Awaited<ReturnType<typeof verifyAccessToken>>;
+    try {
+      payload = await verifyAccessToken(token);
+    } catch {
+      throw new UnauthorizedError("Invalid access token");
+    }
+
+    const actor = await loadActor(Number(payload.userId));
+    if (!actor || !actor.isActive) {
+      throw new UnauthorizedError("Unauthorized");
+    }
+
+    c.set("user", payload);
+    c.set("actor", actor);
+  }
+  await next();
 };
 
 /**
  * Allows the request only if the caller is super-admin or holds `key`.
  * Order (BR-AUTH-23): token check (401) -> load actor (inactive => 401,
  * BR-AUTH-12) -> permission check (403 PERMISSION_DENIED, body carries `key`).
- * Sets `c.set("actor", actor)`. Replaces `requireRole` once routers switch.
  */
 export function requirePermission(
-  _key: PermissionKey,
+  key: PermissionKey,
 ): MiddlewareHandler<AppEnv> {
-  return async () => {
-    throw new Error("not implemented (S3)");
+  return async (c, next) => {
+    await requireAuth(c, async () => {});
+    const actor = c.get("actor");
+    if (!actor.isSuperAdmin && !actor.permissions.has(key)) {
+      throw new ForbiddenError("Permission denied", "PERMISSION_DENIED", {
+        key,
+      });
+    }
+    await next();
+  };
+}
+
+/** Legacy role-name guard, kept until the other branch stops using it. */
+export function requireRole(...allowed: Role[]): MiddlewareHandler<AppEnv> {
+  return async (c, next) => {
+    const role = c.get("actor")?.roleName as Role | undefined;
+    if (!role || !allowed.includes(role)) {
+      throw new ForbiddenError("Forbidden");
+    }
+
+    await next();
   };
 }

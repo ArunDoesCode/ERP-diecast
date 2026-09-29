@@ -1,3 +1,4 @@
+import { invalidateActor } from "../lib/auth-middleware";
 import { BadRequestError, ConflictError, NotFoundError } from "../lib/errors";
 import { generateRawQrToken } from "../lib/qr-token";
 import { employeeRepository } from "../repository/employeeRepository";
@@ -138,6 +139,7 @@ export const employeeService = {
       if (!employee) {
         throw new NotFoundError("Employee not found");
       }
+      invalidateActor(id);
       return employee;
     }
 
@@ -157,6 +159,7 @@ export const employeeService = {
       throw new NotFoundError("Employee not found");
     }
 
+    invalidateActor(id);
     return rawQrToken ? { ...employee, rawQrToken } : employee;
   },
 
@@ -172,6 +175,7 @@ export const employeeService = {
     if (!row) {
       throw new NotFoundError("Employee not found");
     }
+    invalidateActor(id);
   },
 
   async regenerateQr(id: number) {

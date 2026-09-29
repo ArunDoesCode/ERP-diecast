@@ -1,3 +1,4 @@
+import { invalidateRole } from "../lib/auth-middleware";
 import { BadRequestError, NotFoundError } from "../lib/errors";
 import { pageRepository } from "../repository/pageRepository";
 import { permissionRepository } from "../repository/permissionRepository";
@@ -31,6 +32,7 @@ export const permissionService = {
     }
 
     await permissionRepository.applyDiff(roleId, added, deleted);
+    invalidateRole(roleId);
 
     return permissionRepository.listByRoleId(roleId);
   },

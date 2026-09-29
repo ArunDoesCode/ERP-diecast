@@ -7,18 +7,9 @@ import {
 } from "../lib/http";
 import type { AppEnv } from "../lib/types";
 import { authService } from "../service/authService";
-import { loginSchema, registerSchema } from "../types/auth.types";
+import { loginSchema } from "../types/auth.types";
 
 export const authController = {
-  async register(c: Context<AppEnv>) {
-    const body = registerSchema.parse(await c.req.json());
-    const employee = await authService.register(body);
-    return c.json(
-      { success: true, data: employee, message: "Registration Successful" },
-      201,
-    );
-  },
-
   async login(c: Context<AppEnv>) {
     const body = loginSchema.parse(await c.req.json());
     const result = await authService.login(body.email, body.password);
@@ -69,9 +60,9 @@ export const authController = {
   },
 
   async me(c: Context<AppEnv>) {
-    const user = c.get("user");
+    const data = await authService.getSessionUser(c.get("actor"));
     return c.json(
-      { success: true, data: user, message: "User fetched successfully" },
+      { success: true, data, message: "User fetched successfully" },
       200,
     );
   },

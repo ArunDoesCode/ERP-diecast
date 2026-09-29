@@ -124,7 +124,10 @@ export const assetController = {
     const query = assetMachineListQuerySchema.parse(
       Object.fromEntries(new URL(c.req.url).searchParams),
     );
-    const { data, meta } = await assetService.listMachines(query);
+    const { data, meta } = await assetService.listMachines(
+      query,
+      c.get("actor"),
+    );
     return c.json({ success: true, data, meta });
   },
 

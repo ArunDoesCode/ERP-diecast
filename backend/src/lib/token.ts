@@ -14,14 +14,14 @@ export type Role =
 export type TokenPayload = {
   userId: number | string;
   userName: string;
-  role: Role;
-  allowedPages: string[];
 };
 
 const accessSecret = new TextEncoder().encode(env.ACCESS_TOKEN_SECRET);
 const refreshSecret = new TextEncoder().encode(env.REFRESH_TOKEN_SECRET);
 
-export async function signAccessToken(payload: TokenPayload) {
+export async function signAccessToken(
+  payload: TokenPayload & Record<string, unknown>,
+) {
   return new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256", typ: "JWT" })
     .setIssuedAt()

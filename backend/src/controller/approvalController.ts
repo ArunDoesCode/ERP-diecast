@@ -1,6 +1,7 @@
 import type { Context } from "hono";
 
 import { UnauthorizedError } from "../lib/errors";
+import type { Role } from "../lib/token";
 import type { AppEnv } from "../lib/types";
 import { approvalService } from "../service/approvalService";
 import {
@@ -25,7 +26,7 @@ function parseActor(c: Context<AppEnv>) {
 
   return {
     actorId,
-    actorRole: user.role,
+    actorRole: c.get("actor").roleName as Role,
   };
 }
 

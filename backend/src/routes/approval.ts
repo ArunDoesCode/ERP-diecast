@@ -3,9 +3,8 @@ import { z } from "zod";
 
 import { approvalController } from "../controller/approvalController";
 import { asyncHandler } from "../lib/async-handler";
-import { requireAuth, requireRole } from "../lib/auth-middleware";
+import { requireAuth, requirePermission } from "../lib/auth-middleware";
 import { paginatedResponse, successResponse } from "../lib/response-schemas";
-import type { AuthRequirement } from "../lib/route-registry";
 import { register } from "../lib/route-registry";
 import type { AppEnv } from "../lib/types";
 import {
@@ -25,14 +24,6 @@ import { END_POINTS } from "./end-points";
 
 const APPROVAL_ROUTES = END_POINTS.approval;
 const APPROVAL_BASE_PATH = "/api/approval";
-const POLICY_AUTH: AuthRequirement = {
-  type: "roles",
-  roles: ["super-admin", "owner", "back_office"],
-};
-const POLICY_WRITE_AUTH: AuthRequirement = {
-  type: "roles",
-  roles: ["super-admin"],
-};
 
 const approvalRouter = new Hono<AppEnv>();
 
@@ -40,7 +31,7 @@ approvalRouter.use("*", requireAuth);
 
 approvalRouter.get(
   APPROVAL_ROUTES.getPolicies,
-  requireRole("super-admin", "owner", "back_office"),
+  requirePermission("approval.policy.view"),
   asyncHandler(approvalController.getPolicies),
 );
 register({
@@ -48,7 +39,7 @@ register({
   path: `${APPROVAL_BASE_PATH}${APPROVAL_ROUTES.getPolicies}`,
   tags: ["approval"],
   summary: "List approval policies, paginated.",
-  auth: POLICY_AUTH,
+  auth: { type: "permission", key: "approval.policy.view" },
   request: { query: approvalPolicyListQuerySchema },
   responses: { "200": paginatedResponse(approvalPolicySchema) },
   pagination: {
@@ -59,7 +50,7 @@ register({
 
 approvalRouter.get(
   APPROVAL_ROUTES.getPolicyDetails,
-  requireRole("super-admin", "owner", "back_office"),
+  requirePermission("approval.policy.view"),
   asyncHandler(approvalController.getPolicyDetails),
 );
 register({
@@ -67,13 +58,13 @@ register({
   path: `${APPROVAL_BASE_PATH}${APPROVAL_ROUTES.getPolicyDetails}`,
   tags: ["approval"],
   summary: "Get a single approval policy's full definition.",
-  auth: POLICY_AUTH,
+  auth: { type: "permission", key: "approval.policy.view" },
   responses: { "200": successResponse(approvalPolicySchema) },
 });
 
 approvalRouter.post(
   APPROVAL_ROUTES.createPolicy,
-  requireRole("super-admin"),
+  requirePermission("approval.policy.manage"),
   asyncHandler(approvalController.createPolicy),
 );
 register({
@@ -81,14 +72,14 @@ register({
   path: `${APPROVAL_BASE_PATH}${APPROVAL_ROUTES.createPolicy}`,
   tags: ["approval"],
   summary: "Create an approval policy (priority + docType + approval chain).",
-  auth: POLICY_WRITE_AUTH,
+  auth: { type: "permission", key: "approval.policy.manage" },
   request: { body: createApprovalPolicySchema },
   responses: { "201": successResponse(approvalPolicySchema) },
 });
 
 approvalRouter.patch(
   APPROVAL_ROUTES.updatePolicy,
-  requireRole("super-admin"),
+  requirePermission("approval.policy.manage"),
   asyncHandler(approvalController.updatePolicy),
 );
 register({
@@ -96,13 +87,14 @@ register({
   path: `${APPROVAL_BASE_PATH}${APPROVAL_ROUTES.updatePolicy}`,
   tags: ["approval"],
   summary: "Update an approval policy.",
-  auth: POLICY_WRITE_AUTH,
+  auth: { type: "permission", key: "approval.policy.manage" },
   request: { body: updateApprovalPolicySchema },
   responses: { "200": successResponse(approvalPolicySchema) },
 });
 
 approvalRouter.post(
   APPROVAL_ROUTES.submitRequest,
+  requireAuth,
   asyncHandler(approvalController.submitRequest),
 );
 register({
@@ -118,6 +110,7 @@ register({
 
 approvalRouter.get(
   APPROVAL_ROUTES.getRequestDetails,
+  requireAuth,
   asyncHandler(approvalController.getRequestDetails),
 );
 register({
@@ -132,6 +125,7 @@ register({
 
 approvalRouter.get(
   APPROVAL_ROUTES.getRequestTrail,
+  requireAuth,
   asyncHandler(approvalController.getRequestTrail),
 );
 register({
@@ -146,6 +140,7 @@ register({
 
 approvalRouter.post(
   APPROVAL_ROUTES.actOnRequest,
+  requireAuth,
   asyncHandler(approvalController.actOnRequest),
 );
 register({
@@ -161,6 +156,7 @@ register({
 
 approvalRouter.get(
   APPROVAL_ROUTES.getMyPendingApprovals,
+  requireAuth,
   asyncHandler(approvalController.getMyPendingApprovals),
 );
 register({
@@ -180,6 +176,7 @@ register({
 
 approvalRouter.get(
   APPROVAL_ROUTES.getCurrentApprovalByDoc,
+  requireAuth,
   asyncHandler(approvalController.getCurrentApprovalByDoc),
 );
 register({
