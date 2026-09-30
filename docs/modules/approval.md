@@ -11,7 +11,7 @@ depends_on: [auth-setup, purchase-requisition, purchase-order]
 > What the code **is** (the spec says what it **should be**). Agents read this before touching the module
 > and only explore code changed since `last_verified_commit`
 > (`git diff eea4fb1..HEAD --stat -- backend/src/db/schemas/02_procurement-approval.ts backend/src/service/approvalService.ts backend/src/repository/approvalRepository.ts backend/src/routes/approval.ts backend/src/types/approval.types.ts backend/src/controller/approvalController.ts frontend/src/types/approval.ts frontend/src/lib/api/approval frontend/src/components/pages/setup/approval frontend/src/components/pages/approval frontend/src/components/views/approval`).
-> Symbol names, not line numbers. Product-level reference: `backend/docs/approval_policy_engine.md`.
+> Symbol names, not line numbers. Rules: `docs/specs/approval.md`, `docs/specs/approval-policies.md`.
 
 ## Summary
 Rule-based policy engine that decides who approves a PR / PO / SCO and runs the multi-level chain via
