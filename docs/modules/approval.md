@@ -11,7 +11,7 @@ depends_on: [auth-setup, purchase-requisition, purchase-order]
 > What the code **is** (the spec says what it **should be**). Agents read this before touching the module
 > and only explore code changed since `last_verified_commit`
 > (`git diff eea4fb1..HEAD --stat -- backend/src/db/schemas/02_procurement-approval.ts backend/src/service/approvalService.ts backend/src/repository/approvalRepository.ts backend/src/routes/approval.ts backend/src/types/approval.types.ts backend/src/controller/approvalController.ts frontend/src/types/approval.ts frontend/src/lib/api/approval frontend/src/components/pages/setup/approval frontend/src/components/pages/approval frontend/src/components/views/approval`).
-> Symbol names, not line numbers. Product-level reference: `backend/docs/approval_policy_engine.md`.
+> Symbol names, not line numbers. Rules: `docs/specs/approval.md`, `docs/specs/approval-policies.md`.
 
 ## Summary
 Rule-based policy engine that decides who approves a PR / PO / SCO and runs the multi-level chain via
@@ -131,6 +131,12 @@ Full shapes: `cd backend && bun run contract:query "<METHOD /path>"`.
 - Two cancel entry points (`actOnRequest` withdraw vs `cancelOpenRequestForDocument`) can drift.
 - Benchmark: ERPNext workflow has per-transition "Allow Self Approval" (default off); SAP B1 approves
   automatically when no template applies and asks a remark on reject; Odoo uses "reset to draft".
+- Seed the baseline policies with `cd backend && bun run db:seed:approval-policies` (idempotent upsert on
+  `(priority, docType, subDocType)`; edit the `POLICIES` array in the script to change them).
+- "No policy matched" / "wrong policy matched": check the policy is `isActive`, the category matches
+  exactly, the amount is inside `[min, max)`, and a lower `priority` number wins within a specificity level.
+- Inserting via the API with a `created_by` FK error means the actor id is not a real employee; the seed
+  script looks up an active super-admin itself.
 
 ## History
 | Date | PR / commit | Change |

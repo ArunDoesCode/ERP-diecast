@@ -1,5 +1,5 @@
 /**
- * Idempotent baseline seed for approval policies (see docs/approval_policy_engine.md).
+ * Idempotent baseline seed for approval policies (see docs/modules/approval.md).
  *
  * Replaces hand-run SQL: reruns safely (fresh dev DB, CI, onboarding a new dev) by
  * upserting on the same (priority, docType, subDocType) uniqueness the DB enforces,
