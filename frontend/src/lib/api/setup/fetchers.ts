@@ -22,7 +22,7 @@ import type {
 
 // Standard backend envelope: every 2xx response is `{ success: true, data }`
 // (paginated list endpoints add `meta` on top — see PaginatedResponse in
-// docs/backend-pagination-contract.md). HTTP-level failures throw
+// the backend `pagination-contract` skill). HTTP-level failures throw
 // ApiClientError in the client, so `success` is always `true` here.
 type Ok<T> = { success: true; data: T };
 

@@ -131,6 +131,12 @@ Full shapes: `cd backend && bun run contract:query "<METHOD /path>"`.
 - Two cancel entry points (`actOnRequest` withdraw vs `cancelOpenRequestForDocument`) can drift.
 - Benchmark: ERPNext workflow has per-transition "Allow Self Approval" (default off); SAP B1 approves
   automatically when no template applies and asks a remark on reject; Odoo uses "reset to draft".
+- Seed the baseline policies with `cd backend && bun run db:seed:approval-policies` (idempotent upsert on
+  `(priority, docType, subDocType)`; edit the `POLICIES` array in the script to change them).
+- "No policy matched" / "wrong policy matched": check the policy is `isActive`, the category matches
+  exactly, the amount is inside `[min, max)`, and a lower `priority` number wins within a specificity level.
+- Inserting via the API with a `created_by` FK error means the actor id is not a real employee; the seed
+  script looks up an active super-admin itself.
 
 ## History
 | Date | PR / commit | Change |

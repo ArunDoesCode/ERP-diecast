@@ -97,6 +97,6 @@ No frontend tests.
 ## History
 | Date | PR / commit | Change |
 |---|---|---|
-| 2026-07-21 | (see `backend/docs/backend-audit-remediation-2026-07-21.md`) | Backend audit + remediation plan scoped to the PR flow |
+| 2026-07-21 | (doc removed; open items are GitHub issues BL-030..BL-037) | Backend audit + remediation plan scoped to the PR flow |
 | 2026-09-27 | 0a406f4 | Map first verified |
 | 2026-09-29 | work/m1 0a406f4..eea4fb1 | M1 build: draft-only edit, requester/super-admin rule, cancel with reason and audit, line cancel, line states written by PO flows, estimate fallback + `noCostHistory`, machine permission, row locks; frozen spec v2; 4 test files |

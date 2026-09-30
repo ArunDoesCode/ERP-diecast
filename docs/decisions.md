@@ -125,3 +125,10 @@ If a decision is reversed, add a new entry that references the old one — don't
 ### D-018 — Subcontracting build clarifications (2026-09-29, subcontracting v2)
 - **Decision:** uneven send:return ratio consumes raw pieces proportionally on cumulative processed qty, rounded half up (Arun: "do what other ERPs do"); race loser on a challan gets 409, over-qty on arrival 400; close waits for QA (409); `material_received` once all pieces are covered by receipts.
 - **Why:** spec was silent or its examples conflicted (BR-SCO-07 vs 24, 12 vs 18, 19). All recorded in the spec Changelog.
+
+### D-019 — Document numbers: one shared counter table (2026-09-30)
+- **Decision:** keep numeric primary keys; all business document numbers (PR, PO, GRN, SCO) come from one
+  `document_number_counters` table, allocated inside the same transaction as the document insert
+  (`backend/src/lib/document-number.ts`). Expose a `publicId` (UUID/ULID) only if external links need it.
+- **Why:** numeric keys join faster and stay small; one counter table avoids a table per workflow; a rolled-back
+  insert rolls the counter back too, so no retry loop on unique conflicts.
