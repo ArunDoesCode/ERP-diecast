@@ -38,11 +38,11 @@ code happens to do — so they can catch the developer being wrong.
 ## Inputs
 - The spec: `docs/specs/<module>.md` (acceptance criteria + BR ids). If the caller gives BR ids, cover
   exactly those. If the spec is not `status: frozen`, say so and stop unless the caller is `/bug`.
-- The existing pattern: `backend/src/repository/approvalRepository.test.ts` (real-DB integration test,
+- The existing pattern: `backend/tests/repository/approvalRepository.test.ts` (real-DB integration test,
   `TEST_`-prefixed fixtures created in `beforeAll`, removed in `afterAll`, `disconnectDb()` at the end).
 
 ## How to write tests
-- Location: next to the code under test, `*.test.ts` (e.g. `backend/src/service/grnService.test.ts`);
+- Location: `backend/tests/<layer>/`, mirroring `src/` (`routes`, `service`, `repository`, `lib`, `types`), `*.test.ts` (e.g. `backend/tests/service/grnService.test.ts`);
   scenario tests in `backend/src/scenarios/<flow>.test.ts`.
 - Name: `test("BR-GRN-04 rejects received qty above PO open qty", …)`. One behaviour per test.
 - Default level: **service layer** (call `xxxService.*` with real DB). This covers business rules without

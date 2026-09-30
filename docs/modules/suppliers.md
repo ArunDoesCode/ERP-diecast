@@ -54,7 +54,7 @@ inactive supplier) is in `poService`; the SCO side is the subcontracting build (
 ## Tests
 | File | Covers |
 |---|---|
-| `backend/src/service/supplierService.test.ts` | BR-SUP-01..24 (HTTP, real DB) |
+| `backend/tests/service/supplierService.test.ts` | BR-SUP-01..24 (HTTP, real DB) |
 
 ## Known gaps / debt
 - PO supplier picker should request `status=active` (BR-SUP-24) — PO screen (BL-053).

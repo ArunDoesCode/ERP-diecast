@@ -73,9 +73,9 @@ Full shapes: `cd backend && bun --env-file=… run contract:query "<METHOD /path
 ## Tests
 | File | Covers |
 |---|---|
-| `backend/src/service/grnService.test.ts` | BR-GRN-01, 02, 04, 05, 06, 08, 09, 10, 12, 13, 15, 18, 19, 25, 27, 29, 34, 35 (HTTP via `createApp()`, `TEST_grn_` fixtures) |
-| `backend/src/service/stockPosting.test.ts` | BR-GRN-21, 22, 24, 32, 33, 37, 38, 39, 40, 41, 42, 43, 44 |
-| `backend/src/service/poReceiptStatus.test.ts` | BR-PO-10 receipt status from GRN postings (both directions) |
+| `backend/tests/service/grnService.test.ts` | BR-GRN-01, 02, 04, 05, 06, 08, 09, 10, 12, 13, 15, 18, 19, 25, 27, 29, 34, 35 (HTTP via `createApp()`, `TEST_grn_` fixtures) |
+| `backend/tests/service/stockPosting.test.ts` | BR-GRN-21, 22, 24, 32, 33, 37, 38, 39, 40, 41, 42, 43, 44 |
+| `backend/tests/service/poReceiptStatus.test.ts` | BR-PO-10 receipt status from GRN postings (both directions) |
 
 ## Known gaps / debt
 - Schema-only, no code: purchase returns, supplier invoices, supplier payments, supplier bank details, subcontracting orders/GRNs.

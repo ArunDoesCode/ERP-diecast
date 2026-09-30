@@ -187,7 +187,7 @@ listed in section 6 above) as a typed array, validated against the same Zod sche
 (`createApprovalPolicySchema`) the CRUD API uses. Run it with:
 
 ```bash
-bun run db:seed:approval-policies
+bun scripts/seed-approval-policies.ts
 ```
 
 - **Idempotent** — upserts on `(priority, docType, subDocType)`, the same uniqueness the

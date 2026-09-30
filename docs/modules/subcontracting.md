@@ -52,11 +52,11 @@ Endpoints and payloads: `.pipeline/subcontracting/contract.md`, or `bun run cont
 ## Tests
 | File | BRs |
 |---|---|
-| `backend/src/routes/sco.test.ts` | 01–06, 20, 21, 23 |
-| `backend/src/routes/scoChallan.test.ts` | 07–11, 24, 25 |
-| `backend/src/routes/scoReceipt.test.ts` | 12–18, 22, 24, 25 |
-| `backend/src/routes/scoReceiptCost.test.ts` | 14, 17 (issue cost regression, CR-1) |
-| `backend/src/routes/scoClose.test.ts` | 19, 22–25 + reports |
+| `backend/tests/routes/sco.test.ts` | 01–06, 20, 21, 23 |
+| `backend/tests/routes/scoChallan.test.ts` | 07–11, 24, 25 |
+| `backend/tests/routes/scoReceipt.test.ts` | 12–18, 22, 24, 25 |
+| `backend/tests/routes/scoReceiptCost.test.ts` | 14, 17 (issue cost regression, CR-1) |
+| `backend/tests/routes/scoClose.test.ts` | 19, 22–25 + reports |
 
 ## Indian GST notes (why the rules look like this)
 - CGST Sec 143: inputs sent for job work without tax must come back (or be supplied from the job worker's place) within 1 year; capital goods 3 years; moulds, dies, jigs, fixtures, tools exempt. Late = deemed supply on the day sent out, tax + interest.

@@ -52,8 +52,8 @@ backend/                           ← this repo
 │   │   ├── client.ts               ← drizzle-orm/postgres-js client
 │   │   ├── schemas/                ← Drizzle table defs, split by domain (see below)
 │   │   └── migrations/             ← drizzle-kit generated migrations
-│   ├── lib/                        ← auth-middleware, token, errors, async-handler, env, http, qr-token, route-registry, …
-│   └── test/setup-env.ts           ← bun test preload: forces DATABASE_URL_TEST
+│   └── lib/                        ← auth-middleware, token, errors, async-handler, env, http, qr-token, route-registry, …
+├── tests/                          ← all *.test.ts, mirroring src/ (routes, service, repository, lib, types, scripts) + setup-env.ts (bun test preload: forces DATABASE_URL_TEST)
 ├── docs/                            ← audit/remediation notes (see docs/backend-audit-remediation-*.md)
 ├── docker-compose.yaml              ← local Postgres 15 for dev (see "Database" below)
 ├── biome.json                       ← lint + format config (Biome, replaces ESLint/Prettier)
@@ -76,7 +76,7 @@ Do not suggest alternatives without a strong reason.
 | Operator login   | Raw hex QR token + hashed digest    | `src/lib/qr-token.ts`, no password                         |
 | Validation       | Zod (v4)                            | Every controller parses input before calling a service     |
 | Package manager  | Bun                                 | `bun run <script>`                                         |
-| Lint/format      | Biome                               | `bun run lint` / `lint:fix` / `format`                     |
+| Lint/format      | Biome                               | `bun run lint` / `bun run fix` (lint + format)             |
 
 Frontend (`../frontend`) is a separate Next.js repo. It talks to this backend only through
 the Hono API — it does not have its own Supabase client and should not gain one. If you're
@@ -93,13 +93,12 @@ conventions as authoritative for that side; this file only governs `backend/`.
 docker compose up -d        # dev Postgres :5432 + test Postgres :5433 (see docker-compose.yaml)
 bun run db:push             # push current schema to the dev DB (drizzle-kit push)
 bun run db:test:prepare     # push schema + page-access seed to the test DB
-bun run db:studio           # drizzle-kit studio, browse the DB
 ```
 
 `DATABASE_URL` in `.env` points at the local Docker Postgres in dev. There is currently
 no production database — this project is dev-only, no deployed environment yet.
 
-**Tests never touch the dev DB.** `bunfig.toml` preloads `src/test/setup-env.ts`, which replaces
+**Tests never touch the dev DB.** `bunfig.toml` preloads `tests/setup-env.ts`, which replaces
 `DATABASE_URL` with `DATABASE_URL_TEST` before any module loads, and refuses to run if that variable
 is missing, equals `DATABASE_URL`, or names a database that doesn't end in `_test`
 (`src/lib/test-db-url.ts`). The `postgres-test` container is in-memory (tmpfs), so after a container
@@ -227,9 +226,9 @@ src/
     └── env.ts                   ← typed env access
 ```
 
-Tests: `bun test` (co-located `*.test.ts`). HTTP-level tests use `createApp().request(...)` —
-see `src/app.test.ts`. Every frontend `API_ROUTES` path must exist in the route registry
-(`src/lib/frontend-routes-contract.test.ts`), and the committed `.contracts/api-manifest.json`
+Tests: `bun test` (all in `tests/`, mirroring `src/`). HTTP-level tests use `createApp().request(...)` —
+see `tests/app.test.ts`. Every frontend `API_ROUTES` path must exist in the route registry
+(`tests/lib/frontend-routes-contract.test.ts`), and the committed `.contracts/api-manifest.json`
 must be current (`bun run contract:check`, in CI).
 
 There is no `jobs.ts`, `workers.ts`, `payroll.ts`, `enquiries.ts`, `qa.ts`, or `station/` yet —
