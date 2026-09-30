@@ -6,7 +6,7 @@
  * and validates every policy against the same Zod schema the CRUD API uses before
  * touching the DB.
  *
- * Usage: `bun run db:seed:approval-policies`
+ * Usage: `bun scripts/seed-approval-policies.ts`
  */
 import { and, eq, sql } from "drizzle-orm";
 import { db, disconnectDb } from "../src/db/client";

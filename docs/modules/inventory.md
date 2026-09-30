@@ -59,9 +59,9 @@ screen for stock-take and opening stock. All BR-INV-01..25 are built and tested
 ## Tests
 | File | Covers |
 |---|---|
-| `backend/src/service/inventoryMasters.test.ts` | BR-INV-01..18, 24, 25 |
-| `backend/src/service/inventoryStock.test.ts` | BR-INV-06, 07, 10, 19..23 |
-| `backend/src/service/stockPosting.test.ts` | grn-stock BR-GRN-21..44 incl. manual movements |
+| `backend/tests/service/inventoryMasters.test.ts` | BR-INV-01..18, 24, 25 |
+| `backend/tests/service/inventoryStock.test.ts` | BR-INV-06, 07, 10, 19..23 |
+| `backend/tests/service/stockPosting.test.ts` | grn-stock BR-GRN-21..44 incl. manual movements |
 
 ## Known gaps / debt
 - BR-INV-05 PO half (PR line approved before deactivation) → BL-046 (PO code, auth session). SCO part → subcontracting build.

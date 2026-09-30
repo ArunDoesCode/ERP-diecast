@@ -114,12 +114,12 @@ Full shapes: `cd backend && bun run contract:query "<METHOD /path>"`.
 ## Tests
 | File | Covers |
 |---|---|
-| `backend/src/routes/approval-policies.test.ts` | policy admin: access, create / update rules, priority slot, amounts, chain |
-| `backend/src/routes/approval-requests.test.ts` | submit, act, withdraw, notes, two-level rule, read rule, history, document side effects |
-| `backend/src/service/approvalService.test.ts` | `updatePolicy` merge and validation (BR-APR-08, BL-022) |
-| `backend/src/types/approval.types.test.ts` | update schema keeps omitted fields, rejects empty PATCH |
-| `backend/src/repository/approvalRepository.test.ts` | matching rank, submit scenario |
-| `backend/src/lib/permissions.test.ts` | approval keys per role |
+| `backend/tests/routes/approval-policies.test.ts` | policy admin: access, create / update rules, priority slot, amounts, chain |
+| `backend/tests/routes/approval-requests.test.ts` | submit, act, withdraw, notes, two-level rule, read rule, history, document side effects |
+| `backend/tests/service/approvalService.test.ts` | `updatePolicy` merge and validation (BR-APR-08, BL-022) |
+| `backend/tests/types/approval.types.test.ts` | update schema keeps omitted fields, rejects empty PATCH |
+| `backend/tests/repository/approvalRepository.test.ts` | matching rank, submit scenario |
+| `backend/tests/lib/permissions.test.ts` | approval keys per role |
 
 ## Known gaps / debt
 - **SPEC-P3**: UI rules BR-APR-57..60 (policy form) have no automated test; manual checklist only. No

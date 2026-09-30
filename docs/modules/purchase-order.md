@@ -84,10 +84,10 @@ Submit / decide go through `POST /approval/submitRequest` and `actOnRequest` (`d
 ## Tests
 | File | Covers |
 |---|---|
-| `backend/src/routes/po-lifecycle.test.ts` | BR-PO-01..23, BR-PR-25, 28, 30, 31, 32, 33, 36, 46, 47, BR-SUP-16, BR-GRN-27 |
-| `backend/src/service/poReceiptStatus.test.ts` | BR-PO-10, BR-GRN-27 (receipt status both ways) |
-| `backend/src/routes/approval-requests.test.ts` | approval submit / act effects on PO docs |
-| `backend/src/service/grnService.test.ts` | GRN side that calls `recomputeReceiptStatus` |
+| `backend/tests/routes/po-lifecycle.test.ts` | BR-PO-01..23, BR-PR-25, 28, 30, 31, 32, 33, 36, 46, 47, BR-SUP-16, BR-GRN-27 |
+| `backend/tests/service/poReceiptStatus.test.ts` | BR-PO-10, BR-GRN-27 (receipt status both ways) |
+| `backend/tests/routes/approval-requests.test.ts` | approval submit / act effects on PO docs |
+| `backend/tests/service/grnService.test.ts` | GRN side that calls `recomputeReceiptStatus` |
 
 No frontend tests.
 

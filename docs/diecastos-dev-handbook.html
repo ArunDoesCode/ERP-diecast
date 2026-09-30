@@ -618,8 +618,8 @@ gitGraph
       </div>
 
       <h3>How a test file looks</h3>
-      <p>Tests live next to the code as <code>*.test.ts</code>. <code>bun test</code> finds every such file and runs it.</p>
-      <pre class="term"><span class="c">// backend/src/service/grnService.test.ts (example of the style agents will write)</span>
+      <p>Tests live in <code>backend/tests/</code>, in the same folders as <code>src/</code> (routes, service, …), as <code>*.test.ts</code>. <code>bun test</code> finds every such file and runs it.</p>
+      <pre class="term"><span class="c">// backend/tests/service/grnService.test.ts (example of the style agents will write)</span>
 import { test, expect } from "bun:test";
 
 test("BR-GRN-04 rejects received qty above PO open qty", async () => {
@@ -650,7 +650,7 @@ test("BR-GRN-04 rejects received qty above PO open qty", async () => {
             <tr><td><code>docker compose up -d</code></td><td>Start Postgres</td></tr>
             <tr><td><code>bun run db:push</code></td><td><strong>Schema push:</strong> Drizzle compares your TypeScript schema files with the database and creates/alters tables to match</td></tr>
             <tr><td><code>psql … -f src/db/seed_page_access.sql</code></td><td><strong>Seed:</strong> inserts starter data (roles, pages, who sees which page)</td></tr>
-            <tr><td><code>bun run db:seed:approval-policies</code></td><td>Seeds approval rules (needs a super-admin employee to exist)</td></tr>
+            <tr><td><code>bun scripts/seed-approval-policies.ts</code></td><td>Seeds approval rules (needs a super-admin employee to exist)</td></tr>
             <tr><td><code>bun run db:reset</code> <em>(planned, BL-005)</em></td><td>One command: wipe, push schema, seed everything, add realistic test data and a login per role</td></tr>
           </tbody>
         </table>

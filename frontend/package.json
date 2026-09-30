@@ -5,9 +5,8 @@
 	"scripts": {
 		"dev": "next dev",
 		"build": "next build",
-		"start": "next start",
-		"lint": "biome check",
-		"format": "biome format --write"
+		"typecheck": "tsc --noEmit",
+		"lint": "biome check"
 	},
 	"dependencies": {
 		"@hookform/resolvers": "^5.9.1",

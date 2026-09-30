@@ -140,6 +140,7 @@ bun install
 SEED_USER_PASSWORD='choose-8+chars' bun run db:reset   # wipes the dev DB (public schema), schema + roles + permissions
                                            # + admin@diecast.local + approval policies + demo data (PRs, POs, GRNs)
                                            # add --no-fixtures for an empty system (admin only); local hosts only
+bun run seed                               # optional: subcontracting demo data (vendor, stock, 5 SCOs), after db:reset
 bun run db:test:prepare                    # schema + seed into the test DB (re-run after container restart)
 bun run dev                                # API on :4000
 
@@ -156,7 +157,7 @@ min 8). Exit 2 = already bootstrapped, 3 = roles not seeded (run `db:reset --no-
 ### B. Automated checks you can run now
 ```bash
 cd backend  && bun run typecheck && bun run lint && bun test   # runs against diecast_test only (BL-006)
-cd frontend && bunx tsc --noEmit && bun run lint               # expect 8 tsc + ~58 lint errors (backlog)
+cd frontend && bun run typecheck && bun run lint
 ```
 
 ### C. Retroactive testing of existing modules (this *is* milestone M1)

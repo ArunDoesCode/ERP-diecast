@@ -76,11 +76,11 @@ Full shapes: `cd backend && bun run contract:query "<METHOD /path>"`.
 ## Tests
 | File | Covers |
 |---|---|
-| `backend/src/routes/pr-lifecycle.test.ts` | BR-PR-01, 02, 06, 08, 11, 14, 15, 17, 19, 21, 45, 46, 47 |
-| `backend/src/routes/pr-cancel.test.ts` | BR-PR-15, 17, 39, 41, 42, 43, 45, 46, 47 (+ BR-KD-01..16) |
-| `backend/src/routes/pr-machine.test.ts` | BR-AUTH-26, BR-PR-17 |
-| `backend/src/routes/po-lifecycle.test.ts` | PR side of PO flows: BR-PR-25, 28, 30, 31, 32, 33, 36, 46, 47 |
-| `backend/src/routes/approval-requests.test.ts`, `service/approvalService.test.ts` | approval submit / withdraw / act for PR docs |
+| `backend/tests/routes/pr-lifecycle.test.ts` | BR-PR-01, 02, 06, 08, 11, 14, 15, 17, 19, 21, 45, 46, 47 |
+| `backend/tests/routes/pr-cancel.test.ts` | BR-PR-15, 17, 39, 41, 42, 43, 45, 46, 47 (+ BR-KD-01..16) |
+| `backend/tests/routes/pr-machine.test.ts` | BR-AUTH-26, BR-PR-17 |
+| `backend/tests/routes/po-lifecycle.test.ts` | PR side of PO flows: BR-PR-25, 28, 30, 31, 32, 33, 36, 46, 47 |
+| `backend/tests/routes/approval-requests.test.ts`, `backend/tests/service/approvalService.test.ts` | approval submit / withdraw / act for PR docs |
 
 No frontend tests.
 

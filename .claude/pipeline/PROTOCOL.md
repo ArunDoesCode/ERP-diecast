@@ -108,7 +108,7 @@ Tests are the spec turned into code. They must not be shaped by the implementati
    Screens touched: .pipeline/<id>/reports/NN-frontend-dev.md#screens-touched   (checklist mode only)
    Test change request: findings.md#<finding-id>   (only when changing an existing test; the finding must
                                                     quote the spec rule)
-   May edit: <test file globs, e.g. backend/src/**/*.test.ts>   Out: production code, specs
+   May edit: <test file globs, e.g. backend/tests/**/*.test.ts>   Out: production code, specs
    Write your report to: .pipeline/<id>/reports/NN-test-writer.md
    ```
    Nothing else goes in the brief — no extra sentences. If test-writer needs more, it returns `BLOCKED` and
@@ -128,10 +128,11 @@ Tests are the spec turned into code. They must not be shaped by the implementati
   and asks the user. Never loop silently.
 
 ## Code lookup (CodeGraph)
-Each worktree has its own index in `.codegraph/` (gitignored). `/feature` runs `codegraph init -i` once when
-it is missing and `codegraph sync` (incremental, seconds) at run start, after each slice commit and before the
-verify loop, so the index matches the branch. Agents never init or sync; if `.codegraph/` is missing, use
-Read/Grep as before.
+Each worktree has its own index in `.codegraph/` (gitignored). The SessionStart hook
+(`.claude/hooks/codegraph-sync.sh`) builds it in the background when missing and syncs it otherwise; the
+CodeGraph server keeps it current on edits. `/feature` still runs `codegraph sync` at run start, after each slice
+commit and before the verify loop. Agents never init or sync; if `.codegraph/` is missing or still building,
+use Read/Grep as before.
 - **Use it for** "where is X", "who calls X", "what breaks if X changes", tests that cover X: one
   `codegraph_explore` call with the symbol/file names in the query, `projectPath` = the worktree root
   (absolute). It returns the verbatim source + call paths, so **do not Read a file it already returned**.

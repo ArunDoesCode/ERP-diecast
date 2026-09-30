@@ -118,7 +118,7 @@ New key = add to `PERMISSIONS`, use it in a route descriptor, add to `SEED_GRANT
 | `routes/auth.test.ts` | BR-03 identical failures, BR-04 rate limit, BR-05 single-use refresh, BR-23 401 before 403 |
 | `service/authService.test.ts` | BR-01/02 refresh reads DB, inactive cannot refresh |
 | `routes/pr-machine.test.ts` | BR-26 `pr.link_machine` |
-| `scripts/bootstrap-admin.test.ts` | BR-KD-17..29 |
+| `backend/tests/scripts/bootstrap-admin.test.ts` | BR-KD-17..29 |
 | `app.test.ts`, `lib/route-registry.test.ts` | 401 / 403 mapping, descriptor guard mounting |
 
 ## Known gaps / debt
