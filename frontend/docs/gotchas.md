@@ -58,36 +58,10 @@ e.preventDefault()}` (so the click registers before blur closes the panel). See
 [EmployeeCombobox.tsx](../src/components/pages/setup/EmployeeCombobox.tsx). Fewer moving
 parts, no trigger-vs-manual-state conflict.
 
-## TanStack Table (server-side pagination/sorting)
+## TanStack Table
 
-### Sortable column `id` must match the backend's `sortBy` whitelist verbatim
-
-`manualSorting: true` sends `sorting[0].id` straight to the API as the `sortBy` param. If
-the backend sorts by `roleId` but the column id is `"role"` (because the cell displays a
-resolved name via `accessorFn`), sorting silently does nothing or 400s. Rename the column
-id to the raw backend field (e.g. `"roleId"`, `"moduleId"`), keep the display resolution
-in `cell`/`accessorFn` only.
-
-### Derived/computed columns can't be server-sortable
-
-A column whose value is computed client-side (e.g. RoleTable's "Employee Count",
-cross-referenced from a separate full employee list) isn't in the backend's `sortBy`
-enum. Set `enableSorting: false` rather than letting it look sortable and silently no-op.
-
-### Don't bake fetcher/nuqs into a generic render component
-
-`components/common/DataTable.tsx` is render-only (`{table, isLoading}` props) —
-header/body/skeleton/pagination from a TanStack `Table` instance. The feature's own table
-component always owns `useReactTable()`, the query hook call, and pagination/sorting
-state. Collapsing fetch+URL-state+render into one "smart" component breaks per-feature
-control of query keys/staleTime/toast placement and violates the `ui/` (shadcn-CLI-owned,
-presentational) vs `common/` (shared app logic) boundary. See `data-table` skill.
-
-### Skeleton column count — derive it, don't duplicate it
-
-`DataTable`'s loading skeleton reads `table.getVisibleLeafColumns().length`, not a
-separate `columns` prop — columns are already known to `table` before data arrives, so
-there's nothing to pass twice.
+Server-side pagination/sorting rules (column id = backend `sortBy`, render-only `DataTable`,
+no sort on derived columns) live in the `data-table` skill.
 
 ## Response envelope / list endpoints
 
@@ -116,18 +90,3 @@ value needs to survive switching away and back (like `RolePermissionEditor`'s se
 role, or `EmployeeCombobox`'s search text in `PermissionsTab`), lift that state to the
 parent that stays mounted and pass it down as a controlled prop, rather than storing it
 locally in the component that gets torn down.
-
-## TanStack Query infinite/search queries
-
-### Gate the query on the debounced value, not on mount
-
-`useEmployeeSearchQuery` uses `enabled: trimmed.length > 0` so opening/focusing the
-combobox doesn't fire a request before the user types anything — only a non-empty
-(trimmed) search term triggers a fetch.
-
-### `useDebouncedValue`'s initial state avoids a redundant delay on remount
-
-`useDebouncedValue(value, delay)` initializes its internal state to `value` immediately
-(`useState(value)`), so if a component remounts with an already-non-empty persisted
-search string, the debounced value is correct on the very first render — no extra
-250ms wait "reappears" just because the component was recreated.

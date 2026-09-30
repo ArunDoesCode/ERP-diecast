@@ -54,7 +54,6 @@ backend/                           ← this repo
 │   │   └── migrations/             ← drizzle-kit generated migrations
 │   └── lib/                        ← auth-middleware, token, errors, async-handler, env, http, qr-token, route-registry, …
 ├── tests/                          ← all *.test.ts, mirroring src/ (routes, service, repository, lib, types, scripts) + setup-env.ts (bun test preload: forces DATABASE_URL_TEST)
-├── docs/                            ← audit/remediation notes (see docs/backend-audit-remediation-*.md)
 ├── docker-compose.yaml              ← local Postgres 15 for dev (see "Database" below)
 ├── biome.json                       ← lint + format config (Biome, replaces ESLint/Prettier)
 └── CLAUDE.md                        ← this file
@@ -302,4 +301,3 @@ in parallel. Never model jobs as a linear sequence once job-tracking is actually
 | Async handler     | `src/lib/async-handler.ts`                     |
 | Type definitions  | `src/lib/types.ts`                             |
 | Environment       | `src/lib/env.ts`                               |
-| Audit/remediation | `docs/backend-audit-remediation-2026-07-21.md` |
