@@ -64,7 +64,7 @@ Every `Agent` delegation MUST pass this brief. No vague delegation — state exa
 
 - scope: exact files/paths in play.
 - goal: concrete build/fix outcome.
-- constraints: Hono 3-layer (controller→service→repository), `end-points.ts` SoT, OpenAPI on every route, `AppError` contract, `requireRole` RBAC, no `any`, async-handler wrap.
+- constraints: Hono 3-layer (controller→service→repository), `end-points.ts` SoT, OpenAPI on every route, `AppError` contract, `requirePermission` guard on every route, no `any`, async-handler wrap.
 - done-check: `bun run lint && bun run typecheck && bun test` green, plus `bun run contract:generate` re-run if the diff touched any route/schema/auth.
 
 ## Build → Review Loop

@@ -42,7 +42,7 @@ The three reviewer/investigator agents are read-only by construction — `tools:
 Calling a subagent directly (via the `Agent` tool) is fine when the task is **one shot** and needs
 no map → build → review loop:
 
-- "Where is `requireRole` defined?" → `Agent({ subagent_type: "cavecrew-investigator", ... })`
+- "Where is `requirePermission` defined?" → `Agent({ subagent_type: "cavecrew-investigator", ... })`
 - "Apply this one-line fix to `src/lib/errors.ts`" → `Agent({ subagent_type: "cavecrew-builder", ... })`
 - "Quick review this diff for bugs" → `Agent({ subagent_type: "cavecrew-reviewer", ... })`
 
@@ -55,7 +55,7 @@ Every delegation (main → ponytail, or ponytail → worker) passes this brief i
 
 `scope (files) · goal · constraints · done-check`
 
-Constraints default: 3-layer Hono, `end-points.ts` SoT, OpenAPI, `AppError`, `requireRole`, no
+Constraints default: 3-layer Hono, `end-points.ts` SoT, OpenAPI, `AppError`, `requirePermission`, no
 `any`, async-handler wrap. Done-check: `bun run lint && bun run typecheck && bun test`.
 
 ## Routing skills
