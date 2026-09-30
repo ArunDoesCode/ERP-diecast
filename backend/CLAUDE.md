@@ -91,7 +91,7 @@ conventions as authoritative for that side; this file only governs `backend/`.
 ```bash
 docker compose up -d        # dev Postgres :5432 + test Postgres :5433 (see docker-compose.yaml)
 bun run db:push             # push current schema to the dev DB (drizzle-kit push)
-bun run db:test:prepare     # push schema + page-access seed to the test DB
+bun run db:test:prepare     # push schema + seed roles and permission catalog into the test DB
 ```
 
 `DATABASE_URL` in `.env` points at the local Docker Postgres in dev. There is currently
@@ -116,13 +116,14 @@ delete in `afterAll`) — the test DB is shared by every test file in a run.
 
 ```
 src/db/schemas/
-├── 01_auth.ts                     — roles, employees* (FK only), pages, rolePages, refreshTokens
+├── 01_auth.ts                     — roles, modules, permissions, rolePermissions, screens, authAuditLog, refreshTokens, documentNumberCounters (employees* = FK only)
 ├── 02_procurement-catalog.ts      — itemMaster, serviceMaster, machines
 ├── 02_procurement-suppliers.ts    — supplierMaster, supplierItems, supplierServices
 ├── 02_procurement-purchasing.ts   — purchaseRequests(+items), purchaseOrders(+items), GRN, subcontracting
 ├── 02_procurement-approval.ts     — approvalPolicies, approvalRequests, approvalTrails
 ├── 02_procurement.ts              — barrel re-export of the four 02_procurement-* files above
 ├── 03_hcm.ts                      — employees (full definition), attendance/payroll fields
+├── 04_company.ts                  — companySettings (one row: plant name, address, GSTIN, state)
 └── index.ts                       — re-exports everything for drizzle-kit
 ```
 
@@ -144,36 +145,48 @@ bun drizzle-kit generate
 
 ### Key architectural decisions
 
-- **JWT auth, roles are DB rows, not a hardcoded enum** — `roles` table, FK'd from `employees.roleId`. Known role values in code today: `owner`, `back_office`, `floor_supervisor`, `qa_inspector`, `die_designer`, `operator`, `super-admin` (see `src/lib/token.ts` `Role` type)
+- **JWT auth; roles and their grants are DB rows, not a hardcoded enum** — `roles` table (FK'd from `employees.roleId`) plus `rolePermissions`. System roles are seeded: `super-admin`, `owner`, `back_office`, `floor_supervisor`, `qa_inspector`, `die_designer`, `operator`. The permission keys live in code (`src/lib/permissions.ts`) and are synced to the DB
 - **Email/password login for desk workers**, **QR token login for operators** (no password) — both real, both implemented
 - **`createdBy` audit on tables** — enforce on new tables, backfill old ones opportunistically
 - **Business logic lives in services** — not in DB triggers, not in controllers
-- **No RLS** — role enforcement is entirely at the API middleware layer (see RBAC below)
+- **No RLS** — authorization is entirely at the API middleware layer (see Authorization below)
 - **Errors must be typed `AppError` subclasses** (`src/lib/errors.ts`: `BadRequestError`, `NotFoundError`, `ConflictError`, `UnauthorizedError`, `ForbiddenError`, base `AppError`). Raw `throw new Error(...)` still exists in some older files (`authService.ts`, `assetService.ts`, `employeeRepository.ts`) — treat as debt to clean up when you touch those files, don't add new ones
 
 ---
 
-## RBAC — roles and enforcement
+## Authorization — permissions and enforcement
 
-Roles are rows in the `roles` table (see `01_auth.ts`), referenced by FK from `employees.roleId`.
-The `Role` TypeScript union in `src/lib/token.ts` currently covers:
-`owner` | `back_office` | `floor_supervisor` | `qa_inspector` | `die_designer` | `operator` | `super-admin`
+Access is **permission-based**. A role is a row in `roles` with a set of permission keys (`rolePermissions`);
+route guards check keys, never role names. `super-admin` is the one system role that holds every key.
+The key catalog is in `src/lib/permissions.ts` (code owns the keys; the DB copy is synced from it).
 
 **Auth strategies:**
 
 - **Desk workers** (owner, back_office, floor_supervisor, qa_inspector, die_designer, super-admin): email + password login → JWT
 - **Floor operators** (operator): QR token scan → JWT (no password, no email required)
 
-**Enforcement — every route file currently does this correctly, keep it that way:**
+**The token only identifies the caller.** On every request `requireAuth` verifies the token, then loads the
+caller (`Actor`: id, role, `isSuperAdmin`, `isActive`, `permissions`) fresh from the DB (short cache, cleared when
+the employee, role or its grants change). A missing or inactive employee is a 401, so a deactivated user loses
+access immediately. Role and permissions are never read from the token.
+
+**Enforcement — every route applies auth plus a permission guard, per route:**
 
 ```typescript
-// Every Hono route file applies both requireAuth and requireRole
-import { requireAuth, requireRole } from "../lib/auth-middleware";
+import { requirePermission } from "../lib/auth-middleware";
 
-router.use("*", requireAuth, requireRole("super-admin", "back_office"));
+router.post(
+  SCO_ROUTES.create,
+  requirePermission("sco.manage"),
+  asyncHandler(scoController.create),
+);
 ```
 
-Never retrofit RBAC. Every new route gets `requireAuth` + `requireRole()` on day one — check
+- `requirePermission(key)`: 401 if not authenticated, 403 `PERMISSION_DENIED` (body carries `key`) if the caller lacks it.
+- `requireAnyPermission(...keys)`: same, but holding any one key is enough (e.g. a `.manage` key admitting `.view` routes).
+- Add a new key to `src/lib/permissions.ts` first, then use it. `requireRole` does not exist.
+
+Never retrofit authorization. Every new route gets a permission guard on day one — check
 `src/routes/*.ts` for the existing pattern before adding a new router.
 
 **JWT payload shape (see `src/lib/token.ts`):**
@@ -182,8 +195,6 @@ Never retrofit RBAC. Every new route gets `requireAuth` + `requireRole()` on day
 {
   userId: number | string,
   userName: string,
-  role: Role,
-  allowedPages: string[],
 }
 ```
 
@@ -200,18 +211,21 @@ src/
 │   ├── end-points.ts          ← END_POINTS path constants per router
 │   ├── auth.ts                ← /auth — register, login, refresh, logout, me
 │   ├── asset.ts               ← /asset — items, services, machines, locations, inventory movements
-│   ├── setup.ts               ← /setup — modules, employees, roles, pages, permissions (super-admin only)
+│   ├── setup.ts               ← /setup — modules, employees, roles, screens, permissions (`setup.roles.manage` / `setup.employees.manage`)
 │   ├── supplier.ts            ← /supplier — supplier master, supplier items, supplier services
 │   ├── pr.ts                  ← /pr — purchase requisitions
 │   ├── po.ts                  ← /po — purchase orders (create, send, confirm, reminder/escalate/delay, invoice, close)
 │   ├── grn.ts                 ← /grn — goods receipts, QA decision, bypass, correction
-│   └── approval.ts            ← /approval — policies, requests, act, trail, current-by-document
-├── controller/                 ← one file per feature (plus employee/module/page/permission/role for setup)
+│   ├── approval.ts            ← /approval — policies, requests, act, trail, current-by-document
+│   ├── sco.ts                 ← /sco — subcontracting orders, challans, receipts + QA, close, reports
+│   └── company.ts             ← /company — company settings (plant details for the job-work challan)
+├── controller/                 ← one file per feature (plus employee/module/page/permission/role for setup; sco split into order/challan/receipt/report)
 ├── service/                    ← same split as controller/
 ├── repository/                 ← same split; approvalRepository.test.ts is the real-DB test pattern
 ├── types/                      ← Zod request schemas per feature (*.types.ts)
 └── lib/
-    ├── auth-middleware.ts       ← requireAuth, requireRole
+    ├── auth-middleware.ts       ← requireAuth, requirePermission, requireAnyPermission, loadActor (actor cache)
+    ├── permissions.ts           ← permission key + screen catalog (code owns it, synced to DB)
     ├── async-handler.ts         ← asyncHandler() wrapper, logs + rethrows on error
     ├── route-registry.ts        ← register() route descriptors → contract manifest (+ drift test)
     ├── response-schemas.ts      ← shared response envelopes for descriptors
