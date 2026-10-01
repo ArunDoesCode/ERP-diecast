@@ -59,6 +59,7 @@ export function getScoStatusBadgeStyle(status: ScoStatus) {
 export function formatScoDate(value?: string | null) {
 	if (!value) return "-";
 	return new Date(value).toLocaleDateString("en-IN", {
+		timeZone: "Asia/Kolkata",
 		day: "2-digit",
 		month: "short",
 		year: "numeric",
