@@ -6,3 +6,4 @@
 | SEC-4 | minor | fix with BR-KD-53 (NODE_ENV case) |
 | CR-2, CR-3, SEC-3 | minor | backlog (stray DB_RESET_CONFIRM in prepare child; spawn process.execPath; [::1] fails closed) |
 | CR-4, SPEC-1, SPEC-2 | minor | docs step (backend/CLAUDE.md:94, docs/WORKFLOW.md:144, auth-setup map; seed_roles.sql unused) |
+| SEC-7 | major | fix: refuse any URL with a query string in db-reset/prepare guard (BR-KD-53 clarification); verified by hand that the driver applies ?database= at connect (the earlier audit said no effect — wrong) |
