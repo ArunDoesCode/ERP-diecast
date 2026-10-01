@@ -11,6 +11,9 @@
  * nothing listens, and everything else is the scratch DB or a name that exists nowhere.
  * Entry points: `bun run db:reset`, `bun run db:test:prepare` (backend/). Written by test-writer from the spec only.
  *
+ * v5 SEC-7 clarification: a URL with any query string (`?database=`, `?user=`, `?host=`, `?sslmode=` ...) is
+ * refused the same way, by both entry points, whatever the flags or confirm.
+ *
  * Not covered (spec does not say what the right outcome is): a URL with no DB name but PGDATABASE set (refuse
  * for "no name", or judge PGDATABASE?); "name can't be read exactly" beyond the multi-host forms.
  */
@@ -364,6 +367,103 @@ describe("db:test:prepare reads the real target (BR-KD-53 via BR-KD-52)", () => 
     );
     expect(r.code).toBe(2);
     expect(r.out).not.toMatch(NO_CONN);
+    expect(await sentinelIntact()).toBe(true);
+  });
+});
+
+// Spec v5 changelog (SEC-7): BR-KD-53 also covers the URL query string. The driver applies ?database=, ?user=,
+// ?host= and similar keys at connect time, so a URL with any query string is refused: exit 2 before connecting.
+// Targets are built so a guard miss cannot reach a real DB: a `?database=diecast` URL only ever points at a usual
+// port where nothing listens; everything on the live server port names the scratch DB.
+describe("a URL with a query string is refused (BR-KD-53, SEC-7)", () => {
+  async function usualDeadPort(): Promise<string | undefined> {
+    for (const p of ["5432", "5433"])
+      if (p !== serverPort && (await isDeadPort(Number(p)))) return p;
+    return undefined;
+  }
+
+  test("BR-KD-53 db:reset: ?database=diecast on a `_test` URL -> exit 2 before connecting", async () => {
+    const port = await usualDeadPort();
+    if (!port) return;
+    const r = await reset(
+      `postgres://u:p@localhost:${port}/${NOWHERE}?database=diecast`,
+    );
+    expect(r.code).toBe(2);
+    expect(r.out).not.toMatch(NO_CONN);
+  }, 60_000);
+
+  test("BR-KD-53 db:reset: ?user=other on a `_test` URL -> exit 2 before connecting", async () => {
+    const port = await usualDeadPort();
+    if (!port) return;
+    const r = await reset(
+      `postgres://u:p@localhost:${port}/${NOWHERE}?user=other`,
+    );
+    expect(r.code).toBe(2);
+    expect(r.out).not.toMatch(NO_CONN);
+  }, 60_000);
+
+  test("BR-KD-53 db:reset: ?host=prod.example.com on a `_test` URL -> exit 2, data untouched", async () => {
+    await plantSentinel();
+    const r = await reset(
+      `postgres://${auth}@${serverHost}:${serverPort}/${SCRATCH}?host=prod.example.com`,
+    );
+    expect(r.code).toBe(2);
+    expect(r.out).not.toMatch(NO_CONN);
+    expect(await sentinelIntact()).toBe(true);
+  });
+
+  test("BR-KD-53 db:reset: even a harmless-looking ?sslmode=disable is refused (any query string), data untouched", async () => {
+    await plantSentinel();
+    const r = await reset(`${withDb(sharedUrl, SCRATCH)}?sslmode=disable`);
+    expect(r.code).toBe(2);
+    expect(await sentinelIntact()).toBe(true);
+  });
+
+  test("BR-KD-53 db:reset: query string cannot be overridden by --allow-remote + matching confirm", async () => {
+    await plantSentinel();
+    const r = await reset(
+      `${withDb(sharedUrl, SCRATCH)}?sslmode=disable`,
+      ["--allow-remote"],
+      { DB_RESET_CONFIRM: SCRATCH },
+    );
+    expect(r.code).toBe(2);
+    expect(await sentinelIntact()).toBe(true);
+  });
+
+  test("BR-KD-53 db:reset: query string on a non-`_test` local DB with a matching confirm is still refused", async () => {
+    const r = await reset(
+      `postgres://u:p@localhost:${deadPort}/diecast?database=other`,
+      [],
+      { DB_RESET_CONFIRM: "diecast" },
+    );
+    expect(r.code).toBe(2);
+    expect(r.out).not.toMatch(NO_CONN);
+  });
+
+  test("BR-KD-53 db:test:prepare: DATABASE_URL_TEST with ?database=diecast -> exit 2 before connecting", async () => {
+    const port = await usualDeadPort();
+    if (!port) return;
+    const r = await prepare(
+      `postgres://u:p@localhost:${port}/${NOWHERE}?database=diecast`,
+    );
+    expect(r.code).toBe(2);
+    expect(r.out).not.toMatch(NO_CONN);
+  }, 60_000);
+
+  test("BR-KD-53 db:test:prepare: DATABASE_URL_TEST with ?host=prod.example.com -> exit 2, data untouched", async () => {
+    await plantSentinel();
+    const r = await prepare(
+      `postgres://${auth}@${serverHost}:${serverPort}/${SCRATCH}?host=prod.example.com`,
+    );
+    expect(r.code).toBe(2);
+    expect(r.out).not.toMatch(NO_CONN);
+    expect(await sentinelIntact()).toBe(true);
+  });
+
+  test("BR-KD-53 db:test:prepare: DATABASE_URL_TEST with ?sslmode=disable -> exit 2, data untouched", async () => {
+    await plantSentinel();
+    const r = await prepare(`${withDb(sharedUrl, SCRATCH)}?sslmode=disable`);
+    expect(r.code).toBe(2);
     expect(await sentinelIntact()).toBe(true);
   });
 });
