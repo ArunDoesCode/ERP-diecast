@@ -132,3 +132,15 @@ If a decision is reversed, add a new entry that references the old one — don't
   (`backend/src/lib/document-number.ts`). Expose a `publicId` (UUID/ULID) only if external links need it.
 - **Why:** numeric keys join faster and stay small; one counter table avoids a table per workflow; a rolled-back
   insert rolls the counter back too, so no retry loop on unique conflicts.
+
+### D-020 — Generated, forward-only migrations replace `db:push` (2026-10-01, db-migrations v1)
+- **Decision:** schema changes ship as generated migrations (`db:generate` + `db:migrate`); one baseline from `src/db/schemas`; `db:push` removed; CI fails on drift. `db:migrate` on any DB that is not a local `*_test` DB (incl. local dev `diecast`) needs `MIGRATE_CONFIRM=<db>` and a `pg_dump` backup (0700 folder, 0600 file). `db:adopt` deferred — UAT starts empty. Replaces D-004.
+- **Why:** UAT-1 brings real factory data; push can drop columns silently.
+
+### D-021 — The reset/migrate guard judges the DB the driver will really use (2026-10-01, known-defects v5, db-migrations v1)
+- **Decision:** only a local `*_test` DB on 5432/5433 runs `db:reset` without a confirm; every other DB needs `DB_RESET_CONFIRM=<db>`. The guard refuses a URL with no DB name, several hosts, an encoded host, or any query string (postgres.js applies `?database=` at connect time — verified). `db:test:prepare` follows the same guard.
+- **Why:** a dev-URL run wiped the dev DB (#56); the first guard checked the URL path but the driver connected elsewhere.
+
+### D-022 — All subcontracting "today" is the plant's IST day (2026-10-01, subcontracting v4)
+- **Decision:** SCO dates, challan date check, expected-return check, days-left, number period and date pickers use Asia/Kolkata, on server and UI (#63). The receipt-number period and a receipt-date check are separate issues (#82, #83).
+- **Why:** UTC "today" was wrong from 00:00 to 05:30 IST.
