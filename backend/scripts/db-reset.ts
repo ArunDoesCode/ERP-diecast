@@ -34,11 +34,18 @@ let dbHost: string;
 let dbPort: string;
 let dbUser: string;
 let dbPass: string;
-let urlSearch: string;
 try {
   const parsed = new URL(rawUrl);
   if (!/^postgres(ql)?:$/.test(parsed.protocol)) {
     throw new Error("not a postgres url");
+  }
+  // SEC-7: the driver applies ?database=, ?user=, ?host= ... from the query at connect time, so a
+  // path-based check can be bypassed. Any query string is refused before the driver is built.
+  if (parsed.search !== "" || rawUrl.includes("?")) {
+    refuse(
+      EXIT.guard,
+      "Refused: DATABASE_URL must not carry a query string. Nothing was changed.",
+    );
   }
   const { default: postgres } = await import("postgres");
   const o = postgres(rawUrl).options; // lazy: does not connect
@@ -61,7 +68,6 @@ try {
   dbPort = String(o.port[0] ?? 5432);
   dbUser = o.user;
   dbPass = o.pass ?? "";
-  urlSearch = parsed.search;
 } catch {
   refuse(
     EXIT.guard,
@@ -81,7 +87,7 @@ const secrets = [dbPass, encodeURIComponent(dbPass)].filter(
 const targetLabel = `${dbHost}:${dbPort}/${dbName}`;
 // Hand the resolved target on explicitly and drop PG* env, so every child and the in-process
 // client connect to exactly what was judged here.
-process.env.DATABASE_URL = `postgres://${encodeURIComponent(dbUser)}:${encodeURIComponent(dbPass)}@${dbHost}:${dbPort}/${dbName}${urlSearch}`;
+process.env.DATABASE_URL = `postgres://${encodeURIComponent(dbUser)}:${encodeURIComponent(dbPass)}@${dbHost}:${dbPort}/${dbName}`;
 for (const k of ["PGHOST", "PGPORT", "PGDATABASE", "PGUSER", "PGPASSWORD"]) {
   delete process.env[k];
 }
