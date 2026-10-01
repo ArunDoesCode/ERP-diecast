@@ -35,6 +35,7 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  rmdirSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -49,6 +50,9 @@ import * as schema from "../../src/db/schemas";
 const SCRATCH = "diecast_mig_scratch_test";
 const FRESH = "diecast_mig_fresh_test";
 const GUARD = "diecast_mig_guard";
+// a database whose name tries to leave backend/backups/ (SEC-6); the name is "../diecast_mig_guard_trav"
+const TRAV = "../diecast_mig_guard_trav";
+const TRAV_RAW = "..%2Fdiecast_mig_guard_trav"; // the same name as it appears, encoded, in a URL path
 const BACKEND = new URL("../..", import.meta.url).pathname;
 const REPO = join(BACKEND, "..");
 const MIG_DIR = join(BACKEND, "src/db/migrations");
@@ -65,7 +69,7 @@ function withDb(url: string, db: string): string {
 const baseUrl = process.env.DATABASE_URL as string; // preload = DATABASE_URL_TEST
 const urlOf = (db: string) => withDb(baseUrl, db);
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
-const ALLOWED = new Set([SCRATCH, FRESH, GUARD]);
+const ALLOWED = new Set([SCRATCH, FRESH, GUARD, TRAV, TRAV_RAW]);
 
 /**
  * Isolation guard: the scripts under test drop schemas. A local target other than the scratch
@@ -79,7 +83,14 @@ function assertScratchOnly(dbUrl: string) {
     return;
   }
   if (!LOCAL_HOSTS.has(u.hostname)) return;
-  const db = u.pathname.replace(/^\//, "");
+  let db = u.pathname.replace(/^\//, "");
+  try {
+    db = decodeURIComponent(db);
+  } catch {
+    // keep the raw name
+  }
+  // a URL with no database name is allowed only for a user that cannot exist ("*_dummy"): it must be refused
+  if (db === "" && u.username.endsWith("_dummy")) return;
   if (!ALLOWED.has(db) && !db.endsWith("_dummy")) {
     throw new Error(
       `db-migrations.test: refusing to run a script against local database "${db}"`,
@@ -1052,4 +1063,328 @@ describe("CI workflow (BR-MIG-12)", () => {
   test("BR-MIG-12 CI builds the DB by migrations, never by push", () => {
     expect(ci).not.toMatch(/db:push|drizzle-kit\s+push/);
   });
+});
+
+// =====================================================================================
+// Added for the security / code review findings (SEC-1, SEC-2, SEC-4, SEC-6, CR-2).
+// Spec: db-migrations.md v1 changelog "clarified during build" (review + security review).
+// =====================================================================================
+const baseParts = new URL(baseUrl);
+const credentials = `${baseParts.username}:${baseParts.password}`;
+const localPort = baseParts.port || "5432";
+const NO_CONNECT_ERROR = /ENOTFOUND|getaddrinfo|ECONNREFUSED|ETIMEDOUT/;
+
+describe("backup file permissions (BR-MIG-16, SEC-1)", () => {
+  let files: string[] = [];
+  let code = -1;
+  let dirMode = -1;
+  let fileMode = -1;
+  beforeAll(async () => {
+    // an empty folder left by an earlier run is removed so the script creates it
+    if (existsSync(BACKUPS) && readdirSync(BACKUPS).length === 0) {
+      rmdirSync(BACKUPS);
+    }
+    await recreateDb(GUARD);
+    const r = await migrate({
+      dbUrl: urlOf(GUARD),
+      env: { ...withFakeDump("ok"), MIGRATE_CONFIRM: GUARD },
+    });
+    code = r.code;
+    files = newBackups();
+    // read now: the per-test cleanup removes the dump file
+    if (existsSync(BACKUPS)) dirMode = statSync(BACKUPS).mode & 0o777;
+    if (files.length === 1) {
+      fileMode = statSync(join(BACKUPS, files[0])).mode & 0o777;
+    }
+  }, 240_000);
+
+  test("BR-MIG-16 a dump is written for the unusual DB (precondition)", () => {
+    expect(code).toBe(0);
+    expect(files.length).toBe(1);
+  });
+
+  test("BR-MIG-16 the backup folder is mode 0700", () => {
+    expect(dirMode).toBe(0o700);
+  });
+
+  test("BR-MIG-16 the dump file is mode 0600", () => {
+    expect(fileMode).toBe(0o600);
+  });
+});
+
+describe("backup file name from an unsafe database name (BR-MIG-16, SEC-6)", () => {
+  // The URL path is "..%2F...": the driver connects to a database literally named that, while a
+  // script that percent-decodes the path would see "../diecast_mig_guard_trav". Either way the dump must
+  // stay inside backend/backups/ (or the run be refused).
+  const quoted = `"${TRAV_RAW}"`;
+  const travUrl = () => withDb(baseUrl, TRAV_RAW);
+  const strays = () =>
+    readdirSync(BACKEND).filter((f) => f.includes("diecast_mig_guard_trav"));
+  const cleanup = () => {
+    for (const f of strays()) rmSync(join(BACKEND, f), { force: true });
+    for (const f of newBackups()) {
+      if (f.includes("diecast_mig_guard_trav")) {
+        rmSync(join(BACKUPS, f), { force: true });
+      }
+    }
+  };
+
+  test("BR-MIG-16 a database name with an encoded '../' never makes the dump leave backend/backups/", async () => {
+    await admin(async (s) => {
+      await s.unsafe(`DROP DATABASE IF EXISTS ${quoted} WITH (FORCE)`);
+      await s.unsafe(`CREATE DATABASE ${quoted}`);
+    });
+    try {
+      assertScratchOnly(travUrl());
+      for (const confirm of [TRAV_RAW, TRAV]) {
+        await migrate({
+          dbUrl: travUrl(),
+          env: { ...withFakeDump("ok"), MIGRATE_CONFIRM: confirm },
+        });
+        // whatever the outcome, no dump file lands outside the backups folder
+        expect(strays()).toEqual([]);
+        for (const f of newBackups()) {
+          expect(f).not.toContain("/");
+          expect(f).not.toContain("..");
+        }
+        // pg_dump is never told to write outside backups/
+        if (existsSync(fakeLog())) {
+          expect(readFileSync(fakeLog(), "utf8")).not.toContain("../");
+        }
+        cleanup();
+        rmSync(fakeLog(), { force: true });
+      }
+    } finally {
+      cleanup();
+      await admin((s) =>
+        s.unsafe(`DROP DATABASE IF EXISTS ${quoted} WITH (FORCE)`),
+      );
+    }
+  }, 240_000);
+});
+
+describe("db:migrate judges the DB the driver will really use (BR-MIG-17, SEC-2)", () => {
+  async function expectRefusedUntouched(r: Run) {
+    expect(r.code).toBe(2);
+    expect(r.out).not.toMatch(NO_CONNECT_ERROR);
+    expect(existsSync(fakeLog())).toBe(false); // refused before any backup
+    expect(newBackups()).toEqual([]);
+    expect(await nothingApplied(SCRATCH)).toBe(true);
+  }
+
+  test("BR-MIG-17 a URL with several hosts -> exit 2, nothing applied", async () => {
+    await recreateDb(SCRATCH);
+    const url = `postgres://${credentials}@${baseParts.hostname}:${localPort},prod.example.com:5432/${SCRATCH}`;
+    const r = await migrate({ dbUrl: url, env: withFakeDump("ok") });
+    await expectRefusedUntouched(r);
+  }, 120_000);
+
+  test("BR-MIG-17 a URL whose userinfo hides a second host (a@b,prod.example.com:p@localhost) -> exit 2", async () => {
+    await recreateDb(SCRATCH);
+    const url = `postgres://a@b,prod.example.com:p@${baseParts.hostname}:${localPort}/${SCRATCH}`;
+    const r = await migrate({ dbUrl: url, env: withFakeDump("ok") });
+    await expectRefusedUntouched(r);
+  }, 120_000);
+
+  test("BR-MIG-17 an encoded host name -> exit 2, nothing applied", async () => {
+    await recreateDb(SCRATCH);
+    const url = `postgres://${credentials}@%6Cocalhost:${localPort}/${SCRATCH}`;
+    const r = await migrate({ dbUrl: url, env: withFakeDump("ok") });
+    await expectRefusedUntouched(r);
+  }, 120_000);
+
+  test("BR-MIG-17 a URL with no database name -> exit 2", async () => {
+    const url = `postgres://mig_nosuchuser_dummy:pw@${baseParts.hostname}:${localPort}`;
+    const r = await migrate({
+      dbUrl: url,
+      env: {
+        ...withFakeDump("ok"),
+        PGDATABASE: undefined,
+        PGHOST: undefined,
+        PGPORT: undefined,
+      },
+    });
+    expect(r.code).toBe(2);
+    expect(r.out).not.toMatch(NO_CONNECT_ERROR);
+    expect(existsSync(fakeLog())).toBe(false);
+  }, 120_000);
+
+  test("BR-MIG-17 PGPORT counts when the URL has no port: a non-local port on a *_test DB -> exit 2", async () => {
+    await recreateDb(SCRATCH);
+    const url = `postgres://${credentials}@${baseParts.hostname}/${SCRATCH}`;
+    const r = await migrate({
+      dbUrl: url,
+      env: { ...withFakeDump("ok"), PGPORT: "6543" },
+    });
+    await expectRefusedUntouched(r);
+  }, 120_000);
+
+  test("BR-MIG-17 an empty MIGRATE_CONFIRM counts as no confirm -> exit 2, no dump", async () => {
+    await recreateDb(GUARD);
+    const r = await migrate({
+      dbUrl: urlOf(GUARD),
+      env: { ...withFakeDump("ok"), MIGRATE_CONFIRM: "" },
+    });
+    expect(r.code).toBe(2);
+    expect(existsSync(fakeLog())).toBe(false);
+    expect(newBackups()).toEqual([]);
+    expect(await nothingApplied(GUARD)).toBe(true);
+  }, 120_000);
+});
+
+describe("db:test:prepare judges the DB the driver will really use (BR-MIG-11, SEC-2, SEC-4)", () => {
+  const DUMMY = urlOf("diecast_mig_unused_dummy"); // must never be connected to
+  const prepareWith = (
+    testUrl: string,
+    env: Record<string, string | undefined> = {},
+  ) => run(["run", "db:test:prepare"], { dbUrl: DUMMY, testUrl, env });
+
+  // Spec says "refused (exit 2)" in the same sentence for db:migrate and db:test:prepare; for
+  // db:test:prepare only "refused, before connecting, nothing built" is asserted (see report, question 1).
+  test("BR-MIG-11 a test URL with several hosts -> refused before connecting, nothing built", async () => {
+    await recreateDb(SCRATCH);
+    const url = `postgres://${credentials}@${baseParts.hostname}:${localPort},prod.example.com:5432/${SCRATCH}`;
+    const r = await prepareWith(url);
+    expect(r.code).not.toBe(0);
+    expect(r.out).not.toMatch(NO_CONNECT_ERROR);
+    expect(await nothingApplied(SCRATCH)).toBe(true);
+  }, 120_000);
+
+  test("BR-MIG-11 a test URL with an encoded host name -> refused before connecting, nothing built", async () => {
+    await recreateDb(SCRATCH);
+    const url = `postgres://${credentials}@%6Cocalhost:${localPort}/${SCRATCH}`;
+    const r = await prepareWith(url);
+    expect(r.code).not.toBe(0);
+    expect(r.out).not.toMatch(NO_CONNECT_ERROR);
+    expect(await nothingApplied(SCRATCH)).toBe(true);
+  }, 120_000);
+
+  test("BR-MIG-11 a test URL with no database name -> refused before connecting", async () => {
+    const url = `postgres://mig_nosuchuser_dummy:pw@${baseParts.hostname}:${localPort}`;
+    const r = await prepareWith(url, {
+      PGDATABASE: undefined,
+      PGHOST: undefined,
+      PGPORT: undefined,
+    });
+    expect(r.code).not.toBe(0);
+    expect(r.out).not.toMatch(NO_CONNECT_ERROR);
+  }, 120_000);
+
+  test("BR-MIG-11 a pending migration older than one already applied is a journal mismatch -> rebuilt", async () => {
+    await recreateDb(SCRATCH);
+    expect((await prepareWith(urlOf(SCRATCH))).code).toBe(0);
+    await q(SCRATCH, async (s) => {
+      await s.unsafe(`CREATE TABLE public.mig_old_sentinel (x int)`);
+      // the baseline looks unapplied while the 2nd migration is applied
+      await s.unsafe(
+        `DELETE FROM drizzle.__drizzle_migrations
+         WHERE id = (SELECT min(id) FROM drizzle.__drizzle_migrations)`,
+      );
+    });
+    const r = await prepareWith(urlOf(SCRATCH));
+    expect(r.code).toBe(0);
+    expect(r.out).toMatch(/rebuil/i);
+    await q(SCRATCH, async (s) => {
+      expect(await exists(s, "public.mig_old_sentinel")).toBe(false);
+      expect((await journal(s)).length).toBe(folders().length);
+      expect(await publicTables(s)).toEqual(tableNames);
+    });
+  }, 240_000);
+
+  test("BR-MIG-11 an error that is not a journal mismatch never drops the schemas (no rebuild)", async () => {
+    await recreateDb(SCRATCH);
+    expect((await prepareWith(urlOf(SCRATCH))).code).toBe(0);
+    await q(SCRATCH, async (s) => {
+      await s.unsafe(`CREATE TABLE public.mig_keep_sentinel (x int)`);
+      await s.unsafe(`INSERT INTO public.mig_keep_sentinel VALUES (42)`);
+      // the 2nd migration is pending again and will fail: DROP TABLE on a view is an error
+      await removeLastJournalRow(s);
+      await s.unsafe(`CREATE VIEW public.role_pages AS SELECT 1 AS x`);
+    });
+    const before = await snapshot(SCRATCH);
+    const r = await prepareWith(urlOf(SCRATCH));
+    expect(r.code).not.toBe(0);
+    expect(await snapshot(SCRATCH)).toEqual(before);
+    await q(SCRATCH, async (s) => {
+      const rows = await s`SELECT x FROM public.mig_keep_sentinel`;
+      expect(rows.map((x) => x.x)).toEqual([42]);
+      expect(await exists(s, "public.role_pages")).toBe(true);
+    });
+  }, 240_000);
+});
+
+describe("db:migrate on a DB built by push (BR-MIG-21, CR-2)", () => {
+  test("BR-MIG-21 a full push-built dev DB (every table, no journal) -> refused with 'built by push? use db:reset', data kept", async () => {
+    await recreateDb(GUARD);
+    expect(
+      (
+        await migrate({
+          dbUrl: urlOf(GUARD),
+          env: { ...withFakeDump("ok"), MIGRATE_CONFIRM: GUARD },
+        })
+      ).code,
+    ).toBe(0);
+    // a dump name is per minute: clear the first run's dump so the second run is not refused for that
+    for (const f of newBackups()) {
+      if (f.startsWith(`${GUARD}-`)) rmSync(join(BACKUPS, f), { force: true });
+    }
+    await q(GUARD, async (s) => {
+      // what db:push left behind: the tables, but no drizzle journal
+      await s.unsafe(`DROP SCHEMA drizzle CASCADE`);
+      await s.unsafe(
+        `INSERT INTO public.modules (name) VALUES ('mig_keep_push_built')`,
+      );
+    });
+    const before = await snapshot(GUARD);
+    const modulesBefore = await q(GUARD, (s) => count(s, "modules"));
+    const r = await migrate({
+      dbUrl: urlOf(GUARD),
+      env: { ...withFakeDump("ok"), MIGRATE_CONFIRM: GUARD },
+    });
+    expect(r.code).not.toBe(0);
+    expect(r.out).toMatch(/built by push/i);
+    expect(r.out).toContain("db:reset");
+    expect(r.out).not.toMatch(/already exists/i);
+    expect(await snapshot(GUARD)).toEqual(before);
+    expect(await q(GUARD, (s) => count(s, "modules"))).toBe(modulesBefore);
+  }, 240_000);
+
+  test("BR-MIG-21 tables but no journal on a non-test dev DB -> refused with 'built by push? use db:reset', nothing changed", async () => {
+    await recreateDb(GUARD);
+    await q(GUARD, async (s) => {
+      await s.unsafe(`CREATE TABLE public.pages (id serial PRIMARY KEY)`);
+      await s.unsafe(`CREATE TABLE public.mig_old_sentinel (x int)`);
+      await s.unsafe(`INSERT INTO public.mig_old_sentinel VALUES (7)`);
+    });
+    const before = await snapshot(GUARD);
+    const r = await migrate({
+      dbUrl: urlOf(GUARD),
+      env: { ...withFakeDump("ok"), MIGRATE_CONFIRM: GUARD },
+    });
+    expect(r.code).not.toBe(0);
+    expect(r.out).toMatch(/built by push/i);
+    expect(r.out).toContain("db:reset");
+    expect(r.out).not.toMatch(/already exists/i);
+    expect(await snapshot(GUARD)).toEqual(before);
+    await q(GUARD, async (s) => {
+      const rows = await s`SELECT x FROM public.mig_old_sentinel`;
+      expect(rows.map((x) => x.x)).toEqual([7]);
+      expect((await journal(s)).length).toBe(0);
+    });
+  }, 240_000);
+
+  test("BR-MIG-21 db:reset rebuilds a push-built DB (the way out the message points to)", async () => {
+    await recreateDb(SCRATCH);
+    await q(SCRATCH, async (s) => {
+      await s.unsafe(`CREATE TABLE public.pages (id serial PRIMARY KEY)`);
+      await s.unsafe(`CREATE TABLE public.mig_old_sentinel (x int)`);
+    });
+    const r = await run(["run", "db:reset", "--no-fixtures"]);
+    expect(r.code).toBe(0);
+    await q(SCRATCH, async (s) => {
+      expect(await exists(s, "public.mig_old_sentinel")).toBe(false);
+      expect(await exists(s, "public.pages")).toBe(false);
+      expect((await journal(s)).length).toBe(folders().length);
+    });
+  }, 300_000);
 });
