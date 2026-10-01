@@ -78,8 +78,8 @@ Resolve every section — where something is unresolved, stop and ask first.
 ## 10) Auth and RBAC
 
 1. Required auth middleware.
-2. Allowed roles per route.
-3. Any role differences between list/detail and mutating endpoints?
+2. Permission key per route (`requirePermission` / `requireAnyPermission`); new keys go in `src/lib/permissions.ts` first.
+3. Any permission differences between list/detail and mutating endpoints?
 
 ## 11) Data integrity and schema links
 

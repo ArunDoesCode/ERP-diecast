@@ -45,7 +45,7 @@ Verify each of these for every touched route — flag a High finding wherever th
 - Service returns business-shaped data; HTTP response/status handling stays in the controller.
 - Repository returns raw typed data with no HTTP concerns.
 - Route paths come from `src/routes/end-points.ts` constants, not hardcoded strings.
-- Every endpoint requiring RBAC has the right auth/role middleware applied.
+- Every route has `requirePermission("<key>")` (or `requireAnyPermission`) with the right key from `src/lib/permissions.ts`; no role-name checks in route code.
 - Every async controller handler is wrapped by the async handler.
 - Every route descriptor carries OpenAPI metadata.
 - Every error response uses the uniform shape produced by the global error handler.
@@ -55,10 +55,10 @@ Verify each of these for every touched route — flag a High finding wherever th
 
 ## Architecture Checklist (flag as Medium when it doesn't hold)
 
-- Zod validation is sourced from shared validators/centralized schemas, not duplicated locally.
+- Zod validation is sourced from `src/types/*.types.ts`, not duplicated locally in a controller or service.
 - Zod schemas that mirror a Drizzle table derive from it via `drizzle-zod` (`createSelectSchema`/`createInsertSchema`/`createUpdateSchema`), not hand-declared field-by-field — unless a specific field deliberately diverges from the column's nullability, with a comment explaining why.
 - Endpoint paths, schemas, and error codes each have exactly one source of truth.
-- Route registration goes through the descriptor auto-register utility.
+- Route registration goes through `register()` in `src/lib/route-registry.ts`.
 - Controllers return a consistent success shape.
 - Every value across controller/service/repository boundaries is precisely typed.
 - Service and repository contracts stay in their own lane: service typed against Zod-inferred request/response contracts, repository typed against Drizzle-derived DB shapes.
