@@ -113,3 +113,4 @@ Max 7. Each answerable with a letter. Recommended option first.
 
 - 2026-10-01 v1 — draft from BL-011 (#16), BL-056 (#44), D-004
 - 2026-10-01 v1 frozen (Arun): Q1 B (UAT starts empty; BR-MIG-18..20 deferred), Q2 A (`db:migrate` runs `pg_dump`), Q3 A (`db:push` removed).
+- 2026-10-01 v1 clarified during build: BR-MIG-07 'docs' means the repo docs, scripts, CI and package.json; the `.claude/` agent and skill files are the owner's to update (they still say `db:push`). BR-MIG-16's 'usual local dev/test DB' is BR-KD-30 as in known-defects v5: a local `*_test` DB on 5432/5433.
