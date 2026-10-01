@@ -26,7 +26,7 @@ login is still not built (token issuing exists, no login route).
 | schema | `backend/src/db/schemas/01_auth.ts` | `roles`, `modules`, `permissions`, `rolePermissions`, `screens`, `authAuditLog`, `refreshTokens`, `documentNumberCounters` (unrelated numbering) |
 | schema | `backend/src/db/schemas/03_hcm.ts` | `employees` (roleId, passwordHash, qrToken, isActive) |
 | catalog | `backend/src/lib/permissions.ts` | `PERMISSIONS` (all keys), `PERMISSION_KEYS`, `SCREENS` (registry), `SEED_GRANTS` (per seed role) |
-| sync | `backend/src/lib/permissions-sync.ts` | `syncCatalog`, `seedGrants` — run on app start (`index.ts`) and in `db:test:prepare` |
+| sync | `backend/src/lib/permissions-sync.ts` | `syncCatalog`, `seedGrants` — run on app start (`index.ts`) and in `db:reset` (which `db:test:prepare` runs) |
 | guard | `backend/src/lib/auth-middleware.ts` | `requireAuth`, `requirePermission(key)`, `can(actor,key)`, `loadActor`, `invalidateActor`, `invalidateRole`, `Actor`, `SUPER_ADMIN_ROLE_NAME` |
 | routes contract | `backend/src/lib/route-registry.ts` | `AuthRequirement = public \| any-authenticated \| {type:"permission",key}`; `register()` mounts the guard from the descriptor |
 | token | `backend/src/lib/token.ts`, `qr-token.ts`, `rate-limiter.ts` | `TokenPayload{userId,userName}`, `signAccessToken`, `signRefreshToken`, `generateRawQrToken`, `rateLimiter` |
