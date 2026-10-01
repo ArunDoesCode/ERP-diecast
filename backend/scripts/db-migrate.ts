@@ -11,14 +11,18 @@
  * Exit codes: 0 done / up to date, 1 failed, 2 refused by the guard, 3 journal mismatch.
  * The app never runs this itself (BR-MIG-22).
  */
-import { existsSync, mkdirSync, rmSync, statSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import postgres from "postgres";
 import {
   applyMigrations,
+  assertDriverMatches,
+  hasPublicTables,
   JournalMismatchError,
   parseTarget,
   plan,
+  readJournal,
+  safeFileName,
   type Target,
 } from "./lib/migrate";
 
@@ -62,8 +66,13 @@ async function backup(): Promise<string> {
       "Refused: pg_dump is not installed or not on PATH, so no backup can be taken. Nothing was changed.",
     );
   }
-  mkdirSync(BACKUPS_DIR, { recursive: true });
-  const file = join(BACKUPS_DIR, `${target.dbName}-${stamp(new Date())}.dump`);
+  // SEC-1: a dump holds the whole DB. Folder 0700, file born 0600 (umask), then chmod as a belt.
+  mkdirSync(BACKUPS_DIR, { recursive: true, mode: 0o700 });
+  chmodSync(BACKUPS_DIR, 0o700);
+  const file = join(
+    BACKUPS_DIR,
+    `${safeFileName(target.dbName)}-${stamp(new Date())}.dump`,
+  );
   if (existsSync(file)) {
     refuse(
       EXIT.guard,
@@ -71,6 +80,7 @@ async function backup(): Promise<string> {
     );
   }
   // Credentials go through the environment, never the command line.
+  const oldUmask = process.umask(0o077);
   const proc = Bun.spawn(["pg_dump", "--format=custom", `--file=${file}`], {
     env: {
       ...process.env,
@@ -84,10 +94,12 @@ async function backup(): Promise<string> {
     stdout: "ignore",
     stderr: "pipe",
   });
+  process.umask(oldUmask);
   const [err, code] = await Promise.all([
     new Response(proc.stderr).text(),
     proc.exited,
   ]);
+  if (existsSync(file)) chmodSync(file, 0o600);
   const size = existsSync(file) ? statSync(file).size : 0;
   if (code !== 0 || size === 0) {
     rmSync(file, { force: true });
@@ -104,8 +116,23 @@ const sql = postgres(process.env.DATABASE_URL as string, {
   onnotice: () => {},
   connect_timeout: 10,
 });
+// Judge what the driver will really use, before connecting or backing up anything (SEC-2).
+try {
+  assertDriverMatches(sql, target);
+} catch (err) {
+  await sql.end({ timeout: 1 });
+  refuse(EXIT.guard, scrub((err as Error).message));
+}
 
 try {
+  // BR-MIG-21: tables but no journal = built by push; the baseline would fail on "already exists".
+  if ((await readJournal(sql)).length === 0 && (await hasPublicTables(sql))) {
+    console.error(
+      `Refused: ${target.label} has tables but no migration journal (built by push? use db:reset). Nothing was changed.`,
+    );
+    await sql.end({ timeout: 5 });
+    process.exit(EXIT.guard);
+  }
   // Look first: no backup when nothing is pending, none when the journal is refused anyway.
   const pending = await plan(sql);
   if (pending.length === 0) {

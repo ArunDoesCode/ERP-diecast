@@ -9,7 +9,10 @@ import postgres from "postgres";
 import { resolveTestDatabaseUrl } from "../src/lib/test-db-url";
 import {
   applyMigrations,
+  assertDriverMatches,
   hasPublicTables,
+  JournalMismatchError,
+  parseTarget,
   plan,
   readJournal,
 } from "./lib/migrate";
@@ -17,6 +20,21 @@ import {
 const url = resolveTestDatabaseUrl();
 
 const sql = postgres(url, { prepare: false, max: 1, onnotice: () => {} });
+// SEC-2/4: judge the host, port and database the driver will really use, before connecting.
+try {
+  const target = parseTarget(url);
+  assertDriverMatches(sql, target);
+  // The rebuild drops whole schemas: only ever on this machine.
+  if (!target.local) {
+    throw new Error(
+      `${target.label} is not a local host; db:test:prepare only builds a test database on this machine.`,
+    );
+  }
+} catch (err) {
+  console.error(`Refused: ${(err as Error).message.replace(/^Refused: /, "")}`);
+  await sql.end({ timeout: 1 });
+  process.exit(2);
+}
 try {
   const journal = await readJournal(sql);
   let rebuildReason: string | null = null;
@@ -26,6 +44,7 @@ try {
     try {
       await plan(sql);
     } catch (err) {
+      if (!(err instanceof JournalMismatchError)) throw err; // CR-4: only a journal mismatch rebuilds
       rebuildReason = `its journal does not match the repo (${(err as Error).message.replace(/^Refused: /, "")})`;
     }
   }

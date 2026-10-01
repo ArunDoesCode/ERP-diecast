@@ -147,6 +147,8 @@ export type Target = {
   password: string;
   /** host:port/db, never the password */
   label: string;
+  /** host is this machine (localhost, 127.0.0.1, ::1) */
+  local: boolean;
   /** local host, name ends in `_test`, port 5432/5433 (BR-KD-30, v5): no confirm, no backup */
   usual: boolean;
 };
@@ -172,15 +174,14 @@ export function parseTarget(
   }
   const host = (u.hostname || env.PGHOST || "").toLowerCase();
   const port = u.port || env.PGPORT || "5432";
-  const dbName =
-    decodeURIComponent(u.pathname.replace(/^\//, "")) || env.PGDATABASE || "";
+  // Not decoded: the driver sends the path as written, so the guard must judge that same name.
+  const dbName = u.pathname.replace(/^\//, "") || env.PGDATABASE || "";
   if (!host || !dbName) {
     throw new Error("DATABASE_URL has no host or database name; refused.");
   }
+  const local = LOCAL_HOSTS.has(host);
   const usual =
-    LOCAL_HOSTS.has(host) &&
-    dbName.endsWith("_test") &&
-    (port === "5432" || port === "5433");
+    local && dbName.endsWith("_test") && (port === "5432" || port === "5433");
   return {
     host,
     port,
@@ -188,6 +189,38 @@ export function parseTarget(
     user: decodeURIComponent(u.username) || env.PGUSER || "",
     password: decodeURIComponent(u.password) || env.PGPASSWORD || "",
     label: `${host}:${port}/${dbName}`,
+    local,
     usual,
   };
+}
+
+/**
+ * The guard and the driver must agree (BR-MIG-17, SEC-2/4): compare what the built client will
+ * really connect to with the parsed target. Reads options only, never connects. Throws a
+ * "Refused: ..." Error when they differ (several hosts, encoded host, other port or database).
+ */
+export function assertDriverMatches(
+  sql: Pick<Sql, "options">,
+  target: Target,
+): void {
+  const o = sql.options;
+  const hosts = o.host as string[];
+  const ports = o.port as number[];
+  const same =
+    !o.path &&
+    hosts.length === 1 &&
+    ports.length === 1 &&
+    hosts[0].toLowerCase() === target.host &&
+    ports[0] === Number(target.port) &&
+    o.database === target.dbName;
+  if (!same) {
+    throw new Error(
+      `Refused: the database driver would connect to ${hosts.join(",")}:${ports.join(",")}/${o.database}, not ${target.label} (encoded or repeated host in the URL?). Nothing was changed.`,
+    );
+  }
+}
+
+/** A database name as a file-name part: letters, digits, `_` and `-` only, so it cannot leave its folder. */
+export function safeFileName(dbName: string): string {
+  return dbName.replace(/[^A-Za-z0-9_-]/g, "_");
 }

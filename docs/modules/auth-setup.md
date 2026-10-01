@@ -99,7 +99,7 @@ New key = add to `PERMISSIONS`, use it in a route descriptor, add to `SEED_GRANT
 - Access tokens are not revocable, but they carry no rights; the actor is re-read per request, so deactivation / role change is felt within the cache window.
 - The actor cache is in-process (one Bun process). Two instances would need a shared invalidation (SEC-8).
 - `employeeSchema` always returns `qrToken: null`; only `POST /employees/:id/qr` returns the raw value, once.
-- Schema reaches DBs by `db:push` (no migrations, BL-011). `role_pages` has no drop migration (SEC-12).
+- Schema reaches DBs by migrations (`db:generate`, `db:migrate`). `pages` / `role_pages` are dropped by the `drop_legacy_pages` migration (SEC-12).
 - **Stale test DB:** a DB created before S7 still has `pages` / `role_pages`; drop them (or recreate the DB) before `bun run db:test:prepare`, else push / prepare fails.
 - `proxy.ts` `PUBLIC_PATHS` = `/`, `/login`; each protected navigation costs one `/auth/me` call.
 - No login path for QR-token employees; `POST /auth/login` is email + password only.
