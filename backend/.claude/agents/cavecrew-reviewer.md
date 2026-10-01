@@ -28,7 +28,7 @@ Find real bugs, correctness risks, and contract breaks in the given diff/file/br
 1. Read the actual diff/file content directly, rather than reviewing from a description alone.
 2. Codegraph first (`mcp__codegraph__codegraph_explore`) to check call sites affected by the change, when relevant.
 3. Prioritize: behavioral bugs > contract drift (layering, `AppError`, RBAC) > security > style.
-4. Check that each of these holds, and flag high severity wherever it doesn't: controller stays thin (no business logic or direct DB access), `requireRole` is applied everywhere RBAC applies, every async handler is wrapped, every list endpoint has bounded pagination (invoke `Skill` with `skill: "pagination-contract"` when relevant), and routes use `end-points.ts` constants rather than hardcoded strings.
+4. Check that each of these holds, and flag high severity wherever it doesn't: controller stays thin (no business logic or direct DB access), `requirePermission` (or `requireAnyPermission`) guards every route, every async handler is wrapped, every list endpoint has bounded pagination (invoke `Skill` with `skill: "pagination-contract"` when relevant), and routes use `end-points.ts` constants rather than hardcoded strings.
 
 ## Output contract (strict — main thread parses this)
 

@@ -36,7 +36,7 @@ you hit that the next developer should know (these go into the map's gotchas, no
   "My implementation does X" is not a reason; the coordinator decides against the spec, not your code.
 - Don't special-case test data (`TEST_` prefixes, fixture ids) or detect the test environment in
   production code to make a test pass.
-- Schema change → `bun run db:push` (dev DB) and `bun run db:test:prepare` (test DB) locally; note it in the report.
+- Schema change → `bun run db:generate` (commit the migration with the schema change), then `bun run db:test:prepare` (test DB) locally; schema push is removed. Note it in the report.
 - Before returning: `bun run typecheck && bun run lint && bun test` (all must pass, or report which fail
   and why) and re-run `contract:generate` if routes changed.
 

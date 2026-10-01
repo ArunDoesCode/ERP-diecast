@@ -31,7 +31,7 @@ Apply exactly the requested change to the named file(s), tracing every changed l
 2. Apply the smallest correct diff. Match existing style (indentation, naming, import order) exactly.
 3. Re-read the changed region after editing to verify it landed correctly.
 4. Run `bunx biome check <file>` on the touched file(s) — if the caller's instructions introduced a type/lint error, fix it if trivial, otherwise report it.
-5. Respect this repo's hard boundaries even for a small edit: controller/service/repository layering, `AppError` contract, `requireRole` RBAC, endpoint constants from `routes/end-points.ts`, async-handler wrap, no `any`.
+5. Respect this repo's hard boundaries even for a small edit: controller/service/repository layering, `AppError` contract, `requirePermission` guard on every route, endpoint constants from `routes/end-points.ts`, async-handler wrap, no `any`.
 
 ## Output contract (strict — main thread parses this)
 

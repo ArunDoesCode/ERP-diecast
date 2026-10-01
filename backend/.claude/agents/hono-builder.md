@@ -5,7 +5,7 @@ description: >
   end-points.ts SoT, OpenAPI, RBAC, Zod validation, pagination-contract.
   Delegate target for 3+ file / new-feature builds, routed through ponytail for multi-step features.
   Invoke directly only when ponytail hands off a scoped build brief.
-  Trigger: hono route, new endpoint, backend feature, controller service repository, requireRole,
+  Trigger: hono route, new endpoint, backend feature, controller service repository, requirePermission,
   async handler, openapi spec.
 tools: Read, Edit, Write, Grep, Glob, Bash, Skill, AskUserQuestion, mcp__codegraph__codegraph_explore
 ---
@@ -66,9 +66,9 @@ Helpers and utilities live in `src/lib/*`. Auth middleware in `src/lib/auth-midd
 | Concern                                 | Location                                       |
 | ------------------------------------------ | -------------------------------------------------- |
 | API base paths                          | `src/routes/end-points.ts`                     |
-| Request/response schemas                | shared validators package, then `src/schemas/` |
+| Request schemas + inferred types        | `src/types/<feature>.types.ts`                 |
 | Error codes + messages                  | `src/lib/errors.ts`                            |
-| HTTP success/error helpers              | `src/lib/http-response.ts`                     |
+| Response envelope schemas (OpenAPI)     | `src/lib/response-schemas.ts`                  |
 | Route descriptor + OpenAPI registration | `src/lib/route-registry.ts`                    |
 
 ## Error Contract
@@ -80,12 +80,12 @@ Helpers and utilities live in `src/lib/*`. Auth middleware in `src/lib/auth-midd
 ## Approach
 
 1. Add endpoint path constants to `src/routes/end-points.ts`.
-2. Add or update Zod schemas (shared validators first, else `src/schemas/` / `src/types/`).
+2. Add or update Zod schemas in `src/types/<feature>.types.ts` (derive from Drizzle via `drizzle-zod` where they mirror a table).
 3. Implement repository in `src/repository/<feature>Repository.ts`.
 4. Implement service in `src/service/<feature>Service.ts`.
 5. Implement controller in `src/controller/<feature>Controller.ts` — async handler wrap required.
 6. Register route descriptors via `src/lib/route-registry.ts` in `src/routes/<feature>.ts`.
-7. Mount feature router in `src/routes/index.ts` with auth + `requireRole()` middleware.
+7. Mount feature router in `src/routes/index.ts` with auth; apply `requirePermission("<key>")` (or `requireAnyPermission`) on each route — add a new key to `src/lib/permissions.ts` first if needed.
 8. Add OpenAPI summary, tags, request/response schema, and security metadata to every descriptor.
 9. Run `bun run lint && bun run typecheck && bun test` — fix all failures before finishing.
 10. Run `bun run contract:generate` to refresh `.contracts/api-manifest.json`.
