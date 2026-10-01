@@ -26,24 +26,65 @@ function refuse(code: number, msg: string): never {
 // DATABASE_URL_TEST, never a file lookup by this script. Every child (drizzle-kit, bootstrap,
 // policies) inherits that same value, and the in-process db client reads it too.
 // --- BR-KD-33: parse the target first so it can be printed on every refusal ---
+// BR-KD-53: the guard judges what the postgres driver will really connect to, so host, port and
+// user are read from the driver's own parsed options (PGHOST/PGPORT count when the URL omits them).
 const rawUrl = process.env.DATABASE_URL ?? "";
-let target: URL;
+let dbName: string;
+let dbHost: string;
+let dbPort: string;
+let dbUser: string;
+let dbPass: string;
+let urlSearch: string;
 try {
-  target = new URL(rawUrl);
-  if (!/^postgres(ql)?:$/.test(target.protocol) || !target.hostname) {
+  const parsed = new URL(rawUrl);
+  if (!/^postgres(ql)?:$/.test(parsed.protocol)) {
     throw new Error("not a postgres url");
   }
+  const { default: postgres } = await import("postgres");
+  const o = postgres(rawUrl).options; // lazy: does not connect
+  if (o.host.length !== 1) {
+    refuse(
+      EXIT.guard,
+      "Refused: DATABASE_URL names more than one host. Nothing was changed.",
+    );
+  }
+  // The driver falls back to PGDATABASE / the user name; a URL without a name is never judged.
+  if (parsed.pathname.replace(/^\//, "") === "") {
+    refuse(
+      EXIT.guard,
+      "Refused: DATABASE_URL has no database name. Nothing was changed.",
+    );
+  }
+  dbName = o.database;
+  // The driver reads a bracketed IPv6 host as "[" (it then fails to connect: fails closed).
+  dbHost = o.host[0] === "[" ? parsed.hostname : String(o.host[0]);
+  dbPort = String(o.port[0] ?? 5432);
+  dbUser = o.user;
+  dbPass = o.pass ?? "";
+  urlSearch = parsed.search;
 } catch {
   refuse(
     EXIT.guard,
     "Refused: DATABASE_URL is missing or not a valid postgres URL.",
   );
 }
-const dbName = decodeURIComponent(target.pathname.replace(/^\//, ""));
-const secrets = [decodeURIComponent(target.password), target.password].filter(
+// A name that is not plain ASCII word characters cannot be read back exactly (percent-escapes).
+if (!/^[A-Za-z0-9_.$-]+$/.test(dbName)) {
+  refuse(
+    EXIT.guard,
+    "Refused: the database name in DATABASE_URL cannot be read exactly (use letters, digits, _ . $ -).",
+  );
+}
+const secrets = [dbPass, encodeURIComponent(dbPass)].filter(
   (s) => s.length > 0,
 );
-const targetLabel = `${target.hostname}:${target.port || "5432"}/${dbName}`;
+const targetLabel = `${dbHost}:${dbPort}/${dbName}`;
+// Hand the resolved target on explicitly and drop PG* env, so every child and the in-process
+// client connect to exactly what was judged here.
+process.env.DATABASE_URL = `postgres://${encodeURIComponent(dbUser)}:${encodeURIComponent(dbPass)}@${dbHost}:${dbPort}/${dbName}${urlSearch}`;
+for (const k of ["PGHOST", "PGPORT", "PGDATABASE", "PGUSER", "PGPASSWORD"]) {
+  delete process.env[k];
+}
 
 /** Remove the DB password (and the seed password) from any text before it is printed. */
 function scrub(text: string): string {
@@ -58,13 +99,14 @@ function scrub(text: string): string {
 console.log(`db:reset target: ${targetLabel} (password ***)`);
 
 // --- BR-KD-30: guard ---
-if (process.env.NODE_ENV === "production") {
+if ((process.env.NODE_ENV ?? "").toLowerCase() === "production") {
   refuse(
     EXIT.guard,
     "Refused: NODE_ENV=production. db:reset never runs there.",
   );
 }
-const isLocal = LOCAL_HOSTS.has(target.hostname.toLowerCase());
+const isLocal = LOCAL_HOSTS.has(dbHost.toLowerCase());
+// An empty DB_RESET_CONFIRM counts as no confirm (BR-KD-53).
 const confirm = process.env.DB_RESET_CONFIRM ?? "";
 // A confirm that is set but does not match the DB name is always refused.
 if (confirm !== "" && confirm !== dbName) {
@@ -77,7 +119,7 @@ if (!isLocal) {
   if (!allowRemote) {
     refuse(
       EXIT.guard,
-      `Refused: ${target.hostname} is not a local host. Pass --allow-remote and set DB_RESET_CONFIRM=${dbName} to override.`,
+      `Refused: ${dbHost} is not a local host. Pass --allow-remote and set DB_RESET_CONFIRM=${dbName} to override.`,
     );
   }
   if (confirm !== dbName) {
@@ -90,9 +132,8 @@ if (!isLocal) {
   // BR-KD-30 (v5): "localhost" can be an SSH tunnel to a real database, and `diecast` is the
   // dev DB. Only a local `*_test` DB on 5432/5433 resets without a confirm; every other local
   // target needs DB_RESET_CONFIRM=<db name> (the confirm alone is enough for a local target).
-  const port = target.port || "5432";
   const noConfirmNeeded =
-    dbName.endsWith("_test") && (port === "5432" || port === "5433");
+    dbName.endsWith("_test") && (dbPort === "5432" || dbPort === "5433");
   if (!noConfirmNeeded && confirm !== dbName) {
     refuse(
       EXIT.guard,
@@ -152,7 +193,7 @@ const steps: Step[] = [
     name: "drop schema",
     run: async () => {
       const postgres = (await import("postgres")).default;
-      const sql = postgres(rawUrl, {
+      const sql = postgres(process.env.DATABASE_URL as string, {
         max: 1,
         onnotice: () => {},
         connect_timeout: 10,
