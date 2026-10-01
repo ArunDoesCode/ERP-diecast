@@ -1,8 +1,8 @@
 /**
  * `bun run db:reset [--no-fixtures] [--allow-remote]` (known-defects BR-KD-30..46)
  *
- * Wipes the `public` (and `drizzle`) schema of the database in DATABASE_URL, pushes the schema,
- * seeds roles + permission catalog + grants, creates admin@diecast.local, seeds approval
+ * Wipes the `public` (and `drizzle`) schema of the database in DATABASE_URL, applies the
+ * migrations (db-migrations BR-MIG-09), seeds roles + permission catalog + grants, creates admin@diecast.local, seeds approval
  * policies, then (unless --no-fixtures) loads demo data through the real services.
  *
  * Exit codes: 0 done, 1 a step failed, 2 refused by the guard / bad DATABASE_URL, 4 bad input.
@@ -169,15 +169,21 @@ const steps: Step[] = [
     },
   },
   {
-    name: "push schema",
-    run: () =>
-      runChildOrThrow("drizzle-kit push", [
-        "bunx",
-        "drizzle-kit",
-        "push",
-        "--force",
-        "--config=scripts/drizzle-reset.config.ts",
-      ]),
+    name: "apply migrations",
+    run: async () => {
+      const postgres = (await import("postgres")).default;
+      const { applyMigrations } = await import("./lib/migrate");
+      const sql = postgres(rawUrl, {
+        max: 1,
+        onnotice: () => {},
+        connect_timeout: 10,
+      });
+      try {
+        await applyMigrations(sql, (line) => console.log(`  ${line}`));
+      } finally {
+        await sql.end({ timeout: 5 });
+      }
+    },
   },
   {
     name: "roles and permissions",

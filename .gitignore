@@ -100,3 +100,6 @@ test-results/
 
 # --- CodeGraph index (per worktree, rebuilt by /feature) ---
 .codegraph/
+
+# --- pg_dump backups taken by db:migrate (BR-MIG-16) ---
+backend/backups/

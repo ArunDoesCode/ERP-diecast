@@ -1,25 +1,41 @@
 /**
- * `bun run db:test:prepare` — push the current schema and the role seed
- * into the test database (DATABASE_URL_TEST). Safe to re-run: drizzle-kit push
- * diffs the schema and the seed is idempotent.
+ * `bun run db:test:prepare` — apply pending migrations and the role seed to the test database
+ * (DATABASE_URL_TEST). Safe to re-run: nothing pending changes no schema, the seed is idempotent.
+ * A test DB built by push (tables, no journal) or whose journal does not match the repo is
+ * dropped (`public` + `drizzle`) and rebuilt, with the reason printed (db-migrations BR-MIG-10, 11).
+ * Only a `*_test` DB gets this far: resolveTestDatabaseUrl refuses anything else.
  */
 import postgres from "postgres";
 import { resolveTestDatabaseUrl } from "../src/lib/test-db-url";
+import {
+  applyMigrations,
+  hasPublicTables,
+  plan,
+  readJournal,
+} from "./lib/migrate";
 
 const url = resolveTestDatabaseUrl();
 
-const push = Bun.spawnSync(["bunx", "drizzle-kit", "push", "--force"], {
-  env: { ...process.env, DATABASE_URL: url },
-  stdout: "inherit",
-  stderr: "inherit",
-});
-if (push.exitCode !== 0) {
-  console.error("drizzle-kit push failed against DATABASE_URL_TEST");
-  process.exit(push.exitCode ?? 1);
-}
-
-const sql = postgres(url, { prepare: false, max: 1 });
+const sql = postgres(url, { prepare: false, max: 1, onnotice: () => {} });
 try {
+  const journal = await readJournal(sql);
+  let rebuildReason: string | null = null;
+  if (journal.length === 0 && (await hasPublicTables(sql))) {
+    rebuildReason = "it has tables but no migration journal (built by push)";
+  } else {
+    try {
+      await plan(sql);
+    } catch (err) {
+      rebuildReason = `its journal does not match the repo (${(err as Error).message.replace(/^Refused: /, "")})`;
+    }
+  }
+  if (rebuildReason) {
+    console.log(`Test database is being rebuilt: ${rebuildReason}.`);
+    await sql.unsafe("DROP SCHEMA IF EXISTS public CASCADE");
+    await sql.unsafe("DROP SCHEMA IF EXISTS drizzle CASCADE");
+    await sql.unsafe("CREATE SCHEMA public");
+  }
+  await applyMigrations(sql);
   const seed = await Bun.file(
     new URL("../src/db/seed_roles.sql", import.meta.url),
   ).text();
@@ -37,7 +53,7 @@ try {
   const { disconnectDb } = await import("../src/db/client");
   await disconnectDb();
   console.log(
-    "Test database ready: schema pushed, roles seeded, permission catalog synced.",
+    "Test database ready: migrations applied, roles seeded, permission catalog synced.",
   );
 } finally {
   await sql.end({ timeout: 5 });
