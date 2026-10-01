@@ -1388,3 +1388,94 @@ describe("db:migrate on a DB built by push (BR-MIG-21, CR-2)", () => {
     });
   }, 300_000);
 });
+
+// =====================================================================================
+// Added for the security re-audit (SEC-7).
+// Spec: db-migrations.md v1 changelog "clarified during build (security re-audit SEC-7)": a database
+// URL may not carry connection overrides in its query string; such a URL is refused with exit 2
+// before connecting, by db:migrate and db:test:prepare.
+// The path of every URL below is a scratch DB; an override that is not refused would send the driver
+// to FRESH (also a scratch DB), to an unresolvable host, or to a closed port. Nothing real is reachable.
+// =====================================================================================
+describe("a database URL with connection overrides in its query string is refused (BR-MIG-17, BR-MIG-11, SEC-7)", () => {
+  const OVERRIDES: [string, string][] = [
+    ["database", FRESH],
+    ["dbname", FRESH],
+    ["user", "mig_nosuchuser_dummy"],
+    ["host", "prod.example.com"],
+    ["port", "6543"],
+    ["options", "-c search_path=pg_catalog"],
+    ["search_path", "pg_catalog"],
+  ];
+  const withQuery = (db: string, key: string, value: string) => {
+    const u = new URL(urlOf(db));
+    u.searchParams.set(key, value);
+    return u.toString();
+  };
+
+  async function freshStart() {
+    await recreateDb(SCRATCH);
+    await recreateDb(FRESH);
+  }
+  async function bothUntouched() {
+    expect(await nothingApplied(SCRATCH)).toBe(true);
+    expect(await nothingApplied(FRESH)).toBe(true);
+  }
+
+  for (const [key, value] of OVERRIDES) {
+    test(`BR-MIG-17 db:migrate: ?${key}= in the URL -> exit 2, before any backup, nothing applied`, async () => {
+      await freshStart();
+      const r = await migrate({
+        dbUrl: withQuery(SCRATCH, key, value),
+        env: withFakeDump("ok"),
+      });
+      expect(r.code).toBe(2);
+      expect(r.out).not.toMatch(NO_CONNECT_ERROR);
+      expect(existsSync(fakeLog())).toBe(false);
+      expect(newBackups()).toEqual([]);
+      await bothUntouched();
+    }, 120_000);
+
+    test(`BR-MIG-11 db:test:prepare: ?${key}= in the URL -> exit 2, before connecting, nothing built`, async () => {
+      await freshStart();
+      const r = await run(["run", "db:test:prepare"], {
+        dbUrl: urlOf("diecast_mig_unused_dummy"), // must never be connected to
+        testUrl: withQuery(SCRATCH, key, value),
+      });
+      expect(r.code).toBe(2);
+      expect(r.out).not.toMatch(NO_CONNECT_ERROR);
+      await bothUntouched();
+    }, 120_000);
+  }
+
+  test("BR-MIG-17 db:migrate: an encoded key (?%64atabase=) is still an override -> exit 2, nothing applied", async () => {
+    await freshStart();
+    const url = `${urlOf(SCRATCH)}?%64atabase=${FRESH}`;
+    const r = await migrate({ dbUrl: url, env: withFakeDump("ok") });
+    expect(r.code).toBe(2);
+    expect(existsSync(fakeLog())).toBe(false);
+    await bothUntouched();
+  }, 120_000);
+
+  test("BR-MIG-17 db:migrate: an override next to a harmless key is still refused", async () => {
+    await freshStart();
+    const url = `${urlOf(SCRATCH)}?connect_timeout=5&database=${FRESH}`;
+    const r = await migrate({ dbUrl: url, env: withFakeDump("ok") });
+    expect(r.code).toBe(2);
+    await bothUntouched();
+  }, 120_000);
+
+  test("BR-MIG-17 db:migrate: ?database= on a non-usual DB with the right confirm is refused before the backup", async () => {
+    await recreateDb(GUARD);
+    await recreateDb(FRESH);
+    const r = await migrate({
+      dbUrl: withQuery(GUARD, "database", FRESH),
+      env: { ...withFakeDump("ok"), MIGRATE_CONFIRM: GUARD },
+    });
+    expect(r.code).toBe(2);
+    expect(existsSync(fakeLog())).toBe(false);
+    expect(newBackups()).toEqual([]);
+    expect(await nothingApplied(GUARD)).toBe(true);
+    expect(await nothingApplied(FRESH)).toBe(true);
+  }, 120_000);
+});
