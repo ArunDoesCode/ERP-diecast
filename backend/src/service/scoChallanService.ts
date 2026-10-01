@@ -2,6 +2,7 @@ import { db } from "../db/client";
 import type { Actor } from "../lib/auth-middleware";
 import { allocateFinancialYearSequence } from "../lib/document-number";
 import { BadRequestError, ConflictError, NotFoundError } from "../lib/errors";
+import { istDayKey, istDayStart, istDaysBetween } from "../lib/ist-day";
 import { scoChallanRepository } from "../repository/scoChallanRepository";
 import { scoRepository, type Tx } from "../repository/scoRepository";
 import { postStock } from "../repository/stockPostingRepository";
@@ -25,12 +26,14 @@ const EWB_THRESHOLD_PAISE = 5_000_000;
 const WARNING_DAYS = 60;
 const DECLARATION = "Goods sent for job work u/s 143, no tax charged.";
 
+// BR-SCO-09, 11: "today" is the plant's calendar day in IST.
 function todayKey() {
-  return new Date().toISOString().slice(0, 10);
+  return istDayKey();
 }
 
-// BR-SCO-11: challan date + 1 year (29 Feb -> 28 Feb).
-function addOneYear(date: Date) {
+// BR-SCO-11: challan IST day + 1 year (29 Feb -> 28 Feb), as a bare date.
+function addOneYear(challanDate: Date) {
+  const date = istDayStart(challanDate);
   const due = new Date(date.getTime());
   due.setUTCFullYear(due.getUTCFullYear() + 1);
   if (due.getUTCMonth() !== date.getUTCMonth()) {
@@ -39,13 +42,9 @@ function addOneYear(date: Date) {
   return due;
 }
 
-// BR-SCO-09: challan date may be today or earlier (whole days, UTC).
+// BR-SCO-09: challan date may be today or earlier (whole days, IST).
 function assertChallanDateNotFuture(date: Date) {
-  const now = new Date();
-  const startOfTomorrow =
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) +
-    24 * 60 * 60 * 1000;
-  if (date.getTime() >= startOfTomorrow) {
+  if (istDaysBetween(new Date(), date) > 0) {
     throw new BadRequestError(
       "Challan date cannot be in the future",
       "SCO_CHALLAN_DATE_FUTURE",

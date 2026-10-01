@@ -15,16 +15,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useIssueChallanMutation } from "@/lib/api/subcontracting/queries";
+import { istMidnightIso, istTodayIso } from "@/lib/ist-date";
 import type { ScoLine } from "@/types/subcontracting";
 
 type LineDraft = { qty: string; heat: string };
-
-function todayIso() {
-	// Local calendar date (not UTC) so "today" is right early morning in IST.
-	const now = new Date();
-	const pad = (n: number) => String(n).padStart(2, "0");
-	return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-}
 
 function remaining(line: ScoLine) {
 	return Math.max(line.rawQtyToIssue - line.issuedQty, 0);
@@ -40,7 +34,7 @@ export function IssueMaterialDialog({
 	items: ScoLine[];
 }) {
 	const [open, setOpen] = useState(false);
-	const [challanDate, setChallanDate] = useState(todayIso);
+	const [challanDate, setChallanDate] = useState(istTodayIso);
 	const [ewayBillNo, setEwayBillNo] = useState("");
 	const [drafts, setDrafts] = useState<Record<number, LineDraft>>({});
 	const [error, setError] = useState<string | null>(null);
@@ -56,7 +50,7 @@ export function IssueMaterialDialog({
 		}));
 
 	const reset = () => {
-		setChallanDate(todayIso());
+		setChallanDate(istTodayIso());
 		setEwayBillNo("");
 		setDrafts({});
 		setError(null);
@@ -99,9 +93,7 @@ export function IssueMaterialDialog({
 		const eway = ewayBillNo.trim();
 		mutation.mutate(
 			{
-				challanDate: challanDate
-					? new Date(`${challanDate}T00:00:00`).toISOString()
-					: undefined,
+				challanDate: challanDate ? istMidnightIso(challanDate) : undefined,
 				...(eway ? { ewayBillNo: eway } : {}),
 				lines,
 			},
@@ -146,7 +138,7 @@ export function IssueMaterialDialog({
 						<Input
 							id="challan-date"
 							type="date"
-							max={todayIso()}
+							max={istTodayIso()}
 							value={challanDate}
 							onChange={(event) => setChallanDate(event.target.value)}
 						/>

@@ -5,10 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { SearchableSelect } from "@/components/common/SearchableSelect";
-import {
-	formatPaise,
-	todayIso,
-} from "@/components/pages/inventory/inventory-format";
+import { formatPaise } from "@/components/pages/inventory/inventory-format";
 import { ScoItemPicker } from "@/components/pages/subcontracting/ScoItemPicker";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,6 +28,7 @@ import {
 	useSupplierServicesQuery,
 	useSuppliersQuery,
 } from "@/lib/api/suppliers/queries";
+import { istTodayIso } from "@/lib/ist-date";
 import type { ScoDetailPayload, ScoLineInput } from "@/types/subcontracting";
 import { GST_SLABS, type Supplier } from "@/types/suppliers";
 
@@ -223,7 +221,7 @@ export function ScoForm({ existing }: ScoFormProps) {
 		? "Pick a vendor"
 		: !expectedReturnDate
 			? "Expected return date is required"
-			: expectedReturnDate < todayIso()
+			: expectedReturnDate < istTodayIso()
 				? "Return date cannot be before today"
 				: null;
 	const firstLineError = lines.map(lineError).find((error) => error !== null);
@@ -315,7 +313,7 @@ export function ScoForm({ existing }: ScoFormProps) {
 						id="sco-return-date"
 						label="Expected return date"
 						type="date"
-						min={todayIso()}
+						min={istTodayIso()}
 						value={expectedReturnDate}
 						onChange={(event) => setExpectedReturnDate(event.target.value)}
 					/>

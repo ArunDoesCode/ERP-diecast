@@ -15,13 +15,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCreateReceiptMutation } from "@/lib/api/subcontracting/queries";
+import { istMidnightIso, istTodayIso } from "@/lib/ist-date";
 import type { ScoLine } from "@/types/subcontracting";
 
 type LineDraft = { processed: string; unprocessed: string };
-
-function todayIso() {
-	return new Date().toISOString().slice(0, 10);
-}
 
 function atVendor(line: ScoLine) {
 	return line.qtyAtVendor ?? 0;
@@ -49,7 +46,7 @@ export function EnterReceiptDialog({
 }) {
 	const [open, setOpen] = useState(false);
 	const [challanNo, setChallanNo] = useState("");
-	const [receivedDate, setReceivedDate] = useState(todayIso);
+	const [receivedDate, setReceivedDate] = useState(istTodayIso);
 	const [notes, setNotes] = useState("");
 	const [drafts, setDrafts] = useState<Record<number, LineDraft>>({});
 	const [error, setError] = useState<string | null>(null);
@@ -66,7 +63,7 @@ export function EnterReceiptDialog({
 
 	const reset = () => {
 		setChallanNo("");
-		setReceivedDate(todayIso());
+		setReceivedDate(istTodayIso());
 		setNotes("");
 		setDrafts({});
 		setError(null);
@@ -119,9 +116,7 @@ export function EnterReceiptDialog({
 		mutation.mutate(
 			{
 				vendorChallanNo: challanNo.trim(),
-				receivedDate: receivedDate
-					? new Date(`${receivedDate}T00:00:00`).toISOString()
-					: undefined,
+				receivedDate: receivedDate ? istMidnightIso(receivedDate) : undefined,
 				...(note ? { notes: note } : {}),
 				lines,
 			},

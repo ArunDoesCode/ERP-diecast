@@ -11,11 +11,9 @@ export async function allocateDocumentSequence(
   docType: string,
   actorId: number,
   now: Date = new Date(),
+  // Defaults to the UTC month; SCO numbers pass the IST month (BR-SCO-01).
+  periodKey: string = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`,
 ) {
-  const year = now.getUTCFullYear();
-  const month = String(now.getUTCMonth() + 1).padStart(2, "0");
-  const periodKey = `${year}-${month}`;
-
   const [counterRow] = await tx
     .insert(documentNumberCounters)
     .values({
