@@ -1,8 +1,8 @@
 ---
 module: subcontracting
 status: frozen           # draft | frozen | changed-after-freeze
-version: 3
-frozen_on: 2026-09-29
+version: 4
+frozen_on: 2026-10-01
 owner: Arun
 depends_on: [auth-setup, approval, approval-policies, grn, grn-stock, suppliers, inventory]
 ---
@@ -56,19 +56,23 @@ Seed: ow owner, bo back_office.
 
 ## Rules
 
+Dates (v4): every "today", date, number period, financial year and days-left below is the plant's
+calendar day in IST (Asia/Kolkata), the same on the server and in every date picker, whatever clock zone
+the server or the browser runs in.
+
 | ID | Rule | Example (given → then) |
 |---|---|---|
 | BR-SCO-01 | Back office creates the SCO directly (not from a PR); create saves header and lines in one go as `draft`, `createdBy` = me, number `SCO-<period>-<seq>`, never reused. Vendor must be an active supplier of type `service_provider` or `both`, with or without GSTIN; an inactive supplier can't get a new SCO (400, suppliers BR-SUP-07), but its open SCOs carry on. There must be at least one line. | vendor type raw_material → 400; inactive vendor → 400; no lines → 400 |
 | BR-SCO-02 | Each line has a raw item and a finished item (both active, and different), a service from the vendor's active service list (price and GST % copied from it, editable in draft), send qty > 0 and return qty > 0; pieces are whole numbers. Ratio = send qty ÷ return qty. | HSG-RC → HSG-RC → 400; 10.5 pcs → 400; service not on Sai CNC's list → 400 |
-| BR-SCO-03 | Expected return date is required, not before today and not more than 365 days away. | 400 days away → 400 |
+| BR-SCO-03 | Expected return date is required, not before today and not more than 365 days away. 'Today' is the plant's calendar day in IST (Asia/Kolkata), the same on the server and in the date picker. | 400 days away → 400; at 02:00 IST on 1 Oct 2026: 1 Oct 2027 → ok, 30 Sep 2026 → 400 |
 | BR-SCO-04 | SCO value = Σ service price × return qty, without GST; GST is shown per line. Approval is matched on value incl. GST, category `subcontracting`, same basis as a PO (approval-policies BR-APR-21, Q1=C). | L1 1000 × 2,500 → value ₹25,000, GST ₹4,500 shown; approval matched on ₹29,500 |
 | BR-SCO-05 | Header and lines change only in `draft` (else 409); status changes only through actions, never through edit (400). | approved SCO, change price → 409 |
 | BR-SCO-06 | Submit, approve, reject, send back and withdraw follow `approval.md`; only its creator submits. Rejected is final: raise a new SCO. | SCO sent back → draft, editable |
 | BR-SCO-07 | An SCO may go out in several lots: a challan can be made on an `approved` or `material_issued` SCO, for qty > 0 per line and at most send qty − already issued. Main store must hold the qty (BR-GRN-33). | L1 issued 600, challan for 400 → ok; challan for 500 → 400; store has 300 → 409 |
 | BR-SCO-08 | Each challan line posts two ledger rows (`sco_issue`): main store −qty and the vendor's location +qty, at the item's current average cost, heat number copied. Item total stock and average do not change. The vendor's location is created on first use. | 600 pcs out → store −600, "Sai CNC (job work)" +600, both @ 12,000; item stock unchanged |
-| BR-SCO-09 | Challan number `JWC/<FY>/<seq>`: consecutive per financial year, max 16 characters, never reused. The printed challan carries the Rule 55 fields: date, number, our and vendor's name, address and GSTIN ("unregistered" if the vendor has none), item, HSN, qty, value at issue cost, "sent for job work u/s 143, no tax charged". Our name, address, GSTIN and state come from company settings (one row, owner edits it); HSN comes from the raw item's `hsn_code`. If either is missing the challan is refused (400) and nothing posts. Challan date can't be in the future (400); it defaults to today. | 1 Apr 2027 → JWC/27-28/1; vendor without GSTIN → prints "GSTIN: unregistered" |
+| BR-SCO-09 | Challan number `JWC/<FY>/<seq>`: consecutive per financial year, max 16 characters, never reused. The printed challan carries the Rule 55 fields: date, number, our and vendor's name, address and GSTIN ("unregistered" if the vendor has none), item, HSN, qty, value at issue cost, "sent for job work u/s 143, no tax charged". Our name, address, GSTIN and state come from company settings (one row, owner edits it); HSN comes from the raw item's `hsn_code`. If either is missing the challan is refused (400) and nothing posts. Challan date can't be in the future (400); it defaults to today. 'Today' is the plant's calendar day in IST (Asia/Kolkata), the same on the server and in the date picker; the FY in the number comes from the challan date. | 1 Apr 2027 → JWC/27-28/1; vendor without GSTIN → prints "GSTIN: unregistered"; at 02:00 IST on 1 Oct: date 1 Oct → ok, 2 Oct → 400 |
 | BR-SCO-10 | We always produce the e-way bill; its number must be entered before the challan is saved when the vendor is in another state (GSTIN state code differs from ours), the vendor has no GSTIN, or the challan value is ≥ ₹50,000. | inter-state, value ₹8,000, no EWB → 400; unregistered vendor, ₹5,000, no EWB → 400 |
-| BR-SCO-11 | Each challan's return due date = challan date + 1 year. Open challans show days left; ≤ 60 days = warning, past due = "overdue: deemed supply, tell accounts". Nothing is blocked, new challans to that vendor included. | challan 1 Oct 2026, today 15 Aug 2027 → 47 days left, warning; overdue challan, new challan to same vendor → ok |
+| BR-SCO-11 | Each challan's return due date = challan date + 1 year. Open challans show days left = due date − today, in whole days, where 'today' is the plant's calendar day in IST (Asia/Kolkata), the same on the server and on screen; ≤ 60 days = warning, past due = "overdue: deemed supply, tell accounts". Nothing is blocked, new challans to that vendor included. | challan 1 Oct 2026, 02:00 IST on 15 Aug 2027 → 47 days left (not 48), warning; overdue challan, new challan to same vendor → ok |
 | BR-SCO-12 | A receipt can be made only on a `material_issued` SCO and needs the vendor's challan/invoice number, unique per vendor (409 if repeated). Per line: processed qty and unprocessed qty; (processed × ratio) + unprocessed ≤ qty still at the vendor for that line. | 600 at vendor, return 700 processed → 400 |
 | BR-SCO-13 | Every processed line needs one QA decision before it enters stock, whatever the service (plating and heat treatment too): accepted + rejected = processed. A second decision → 409; two at once post only once. | 500 back: 480 + 20 → ok; 480 + 10 → 400 |
 | BR-SCO-14 | On QA decision, accepted qty posts (`sco_receipt`): raw item −(accepted × ratio) from the vendor location at the line's issue cost, and finished item +accepted into main store at cost = ratio × issue cost + service price (no GST). Finished item average moves per BR-GRN-38. | 480 accepted → HSG-RC −480 @ 12,000 at vendor; HSG-MC +480 @ 14,500 |
@@ -83,6 +87,16 @@ Seed: ow owner, bo back_office.
 | BR-SCO-23 | Every action needs its key from "Who can do what"; otherwise 403 and nothing changes. | fs closes SCO → 403; qa makes a challan → 403 |
 | BR-SCO-24 | Challan, receipt, QA decision and close each save everything in one go (ledger rows, SCO lines, status, challan settlement) and lock the SCO first; the loser of a race gets 409, nothing half-written. | two challans for the last 400 at once → one 200, one 409 |
 | BR-SCO-25 | Every posting stores who, when, reason (if any) and the heat number, so a finished part traces back to its challan and casting batch. | HSG-MC receipt row → challan JWC/26-27/4, heat H-231 |
+
+### Acceptance — IST day (v4, BL-079)
+
+- Given it is 02:00 IST on 1 Oct 2026, when a challan is saved with date 1 Oct 2026, then it is accepted (200).
+- Given it is 02:00 IST on 1 Oct 2026, when a challan is saved with date 2 Oct 2026, then 400 `SCO_CHALLAN_DATE_FUTURE`, nothing posts.
+- Given it is 02:00 IST on 1 Oct 2026, when the challan date is left empty, then it is 1 Oct 2026 and the number is JWC/26-27/…
+- Given it is 00:30 IST on 1 Apr 2027, when a challan is saved with date 1 Apr 2027, then it is accepted and numbered JWC/27-28/….
+- Given it is 02:00 IST on 1 Oct 2026, when an SCO is saved with expected return 30 Sep 2026, then 400; with 1 Oct 2027, then accepted.
+- Given challan dated 1 Oct 2026 and it is 02:00 IST on 15 Aug 2027, when open challans are listed, then days left = 47, warning.
+- Given it is 02:00 IST, when the challan or SCO date picker opens, then its max (challan) / min (expected return) is today's IST date, whatever the browser zone.
 
 ## Not now
 
@@ -106,6 +120,7 @@ None open.
 | BR-SCO-07..11, 24, 25 | done | scoChallan.test.ts | scoChallanService |
 | BR-SCO-12..18, 22 | done | scoReceipt.test.ts, scoReceiptCost.test.ts | scoReceiptService, sco-math |
 | BR-SCO-19, 22–25 | done | scoClose.test.ts | scoService.close, scoReportService |
+| BR-SCO-03, 09, 11 (v4 IST day) | to change (today = UTC day now) | sco.test.ts, scoChallan.test.ts | scoService, scoChallanService, SCO + challan date pickers |
 
 ## Changelog
 
@@ -121,3 +136,5 @@ None open.
 - 2026-09-29 — clarified during build (S4): close while any receipt line is still pending QA → 409 "decide QA first"; nothing is written off until every processed line has a QA decision (BR-SCO-19).
 - 2026-09-29 — clarified during build (S4, supersedes the S3 note): BR-SCO-18 — status becomes `material_received` once every line is fully issued and every issued piece is covered by a receipt (unprocessed or processed), even if QA on it is still pending; close still waits for QA (409, BR-SCO-19).
 - 2026-09-29 — v3 (Arun, BL-072): challan date can't be in the future → 400 (BR-SCO-09); back-dating stays open. No other rule changed.
+- 2026-10-01 — v4 change request (BL-079, #63): every SCO "today" / days-left = plant calendar day in IST (Asia/Kolkata), same on server and date picker (BR-SCO-03, 09, 11; dates note above Rules; FY and number period follow it). Fixes 00:00–05:30 IST mismatch. No other rule changed. Awaiting re-freeze.
+- 2026-10-01 — v4 frozen (Arun): IST-day rules as above; no open questions.
