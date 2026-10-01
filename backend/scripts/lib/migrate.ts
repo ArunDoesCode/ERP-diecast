@@ -172,6 +172,13 @@ export function parseTarget(
   if (/^[a-z]+:\/\/[^/?#]*,/i.test(raw)) {
     throw new Error("DATABASE_URL names more than one host; refused.");
   }
+  // SEC-7: the driver applies query keys (?database=, ?host=, ?user=, ?options=...) at connect time,
+  // after the path was judged. The repo's URLs use none, so any query string is refused.
+  if (raw.includes("?")) {
+    throw new Error(
+      "DATABASE_URL has a query string (connection overrides such as ?database=); refused. Put the settings in the URL path and host instead.",
+    );
+  }
   const host = (u.hostname || env.PGHOST || "").toLowerCase();
   const port = u.port || env.PGPORT || "5432";
   // Not decoded: the driver sends the path as written, so the guard must judge that same name.
