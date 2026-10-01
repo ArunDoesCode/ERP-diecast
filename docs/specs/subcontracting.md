@@ -120,7 +120,7 @@ None open.
 | BR-SCO-07..11, 24, 25 | done | scoChallan.test.ts | scoChallanService |
 | BR-SCO-12..18, 22 | done | scoReceipt.test.ts, scoReceiptCost.test.ts | scoReceiptService, sco-math |
 | BR-SCO-19, 22–25 | done | scoClose.test.ts | scoService.close, scoReportService |
-| BR-SCO-03, 09, 11 (v4 IST day) | to change (today = UTC day now) | sco.test.ts, scoChallan.test.ts | scoService, scoChallanService, SCO + challan date pickers |
+| BR-SCO-03, 09, 11 (v4 IST day) | done (IST day, 2026-10-01) | scoIstDay.test.ts, scoChallan.test.ts | scoService, scoChallanService, lib/ist-day.ts, SCO + challan date pickers, lib/ist-date.ts |
 
 ## Changelog
 
