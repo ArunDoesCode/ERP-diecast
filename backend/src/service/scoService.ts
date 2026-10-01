@@ -6,6 +6,7 @@ import {
   ForbiddenError,
   NotFoundError,
 } from "../lib/errors";
+import { istDaysBetween } from "../lib/ist-day";
 import { qtyAtVendor } from "../lib/sco-math";
 import { approvalRepository } from "../repository/approvalRepository";
 import { scoReceiptRepository } from "../repository/scoReceiptRepository";
@@ -35,7 +36,6 @@ type Paginated<T> = {
   meta: { page: number; pageSize: number; total: number; totalPages: number };
 };
 
-const DAY_MS = 86_400_000;
 const CANCELLABLE_STATUSES = ["draft", "pending_approval", "approved"] as const;
 
 function toPaginatedMeta(page: number, pageSize: number, total: number) {
@@ -47,22 +47,16 @@ function toPaginatedMeta(page: number, pageSize: number, total: number) {
   };
 }
 
-// BR-SCO-03: today .. today + 365 days (whole days, UTC).
+// BR-SCO-03: today .. today + 365 days (whole days, IST).
 function assertReturnDateInWindow(date: Date) {
-  const now = new Date();
-  const startOfToday = Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate(),
-  );
-  const t = date.getTime();
-  if (t < startOfToday) {
+  const daysAway = istDaysBetween(new Date(), date);
+  if (daysAway < 0) {
     throw new BadRequestError(
       "Expected return date cannot be before today",
       "SCO_RETURN_DATE_INVALID",
     );
   }
-  if (t >= startOfToday + 366 * DAY_MS) {
+  if (daysAway > 365) {
     throw new BadRequestError(
       "Expected return date cannot be more than 365 days away",
       "SCO_RETURN_DATE_INVALID",
