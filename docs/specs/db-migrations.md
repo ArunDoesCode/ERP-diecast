@@ -25,8 +25,8 @@ be adopted without losing a row.
 | Action                                             | Allowed                                          |
 | -------------------------------------------------- | ------------------------------------------------ |
 | `db:generate` (write a migration file)           | developer, in a PR                               |
-| `db:migrate` on a local dev/test DB              | anyone with shell                                |
-| `db:migrate` on any other DB (UAT, prod, tunnel) | plant IT / owner, with typed confirm (BR-MIG-17) |
+| `db:migrate` on a local `*_test` DB              | anyone with shell                                |
+| `db:migrate` on any other DB (local dev `diecast`, UAT, prod, tunnel) | owner / plant IT, with typed confirm (BR-MIG-17) and a backup (BR-MIG-16) |
 | `db:adopt` (one-time, push-built DB)             | plant IT / owner, with typed confirm             |
 
 Scripts are not HTTP routes. Their guard is shell access plus the rules below.
@@ -114,3 +114,4 @@ Max 7. Each answerable with a letter. Recommended option first.
 - 2026-10-01 v1 — draft from BL-011 (#16), BL-056 (#44), D-004
 - 2026-10-01 v1 frozen (Arun): Q1 B (UAT starts empty; BR-MIG-18..20 deferred), Q2 A (`db:migrate` runs `pg_dump`), Q3 A (`db:push` removed).
 - 2026-10-01 v1 clarified during build: BR-MIG-07 'docs' means the repo docs, scripts, CI and package.json; the `.claude/` agent and skill files are the owner's to update (they still say `db:push`). BR-MIG-16's 'usual local dev/test DB' is BR-KD-30 as in known-defects v5: a local `*_test` DB on 5432/5433.
+- 2026-10-01 v1 clarified during build (review): (1) the local dev DB `diecast` is not 'usual' — `db:migrate` on it needs `MIGRATE_CONFIRM=diecast` and a working `pg_dump` (install with `brew install libpq`); a dev who wants a clean DB uses `db:reset`. (2) BR-MIG-09/10/11 say how the schema is applied for `db:reset` and `db:test:prepare` (migrate, then seed; rebuild a push-built or mismatched test DB); they replace the 'push schema' wording in known-defects BR-KD-35 and the 'db:test:prepare = db:reset --no-fixtures' wording in BR-KD-52 (the guard rules of KD-30/53 still apply). (3) Also in force: a pending migration older than one already applied is refused (a 'journal mismatch', rebuild for test DBs); migrations run under one advisory lock; a dump file name that already exists in the same minute is refused; a URL with several hosts or no database name is refused (exit 2); a journal problem exits 3. (4) A push-built dev DB gives 'already exists' on the baseline — use `db:reset` (BR-MIG-21).

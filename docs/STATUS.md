@@ -29,7 +29,7 @@ Legend — Code: none / schema only / partial / full. Tests per module: see each
 | — | — | none active | — | — |
 
 ## Waiting on you
-- [ ] Dev DB after the merges: `drop table subcontracting_grn_items, subcontracting_grns cascade` (old empty tables), drop `pages` and `role_pages` if still there, then `bun run db:push`.
+- [ ] Dev DB after the merges: run `bun run db:reset` then `bun run seed` (a push-built dev DB cannot be migrated; BR-MIG-21).
 - [ ] Owner: fill **Company details** (plant name, address, GSTIN, state) and give each raw item an HSN code — a challan is refused (400) without them.
 - [ ] Run the subcontracting manual UI checklist (PR #14 body) before UAT-1.
 - [ ] Open issues: <https://github.com/ArunDoesCode/ERP-diecast/issues> (P1: `gh issue list --label P1`). BL-079 challan date timezone is one of them.
