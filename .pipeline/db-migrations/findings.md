@@ -11,3 +11,4 @@
 | SEC-5 | minor | backlog (pg_dump inherits PGHOSTADDR; sslmode not forwarded) |
 | CR-2 / SPEC-5 | minor | fix: push-built DB → 'use db:reset' (BR-MIG-21, changelog 4) |
 | SPEC-1 | major | docs: stale db:push in handbook + module maps |
+| SEC-7 | major | fix: refuse any connection-override query key in the URL (changelog SEC-7); checked by hand: driver applies ?database= at connect |
