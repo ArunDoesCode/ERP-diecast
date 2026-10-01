@@ -10,14 +10,15 @@
 | Module | Spec | Map | Code | Next step |
 |---|---|---|---|---|
 | auth-setup | frozen v10 | [map](modules/auth-setup.md) | full — permission layer S1–S7 built on work/m1 | merged (PR #13) |
-| known-defects | frozen v4 | (PR / auth maps) | full — BL-001/004/005 fixed (`bootstrap-admin`, `db:reset`) | merged (PR #13) |
+| known-defects | frozen v5 | (PR / auth maps) | full — BL-001/004/005/071 fixed (`bootstrap-admin`, `db:reset` guard BR-KD-30/52/53) | on work/pending-fixes, PR not opened |
 | purchase-requisition | frozen v2 | [map](modules/purchase-requisition.md) | full — built on work/m1 | merged (PR #13) |
 | approval + approval-policies | frozen v2 / v1 | [map](modules/approval.md) | full — built on work/m1 (SCO plumbing only) | merged (PR #13) |
 | purchase-order | frozen v2 | [map](modules/purchase-order.md) | full — built on work/m1 | merged (PR #13) |
 | grn + grn-stock | frozen v1 / v1 | [map](modules/grn.md) | full — built on work/m1-stock, merged da516f2 | merged (PR #13) |
 | inventory | frozen v1 | [map](modules/inventory.md) | full — merged da516f2 | merged (PR #13) |
 | suppliers | frozen v1 | [map](modules/suppliers.md) | full — merged da516f2 | merged (PR #13) |
-| subcontracting | frozen v3 | [map](modules/subcontracting.md) | full — merged (PR #14) | UAT-1 at factory |
+| subcontracting | frozen v4 | [map](modules/subcontracting.md) | full — PR #14 + IST day (BL-079) on work/pending-fixes | UAT-1 at factory |
+| db-migrations | frozen v1 | — | full — baseline + `db:migrate` (BL-011/056) on work/pending-fixes | PR not opened |
 | bom | none | — | none | M3 (after UAT-1 starts) |
 | sale-order | none | — | none | M4 |
 
@@ -26,12 +27,13 @@ Legend — Code: none / schema only / partial / full. Tests per module: see each
 ## Active pipelines
 | Feature | Branch | Phase | PR | Waiting on |
 |---|---|---|---|---|
-| — | — | none active | — | — |
+| pending-fixes (3 fixes) | work/pending-fixes | built, reviewed, tested locally | not opened | you: push + open PR |
 
 ## Waiting on you
 - [ ] Dev DB: `brew install libpq` (for `pg_dump`), then `bun run db:reset` + `bun run seed` — a push-built dev DB cannot be migrated (BR-MIG-21).
 - [ ] Before UAT-1: owner enters real **Company details** (plant name, address, GSTIN, state) and an HSN code on each raw item — a challan is refused (400) without them. The demo seed fills dummy values only.
 - [ ] Run the subcontracting manual UI checklist (PR #14 body) before UAT-1.
+- [ ] P1 #56 is fixed on work/pending-fixes (closes when the PR merges).
 - [ ] Open issues: <https://github.com/ArunDoesCode/ERP-diecast/issues> (P1: `gh issue list --label P1`). New today: #82 receipt-number period UTC, #83 receipt date future check, #84, #85.
 
 ## Recently done
