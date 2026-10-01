@@ -1,6 +1,8 @@
 /**
- * docs/specs/known-defects.md (v1) — db:reset (BL-005)
- * BR-KD-30 host guard, --allow-remote + DB_RESET_CONFIRM, production always refused
+ * docs/specs/known-defects.md (v5) — db:reset (BL-005, BL-071)
+ * BR-KD-30 host guard: only a local `*_test` DB on 5432/5433 runs without a confirm; any other local DB
+ *          (including `diecast`) needs DB_RESET_CONFIRM=<db>; non-local needs --allow-remote + confirm;
+ *          a wrong confirm is always refused; production always refused
  * BR-KD-33 target printed with masked password, inputs checked before any write
  * BR-KD-35 step order outcome: public schema dropped (never the DB), seed, admin, policies, fixtures,
  *          --no-fixtures, idempotent row counts + document numbers
@@ -48,6 +50,34 @@ type Run = { code: number; out: string };
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 
 /**
+ * Ports where nothing listens (verified in beforeAll). Targets named like real databases (`diecast`,
+ * `diecast_test`) are only ever pointed at these, so a guard bug can never wipe a real dev DB: the run
+ * would end in a connect failure instead. `deadUsualPort` is whichever of 5432/5433 the test server
+ * does not use (null if something listens on both: the tests that need it then skip).
+ */
+const deadPorts = new Set<string>();
+let deadUsualPort: string | null = null;
+
+async function isListening(host: string, port: number): Promise<boolean> {
+  try {
+    const s = await Bun.connect({
+      hostname: host,
+      port,
+      socket: { data() {}, open() {}, close() {}, error() {} },
+    });
+    s.end();
+    return true;
+  } catch {
+    return false;
+  }
+}
+async function isDeadPort(port: number): Promise<boolean> {
+  for (const h of ["127.0.0.1", "::1"])
+    if (await isListening(h, port)) return false;
+  return true;
+}
+
+/**
  * Isolation guard (F-TEST-10): the script under test wipes a schema. It must never be pointed at the
  * shared test DB (or any DB but the scratch one). Any local target other than SCRATCH throws before
  * a process is spawned; remote / unparsable URLs are only used by refusal-path tests.
@@ -61,9 +91,9 @@ function assertScratchOnly(dbUrl: string) {
   }
   if (!LOCAL_HOSTS.has(u.hostname)) return; // remote: must be refused / cannot reach a local DB
   const db = u.pathname.replace(/^\//, "");
-  if (db !== SCRATCH && db !== GUARD) {
+  if (db !== SCRATCH && db !== GUARD && !deadPorts.has(u.port)) {
     throw new Error(
-      `db-reset.test: refusing to run db:reset against local database "${db}"; only "${SCRATCH}" and "${GUARD}" are allowed`,
+      `db-reset.test: refusing to run db:reset against local database "${db}" on port ${u.port}; only "${SCRATCH}", "${GUARD}" or a verified-dead port are allowed`,
     );
   }
 }
@@ -152,6 +182,10 @@ beforeAll(async () => {
   await admin.unsafe(`DROP DATABASE IF EXISTS ${GUARD} WITH (FORCE)`);
   await admin.unsafe(`CREATE DATABASE ${GUARD}`);
   await admin.end({ timeout: 5 });
+  const serverPort = new URL(baseUrl).port || "5432";
+  for (const p of ["5432", "5433", "6543"])
+    if (p !== serverPort && (await isDeadPort(Number(p)))) deadPorts.add(p);
+  deadUsualPort = ["5432", "5433"].find((p) => deadPorts.has(p)) ?? null;
   sql = postgres(scratchUrl, { max: 2, onnotice: () => {} });
   guardSql = postgres(guardUrl, { max: 2, onnotice: () => {} });
 }, 60_000);
@@ -288,6 +322,148 @@ describe("db:reset local guard needs DB_RESET_CONFIRM for unusual targets (BR-KD
   }, 240_000);
 });
 
+describe("db:reset confirm rules (BR-KD-30, v5)", () => {
+  const target = (db: string, port: string, host = "localhost") => {
+    const u = new URL(scratchUrl);
+    u.hostname = host;
+    u.port = port;
+    u.pathname = `/${db}`;
+    return u.toString();
+  };
+  const NO_CONN = /ECONNREFUSED|ETIMEDOUT|ENOTFOUND|getaddrinfo/;
+
+  test("BR-KD-30 local `diecast`, no confirm -> exit 2 before connecting", async () => {
+    if (!deadUsualPort) return;
+    const r = await run([], {}, target("diecast", deadUsualPort));
+    expect(r.code).toBe(2);
+    expect(r.out).not.toMatch(NO_CONN);
+  });
+
+  test("BR-KD-30 local `diecast`, no confirm, even with --allow-remote -> exit 2", async () => {
+    if (!deadUsualPort) return;
+    const r = await run(
+      ["--allow-remote"],
+      {},
+      target("diecast", deadUsualPort),
+    );
+    expect(r.code).toBe(2);
+    expect(r.out).not.toMatch(NO_CONN);
+  });
+
+  test("BR-KD-30 local `diecast`, DB_RESET_CONFIRM=diecast_test (wrong) -> exit 2", async () => {
+    if (!deadUsualPort) return;
+    const r = await run(
+      [],
+      { DB_RESET_CONFIRM: "diecast_test" },
+      target("diecast", deadUsualPort),
+    );
+    expect(r.code).toBe(2);
+    expect(r.out).not.toMatch(NO_CONN);
+  });
+
+  test("BR-KD-30 local `diecast`, DB_RESET_CONFIRM=diecast -> guard passes (not exit 2; fails later on connect)", async () => {
+    if (!deadUsualPort) return;
+    const r = await run(
+      [],
+      { DB_RESET_CONFIRM: "diecast" },
+      target("diecast", deadUsualPort),
+    );
+    expect(r.code).not.toBe(2);
+    expect(r.code).not.toBe(0);
+  }, 60_000);
+
+  test("BR-KD-30 local `*_test` on a usual port (5432/5433), no confirm -> guard passes (not exit 2)", async () => {
+    if (!deadUsualPort) return;
+    const r = await run([], {}, target("diecast_test", deadUsualPort));
+    expect(r.code).not.toBe(2);
+    expect(r.code).not.toBe(0);
+  }, 60_000);
+
+  test("BR-KD-30 ::1 counts as local: `*_test` on a usual port, no confirm -> guard passes", async () => {
+    if (!deadUsualPort) return;
+    const r = await run([], {}, target("diecast_test", deadUsualPort, "[::1]"));
+    expect(r.code).not.toBe(2);
+    expect(r.code).not.toBe(0);
+  }, 60_000);
+
+  test("BR-KD-30 local `*_test` on port 6543, no confirm -> exit 2 before connecting", async () => {
+    if (!deadPorts.has("6543")) return;
+    const r = await run([], {}, target("diecast_test", "6543"));
+    expect(r.code).toBe(2);
+    expect(r.out).not.toMatch(NO_CONN);
+  });
+
+  test("BR-KD-30 local `*_test` on port 6543 with matching DB_RESET_CONFIRM -> guard passes", async () => {
+    if (!deadPorts.has("6543")) return;
+    const r = await run(
+      [],
+      { DB_RESET_CONFIRM: "diecast_test" },
+      target("diecast_test", "6543"),
+    );
+    expect(r.code).not.toBe(2);
+    expect(r.code).not.toBe(0);
+  }, 60_000);
+
+  test("BR-KD-30 a `_test` name earns no shortcut on a non-local host -> exit 2", async () => {
+    const r = await run(
+      [],
+      {},
+      "postgres://u:pw-remote@db.example.com:5432/diecast_test",
+    );
+    expect(r.code).toBe(2);
+    expect(r.out).not.toMatch(NO_CONN);
+  });
+
+  test("BR-KD-30 non-local host with matching DB_RESET_CONFIRM but no --allow-remote -> exit 2", async () => {
+    const r = await run(
+      [],
+      { DB_RESET_CONFIRM: "diecast_test" },
+      "postgres://u:pw-remote@db.example.com:5432/diecast_test",
+    );
+    expect(r.code).toBe(2);
+    expect(r.out).not.toMatch(NO_CONN);
+  });
+
+  test("BR-KD-30 a wrong DB_RESET_CONFIRM is refused even on a local `*_test` DB -> exit 2, data untouched", async () => {
+    await plantSentinel();
+    const r = await run([], { DB_RESET_CONFIRM: "diecast" });
+    expect(r.code).toBe(2);
+    expect(await sentinelIntact()).toBe(true);
+  });
+
+  test("BR-KD-30 a wrong DB_RESET_CONFIRM with --allow-remote on a local `*_test` DB -> exit 2, data untouched", async () => {
+    await plantSentinel();
+    const r = await run(["--allow-remote"], {
+      DB_RESET_CONFIRM: "not_this_db",
+    });
+    expect(r.code).toBe(2);
+    expect(await sentinelIntact()).toBe(true);
+  });
+
+  test("BR-KD-30 local non-`_test` DB with matching DB_RESET_CONFIRM alone (no --allow-remote) -> runs", async () => {
+    await guardSql.unsafe(`DROP SCHEMA IF EXISTS public CASCADE`);
+    await guardSql.unsafe(`CREATE SCHEMA public`);
+    await guardSql.unsafe(`CREATE TABLE public.kd_old_data (x int)`);
+    const r = await run(
+      ["--no-fixtures"],
+      { DB_RESET_CONFIRM: GUARD },
+      guardUrl,
+    );
+    expect(r.code).toBe(0);
+    const gone = await guardSql`SELECT to_regclass('public.kd_old_data') AS t`;
+    expect(gone[0].t).toBeNull();
+    expect(r.out).not.toMatch(/rotate the seed admin password now/i);
+  }, 240_000);
+
+  test("BR-KD-30 local `*_test` on the test server port, no confirm -> runs and rebuilds", async () => {
+    await plantSentinel();
+    const r = await run(["--no-fixtures"]);
+    expect(r.code).toBe(0);
+    const gone = await sql`SELECT to_regclass('public.kd_old_data') AS t`;
+    expect(gone[0].t).toBeNull();
+  }, 240_000);
+});
+
 describe("db:reset inputs and output before any write (BR-KD-33)", () => {
   test("BR-KD-33 missing SEED_USER_PASSWORD -> exit 4, old data still there", async () => {
     await plantSentinel();
@@ -327,6 +503,8 @@ describe("db:reset --no-fixtures (BR-KD-35, 40)", () => {
     await plantSentinel();
     await sql.unsafe(`CREATE SCHEMA IF NOT EXISTS kd_keep`);
     await sql.unsafe(`CREATE TABLE IF NOT EXISTS kd_keep.t (x int)`);
+    await sql.unsafe(`CREATE SCHEMA IF NOT EXISTS drizzle`);
+    await sql.unsafe(`CREATE TABLE IF NOT EXISTS drizzle.kd_old (x int)`);
     const [d] =
       await sql`SELECT oid::int AS oid FROM pg_database WHERE datname = ${SCRATCH}`;
     oidBefore = d.oid;
@@ -352,6 +530,11 @@ describe("db:reset --no-fixtures (BR-KD-35, 40)", () => {
     expect(gone[0].t).toBeNull();
     const kept = await sql`SELECT to_regclass('kd_keep.t') AS t`;
     expect(kept[0].t).not.toBeNull();
+  });
+
+  test("BR-KD-35 the drizzle schema is dropped too (schemas only, never the database)", async () => {
+    const gone = await sql`SELECT to_regclass('drizzle.kd_old') AS t`;
+    expect(gone[0].t).toBeNull();
   });
 
   test("BR-KD-35 --no-fixtures leaves 1 employee (admin@diecast.local, active super-admin) and 0 PRs", async () => {
