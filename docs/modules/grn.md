@@ -68,7 +68,7 @@ Full shapes: `cd backend && bun --env-file=… run contract:query "<METHOD /path
 - Zod strips unknown keys; use `.strict()` where an extra key must be a 400.
 - The frontend whole-number unit list (`grn-units.ts`) duplicates backend `WHOLE_NUMBER_UNITS` — change both (BL-043).
 - Test fixtures must be real employees with seed roles (the permission layer reads role + keys from the DB, not the token); a role-in-token user gets 403.
-- Schema changes reach DBs only via `db:push` (no migrations yet, BL-011). Dev DB needs `db:push` after this batch (bigint column + 2 ledger indexes).
+- Schema changes reach DBs only via migrations (`db:generate`, `db:migrate`); the bigint column + 2 ledger indexes are in the baseline migration. A dev DB built by the old `db:push` needs `db:reset`.
 
 ## Tests
 | File | Covers |

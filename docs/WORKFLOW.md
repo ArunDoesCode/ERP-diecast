@@ -186,7 +186,7 @@ QA accept/reject lines → check inventory movements + item stock. Note anything
 | M0 | Workflow infra (~1 week) | Items under "Workflow infrastructure" (issues labelled `infra`): bootstrap-admin, `db:reset` + realistic fixtures, test DB, `createApp()`, commit contract manifest + route check, CI, hooks. Fix the 3 known defects via `/bug`. | CI green; `db:reset && bun test` works from zero |
 | M1 | Procurement hardening | Retroactive specs + BR tests for GRN, PR, Approval, PO (section C) | Scenario test green; SME walkthrough OK |
 | M2 | Subcontracting | `/spec subcontracting` (schema exists, no routes): SCO, issue material to vendor location, job-work challan, receive back, QA, loss/scrap | Scenario extended to SCO |
-| UAT-1 | Procurement at factory (2–3 weeks) | Real users, real data. Switch `db:push` → migrations first (D-004). Log via `/bug` into `docs/uat-log.md`; S1/S2 fixed immediately | Sign-off from purchase + stores |
+| UAT-1 | Procurement at factory (2–3 weeks) | Real users, real data. Migrations (`db:generate` / `db:migrate`) replace the old push (done, db-migrations). Log via `/bug` into `docs/uat-log.md`; S1/S2 fixed immediately | Sign-off from purchase + stores |
 | M3 | BOM spec (parallel with UAT-1) | `/spec bom` with real part drawings: levels, casting yield (shot weight, runner/overflow %, rejection %), alloy, inserts, consumables, packaging, subcontract ops, revisions | Spec frozen |
 | M4 | Sale Order + BOM explosion | `/spec sale-order`, then slices: BOM master → SO → explosion → net requirement vs stock → draft PRs/SCOs through the existing procurement services | Scenario: SO → PRs/SCOs auto-created |
 | UAT-2 | Planning at factory | Same as UAT-1 | Sign-off |

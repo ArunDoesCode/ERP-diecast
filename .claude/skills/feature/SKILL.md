@@ -26,7 +26,7 @@ limit hit, (c) the PR is ready. Everything else you decide and record.
    EnterWorktree `path=.claude/worktrees/bl-006-test-db`; if its branch is `work/<theme>`, build on it.
    Only if no working branch exists, create `work/<theme>` there from fresh `origin/main`. Never create a
    per-feature branch or worktree. Epic sub-features are the one exception (`feature/<epic>--<sub>`).
-5. Infra: `cd backend && docker compose up -d && bun run db:push && bun run db:test:prepare`.
+5. Infra: `cd backend && docker compose up -d && bun run db:test:prepare` (migrates + seeds the test DB; dev DB: `bun run db:reset` — see docs/specs/db-migrations.md).
    Code index: `[ -d .codegraph ] && codegraph sync || codegraph init -i` at the worktree root (also on
    `--resume`). Keep it fresh: `codegraph sync` after each slice commit and before Phase 3 step A. Agents
    use it per PROTOCOL → Code lookup.
