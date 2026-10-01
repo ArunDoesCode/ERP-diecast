@@ -65,6 +65,14 @@ if (process.env.NODE_ENV === "production") {
   );
 }
 const isLocal = LOCAL_HOSTS.has(target.hostname.toLowerCase());
+const confirm = process.env.DB_RESET_CONFIRM ?? "";
+// A confirm that is set but does not match the DB name is always refused.
+if (confirm !== "" && confirm !== dbName) {
+  refuse(
+    EXIT.guard,
+    `Refused: DB_RESET_CONFIRM does not match the database name '${dbName}'.`,
+  );
+}
 if (!isLocal) {
   if (!allowRemote) {
     refuse(
@@ -72,32 +80,23 @@ if (!isLocal) {
       `Refused: ${target.hostname} is not a local host. Pass --allow-remote and set DB_RESET_CONFIRM=${dbName} to override.`,
     );
   }
-  if (process.env.DB_RESET_CONFIRM !== dbName) {
+  if (confirm !== dbName) {
     refuse(
       EXIT.guard,
       "Refused: DB_RESET_CONFIRM must equal the database name when using --allow-remote.",
     );
   }
 } else {
-  // SEC-P1 (known-defects v3): "localhost" can be an SSH tunnel to a real database. A local
-  // target that is not the usual dev/test one needs DB_RESET_CONFIRM=<db name>; for such a
-  // target the confirm alone is enough (--allow-remote stays for non-local hosts).
+  // BR-KD-30 (v5): "localhost" can be an SSH tunnel to a real database, and `diecast` is the
+  // dev DB. Only a local `*_test` DB on 5432/5433 resets without a confirm; every other local
+  // target needs DB_RESET_CONFIRM=<db name> (the confirm alone is enough for a local target).
   const port = target.port || "5432";
-  const usualTarget =
-    (dbName === "diecast" || dbName.endsWith("_test")) &&
-    (port === "5432" || port === "5433");
-  if (!usualTarget) {
-    if (process.env.DB_RESET_CONFIRM !== dbName) {
-      refuse(
-        EXIT.guard,
-        `Refused: ${targetLabel} is not the usual local dev/test database (name diecast or *_test, port 5432/5433). Set DB_RESET_CONFIRM=${dbName} to override.`,
-      );
-    }
-  } else if (process.env.DB_RESET_CONFIRM && !allowRemote) {
-    // A confirmation with no override flag is a sign of a wrong command line; do nothing.
+  const noConfirmNeeded =
+    dbName.endsWith("_test") && (port === "5432" || port === "5433");
+  if (!noConfirmNeeded && confirm !== dbName) {
     refuse(
       EXIT.guard,
-      "Refused: DB_RESET_CONFIRM is set without --allow-remote.",
+      `Refused: ${targetLabel} is not a local *_test database on port 5432/5433. Set DB_RESET_CONFIRM=${dbName} to override.`,
     );
   }
 }

@@ -1,44 +1,36 @@
 /**
- * `bun run db:test:prepare` — push the current schema and the role seed
- * into the test database (DATABASE_URL_TEST). Safe to re-run: drizzle-kit push
- * diffs the schema and the seed is idempotent.
+ * `bun run db:test:prepare` (known-defects BR-KD-52, BR-KD-35)
+ *
+ * Builds the test database by running `db:reset --no-fixtures` with DATABASE_URL set to
+ * DATABASE_URL_TEST: one build path, so local and CI test DBs never drift.
+ *
+ * Exit codes: 0 done, 2 DATABASE_URL_TEST refused (nothing changed), 4 bad SEED_USER_PASSWORD
+ * (reported by db:reset before any write), otherwise the exit code of db:reset.
  */
-import postgres from "postgres";
 import { resolveTestDatabaseUrl } from "../src/lib/test-db-url";
 
-const url = resolveTestDatabaseUrl();
+const BACKEND_DIR = new URL("..", import.meta.url).pathname;
 
-const push = Bun.spawnSync(["bunx", "drizzle-kit", "push", "--force"], {
+let url: string;
+try {
+  // Throws if missing, not a URL, name not ending in `_test`, or equal to DATABASE_URL.
+  url = resolveTestDatabaseUrl();
+} catch (err) {
+  console.error(
+    `Refused: ${err instanceof Error ? err.message : String(err)} Nothing was changed.`,
+  );
+  process.exit(2);
+}
+
+const reset = Bun.spawnSync(["bun", "scripts/db-reset.ts", "--no-fixtures"], {
+  cwd: BACKEND_DIR,
   env: { ...process.env, DATABASE_URL: url },
+  stdin: "ignore",
   stdout: "inherit",
   stderr: "inherit",
 });
-if (push.exitCode !== 0) {
-  console.error("drizzle-kit push failed against DATABASE_URL_TEST");
-  process.exit(push.exitCode ?? 1);
+if (reset.exitCode !== 0) {
+  console.error(`db:test:prepare failed (db:reset exit ${reset.exitCode}).`);
+  process.exit(reset.exitCode ?? 1);
 }
-
-const sql = postgres(url, { prepare: false, max: 1 });
-try {
-  const seed = await Bun.file(
-    new URL("../src/db/seed_roles.sql", import.meta.url),
-  ).text();
-  await sql.unsafe(seed);
-  // The shared db client reads DATABASE_URL at import time: point it at the test DB first.
-  process.env.DATABASE_URL = url;
-  const { syncCatalog, seedGrants } = await import(
-    "../src/lib/permissions-sync"
-  );
-  await syncCatalog();
-  await seedGrants();
-  // BR-APR-22: the built-in fallback approval policy is seed data the code only reads.
-  const { seedFallbackPolicies } = await import("./seed-approval-policies");
-  await seedFallbackPolicies(null);
-  const { disconnectDb } = await import("../src/db/client");
-  await disconnectDb();
-  console.log(
-    "Test database ready: schema pushed, roles seeded, permission catalog synced.",
-  );
-} finally {
-  await sql.end({ timeout: 5 });
-}
+console.log("Test database ready: built by db:reset --no-fixtures.");
