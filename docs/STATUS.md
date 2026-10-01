@@ -3,8 +3,8 @@
 > Single entry point for "where are we and what's next". Updated by `/feature` (at phase changes and in
 > every PR), `/watch-prs` (merges), `/status` (on demand) and `/wrap`. Humans: read this, then run `/status`.
 
-**Updated:** 2026-09-29 · **Milestone:** M2 Subcontracting merged (PR #14) → next: UAT-1 at the factory
-**Next action:** dev DB setup (below), fill Company details + item HSN, then run subcontracting through the manual checklist at the factory (UAT-1). After UAT-1: M3 BOM spec (`/spec bom`).
+**Updated:** 2026-10-01 · **Milestone:** M2 Subcontracting merged (PR #14) → next: UAT-1 at the factory
+**Next action:** push `work/pending-fixes` and open one PR (#56, #63, #16/#44 — below). Then `bun run db:reset` + `bun run seed`, run the subcontracting checklist, enter real Company details + item HSN for UAT-1. After UAT-1: M3 BOM spec (`/spec bom`).
 
 ## Modules
 | Module | Spec | Map | Code | Next step |
@@ -29,13 +29,13 @@ Legend — Code: none / schema only / partial / full. Tests per module: see each
 | — | — | none active | — | — |
 
 ## Waiting on you
-- [ ] Dev DB after the merges: run `bun run db:reset` then `bun run seed` (a push-built dev DB cannot be migrated; BR-MIG-21).
-- [ ] Owner: fill **Company details** (plant name, address, GSTIN, state) and give each raw item an HSN code — a challan is refused (400) without them.
+- [ ] Dev DB: `brew install libpq` (for `pg_dump`), then `bun run db:reset` + `bun run seed` — a push-built dev DB cannot be migrated (BR-MIG-21).
+- [ ] Before UAT-1: owner enters real **Company details** (plant name, address, GSTIN, state) and an HSN code on each raw item — a challan is refused (400) without them. The demo seed fills dummy values only.
 - [ ] Run the subcontracting manual UI checklist (PR #14 body) before UAT-1.
-- [ ] Open issues: <https://github.com/ArunDoesCode/ERP-diecast/issues> (P1: `gh issue list --label P1`). BL-079 challan date timezone is one of them.
-- [ ] BL-011 migrations before UAT-1 (also drops `pages`/`role_pages`, BL-056).
+- [ ] Open issues: <https://github.com/ArunDoesCode/ERP-diecast/issues> (P1: `gh issue list --label P1`). New today: #82 receipt-number period UTC, #83 receipt date future check, #84, #85.
 
 ## Recently done
+- 2026-10-01 — work/pending-fixes (not yet pushed): #56 db:reset guard checks the real DB target (known-defects v5, BR-KD-53), #63 SCO dates use the IST day (subcontracting v4), #16/#44 generated migrations replace db:push (db-migrations v1). Decisions D-020..D-022
 - 2026-09-29 — PR #14 merged: subcontracting (SCO, challan, receipt + QA, close, loss, reports; spec v3). Backend 1346 tests. Decisions D-017, D-018; backlog BL-072..079
 - 2026-09-29 — PR #13 merged: work/m1 → main (M1 done)
 - 2026-09-29 — work/m1 (not yet merged): permission layer S1–S7 (role lists and `role_pages` gone,
