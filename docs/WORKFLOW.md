@@ -141,7 +141,7 @@ SEED_USER_PASSWORD='choose-8+chars' bun run db:reset   # wipes the dev DB (publi
                                            # + admin@diecast.local + approval policies + demo data (PRs, POs, GRNs)
                                            # add --no-fixtures for an empty system (admin only); local hosts only
 bun run seed                               # optional: subcontracting demo data (vendor, stock, 5 SCOs), after db:reset
-bun run db:test:prepare                    # schema + seed into the test DB (re-run after container restart)
+bun run db:test:prepare                    # wipes + rebuilds the test DB (= db:reset --no-fixtures; needs SEED_USER_PASSWORD; re-run after container restart)
 bun run dev                                # API on :4000
 
 cd ../frontend
