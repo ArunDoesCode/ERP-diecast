@@ -41,7 +41,7 @@ Endpoints and payloads: `.pipeline/subcontracting/contract.md`, or `bun run cont
 - E-way bill: required if vendor state ≠ ours, no GSTIN, or challan value ≥ ₹50,000 (5,000,000 paise) — money is paise everywhere; a fixture cost ≥ 1,000 paise × 50+ pcs crosses the line.
 - Challan needs company settings + raw item `hsn_code`, else 400. Frontend shows the e-way field always as optional; the server decides.
 - Route order: `/challans/open` before `/challans/:challanId`. Close body may be empty (`.json().catch`).
-- Drizzle subqueries need unique column aliases; `db:push` asks interactively about renames — old empty `subcontracting_grn*` tables were dropped once (dev DB: `drop table subcontracting_grn_items, subcontracting_grns cascade` before `db:push`, if it has no rows).
+- Drizzle subqueries need unique column aliases; `db:generate` asks interactively about renames — old empty `subcontracting_grn*` tables were dropped once; schema changes now go through migrations (`db:generate` then `db:migrate`).
 - Loss write-off also raises `settledQty` on open challan lines with no settlement row (keeps ITC-04 data honest); there is no SCO delete route (404).
 - Receipt statuses (`pending_qa`, `accepted`, `partial_accepted`, `rejected`) and receipt number `SCO-GRN-<period>-<seq>` are build choices, not in the spec.
 - Challan date: future → 400 (`SCO_CHALLAN_DATE_FUTURE`, UTC day) — the picker uses local day, so 00:00–05:30 IST mismatches (BL-079).

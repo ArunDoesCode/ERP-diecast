@@ -49,7 +49,7 @@ inactive supplier) is in `poService`; the SCO side is the subcontracting build (
 - History also records SKU, qty, unit and lead-time changes (more than BR-SUP-10 lists; BL-055).
 - Error text is a fixed sentence per case (BR-SUP-22); an unmapped 23505 → "Already exists".
 - Test fixtures must be real employees with seed roles (keys come from the DB, not the token).
-- Name unique index can fail `db:push` on a dev DB that already has names clashing by case/spaces.
+- Name unique index can fail `db:migrate` on a dev DB that already has names clashing by case/spaces.
 
 ## Tests
 | File | Covers |

@@ -47,6 +47,19 @@ jobs:
         env:
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/diecast_test
           SEED_USER_PASSWORD: ci-seed-password-1
+      - name: Migrations are in sync with the schema
+        # BR-MIG-12: generate must find nothing to write; a schema change without its migration
+        # leaves a new or changed file under src/db/migrations and fails here.
+        run: |
+          bun run drizzle-kit generate
+          bun run drizzle-kit check
+          if [ -n "$(git status --porcelain -- src/db/migrations)" ]; then
+            echo "Schema changed without a migration. Run 'bun run db:generate' and commit:"
+            git status --porcelain -- src/db/migrations
+            exit 1
+          fi
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/diecast_test
       - run: bun test
       - name: Contract manifest is committed and current
         run: bun run contract:check

@@ -30,6 +30,7 @@ import {
 } from "../db/schemas/02_procurement-suppliers";
 import { employees } from "../db/schemas/03_hcm";
 import { allocateDocumentSequence } from "../lib/document-number";
+import { istMonthKey } from "../lib/ist-day";
 import type {
   scoListQuerySchemaType,
   scoResponseSchemaType,
@@ -267,6 +268,8 @@ export const scoRepository = {
       tx,
       "sco",
       data.createdBy as number,
+      new Date(),
+      istMonthKey(),
     );
     const [row] = await tx
       .insert(subcontractingOrders)

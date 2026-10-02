@@ -777,9 +777,12 @@ describe("BR-SCO-09 challan number and print data", () => {
     expect(today.status).toBe(201);
     expect(past.status).toBe(201);
     expect(dflt.status).toBe(201);
-    expect(String(dflt.json.data.challan.challanDate).slice(0, 10)).toBe(
-      new Date().toISOString().slice(0, 10),
-    );
+    // BR-SCO-09: "today" is the plant's calendar day in IST (UTC+05:30).
+    const istDayOf = (t: number) =>
+      new Date(t + 330 * 60_000).toISOString().slice(0, 10);
+    expect(
+      istDayOf(new Date(String(dflt.json.data.challan.challanDate)).getTime()),
+    ).toBe(istDayOf(Date.now()));
   });
 
   test("BR-SCO-09 unknown challan -> 404", async () => {

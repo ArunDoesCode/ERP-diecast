@@ -90,8 +90,8 @@ conventions as authoritative for that side; this file only governs `backend/`.
 
 ```bash
 docker compose up -d        # dev Postgres :5432 + test Postgres :5433 (see docker-compose.yaml)
-bun run db:push             # push current schema to the dev DB (drizzle-kit push)
-bun run db:test:prepare     # push schema + seed roles and permission catalog into the test DB
+bun run db:migrate          # apply pending migrations to DATABASE_URL (dev DB)
+bun run db:test:prepare     # apply migrations + role/permission seed to the test DB
 ```
 
 `DATABASE_URL` in `.env` points at the local Docker Postgres in dev. There is currently
@@ -136,11 +136,11 @@ src/db/schemas/
 # 2. Typecheck
 bun run typecheck
 
-# 3. Push straight to your local dev DB (no production yet, no backfill ceremony needed)
-bun run db:push
+# 3. Generate the migration (commit it in the same PR; CI fails if it is missing)
+bun run db:generate
 
-# 4. If you want a committed migration file too
-bun drizzle-kit generate
+# 4. Apply it to your dev DB (never edit a migration that is merged to main)
+bun run db:migrate
 ```
 
 ### Key architectural decisions
@@ -293,7 +293,7 @@ in parallel. Never model jobs as a linear sequence once job-tracking is actually
 - No microservices, message queues, or distributed systems
 - No React Native or separate mobile app — PWA only, once that phase starts
 - No keyboard input on worker screens (once built)
-- No schema changes applied by hand to the DB — always through `src/db/schemas/*.ts` + `bun run db:push` / migrations
+- No schema changes applied by hand to the DB — always through `src/db/schemas/*.ts` + `bun run db:generate` / `bun run db:migrate`
 - No `any` types in new TypeScript code
 - No raw `throw new Error(...)` in new code — use the `AppError` family in `src/lib/errors.ts`
 - No debug `console.log` left in controllers/services — remove before considering a change done
