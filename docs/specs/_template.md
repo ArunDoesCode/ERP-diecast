@@ -9,7 +9,7 @@ depends_on: []           # e.g. [approval, purchase-requisition]
 
 # <Module name>
 
-> Keep it to one screen per section and ≤ 150 lines total (≤ 25 rules). Plain words, short sentences.
+> Keep it to one screen per section and ≤ 400 lines total (above that: split by sub-module). Plain words, short sentences.
 > Bigger module → split into sub-specs. Code locations, gaps and history go in `docs/modules/<module>.md`.
 
 ## Summary

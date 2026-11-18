@@ -17,7 +17,7 @@ Read `docs/specs/<module>.md` and report a checklist:
 - [ ] "Questions for you" all answered, or each remaining one explicitly marked `deferred → backlog`.
 - [ ] "Who can do what" filled in.
 - [ ] "Not now" section present (even if short).
-- [ ] ≤ 150 lines / ≤ 25 rules, or the user agreed to the size.
+- [ ] ≤ 400 lines. Above that → not ready: split by sub-module (one spec each) first.
 - [ ] Specs this one depends on (listed under Dependencies) are `frozen`.
 
 If anything fails: list the gaps and stop. Offer `/spec <module>` to fix.

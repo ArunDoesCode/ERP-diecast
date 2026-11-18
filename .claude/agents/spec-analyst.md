@@ -40,7 +40,7 @@ rules nobody wrote down. Your job is to surface those rules *before* code exists
    tolerance % c) with approval"). Stop when every rule has an answer or is parked as an Open Question.
 4. **Write the spec** from `docs/specs/_template.md` into `docs/specs/<module>.md` with `status: draft`.
    Follow the template exactly — it is deliberately small:
-   - ≤ 150 lines, ≤ 25 rules. More than that → propose splitting into sub-specs.
+   - ≤ 400 lines (the one size rule, `docs/KNOWLEDGE.md`). Above that → split by sub-module, one spec each.
    - Plain words a stores clerk understands. One sentence per rule, plus one concrete example
      (given → then) in the same table row. No separate acceptance-criteria section.
    - Cover the negative paths that matter (reject, cancel, partial, over/under, no permission) as rules,

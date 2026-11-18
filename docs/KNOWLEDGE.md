@@ -9,7 +9,7 @@ Knowledge is layered by **how often it's needed**; agents load the smallest laye
 | L1 | `backend/CLAUDE.md`, `frontend/CLAUDE.md` | when working in that package | tech conventions for the package | ≤ 150 lines each |
 | L2 | package skills (`pagination-contract`, `data-table`, `ui-form-standards` …) | when the task matches | detailed how-to for one kind of work | one topic each |
 | L3 | `docs/modules/<module>.md` (**module map**, as-built) | before touching a module | where the code is, data model, API, flows, module gotchas, tests, history | 60–250 lines |
-| L3 | `docs/specs/<module>.md` (spec, should-be) | before building/changing behaviour | states, rules `BR-*`, acceptance criteria | 150–400 lines |
+| L3 | `docs/specs/<module>.md` (spec, should-be) | before building/changing behaviour | states, rules `BR-*`, acceptance criteria | ≤ 400 lines |
 | L4 | `docs/decisions.md`, GitHub Issues (backlog, UAT bugs), `docs/STATUS.md` | when deciding / planning / picking up | why, what's deferred, what's broken, where we are | append-only / tables |
 | L5 | `.pipeline/<feature>/` | only by the coordinator of that feature | briefs, reports, findings, questions of one run | per run, archived |
 | — | codegraph index (`.codegraph/`) + contract manifest | on demand | exact symbols, call paths, API shapes | generated |
@@ -41,7 +41,8 @@ Knowledge is layered by **how often it's needed**; agents load the smallest laye
 ## When the codebase grows
 - **New module** → `/map <module>` creates its map; add a row to `docs/STATUS.md`.
 - **Map > 250 lines** → split by sub-area (`docs/modules/grn/qa.md`, `…/costing.md`) with `grn.md` as index.
-- **Spec > 400 lines** → split into sub-feature specs; use `/epic`.
+- **Spec > 400 lines** → split by sub-module (one spec per sub-module, e.g. `grn` + `grn-stock`); build with `/epic`.
+  This is the only spec size rule — `spec-analyst` and `/freeze` apply it.
 - **CLAUDE.md over budget** → move detail to a skill or module map, leave a one-line pointer. `/wrap`
   checks budgets.
 - **Backlog** lives in GitHub Issues (filter by label); no file to split.
