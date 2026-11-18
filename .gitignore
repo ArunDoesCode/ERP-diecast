@@ -27,6 +27,8 @@ node_modules/
 # --- Build outputs ---
 dist/
 build/
+# ...but the /build skill is not a build output
+!.claude/skills/build/
 coverage/
 *.tsbuildinfo
 
@@ -103,3 +105,10 @@ test-results/
 
 # --- pg_dump backups taken by db:migrate (BR-MIG-16) ---
 backend/backups/
+
+# --- Pipeline run folders (local to each worktree; plan v2 item 4.2) ---
+# Only the one-page record of each run is committed: .pipeline/<id>/summary.md
+.pipeline/*
+!.pipeline/*/
+.pipeline/*/*
+!.pipeline/*/summary.md

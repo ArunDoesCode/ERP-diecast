@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Pipeline run state (.pipeline/<id>/state.json)",
+  "description": "Written only by the coordinator, at every phase change and after every agent call. Rules: .claude/pipeline/PROTOCOL.md -> Run state. Times are UTC ISO 8601 (state.sh now).",
+  "type": "object",
+  "required": ["schema", "id", "module", "mode", "branch", "base", "phase", "phases", "calls", "fixRounds", "findings", "gates", "lastGreen", "parked", "failures", "pr"],
+  "additionalProperties": true,
+  "$defs": {
+    "time": { "type": ["string", "null"], "format": "date-time" },
+    "gate": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": { "enum": ["pending", "green", "red", "skipped", "parked"] },
+        "note": { "type": "string", "description": "Required for skipped and parked (why / issue link)." }
+      }
+    },
+    "findingCount": {
+      "type": "object",
+      "description": "Counts for one finding class over the whole run. open = blockers + majors not yet fixed.",
+      "properties": {
+        "found": { "type": "integer", "minimum": 0 },
+        "fixed": { "type": "integer", "minimum": 0 },
+        "backlog": { "type": "integer", "minimum": 0 },
+        "rejected": { "type": "integer", "minimum": 0 },
+        "open": { "type": "integer", "minimum": 0 }
+      }
+    }
+  },
+  "properties": {
+    "schema": { "const": 2 },
+    "id": { "type": "string", "description": "Run id = folder name .pipeline/<id>/ = branch feature/<id>. <module>, <module>-<sub>, bug-<issue>, epic-<module>." },
+    "module": { "type": "string", "description": "One module = one spec. Read by .claude/hooks/spec-gate.sh." },
+    "mode": { "enum": ["feature", "sub", "bug", "epic"], "description": "sub = sub-feature of an epic; epic = the epic's own folder. bug lets the spec-gate hook pass." },
+    "epic": { "type": ["string", "null"], "description": "epic/<name> this run belongs to (mode sub)." },
+    "spec": { "type": "string", "description": "Path + version, e.g. docs/specs/grn.md v3." },
+    "branch": { "type": "string", "pattern": "^(feature|epic)/" },
+    "base": { "type": "string", "description": "main or epic/<name>." },
+    "envFile": { "type": "string", "description": "Path of the env file when the worktree has no backend/.env (bun --env-file=<path> ...)." },
+    "phase": { "enum": ["preflight", "plan", "build", "review", "fix", "handover", "done"], "description": "handover = entered at the start of /feature Phase 4 (docs commit, HANDOVER.md, PR, CI) and kept until the merge; also set on a hard stop. done = merged and cleaned up." },
+    "phases": {
+      "type": "object",
+      "description": "Start and end per phase. A phase entered again keeps its first start and adds to rounds.",
+      "additionalProperties": {
+        "type": "object",
+        "properties": { "start": { "$ref": "#/$defs/time" }, "end": { "$ref": "#/$defs/time" }, "rounds": { "type": "integer" } }
+      }
+    },
+    "slices": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "status"],
+        "properties": {
+          "id": { "type": "string" },
+          "brs": { "type": "array", "items": { "type": "string" } },
+          "status": { "enum": ["todo", "building", "green", "parked"] }
+        }
+      }
+    },
+    "currentSlice": { "type": ["string", "null"] },
+    "nextSeq": { "type": "integer", "description": "Next brief / report number NN." },
+    "calls": {
+      "type": "array",
+      "description": "One entry per agent call, appended when the agent returns.",
+      "items": {
+        "type": "object",
+        "required": ["agent", "start", "end", "result"],
+        "properties": {
+          "seq": { "type": "integer" },
+          "agent": { "type": "string" },
+          "slice": { "type": ["string", "null"] },
+          "start": { "$ref": "#/$defs/time" },
+          "end": { "$ref": "#/$defs/time" },
+          "tokens": { "type": ["integer", "null"], "description": "Total tokens if the Agent result reports them, else null." },
+          "result": { "enum": ["DONE", "BLOCKED", "FAILED"] }
+        }
+      }
+    },
+    "fixRounds": { "type": "integer", "minimum": 0, "description": "Fix rounds in the current review phase (max 3). Reset to 0 after a park." },
+    "fixRoundsTotal": { "type": "integer", "minimum": 0 },
+    "findings": {
+      "type": "object",
+      "description": "Counts by class: CR, SEC, PERF, SPEC, DES, TEST, PR.",
+      "additionalProperties": { "$ref": "#/$defs/findingCount" }
+    },
+    "gates": {
+      "type": "object",
+      "required": ["typecheck", "lint", "tests", "contract", "standards", "codeReview", "security", "performance", "spec", "design", "screenshots", "ci"],
+      "additionalProperties": { "$ref": "#/$defs/gate" }
+    },
+    "lastGreen": { "type": ["string", "null"], "description": "Newest commit where typecheck, lint, tests and contract were all green." },
+    "parked": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["slice", "issue", "reason"],
+        "properties": {
+          "slice": { "type": "string" },
+          "brs": { "type": "array", "items": { "type": "string" } },
+          "issue": { "type": "string", "description": "GitHub issue URL." },
+          "reverts": { "type": "array", "items": { "type": "string" } },
+          "reason": { "type": "string" }
+        }
+      }
+    },
+    "failures": {
+      "type": "array",
+      "description": "Check / CI / env / permission failures. Second entry of the same kind for a slice = park.",
+      "items": {
+        "type": "object",
+        "required": ["at", "kind", "note"],
+        "properties": {
+          "at": { "$ref": "#/$defs/time" },
+          "kind": { "enum": ["check", "ci", "env", "contract", "permission", "spec-gap", "crash"] },
+          "slice": { "type": ["string", "null"] },
+          "runbook": { "type": "string" },
+          "note": { "type": "string" }
+        }
+      }
+    },
+    "assumptions": {
+      "type": "object",
+      "properties": {
+        "file": { "type": "string" },
+        "confirm": { "type": "integer", "minimum": 0 },
+        "info": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "pr": {
+      "type": ["object", "null"],
+      "properties": {
+        "number": { "type": "integer" },
+        "url": { "type": "string" },
+        "lastProcessedCommentAt": { "$ref": "#/$defs/time" },
+        "merge": { "enum": ["owner", "auto", "merged"], "description": "owner = waits for the owner; auto = auto-merge is set (sub-feature into an epic)." }
+      }
+    }
+  }
+}

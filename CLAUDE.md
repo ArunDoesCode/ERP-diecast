@@ -5,19 +5,24 @@ Die-casting plant ERP. Solo developer + Claude Code. `backend/` = Bun + Hono + D
 read the one for the package you touch. This file only covers **how work flows**.
 
 ## Current milestone
-M1 — Procurement hardening: write specs + business-rule tests for PR, Approval, PO, GRN (code exists,
-specs don't). Next: M2 Subcontracting → UAT-1 at factory → M3 BOM spec → M4 Sale Order + BOM explosion.
-Full roadmap and daily routine: `docs/WORKFLOW.md`.
+M1 Procurement hardening and M2 Subcontracting are merged. UAT-1 at the factory has not started. BOM and
+Sale Order are not started (no spec). In progress: workflow v2 (`docs/plans/agentic-workflow-v2.md`); BOM
+explosion is the first feature after it. Live state: `docs/STATUS.md`. Roadmap and routine: `docs/WORKFLOW.md`.
 
 ## The loop (every module, no exceptions)
-SPEC → FREEZE → CONTRACT → BACKEND + TESTS → FRONTEND → SCENARIO TEST → SME CHECK → DONE → lessons written down
+BRIEF → RESEARCH → SPEC → PRE-FREEZE REVIEW → FREEZE (owner approves `OWNER.md`) → BUILD (contract → red
+tests → backend ∥ frontend → review loop) → HAND-OVER → owner tries it, answers, merges → lessons written down
 
-**Gate rule:** do not write or change feature code for a module unless `docs/specs/<module>.md` exists and
-has `status: frozen`. If it doesn't, stop and say so — suggest `/spec <module>`. Bug fixes to existing
-behaviour are allowed via `/bug`, but a bug that reveals a missing rule becomes a spec change first.
+**Gate rule:** do not write or change feature code for a module unless its spec (`docs/specs/<module>/spec.md`,
+or the older flat `docs/specs/<module>.md`) has `status: frozen`. If it doesn't, stop and say so — suggest
+`/spec <module>`. Bug fixes to existing behaviour are allowed via `/bug`; a bug that reveals a missing rule
+becomes a spec change first. Hook: `.claude/hooks/spec-gate.sh`.
 
-**Scope rule:** ideas that are not in the frozen spec become a GitHub issue (`gh issue create`, labels `P1–P3` + type + `mod:<module>`), never into the
-current build. Don't "also add" things.
+**Never-wait rule:** after `/freeze` a build never stops to ask: spec gap → benchmark + logged assumption;
+failure → runbook, second time → park the slice with an issue. What it decided alone is shown once, in the
+hand-over (built · parked · confirm yes/no · try it). Policy + the four hard stops: `.claude/pipeline/PROTOCOL.md`.
+
+**Scope rule:** ideas not in the frozen spec become a GitHub issue (labels `P1–P3` + type + `mod:<module>`), never part of the current build.
 
 **Test independence rule:** tests are written only by the `test-writer` agent, from the spec, in a fresh
 context with a pointers-only brief (never a fork, never your summary). Developer agents and the coordinator
@@ -38,43 +43,46 @@ The user reads everything; keep it light.
 |---|---|
 | `docs/STATUS.md` | **Start here.** Where every module stands, active pipelines, what's waiting, next action |
 | `docs/modules/<module>.md` | As-built map: code locations, data model, API, flows, module gotchas, history |
-| `docs/specs/<module>.md` | Should-be behaviour: states, rules `BR-<MOD>-NN`, acceptance criteria |
+| `docs/briefs/<feature>.md` · `docs/research/<feature>.md` | The owner's why / who / outcome · what other ERPs do, with links |
+| `docs/specs/<module>/` | `OWNER.md` (the only file the owner reads) · `spec.md` (rules `BR-<MOD>-NN`) · `design/` · `assumptions.md`. Older modules: flat `docs/specs/<module>.md` |
+| `docs/runbooks/` · `docs/metrics/runs.md` | What to do when a build goes wrong · one row per pipeline run |
 | GitHub Issues | Deferred ideas, defects, change requests, UAT bugs (old `BL-NNN` ids in titles; `docs/backlog.md` = closed archive) |
 | `docs/decisions.md` | Decisions with the why (append-only) |
 | `docs/uat-log.md` | Factory UAT bugs |
 | package `CLAUDE.md` + skills | Tech conventions per package / per kind of task |
 
-**Before touching a module, read its map; explore only code changed since the map's
-`last_verified_commit`.** Module-specific learnings go in the map, not in CLAUDE.md. If the user corrects
-you on the same thing twice, write it down at the narrowest layer that fits.
+**Before touching a module, read its map; explore only code changed since its `last_verified_commit`.**
+Module learnings go in the map, not here. Corrected twice on the same thing → write it at the narrowest layer.
 
-CodeGraph: each worktree has its own gitignored `.codegraph/` index; `/feature` inits/syncs it and agents use it
-per `.claude/pipeline/PROTOCOL.md` → Code lookup.
+CodeGraph: per-worktree gitignored `.codegraph/` index; use it per `.claude/pipeline/PROTOCOL.md` → Code lookup.
 
 ## Commands (repo-root `.claude/skills/`)
-You (with Claude): `/spec <module>` → SME answers → `/freeze <module>`  ← last step you must be present for
-Autonomous (Opus coordinator = main session, `claude --model opus`):
-- `/feature <module>` — plan → branch/worktree → build → review+security+perf+spec audit → tests → fix loop → PR
+You (with Claude): `/brief <feature>` → `/research <feature>` → `/spec <module>` → answer the cards →
+`/freeze <module>`  ← last step you must be present for → `/build <module>` prints the two lines to run.
+Autonomous (Opus coordinator = main session, `claude --model opus`; `/goal` keeps it going to hand-over):
+- `/feature <module>` — plan → branch/worktree → build → 5 reviewers ∥ test-runner → fix loop / park → PR + hand-over
 - `/epic <module>` — large feature: split into sub-features, epic branch, one `/feature` + PR per sub-feature
 - `/watch-prs` — run as `/loop 10m /watch-prs`; picks up your PR comments and merges, re-runs the loop
 Pick-up & knowledge: `/status` (where are we, next action), `/map <module>` / `/map --stale` (module maps),
 `/wrap` (end of session). Manual helpers: `/slice` (one slice, you in the loop), `/bug`.
 
-Pipeline agents (repo-root `.claude/agents/`, model set by family alias — always the latest of that family): explorer (haiku), backend-dev, frontend-dev,
-test-writer, code-reviewer, security-auditor, performance-auditor, spec-reviewer (sonnet), test-runner (haiku),
-spec-analyst (opus). Agents communicate only via the coordinator and `.pipeline/<feature>/` —
-protocol: `.claude/pipeline/PROTOCOL.md`. Package agents (hono-*, nextjs-*) hold the detailed conventions
-the dev/review agents read.
+Agents (repo-root `.claude/agents/`, model by family alias). Spec time: researcher, solution-designer,
+ui-ux-designer (sonnet), spec-analyst (opus). Build: explorer, test-runner (haiku); backend-dev, frontend-dev,
+test-writer, code-reviewer, security-auditor, performance-auditor, spec-reviewer, design-reviewer (sonnet).
+They talk only through the coordinator and the run folder `.pipeline/<id>/` — local to the worktree and
+git-ignored; only `summary.md` (the run record) is committed. Protocol: `.claude/pipeline/PROTOCOL.md`.
+Conventions the dev/review agents read: `backend/.claude/reference/`, `frontend/.claude/reference/`.
 
 ## Git
-- **One working branch, one worktree, few PRs.** Work happens on one local branch `work/<theme>` (now
-  `work/m1`) in the one worktree `.claude/worktrees/bl-006-test-db`. Re-enter it (EnterWorktree `path=`);
-  never create a new branch or worktree per bug, feature, spec or doc fix.
-- Every item is its own commit on that branch (`fix(BL-018): …`, `test(…)`, `feat(…)`, `docs(…)`).
-  STATUS/backlog/map updates are commits there too — never a PR of their own.
-- **Don't push until the batch is ready.** Push and open one PR only when the user asks, or when a group
-  of related items is done and checked. The user merges; then start the next batch from fresh `main`.
-- A second branch/worktree only for a truly parallel session or an epic. Never commit to `main`.
+- **One branch + one worktree per pipeline run, one small PR each.** A run (`/feature`, `/bug`, `/slice`)
+  works on `feature/<id>` in `.claude/worktrees/<id>`, cut from fresh `origin/main`. Resuming a run =
+  re-enter its worktree (EnterWorktree `path=`); never a second branch or worktree for the same id.
+- Epics: `epic/<name>` from `main`; each sub-feature is `feature/<id>` cut from the epic branch with a PR
+  into it; one final PR `epic/<name>` → `main`.
+- Every item is its own commit (`fix(<id>): …`, `test(…)`, `feat(…)`, `docs(…)`). STATUS/map/spec-status
+  updates are commits in the same PR — never a PR of their own.
+- Never commit or push to `main`. The pipeline pushes only `feature/*` and `epic/*`; the user merges into
+  `main`. After the merge: remove the worktree, delete the local branch.
 - Pipeline PRs carry label `agent-pipeline`. Pipeline replies on GitHub start with `🤖`.
 - CI (`.github/workflows/ci.yml`) must be green before a PR is handed to the user.
 
@@ -88,4 +96,5 @@ the dev/review agents read.
 ## Domain invariants (never break)
 - Money = integer paise. Quantities: check the spec for units/decimals before assuming.
 - Stock changes only through `inventory_ledger` postings — never edit `currentStock` directly.
-- Every state change on PR/PO/GRN/SCO is role-checked (`requireRole`) and audit-trailed.
+- Every state change on PR/PO/GRN/SCO is permission-checked (`requirePermission("<key>")`, keys in
+  `backend/src/lib/permissions.ts`; no role-name checks in route code) and audit-trailed.

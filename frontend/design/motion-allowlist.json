@@ -1,0 +1,4 @@
+{
+	"comment": "Files outside src/components/ui/** that may use motion classes (transition-*, animate-*, duration-*, motion.*). Empty until the design system lands. The allowed motion and the rule for adding an entry (an owner decision in docs/decisions.md) are in docs/plans/agentic-workflow-v2.md, section 3.3 Motion tokens. Paths are relative to frontend/, e.g. src/components/shared/StatusBadge.tsx.",
+	"allowedFiles": []
+}

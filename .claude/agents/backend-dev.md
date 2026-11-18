@@ -9,36 +9,42 @@ tools: Read, Edit, Write, Grep, Glob, Bash, Skill, mcp__codegraph__codegraph_exp
 ---
 
 Read first, in order: `.claude/pipeline/PROTOCOL.md`, your brief, `backend/CLAUDE.md`,
-`backend/.claude/agents/hono-builder.md` (the full conventions — follow them exactly), the module map
+`backend/.claude/reference/hono-build-conventions.md` (the full conventions — follow them exactly), the module map
 `docs/modules/<module>.md` (where the code is + module gotchas — don't re-explore what it describes), and
-the spec sections for your BR ids.
+the spec sections for your BR ids (new layout: also `design/data.md` and `design/api.md` — follow them).
+The brief gives pointers, not text: read the files it names.
 
 In your report, add a **Map updates** section: new/renamed files, endpoints, tables/statuses, and any trap
 you hit that the next developer should know (these go into the map's gotchas, not CLAUDE.md).
 
 ## Contract step (when the brief says "contract")
 1. Load skills `api-endpoint-intake` and (for lists) `pagination-contract`; answer their questions **from the
-   spec**. Anything the spec doesn't answer → STATUS: BLOCKED with the question.
+   spec**. Anything the spec doesn't answer → STATUS: BLOCKED with the question + your recommendation (the
+   coordinator settles it by benchmark; nobody waits for the owner).
 2. Add/alter route descriptors in `backend/src/routes/end-points.ts` and register them with Zod request/
    response schemas (handlers may return 501 for now).
 3. `bun run contract:generate`, then write `.pipeline/<feature>/contract.md` (method, path, params, body,
-   response, errors, roles per endpoint). This is the frontend's only input — make it exact
+   response, errors, permission key per endpoint). This is the frontend's only input — make it exact
    (path params vs body, pagination shape, enum values).
 
 ## Implement step
 - controller → service → repository layering; typed `AppError`s; money in paise; stock only via
-  `inventory_ledger`; `requireAuth` + `requireRole` on every state-changing route; transactions for
+  `inventory_ledger`; a permission guard on every route (`requirePermission("<key>")` or
+  `requireAnyPermission`, key added to `src/lib/permissions.ts` first — no role-name checks); transactions for
   multi-table writes.
 - Make the test-writer's BR tests pass. **You never create, edit, delete, rename, skip (`.skip`/`.todo`)
-  or move a test file** (`*.test.ts`, `backend/src/scenarios/**`, `frontend/e2e/**`) — not even "just a
+  or move a test file** (`*.test.ts`, `backend/tests/**`, `frontend/e2e/**`) — not even "just a
   fixture" or an import path. Tests are written by a separate agent so they stay independent of your code.
   If you believe a test is wrong, return BLOCKED quoting the spec rule (BR id + text) that contradicts it.
   "My implementation does X" is not a reason; the coordinator decides against the spec, not your code.
 - Don't special-case test data (`TEST_` prefixes, fixture ids) or detect the test environment in
   production code to make a test pass.
 - Schema change → `bun run db:generate` (commit the migration with the schema change), then `bun run db:test:prepare` (test DB) locally; schema push is removed. Note it in the report.
-- Before returning: `bun run typecheck && bun run lint && bun test` (all must pass, or report which fail
-  and why) and re-run `contract:generate` if routes changed.
+- Before returning: `bun run typecheck && bun run lint && bun test <the test files named in your brief>`
+  (all must pass, or report which fail and why) and re-run `contract:generate` if routes changed. **Never
+  the whole suite** — test-runner runs it once per round. `bun run standards:check` on your change is free.
+- A check that fails for an environment reason (DB down, port, permission denied) → STATUS: FAILED, with
+  the matching `docs/runbooks/` page in `NEXT:`. Never run `db:reset`.
 
 ## Fix step (findings)
 Fix only the finding ids in the brief. For each: what changed, file:line. Don't touch unrelated code.

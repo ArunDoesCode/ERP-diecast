@@ -144,3 +144,7 @@ If a decision is reversed, add a new entry that references the old one — don't
 ### D-022 — All subcontracting "today" is the plant's IST day (2026-10-01, subcontracting v4)
 - **Decision:** SCO dates, challan date check, expected-return check, days-left, number period and date pickers use Asia/Kolkata, on server and UI (#63). The receipt-number period and a receipt-date check are separate issues (#82, #83).
 - **Why:** UTC "today" was wrong from 00:00 to 05:30 IST.
+
+### D-023 — One git model and one agent system (2026-11-18, workflow v2 phase 0)
+- **Decision:** (D1) every pipeline run gets its own `feature/<id>` branch + worktree and one small PR; epics use `epic/<name>`. The `work/<theme>` shared-branch rule is dropped. (D2) the package-level agents and skills (`ponytail`, `cavecrew-*`, `caveman-*`, `karpathy-guidelines`) are deleted; `hono-builder` / `hono-reviewer` / `nextjs-builder` / `nextjs-reviewer` became reference docs in `backend/.claude/reference/` and `frontend/.claude/reference/`, read by the root pipeline agents.
+- **Why:** skills, settings and history already followed `feature/<id>`; two orchestration systems gave agents two sets of rules. Plan: `docs/plans/agentic-workflow-v2.md`.

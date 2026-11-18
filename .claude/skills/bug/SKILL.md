@@ -8,28 +8,35 @@ description: >
 
 # /bug <description>
 
-1. **Restate** the bug as: expected vs actual, where (page/endpoint), which role, steps. Ask only for what's
-   missing to reproduce. If it came from the factory, open a GitHub issue now (`gh issue create --label uat-bug --label defect --label P<n> --label mod:<module>`; severity S1/S2 → P1/P2)
-   (id `UAT-NNN`, date, reporter, severity S1 blocks work / S2 wrong data / S3 annoyance / S4 cosmetic).
-2. **Locate** — delegate to `cavecrew-investigator` (package-level) or use codegraph to find the code path (`codegraph sync` first; one `codegraph_explore` call with the symbol names, per PROTOCOL → Code lookup).
-   Decide the layer: frontend-only, contract mismatch (frontend path/body vs backend route), backend rule,
-   or data/seed.
-3. **Map to spec** — find the BR in `docs/specs/<module>.md` that this violates.
-   - Rule exists → it's a code bug, continue.
-   - No rule covers it → it's a **spec gap**. Tell the user, propose the rule, add it via `/freeze`'s
-     change-request path (or to the draft spec) before fixing.
-4. **Red** — delegate to **test-writer** (`subagent_type: test-writer`, never a fork) using the
-   **zero-context brief template** in `.claude/pipeline/PROTOCOL.md`, mode `regression`: spec path, BR id,
-   and the bug's issue number (the reporter's expected-vs-actual). Do **not** pass what you found
-   while locating the code in step 2 — no suspected cause, file names or fix ideas. Test named
-   `BR-<MOD>-NN regression: <short>` (or `UAT-NNN`); it must fail before the fix. Commit it alone as
-   `test(bug): …`. Frontend-only bugs: test-writer writes the manual repro steps instead.
-5. **Fix** — smallest change that makes the test pass (backend-dev / frontend-dev, or directly for a
-   1–2 line fix). Never edit the regression test while fixing; if it looks wrong, go back to step 3 and
-   check the spec. Commit as `fix(bug): …` with no test files. No refactors, no extra features.
-6. **Verify** — the test passes, `bun test` whole suite passes, typecheck + lint clean.
-7. **Log** — if this bug pattern could recur (e.g. path param vs body, stale enum after rename), add an entry
-   to `frontend/docs/gotchas.md` or `docs/decisions.md`. Put `Closes #NN` in the fix PR body so the issue closes on merge.
-   S1/S2 during UAT: fix now. S3/S4 during UAT: log and batch weekly.
-8. **Ship with the batch** — all commits go on the working branch (root `CLAUDE.md` → Git). No new branch,
-   no push, no PR for one bug; it goes out in the next batch PR (push earlier only for S1 when the user asks).
+Never-wait policy and hard stops: `.claude/pipeline/PROTOCOL.md`. Ask the owner only in step 1.
+
+1. **Restate** the bug: expected vs actual, where (page/endpoint), which role, steps. Ask only for what is
+   missing to reproduce. From the factory → open an issue now (`gh issue create --label uat-bug --label
+   defect --label P<n> --label mod:<module>`; S1 blocks work / S2 wrong data → P1/P2, S3/S4 → P3).
+2. **Run** — commits go on `feature/bug-<issue or short name>` in its own worktree; found inside an active
+   run → that run's branch and state. Else `.claude/pipeline/state.sh init bug-<x> <module> bug
+   feature/bug-<x> main` (`mode: bug` lets the spec-gate hook pass for modules without a frozen spec).
+3. **Locate** — **explorer**, or one `codegraph_explore` yourself (PROTOCOL → Code lookup). Decide the
+   layer: frontend-only, contract mismatch, backend rule, or data/seed.
+4. **Map to spec** — find the BR this violates (PROTOCOL → Spec paths).
+   - Rule exists → code bug, continue.
+   - No rule → **spec gap**. Do not wait:
+     [spec-gap-mid-build](../../../docs/runbooks/spec-gap-mid-build.md) — spawn **researcher** for the
+     benchmark, add the rule to the spec changelog, log the assumption (`confirm` if it touches money,
+     stock, tax, permissions or what a factory user sees). Invariant conflict → hard stop.
+5. **Red** — **test-writer** (`subagent_type: test-writer`, never a fork), zero-context brief template
+   from PROTOCOL, mode `regression`: spec path, BR id, the issue number. Do **not** pass what you found
+   in step 3 — no suspected cause, file names or fix ideas. Test named `BR-<MOD>-NN regression: <short>`
+   (or `UAT-NNN`); it must fail before the fix. Commit alone as `test(bug): …`. Frontend-only bug:
+   test-writer writes the manual repro steps instead.
+6. **Fix** — smallest change that makes the test pass: backend-dev / frontend-dev (they run only the
+   regression test file + typecheck + lint), or yourself for a 1–2 line fix. Never edit the regression test while fixing; if it looks
+   wrong, back to step 4. Commit `fix(bug): …`, no test files, no refactors, no extras.
+7. **Verify** — **test-runner** once (full checks). Red →
+   [ci-red](../../../docs/runbooks/ci-red.md). Still red after 2 fixes → revert the fix commit, put
+   the evidence on the issue, hand over ([park-a-slice](../../../docs/runbooks/park-a-slice.md)).
+8. **Log** — a pattern that could recur → module map gotchas or `docs/decisions.md`.
+9. **Ship** — push and open the PR without asking (label `agent-pipeline`, `Closes #NN`, body from
+   `.claude/pipeline/templates/PR_BODY.md`, cut to: what was wrong · the rule · the fix · assumptions to
+   confirm · how to try). The owner merges. Never `main`.
+   UAT: S1/S2 fix now; S3/S4 log and batch weekly.

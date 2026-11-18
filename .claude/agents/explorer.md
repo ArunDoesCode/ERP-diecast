@@ -19,6 +19,8 @@ Bash only for read commands (`ls`, `git log`, `git diff`, `bun run --cwd backend
 - Answer the brief's questions with file:line references. Quote at most a few lines per hit.
 - Always list: existing code to reuse, files likely to change, patterns to follow (point to one good
   example file for each), and anything surprising (dead code, duplicates, TODOs in the area).
+- New-layout specs: `docs/specs/<module>/design/{data,api,screens}.md` already name tables, endpoints and
+  screens — check them before searching, and report where the code differs.
 - Report ≤ 300 lines. Return the protocol block.
 
 ## Code lookup
