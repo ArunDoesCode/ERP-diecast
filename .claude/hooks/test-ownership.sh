@@ -81,7 +81,9 @@ root=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null) || root="${CLAUDE_PR
 root=$(resolve_path "$root") || root="${root%/}"
 
 rel="${file#"$root"/}"
-case "$rel" in
+# macOS is case-insensitive: match on a lowercased copy (tr, bash 3.2), report the real path.
+rel_lc=$(printf '%s' "$rel" | tr '[:upper:]' '[:lower:]')
+case "$rel_lc" in
   backend/tests/* | frontend/e2e/*) ;;
   *) exit 0 ;;
 esac
