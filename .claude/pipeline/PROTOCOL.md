@@ -168,6 +168,8 @@ Tests are the spec turned into code. They must not be shaped by the implementati
 6. **Human checklist is independent too.** The manual UI test checklist in the PR is written by
    test-writer from the spec, not by the developer who built the screens.
 
+**What the hooks do not cover.** `spec-gate.sh` and `test-ownership.sh` are deny-by-default (`SPEC_GATE_MODE=warn` / `TEST_OWNERSHIP_MODE=warn` for warn-only), resolve symlinks and `..` before matching, and fail closed when `jq` is missing or the input is unreadable. They still do not stop: (1) writes through Bash (`sed -i`, `>`, `tee`, `git apply`); (2) `NotebookEdit` (only Edit|Write|MultiEdit are matched); (3) edits when there is no schema-2 run state (spec-gate allows by design); (4) a wrong `agent_type` (test-ownership trusts the field the harness sends). Commit-level checks (rule 5) and review are the backstop.
+
 ## Efficiency (one full test run per loop)
 - **Full `bun test` is run only by test-runner**: once as baseline, once per review round.
 - **test-runner runs in parallel with the reviewers** (one message, all Agent calls together).
