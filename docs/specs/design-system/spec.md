@@ -1,8 +1,8 @@
 ---
 module: design-system
-status: draft            # draft | frozen (set only by /freeze)
-version: 0
-frozen_on:
+status: frozen           # draft | frozen (set only by /freeze)
+version: 1
+frozen_on: 2026-11-18
 owner: Arun
 depends_on: []
 brief: docs/plans/agentic-workflow-v2.md   # Phase 3 (3.1–3.5); no separate brief
@@ -363,3 +363,4 @@ None.
 ## Changelog
 - 2026-11-18 v0 — draft
 - 2026-11-18 v0 — pre-freeze review fixes: one design (owner picked A / B / A / A / A / A), stronger accent, solid selection, blue focus ring, tone icons, approval statuses, scope cut to one reference module
+- 2026-11-18 v1 — frozen. Owner answered 6 cards and confirmed 5 choices; spec and design reviews passed in round 2

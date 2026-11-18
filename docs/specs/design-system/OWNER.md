@@ -1,7 +1,7 @@
 ---
 module: design-system
-status: draft
-approved_on:
+status: frozen
+approved_on: 2026-11-18
 ---
 # Design system — for your approval
 ## 1. What you asked for
