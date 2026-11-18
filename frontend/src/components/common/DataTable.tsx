@@ -66,10 +66,7 @@ export function DataTable<TData>({
 
 	return (
 		<>
-			<Table
-				aria-busy={isLoading ? true : undefined}
-				className="text-(length:--table-text-size) [&_td]:h-(--row-height) [&_td]:py-0"
-			>
+			<Table aria-busy={isLoading ? true : undefined}>
 				<TableHeader className="[&_tr]:bg-table-header [&_tr]:hover:bg-table-header">
 					{table.getHeaderGroups().map((headerGroup) => (
 						<TableRow key={headerGroup.id}>
