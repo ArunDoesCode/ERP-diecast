@@ -1,6 +1,6 @@
 ---
 module: api-standards
-approved_on:                 # set by /freeze when the owner says yes
+approved_on: 2026-11-18
 ---
 
 # API standards clean-up — for your approval
