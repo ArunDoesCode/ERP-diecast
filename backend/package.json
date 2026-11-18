@@ -17,7 +17,9 @@
     "bootstrap-admin": "bun scripts/bootstrap-admin.ts",
     "contract:generate": "bun scripts/generate-api-manifest.ts",
     "contract:check": "bun scripts/generate-api-manifest.ts --check",
-    "contract:query": "bun scripts/query-api-manifest.ts"
+    "contract:query": "bun scripts/query-api-manifest.ts",
+    "standards:check": "bun scripts/standards-check.ts",
+    "standards:check:strict": "bun scripts/standards-check.ts --strict"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.1",

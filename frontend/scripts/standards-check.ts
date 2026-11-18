@@ -1,0 +1,284 @@
+/**
+ * Frontend standards check — plan agentic-workflow-v2, guardrail 1.4.
+ *
+ *   bun scripts/standards-check.ts             report mode: prints findings, exit 0
+ *   bun scripts/standards-check.ts --strict    exit 1 when there is any finding
+ *   STANDARDS_STRICT=1 bun scripts/...         same as --strict
+ *   --summary                                  counts per rule + top files only
+ *
+ * Rules (text-based heuristics, no AST — a finding is a pointer, not a proof):
+ *   mutation-invalidate  a `useMutation(` neither invalidates / updates the query cache
+ *                        nor carries a `// no-invalidate: <reason>` comment
+ *   raw-palette          raw Tailwind palette class (bg-emerald-100 ...) outside src/components/ui/**
+ *   motion               transition-* / animate-* / duration-* / motion.* outside
+ *                        src/components/ui/** and design/motion-allowlist.json
+ */
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { dirname, join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const SRC = join(ROOT, "src");
+const UI_DIR = "src/components/ui/";
+const ALLOWLIST = "design/motion-allowlist.json";
+
+const strict =
+	process.argv.includes("--strict") || process.env.STANDARDS_STRICT === "1";
+const summaryOnly = process.argv.includes("--summary");
+
+type Finding = { file: string; line: number; rule: string; message: string };
+const findings: Finding[] = [];
+const notes: string[] = [];
+
+function add(file: string, line: number, rule: string, message: string) {
+	findings.push({ file, line, rule, message });
+}
+
+// ─── helpers ────────────────────────────────────────────────────────────────
+
+function walk(dir: string, out: string[] = []): string[] {
+	if (!existsSync(dir)) return out;
+	for (const name of readdirSync(dir)) {
+		const full = join(dir, name);
+		if (statSync(full).isDirectory()) {
+			if (name !== "node_modules") walk(full, out);
+		} else if (/\.(ts|tsx)$/.test(name) && !/\.(test|spec)\.tsx?$/.test(name)) {
+			out.push(full);
+		}
+	}
+	return out.sort();
+}
+
+const rel = (file: string) => relative(ROOT, file).split("\\").join("/");
+
+/** Blanks out comments (same length, newlines kept) so offsets and lines still match. */
+function maskComments(src: string): string {
+	const out = src.split("");
+	let i = 0;
+	let quote: string | null = null;
+	while (i < src.length) {
+		const ch = src[i];
+		const next = src[i + 1];
+		if (quote) {
+			if (ch === "\\") i += 2;
+			else {
+				if (ch === quote) quote = null;
+				i += 1;
+			}
+			continue;
+		}
+		if (ch === '"' || ch === "`") {
+			// Single quotes are skipped on purpose: JSX text has apostrophes.
+			quote = ch;
+			i += 1;
+		} else if (ch === "/" && next === "/" && src[i - 1] !== ":") {
+			while (i < src.length && src[i] !== "\n") {
+				out[i] = " ";
+				i += 1;
+			}
+		} else if (ch === "/" && next === "*") {
+			while (i < src.length && !(src[i] === "*" && src[i + 1] === "/")) {
+				if (src[i] !== "\n") out[i] = " ";
+				i += 1;
+			}
+			out[i] = " ";
+			out[i + 1] = " ";
+			i += 2;
+		} else {
+			i += 1;
+		}
+	}
+	return out.join("");
+}
+
+function lineAt(src: string, offset: number): number {
+	let line = 1;
+	for (let i = 0; i < offset && i < src.length; i += 1) {
+		if (src[i] === "\n") line += 1;
+	}
+	return line;
+}
+
+/** Index of the `)` that closes the `(` at `open` (or -1). */
+function matchParen(src: string, open: number): number {
+	let depth = 0;
+	for (let i = open; i < src.length; i += 1) {
+		const ch = src[i];
+		if (ch === "(") depth += 1;
+		else if (ch === ")") {
+			depth -= 1;
+			if (depth === 0) return i;
+		}
+	}
+	return -1;
+}
+
+type SourceFile = { rel: string; raw: string; code: string };
+const files: SourceFile[] = walk(SRC).map((path) => {
+	const raw = readFileSync(path, "utf8");
+	return { rel: rel(path), raw, code: maskComments(raw) };
+});
+
+// ─── (a) every mutation invalidates the cache ───────────────────────────────
+
+const CACHE_CALL =
+	/\b(invalidateQueries|setQueryData|setQueriesData|refetchQueries|resetQueries|removeQueries)\b/;
+
+function checkMutations() {
+	let total = 0;
+	for (const f of files) {
+		const re = /\buseMutation\s*(?:<[^(]*>)?\s*\(/g;
+		for (let m = re.exec(f.code); m; m = re.exec(f.code)) {
+			const open = m.index + m[0].length - 1;
+			const close = matchParen(f.code, open);
+			if (close < 0) continue;
+			total += 1;
+			const call = f.code.slice(m.index, close + 1);
+			if (CACHE_CALL.test(call)) continue;
+
+			// One hop: a helper declared in the same file that does the invalidation.
+			const viaHelper = [
+				...new Set(call.match(/\b[A-Za-z_]\w*(?=\s*\()/g)),
+			].some((name) => {
+				const decl = new RegExp(
+					`(?:function\\s+${name}\\b|const\\s+${name}\\s*=)`,
+				).exec(f.code);
+				if (!decl) return false;
+				const next = /\n(?=[A-Za-z])/.exec(f.code.slice(decl.index + 1));
+				const end = next ? decl.index + 1 + next.index : f.code.length;
+				return CACHE_CALL.test(f.code.slice(decl.index, end));
+			});
+			if (viaHelper) continue;
+
+			// Opt-out comment: inside the call, or on the 3 lines above it.
+			const line = lineAt(f.code, m.index);
+			const rawLines = f.raw.split("\n");
+			const endLine = lineAt(f.code, close);
+			const window = rawLines.slice(Math.max(0, line - 4), endLine).join("\n");
+			if (/\/\/\s*no-invalidate:\s*\S+/.test(window)) continue;
+
+			add(
+				f.rel,
+				line,
+				"mutation-invalidate",
+				"useMutation( has no invalidateQueries / setQueryData and no `// no-invalidate: <reason>` comment",
+			);
+		}
+	}
+	notes.push(`mutation-invalidate: ${total} useMutation( call(s) checked.`);
+}
+
+// ─── (b) raw palette classes ────────────────────────────────────────────────
+
+const PALETTE =
+	/(?<![\w-])(bg|text|border|ring|fill|stroke)-(red|rose|pink|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|slate|gray|zinc|neutral|stone)-\d{2,3}(?![\w])/g;
+
+function checkPalette() {
+	for (const f of files) {
+		if (f.rel.startsWith(UI_DIR)) continue;
+		const lines = f.code.split("\n");
+		lines.forEach((text, i) => {
+			const hits = text.match(PALETTE);
+			if (!hits) return;
+			add(
+				f.rel,
+				i + 1,
+				"raw-palette",
+				`raw palette class ${[...new Set(hits)].join(", ")} - use a semantic token (status map / design tokens)`,
+			);
+		});
+	}
+}
+
+// ─── (c) motion outside the allow-list ──────────────────────────────────────
+
+const MOTION =
+	/(?<![\w-])(?:transition|animate|duration)-[\w[\]().%/-]+|(?<![\w.$])motion\.\w+/g;
+
+function checkMotion() {
+	let allowed: string[] = [];
+	const allowPath = join(ROOT, ALLOWLIST);
+	if (existsSync(allowPath)) {
+		try {
+			const parsed: unknown = JSON.parse(readFileSync(allowPath, "utf8"));
+			const list =
+				typeof parsed === "object" &&
+				parsed !== null &&
+				"allowedFiles" in parsed
+					? parsed.allowedFiles
+					: [];
+			if (Array.isArray(list)) {
+				allowed = list.filter((x): x is string => typeof x === "string");
+			}
+		} catch {
+			add(ALLOWLIST, 0, "motion", "allow-list file is not valid JSON");
+		}
+	} else {
+		add(ALLOWLIST, 0, "motion", "allow-list file is missing");
+	}
+	for (const f of files) {
+		if (f.rel.startsWith(UI_DIR) || allowed.includes(f.rel)) continue;
+		const lines = f.code.split("\n");
+		lines.forEach((text, i) => {
+			const hits = text.match(MOTION);
+			if (!hits) return;
+			add(
+				f.rel,
+				i + 1,
+				"motion",
+				`${[...new Set(hits)].join(", ")} used outside src/components/ui and ${ALLOWLIST}`,
+			);
+		});
+	}
+	notes.push(`motion: ${allowed.length} file(s) on the allow-list.`);
+}
+
+// ─── run + report ───────────────────────────────────────────────────────────
+
+checkMutations();
+checkPalette();
+checkMotion();
+
+const RULES = ["mutation-invalidate", "raw-palette", "motion"];
+
+console.log(
+	`frontend standards-check (${strict ? "strict" : "report"} mode) - ${findings.length} finding(s)\n`,
+);
+if (!summaryOnly) {
+	for (const rule of RULES) {
+		const list = findings
+			.filter((f) => f.rule === rule)
+			.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line);
+		if (list.length === 0) continue;
+		console.log(`## ${rule} (${list.length})`);
+		for (const f of list) {
+			console.log(`${f.file}:${f.line} ${f.rule} ${f.message}`);
+		}
+		console.log("");
+	}
+}
+console.log("## Count per rule");
+for (const rule of RULES) {
+	console.log(
+		`${rule.padEnd(20)} ${findings.filter((f) => f.rule === rule).length}`,
+	);
+}
+console.log(`${"total".padEnd(20)} ${findings.length}`);
+
+const perFile = new Map<string, number>();
+for (const f of findings) perFile.set(f.file, (perFile.get(f.file) ?? 0) + 1);
+console.log("\n## Top files");
+for (const [file, n] of [...perFile.entries()]
+	.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+	.slice(0, 10)) {
+	console.log(`${String(n).padStart(4)}  ${file}`);
+}
+if (notes.length > 0) {
+	console.log("\n## Notes");
+	for (const n of notes) console.log(`- ${n}`);
+}
+
+if (strict && findings.length > 0) {
+	console.log("\nstandards-check failed (strict mode).");
+	process.exit(1);
+}

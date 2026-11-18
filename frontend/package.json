@@ -6,7 +6,9 @@
 		"dev": "next dev",
 		"build": "next build",
 		"typecheck": "tsc --noEmit",
-		"lint": "biome check"
+		"lint": "biome check",
+		"standards:check": "bun scripts/standards-check.ts",
+		"standards:check:strict": "bun scripts/standards-check.ts --strict"
 	},
 	"dependencies": {
 		"@hookform/resolvers": "^5.9.1",
