@@ -243,7 +243,7 @@ html[data-density="compact"] {
 	outline-color: var(--sidebar-ring);
 }
 
-:focus-visible {
+:is(a, button, input, select, textarea, [role], [tabindex]):focus-visible {
 	outline: 2px solid var(--ring);
 	outline-offset: 2px;
 }

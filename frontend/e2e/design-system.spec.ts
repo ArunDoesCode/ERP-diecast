@@ -11,44 +11,8 @@
  * Login: once per worker (worker-scoped fixture), session reused via storage state. Logging in per test
  * trips the backend login rate limiter.
  */
-import { test as base, expect, type Page } from "@playwright/test";
-
-const EMAIL = process.env.E2E_ADMIN_EMAIL ?? "admin@diecast.local";
-const PASSWORD =
-	process.env.E2E_ADMIN_PASSWORD ?? process.env.SEED_USER_PASSWORD ?? "";
-const BASE_URL = process.env.E2E_BASE_URL ?? "http://localhost:3000";
-
-type AuthState = Awaited<
-	ReturnType<import("@playwright/test").BrowserContext["storageState"]>
->;
-
-const test = base.extend<{ storageState: AuthState }, { authState: AuthState }>(
-	{
-		authState: [
-			async ({ browser }, use) => {
-				if (!PASSWORD) {
-					throw new Error(
-						"Set E2E_ADMIN_PASSWORD (or SEED_USER_PASSWORD): the password of the seeded admin",
-					);
-				}
-				const context = await browser.newContext({ baseURL: BASE_URL });
-				const page = await context.newPage();
-				await page.goto("/login");
-				await page.getByLabel("Email").fill(EMAIL);
-				await page.getByLabel("Password").fill(PASSWORD);
-				await page.getByRole("button", { name: "Sign in" }).click();
-				await page.waitForURL("**/landing");
-				const state = await context.storageState();
-				await context.close();
-				await use(state);
-			},
-			{ scope: "worker" },
-		],
-		storageState: async ({ authState }, use) => {
-			await use(authState);
-		},
-	},
-);
+import { expect, type Page } from "@playwright/test";
+import { test } from "./support/auth";
 
 /** A page that exists today and is behind login. Foundation-level checks only. */
 async function openPage(page: Page) {

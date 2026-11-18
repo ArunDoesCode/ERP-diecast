@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Geist_Mono, Manrope } from "next/font/google";
 import Providers from "@/lib/Providers";
+import { DENSITY_INIT_SCRIPT } from "@/lib/shell/density";
 import { cn } from "@/lib/utils";
 
 const manrope = Manrope({ subsets: ["latin"], variable: "--font-sans" });
@@ -28,6 +29,9 @@ export default function RootLayout({
 			className={cn("font-sans", manrope.variable, geistMono.variable)}
 			suppressHydrationWarning
 		>
+			<head>
+				<script>{DENSITY_INIT_SCRIPT}</script>
+			</head>
 			<body>
 				<Providers>{children}</Providers>
 			</body>
