@@ -34,7 +34,7 @@ export function DataTable<TData>({
 
 	return (
 		<>
-			<Table className="text-(length:--table-text-size) [&_td]:h-(--row-height) [&_td]:py-0">
+			<Table>
 				<TableHeader>
 					{table.getHeaderGroups().map((headerGroup) => (
 						<TableRow key={headerGroup.id}>
