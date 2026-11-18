@@ -1,6 +1,11 @@
 "use client";
 
-import { flexRender, type Table as TableInstance } from "@tanstack/react-table";
+import {
+	type ColumnMeta,
+	flexRender,
+	type RowData,
+	type Table as TableInstance,
+} from "@tanstack/react-table";
 import type { ReactNode } from "react";
 
 import { DataTablePagination } from "@/components/common/DataTablePagination";
@@ -14,18 +19,34 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 
-const SKELETON_ROWS = 3;
+import { cn } from "@/lib/utils";
+
+declare module "@tanstack/react-table" {
+	// biome-ignore lint/correctness/noUnusedVariables: must match the library's generic signature
+	interface ColumnMeta<TData extends RowData, TValue> {
+		/** Right-align the column (header and cells) with tabular numbers (BR-DS-19). */
+		numeric?: boolean;
+	}
+}
+
+const SKELETON_ROWS = 8;
+
+function isNumeric(meta: ColumnMeta<never, unknown> | undefined) {
+	return meta?.numeric === true;
+}
 
 type DataTableProps<TData> = {
 	table: TableInstance<TData>;
 	isLoading?: boolean;
 	rowClassName?: (row: TData) => string | undefined;
-	/** Not wired yet (BR-DS-07): rendered in place of the empty row. */
+	/** Rendered in place of the empty row. */
 	emptyState?: ReactNode;
-	/** Not wired yet (BR-DS-07): rendered when set instead of the body. */
+	/** Rendered when set instead of the body. */
 	errorState?: ReactNode;
-	/** Not wired yet (BR-DS-07): skeleton row count while loading. */
+	/** Skeleton row count while loading (default 8). */
 	skeletonRows?: number;
+	/** Hide the built-in pager when the view renders the shared `Pagination`. */
+	hidePagination?: boolean;
 };
 
 // Render-only: owns header/body/skeleton/pagination markup for any TanStack Table
@@ -35,18 +56,32 @@ export function DataTable<TData>({
 	table,
 	isLoading,
 	rowClassName,
+	emptyState,
+	errorState,
+	skeletonRows = SKELETON_ROWS,
+	hidePagination,
 }: DataTableProps<TData>) {
 	const rows = table.getRowModel().rows;
 	const leafColumns = table.getVisibleLeafColumns();
 
 	return (
 		<>
-			<Table className="text-(length:--table-text-size) [&_td]:h-(--row-height) [&_td]:py-0">
-				<TableHeader>
+			<Table
+				aria-busy={isLoading ? true : undefined}
+				className="text-(length:--table-text-size) [&_td]:h-(--row-height) [&_td]:py-0"
+			>
+				<TableHeader className="[&_tr]:bg-table-header [&_tr]:hover:bg-table-header">
 					{table.getHeaderGroups().map((headerGroup) => (
 						<TableRow key={headerGroup.id}>
 							{headerGroup.headers.map((header) => (
-								<TableHead key={header.id}>
+								<TableHead
+									key={header.id}
+									scope="col"
+									className={cn(
+										isNumeric(header.column.columnDef.meta) &&
+											"text-right tabular-nums",
+									)}
+								>
 									{header.isPlaceholder
 										? null
 										: flexRender(
@@ -60,7 +95,7 @@ export function DataTable<TData>({
 				</TableHeader>
 				<TableBody>
 					{isLoading ? (
-						Array.from({ length: SKELETON_ROWS }, (_, rowIndex) => (
+						Array.from({ length: skeletonRows }, (_, rowIndex) => (
 							// biome-ignore lint/suspicious/noArrayIndexKey: fixed skeleton row count, never reorders
 							<TableRow key={`skeleton-row-${rowIndex}`}>
 								{leafColumns.map((column) => (
@@ -70,20 +105,35 @@ export function DataTable<TData>({
 								))}
 							</TableRow>
 						))
+					) : errorState ? (
+						<TableRow className="hover:bg-transparent">
+							<TableCell colSpan={leafColumns.length} className="h-auto">
+								{errorState}
+							</TableCell>
+						</TableRow>
 					) : rows.length === 0 ? (
-						<TableRow>
+						<TableRow className="hover:bg-transparent">
 							<TableCell
 								colSpan={leafColumns.length}
-								className="text-center text-muted-foreground"
+								className={cn(
+									"text-center text-muted-foreground",
+									emptyState && "h-auto",
+								)}
 							>
-								No results.
+								{emptyState ?? "No results."}
 							</TableCell>
 						</TableRow>
 					) : (
 						rows.map((row) => (
 							<TableRow key={row.id} className={rowClassName?.(row.original)}>
 								{row.getVisibleCells().map((cell) => (
-									<TableCell key={cell.id}>
+									<TableCell
+										key={cell.id}
+										className={cn(
+											isNumeric(cell.column.columnDef.meta) &&
+												"text-right tabular-nums",
+										)}
+									>
 										{flexRender(cell.column.columnDef.cell, cell.getContext())}
 									</TableCell>
 								))}
@@ -93,7 +143,7 @@ export function DataTable<TData>({
 				</TableBody>
 			</Table>
 
-			<DataTablePagination table={table} />
+			{hidePagination ? null : <DataTablePagination table={table} />}
 		</>
 	);
 }
