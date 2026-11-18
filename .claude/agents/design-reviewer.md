@@ -43,7 +43,10 @@ Read `.claude/pipeline/PROTOCOL.md` and your brief. Input: the diff `git diff <b
 3. For each changed screen take four screenshots: light + dark × desktop 1440×900 + tablet 1024×768.
    Save to `.pipeline/<run>/screens/<screen>-<theme>-<size>.png`. Also the empty and error state where
    the screen has one.
-4. Run axe on each screen; every serious or critical violation is a finding.
+4. Accessibility: if `@axe-core/playwright` is in `frontend/package.json`, run axe on each screen; every
+   serious or critical violation is a finding. If it is not installed (never install it), use Playwright's
+   `page.accessibility.snapshot()` + role/name checks for every button, link and field, check the focus
+   ring by tabbing, and note "axe not installed" in the report.
 5. Compare each screenshot with the skill and with the spec's `design/screens.md` (or the spec's
    screen rules for a flat spec): missing field or action, wrong pattern, raw colour, contrast in dark
    mode, overflow on tablet, motion outside the allow-list, status colour not from the status map.

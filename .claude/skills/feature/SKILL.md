@@ -82,9 +82,16 @@ Test independence (PROTOCOL) holds: you write neither tests nor production code.
 ## Phase 3 — Review loop (`phase: review` ⇄ `fix`, whole diff vs base)
 ```
 A. Review (phase review) — `codegraph sync`, then ONE message with all of:
-     code-reviewer · security-auditor · performance-auditor · spec-reviewer · design-reviewer (if active)
-     · test-runner (compare with baseline; includes test integrity and standards:check)
-   Round 2+: reviewers get the fix diff only (spec-reviewer the full diff); test-runner always full.
+     code-reviewer · security-auditor · performance-auditor · spec-reviewer
+     · test-runner (compare with baseline; includes test integrity, standards:check and local e2e, step 9)
+   Then, when test-runner has returned and design-reviewer is active (Phase 0 step 6) and the diff touches
+     `frontend/src`: **design-reviewer**, build mode. It needs the same ports and test DB as the e2e step,
+     so never in parallel with test-runner. Brief: changed screens = the dev reports' "Screens touched";
+     start the stack exactly as test-runner step 9 (test DB only, demo data, API :4000, UI :3000, reset
+     after); standard = the `design-system` skill + the spec's `design/screens.md`. Its result sets gates
+     `design` and `screenshots`; screenshots go in `.pipeline/<id>/screens/` and the PR body.
+   Round 2+: reviewers get the fix diff only (spec-reviewer the full diff); test-runner always full;
+     design-reviewer only the screens the fix touched.
 B. Triage — merge into findings.md (dedupe by file:line + issue), update state.json findings + gates.
      fix now: every blocker, majors in scope · backlog: minors, out of scope (issue at hand-over)
      reject: with a reason line — reviewers can be wrong; check the code yourself
