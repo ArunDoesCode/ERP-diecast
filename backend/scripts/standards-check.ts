@@ -4,6 +4,8 @@
  *   bun scripts/standards-check.ts             report mode: prints findings, exit 0
  *   bun scripts/standards-check.ts --strict    exit 1 when there is any finding
  *   STANDARDS_STRICT=1 bun scripts/...         same as --strict
+ *   --strict=rule1,rule2                       exit 1 only for findings of those rules
+ *   STANDARDS_STRICT=rule1,rule2               same
  *   --summary                                  counts per rule + top files only
  *
  * Rules (text-based heuristics, no AST — a finding is a pointer, not a proof):
@@ -11,7 +13,11 @@
  *                 leading column of any index
  *   idx-filter    a column filtered in a repository query (eq / inArray / range)
  *                 is not the leading column of any index
- *   raw-ilike     `ilike(` outside the shared search helper (SEARCH_HELPER)
+ *                 (a column may carry `// no-index: <tag> <reason>`; tags: audit, tiny,
+ *                 covered:<index>, low-card, pk-join; see design/data.md)
+ *   raw-ilike     `ilike(` or the word ilike inside a `sql` template outside the shared
+ *                 search helper (SEARCH_HELPER); local escapeLike()/likePattern() copies
+ *   zod-array     `z.array(` / `.array(` in a request schema without `.max(`
  *   zod-string    `z.string()` in a request schema without `.max(` or a
  *                 bounded format (uuid, email, date, regex, ...)
  *   zod-number    quantity / amount number in a request schema without an upper bound
@@ -28,8 +34,25 @@ const SEARCH_HELPER = "src/lib/safe-search.ts";
 const IST_HELPER = "src/lib/ist-day.ts";
 const ERROR_HANDLER = "src/app.ts";
 
-const strict =
-  process.argv.includes("--strict") || process.env.STANDARDS_STRICT === "1";
+// Strict switch: `--strict` / STANDARDS_STRICT=1 = every rule blocks;
+// `--strict=rule1,rule2` / STANDARDS_STRICT=rule1,rule2 = only those rules block.
+const strictArg = process.argv.find(
+  (a) => a === "--strict" || a.startsWith("--strict="),
+);
+const strictSpec =
+  strictArg !== undefined
+    ? strictArg === "--strict"
+      ? "1"
+      : strictArg.slice("--strict=".length)
+    : (process.env.STANDARDS_STRICT ?? "");
+const strictAll = strictSpec === "1" || strictSpec === "true";
+const strictRules = new Set(
+  strictAll || strictSpec === ""
+    ? []
+    : strictSpec.split(",").filter((x) => x.length > 0),
+);
+const strict = strictAll || strictRules.size > 0;
+const blocks = (rule: string) => strictAll || strictRules.has(rule);
 const summaryOnly = process.argv.includes("--summary");
 
 type Finding = { file: string; line: number; rule: string; message: string };
@@ -162,6 +185,12 @@ type Column = {
   isFk: boolean;
   selfIndexed: boolean;
   dbName: string;
+  startLine: number;
+  endLine: number;
+  /** text after `// no-index:` (may be ""), null when the column has no exemption comment */
+  noIndex: string | null;
+  exempt: boolean;
+  badExempt: boolean;
 };
 type Table = {
   file: string;
@@ -171,9 +200,57 @@ type Table = {
   leading: Set<string>;
 };
 const tables = new Map<string, Table>();
+const indexNames = new Set<string>();
+const EXEMPT_TAGS = ["audit", "tiny", "low-card", "pk-join"];
+const GROWTH_TABLES = new Set([
+  "inventory_ledger",
+  "purchase_request_items",
+  "purchase_order_items",
+  "grn_items",
+  "subcontracting_order_items",
+  "sco_challan_lines",
+  "subcontracting_grn_items",
+  "approval_requests",
+  "approval_trails",
+]);
+const exemptCounts: Record<string, number> = {
+  audit: 0,
+  covered: 0,
+  tiny: 0,
+  "low-card": 0,
+  "pk-join": 0,
+};
+
+/** `// no-index:` text on the column's own lines, or on a comment-only line just above. */
+function findNoIndex(
+  rawLines: string[],
+  startLine: number,
+  endLine: number,
+): string | null {
+  const re = /\/\/\s*no-index:(.*)$/;
+  for (let l = startLine; l <= endLine; l += 1) {
+    const m = re.exec(rawLines[l - 1] ?? "");
+    if (m) return (m[1] ?? "").trim();
+  }
+  const above = rawLines[startLine - 2] ?? "";
+  if (/^\s*\/\//.test(above)) {
+    const m = re.exec(above);
+    if (m) return (m[1] ?? "").trim();
+  }
+  return null;
+}
 
 function parseSchemas() {
   for (const f of inDir("src/db/schemas/")) {
+    const rawLines = f.raw.split("\n");
+    for (const im of f.code.matchAll(
+      /\b(?:uniqueIndex|index)\(\s*["'`]([^"'`]+)["'`]/g,
+    )) {
+      indexNames.add(im[1] ?? "");
+    }
+    for (const um of f.code.matchAll(/\bunique\(\s*["'`]([^"'`]+)["'`]/g)) {
+      indexNames.add(um[1] ?? "");
+    }
     const re = /export const (\w+)\s*=\s*pgTable\(/g;
     for (let m = re.exec(f.code); m; m = re.exec(f.code)) {
       const open = m.index + m[0].length - 1;
@@ -200,8 +277,22 @@ function parseSchemas() {
         const key = /^\s*(\w+)\s*:/.exec(text);
         if (key) {
           const keyOffset = entryStart + text.indexOf(key[1] ?? "");
+          const colDb =
+            /\(\s*["'`]([^"'`]+)["'`]/.exec(text)?.[1] ?? key[1] ?? "";
+          // Postgres default names: `<table>_<col>_key` (unique), `<table>_pkey` (PK).
+          if (/\.unique\(/.test(text))
+            indexNames.add(`${table.dbName}_${colDb}_key`);
+          if (/\.primaryKey\(/.test(text))
+            indexNames.add(`${table.dbName}_pkey`);
+          const startLine = lineAt(body, keyOffset);
+          const endLine = lineAt(body, end);
           table.columns.set(key[1] ?? "", {
-            line: lineAt(body, keyOffset),
+            line: startLine,
+            startLine,
+            endLine,
+            noIndex: findNoIndex(rawLines, startLine, endLine),
+            exempt: false,
+            badExempt: false,
             isFk: /\.references\(/.test(text),
             selfIndexed: /\.primaryKey\(|\.unique\(/.test(text),
             dbName: /\(\s*["'`]([^"'`]+)["'`]/.exec(text)?.[1] ?? key[1] ?? "",
@@ -250,10 +341,53 @@ function isIndexed(table: Table, col: string): boolean {
   );
 }
 
+function checkExemptions() {
+  for (const table of tables.values()) {
+    const growth = GROWTH_TABLES.has(table.dbName);
+    for (const col of table.columns.values()) {
+      if (col.noIndex === null) continue;
+      const rule = col.isFk ? "idx-fk" : "idx-filter";
+      const where = `${table.dbName}.${col.dbName}`;
+      const bad = (why: string) => {
+        col.badExempt = true;
+        add(table.file, col.line, rule, `${where}: // no-index: ${why}`);
+      };
+      const text = col.noIndex;
+      if (text === "") {
+        bad("has no tag and no reason");
+        continue;
+      }
+      const cov = /^covered:([\w-]+)/.exec(text);
+      const tag = cov
+        ? "covered"
+        : EXEMPT_TAGS.find((t) => new RegExp(`^${t}(?:\\s|$)`).test(text));
+      if (!tag) {
+        bad(
+          `unknown tag "${text.split(/\s/)[0]}" (use audit, tiny, covered:<index>, low-card, pk-join)`,
+        );
+      } else if (cov && !indexNames.has(cov[1] ?? "")) {
+        bad(`covered:${cov[1]} names an index that does not exist`);
+      } else if (
+        growth &&
+        (tag === "tiny" ||
+          tag === "pk-join" ||
+          (tag === "audit" && !col.dbName.endsWith("_by")))
+      ) {
+        bad(`${tag} is refused on growth table ${table.dbName} - add an index`);
+      } else {
+        col.exempt = true;
+        exemptCounts[tag] = (exemptCounts[tag] ?? 0) + 1;
+      }
+    }
+  }
+}
+
 function checkIndexes() {
   parseSchemas();
+  checkExemptions();
   for (const table of tables.values()) {
     for (const [name, col] of table.columns) {
+      if (col.exempt || col.badExempt) continue;
       if (col.isFk && !isIndexed(table, name)) {
         add(
           table.file,
@@ -274,6 +408,7 @@ function checkIndexes() {
       const colName = m[3] ?? "";
       const col = table?.columns.get(colName);
       if (!table || !col || isIndexed(table, colName)) continue;
+      if (col.exempt || col.badExempt) continue;
       const key = `${table.varName}.${colName}`;
       const hit = seen.get(key);
       if (hit) {
@@ -320,6 +455,32 @@ function checkIlike() {
   }
   for (const f of files) {
     if (f.rel === SEARCH_HELPER) continue;
+    for (const m of f.code.matchAll(
+      /\bfunction\s+(escapeLike|likePattern)\b|\bconst\s+(escapeLike|likePattern)\s*=/g,
+    )) {
+      add(
+        f.rel,
+        lineAt(f.code, m.index ?? 0),
+        "raw-ilike",
+        `local ${m[1] ?? m[2]}() copy - use safeSearch() from ${SEARCH_HELPER}`,
+      );
+    }
+    // The word ilike inside a `sql` template (call form is caught below).
+    for (const t of f.code.matchAll(/\bsql\s*`/g)) {
+      const from = (t.index ?? 0) + t[0].length;
+      let to = from;
+      while (to < f.code.length && f.code[to] !== "`") {
+        to += f.code[to] === "\\" ? 2 : 1;
+      }
+      for (const w of f.code.slice(from, to).matchAll(/\bilike\b/gi)) {
+        add(
+          f.rel,
+          lineAt(f.code, from + (w.index ?? 0)),
+          "raw-ilike",
+          `ilike inside a sql template outside ${SEARCH_HELPER} - use safeSearchSql()`,
+        );
+      }
+    }
     const re = /\bilike\(/g;
     for (let m = re.exec(f.code); m; m = re.exec(f.code)) {
       const close = matchClose(f.code, m.index + m[0].length - 1);
@@ -455,6 +616,28 @@ function checkZod() {
   const done = new Set<string>();
   for (const r of ranges) {
     const text = r.file.code.slice(r.start, r.end);
+
+    const arrRe = /(?:\bz\s*\.\s*|\.\s*)array\s*\(/g;
+    for (let m = arrRe.exec(text); m; m = arrRe.exec(text)) {
+      const at = r.start + m.index;
+      const id = `${r.file.rel}:${at}:a`;
+      if (done.has(id)) continue;
+      done.add(id);
+      const open = at + m[0].length - 1;
+      const close = matchClose(r.file.code, open);
+      const chain = chainMethods(r.file.code, close < 0 ? open + 1 : close + 1);
+      if (chain.methods.some((x) => x === "max" || x === "length")) continue;
+      const lineStart = r.file.code.lastIndexOf("\n", at) + 1;
+      const key =
+        /(\w+)\??:\s*[\w.(]*$/.exec(r.file.code.slice(lineStart, at))?.[1] ??
+        r.key;
+      add(
+        r.file.rel,
+        lineAt(r.file.code, at),
+        "zod-array",
+        `${key}: array in a request schema has no .max()`,
+      );
+    }
 
     const strRe = /\bz\s*\.\s*(?:coerce\s*\.\s*)?string\(\)/g;
     for (let m = strRe.exec(text); m; m = strRe.exec(text)) {
@@ -602,12 +785,13 @@ const RULES = [
   "raw-ilike",
   "zod-string",
   "zod-number",
+  "zod-array",
   "db-error-409",
   "ist-date",
 ];
 
 console.log(
-  `backend standards-check (${strict ? "strict" : "report"} mode) - ${findings.length} finding(s)\n`,
+  `backend standards-check (${strictAll ? "strict" : strict ? `strict: ${[...strictRules].join(",")}` : "report"} mode) - ${findings.length} finding(s)\n`,
 );
 if (!summaryOnly) {
   for (const rule of RULES) {
@@ -629,6 +813,14 @@ for (const rule of RULES) {
   );
 }
 console.log(`${"total".padEnd(14)} ${findings.length}`);
+{
+  const total = Object.values(exemptCounts).reduce((a, b) => a + b, 0);
+  console.log(
+    `\nexempt: ${total} (${["audit", "covered", "tiny", "low-card", "pk-join"]
+      .map((t) => `${t} ${exemptCounts[t] ?? 0}`)
+      .join(", ")})`,
+  );
+}
 
 const perFile = new Map<string, number>();
 for (const f of findings) perFile.set(f.file, (perFile.get(f.file) ?? 0) + 1);
@@ -643,7 +835,8 @@ if (notes.length > 0) {
   for (const n of notes) console.log(`- ${n}`);
 }
 
-if (strict && findings.length > 0) {
+const blocking = findings.filter((f) => blocks(f.rule));
+if (strict && blocking.length > 0) {
   console.log("\nstandards-check failed (strict mode).");
   process.exit(1);
 }
