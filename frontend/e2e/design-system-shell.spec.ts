@@ -1,0 +1,296 @@
+/**
+ * docs/specs/design-system/spec.md (v1): BR-DS-06, BR-DS-16, BR-DS-21, BR-DS-22, BR-DS-26.
+ * Runs against the `bun run try` stack (see e2e/README.md). Written by test-writer from the spec only.
+ */
+import { expect, type Page, test } from "@playwright/test";
+
+const EMAIL = process.env.E2E_ADMIN_EMAIL ?? "admin@diecast.local";
+const PASSWORD =
+	process.env.E2E_ADMIN_PASSWORD ?? process.env.SEED_USER_PASSWORD ?? "";
+
+async function login(page: Page) {
+	if (!PASSWORD) {
+		throw new Error(
+			"Set E2E_ADMIN_PASSWORD (or SEED_USER_PASSWORD): the password of the seeded admin",
+		);
+	}
+	await page.goto("/login");
+	await page.getByLabel("Email").fill(EMAIL);
+	await page.getByLabel("Password").fill(PASSWORD);
+	await page.getByRole("button", { name: "Sign in" }).click();
+	await page.waitForURL("**/landing");
+}
+
+async function open(page: Page, path: string) {
+	await page.goto(path);
+	await expect(page.getByRole("heading", { level: 1 })).toBeVisible({
+		timeout: 15_000,
+	});
+}
+
+/** Resolve a CSS colour (token via var()) to the browser's computed rgb string. */
+const resolveColour = (page: Page, value: string) =>
+	page.evaluate((v) => {
+		const probe = document.createElement("div");
+		probe.style.color = v;
+		document.body.appendChild(probe);
+		const c = getComputedStyle(probe).color;
+		probe.remove();
+		return c;
+	}, value);
+
+test.describe("BR-DS-22 one h1 and one breadcrumb trail in the top bar", () => {
+	test.beforeEach(async ({ page }) => {
+		await login(page);
+	});
+
+	test("BR-DS-22 the PO list has one h1 and one Breadcrumb nav inside the top bar", async ({
+		page,
+	}) => {
+		await open(page, "/purchase-orders");
+		await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
+		const trail = page.getByRole("navigation", { name: "Breadcrumb" });
+		await expect(trail).toHaveCount(1);
+		await expect(trail).toContainText("Purchase orders");
+		await expect(trail.locator("[aria-current='page']")).toHaveCount(1);
+	});
+
+	test("BR-DS-22 PO detail shows Purchase / Purchase orders / <PO number>", async ({
+		page,
+	}) => {
+		await open(page, "/purchase-orders");
+		const firstDoc = page.getByRole("link", { name: /^PO-\S+/ }).first();
+		await expect(firstDoc).toBeVisible({ timeout: 15_000 });
+		const docNumber = (await firstDoc.innerText()).trim();
+		await firstDoc.click();
+		await page.waitForURL(/\/purchase-orders\/.+/);
+		await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
+		const trail = page.getByRole("navigation", { name: "Breadcrumb" });
+		await expect(trail).toHaveCount(1);
+		const items = trail.getByRole("listitem");
+		await expect(items).toHaveCount(3);
+		await expect(items.nth(0)).toContainText("Purchase");
+		await expect(items.nth(1)).toContainText("Purchase orders");
+		await expect(items.nth(1).getByRole("link")).toHaveAttribute(
+			"href",
+			"/purchase-orders",
+		);
+		await expect(items.nth(2)).toContainText(docNumber);
+		await expect(items.nth(2).locator("a")).toHaveCount(0);
+		await expect(trail.locator("[aria-current='page']")).toContainText(
+			docNumber,
+		);
+	});
+
+	test("BR-DS-22 the top bar fold button toggles its name", async ({
+		page,
+	}) => {
+		await open(page, "/purchase-orders");
+		await page.evaluate(() =>
+			localStorage.removeItem("diecast.sidebar.folded"),
+		);
+		await page.reload();
+		await page.getByRole("button", { name: "Fold sidebar" }).click();
+		await expect(
+			page.getByRole("button", { name: "Unfold sidebar" }),
+		).toBeVisible();
+	});
+});
+
+test.describe("BR-DS-21 sidebar icons and active item", () => {
+	test.beforeEach(async ({ page }) => {
+		await login(page);
+	});
+
+	test("BR-DS-21 every sidebar link has an icon", async ({ page }) => {
+		await open(page, "/purchase-orders");
+		const links = page.getByRole("complementary").getByRole("link");
+		const n = await links.count();
+		expect(n).toBeGreaterThan(0);
+		for (let i = 0; i < n; i++) {
+			await expect(links.nth(i).locator("svg").first()).toBeVisible();
+		}
+	});
+
+	test("BR-DS-21 on /purchase-orders only Purchase orders is current, tinted and bold", async ({
+		page,
+	}) => {
+		await open(page, "/purchase-orders");
+		const side = page.getByRole("complementary");
+		const current = side.locator("a[aria-current='page']");
+		await expect(current).toHaveCount(1);
+		await expect(current).toContainText("Purchase orders");
+		const style = await current.evaluate((el) => {
+			const cs = getComputedStyle(el);
+			return { weight: Number(cs.fontWeight), bg: cs.backgroundColor };
+		});
+		expect(style.weight).toBeGreaterThanOrEqual(600);
+		const tint = await resolveColour(page, "var(--sidebar-accent)");
+		expect(style.bg).toBe(tint);
+		// A non-active item is not tinted.
+		const other = side
+			.getByRole("link")
+			.filter({ hasNotText: "Purchase orders" })
+			.first();
+		const otherBg = await other.evaluate(
+			(el) => getComputedStyle(el).backgroundColor,
+		);
+		expect(otherBg).not.toBe(tint);
+	});
+
+	test("BR-DS-21 the active item has a 3 px --sidebar-primary bar", async ({
+		page,
+	}) => {
+		await open(page, "/purchase-orders");
+		const current = page
+			.getByRole("complementary")
+			.locator("a[aria-current='page']");
+		const bar = await resolveColour(page, "var(--sidebar-primary)");
+		const found = await current.evaluate((el, expected) => {
+			const probes = [el, ...Array.from(el.querySelectorAll("*"))];
+			const view = (n: Element, pseudo?: string) => getComputedStyle(n, pseudo);
+			for (const n of probes) {
+				for (const pseudo of [undefined, "::before", "::after"]) {
+					const cs = view(n, pseudo);
+					if (
+						cs.borderLeftColor === expected &&
+						Number.parseFloat(cs.borderLeftWidth) === 3
+					)
+						return true;
+					if (
+						cs.backgroundColor === expected &&
+						Number.parseFloat(cs.width) === 3
+					)
+						return true;
+				}
+			}
+			return false;
+		}, bar);
+		expect(found).toBe(true);
+	});
+});
+
+test.describe("BR-DS-16 table density", () => {
+	test.beforeEach(async ({ page }) => {
+		await login(page);
+	});
+
+	const rowHeight = async (page: Page) => {
+		const row = page.locator("tbody tr").first();
+		await expect(row).toBeVisible({ timeout: 15_000 });
+		return (await row.boundingBox())?.height ?? 0;
+	};
+
+	test("BR-DS-16 default is comfortable: <html data-density> and 36 px rows", async ({
+		page,
+	}) => {
+		await open(page, "/purchase-orders");
+		await page.evaluate(() => localStorage.removeItem("diecast.density"));
+		await page.reload();
+		await expect(page.locator("html")).toHaveAttribute(
+			"data-density",
+			"comfortable",
+		);
+		expect(Math.round(await rowHeight(page))).toBe(36);
+	});
+
+	test("BR-DS-16 a Compact choice from the user menu survives reload and shows 30 px rows", async ({
+		page,
+	}) => {
+		await open(page, "/purchase-orders");
+		await page.evaluate(() => localStorage.removeItem("diecast.density"));
+		await page.reload();
+		await page.locator("header").getByRole("button").last().click();
+		await page.getByText("Compact", { exact: true }).click();
+		await expect(page.locator("html")).toHaveAttribute(
+			"data-density",
+			"compact",
+		);
+		await page.reload();
+		await expect(page.locator("html")).toHaveAttribute(
+			"data-density",
+			"compact",
+		);
+		expect(Math.round(await rowHeight(page))).toBe(30);
+	});
+
+	test("BR-DS-16 the saved Compact choice applies to the GRN list too", async ({
+		page,
+	}) => {
+		await open(page, "/purchase-orders");
+		await page.evaluate(() =>
+			localStorage.setItem("diecast.density", "compact"),
+		);
+		await page.goto("/grn");
+		await expect(page.locator("html")).toHaveAttribute(
+			"data-density",
+			"compact",
+		);
+		expect(Math.round(await rowHeight(page))).toBe(30);
+	});
+});
+
+test.describe("BR-DS-06 and BR-DS-26 colour carries weight only where allowed", () => {
+	test.beforeEach(async ({ page }) => {
+		await login(page);
+	});
+
+	test("BR-DS-06 at most one solid --primary button in the PO list page header", async ({
+		page,
+	}) => {
+		await open(page, "/purchase-orders");
+		const primary = await resolveColour(page, "var(--primary)");
+		const count = await page.evaluate((expected) => {
+			const header = document.querySelector("h1")?.closest("header, div");
+			const root = header?.parentElement ?? document.body;
+			return Array.from(root.querySelectorAll("button, a")).filter(
+				(el) => getComputedStyle(el).backgroundColor === expected,
+			).length;
+		}, primary);
+		expect(count).toBeLessThanOrEqual(1);
+	});
+
+	test("BR-DS-06 the sidebar active item is the only --primary-family fill on a nav link", async ({
+		page,
+	}) => {
+		await open(page, "/purchase-orders");
+		const primary = await resolveColour(page, "var(--primary)");
+		const filled = await page
+			.getByRole("complementary")
+			.getByRole("link")
+			.evaluateAll(
+				(els, expected) =>
+					els.filter((e) => getComputedStyle(e).backgroundColor === expected)
+						.length,
+				primary,
+			);
+		expect(filled).toBe(0);
+	});
+
+	test("BR-DS-26 no gradient anywhere on the PO list (skeleton sweep excepted)", async ({
+		page,
+	}) => {
+		await open(page, "/purchase-orders");
+		await page.waitForLoadState("networkidle");
+		const offenders = await page.evaluate(() =>
+			Array.from(document.querySelectorAll("*"))
+				.filter((el) => /gradient/.test(getComputedStyle(el).backgroundImage))
+				.filter(
+					(el) => !el.closest("[class*='skeleton'], [data-slot='skeleton']"),
+				)
+				.map((el) => el.tagName.toLowerCase()),
+		);
+		expect(offenders).toEqual([]);
+	});
+
+	test("BR-DS-26 the page background is --background, not a colour", async ({
+		page,
+	}) => {
+		await open(page, "/purchase-orders");
+		const bg = await resolveColour(page, "var(--background)");
+		const actual = await page.evaluate(
+			() => getComputedStyle(document.body).backgroundColor,
+		);
+		expect(actual).toBe(bg);
+	});
+});
