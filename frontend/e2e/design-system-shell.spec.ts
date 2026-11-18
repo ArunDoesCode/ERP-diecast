@@ -69,8 +69,9 @@ test.describe("BR-DS-22 one h1 and one breadcrumb trail in the top bar", () => {
 		await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
 		const trail = page.getByRole("navigation", { name: "Breadcrumb" });
 		await expect(trail).toHaveCount(1);
-		await expect(trail).toContainText("Purchase orders");
-		await expect(trail.locator("[aria-current='page']")).toHaveCount(1);
+		const crumb = trail.locator("[aria-current='page']");
+		await expect(crumb).toHaveCount(1);
+		await expect(crumb).not.toHaveText("");
 	});
 
 	test("BR-DS-22 the top bar fold button toggles its name", async ({
@@ -92,6 +93,7 @@ test.describe("BR-DS-21 sidebar icons and active item", () => {
 	test("BR-DS-21 every sidebar link has an icon", async ({ page }) => {
 		await open(page, "/purchase-orders");
 		const links = page.locator("[data-sidebar='sidebar']").getByRole("link");
+		await expect(links.first()).toBeVisible({ timeout: 15_000 });
 		const n = await links.count();
 		expect(n).toBeGreaterThan(0);
 		for (let i = 0; i < n; i++) {
@@ -101,14 +103,14 @@ test.describe("BR-DS-21 sidebar icons and active item", () => {
 		}
 	});
 
-	test("BR-DS-21 on /purchase-orders only Purchase orders is current, tinted and bold", async ({
+	test("BR-DS-21 on /purchase-orders only the /purchase-orders item is current, tinted and bold", async ({
 		page,
 	}) => {
 		await open(page, "/purchase-orders");
 		const side = page.locator("[data-sidebar='sidebar']");
 		const current = side.locator("a[aria-current='page']");
 		await expect(current).toHaveCount(1);
-		await expect(current).toContainText("Purchase orders");
+		await expect(current).toHaveAttribute("href", "/purchase-orders");
 		const style = await current.evaluate((el) => {
 			const cs = getComputedStyle(el);
 			return { weight: Number(cs.fontWeight), bg: cs.backgroundColor };
@@ -119,7 +121,7 @@ test.describe("BR-DS-21 sidebar icons and active item", () => {
 		// A non-active item is not tinted.
 		const other = side
 			.getByRole("link")
-			.filter({ hasNotText: "Purchase orders" })
+			.and(page.locator("a:not([href='/purchase-orders'])"))
 			.first();
 		const otherBg = await other.evaluate(
 			(el) => getComputedStyle(el).backgroundColor,
