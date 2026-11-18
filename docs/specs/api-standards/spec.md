@@ -1,7 +1,7 @@
 ---
 module: api-standards
 status: frozen           # draft | frozen (set only by /freeze)
-version: 1
+version: 2
 frozen_on: 2026-11-18
 owner: Arun
 depends_on: [auth-setup, suppliers, inventory, purchase-requisition, purchase-order, grn, grn-stock, subcontracting, approval, approval-policies, db-migrations, known-defects, design-system]
@@ -201,3 +201,4 @@ Full list: `design/edge-cases.md`. Every row names a rule in this file.
 - 2026-11-18 v0 — pre-freeze review round 1: SEC-1..9, PERF-1..4, SPEC-1..5 folded in (rules BR-STD-33..42 added)
 - 2026-11-18 v0 — pre-freeze review round 2: F1..F14 folded in (BR-STD-43 added; indexes #11, #12 reshaped; frontend money cap; 43 rules)
 - 2026-11-18 v1 — frozen. Two review rounds passed their blockers; Card 1 answered (64-bit money); the 9 confirm lines go to the hand-over
+- 2026-11-18 v2 — wording only, no rule change: text matches the code (`--strict=rule1,rule2`, `safeSearchMin` / `usableTerm`, `isPublicPath()`, second `AMOUNT_TOO_LARGE` text for stock value); status stays frozen

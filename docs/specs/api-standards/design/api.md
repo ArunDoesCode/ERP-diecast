@@ -31,7 +31,8 @@ Body shape is the project's own (`src/app.ts` `onError`, manifest `errorEnvelope
 - Tests spy on `console.warn` and `console.error` and assert: the call count, the six fields, and that no call
   argument (as JSON) holds the duplicate value or the text `Key (`.
 - Public routes (BR-STD-36, mechanism): the list `PUBLIC_PATHS` (the four paths of BR-STD-42) lives in
-  `src/lib/public-routes.ts` (new). `handleAppError` compares `c.req.path` with it; on a public path the
+  `src/lib/public-routes.ts` (new), with a helper `isPublicPath(path)` that `handleAppError` and the auth
+  middleware in `app.ts` both call. `handleAppError` checks `c.req.path` with it; on a public path the
   23505 / 23503 branch is skipped and the answer is `{ success: false, message: "Internal server error" }`, 500,
   in every `NODE_ENV` (the log call above still runs). Today such an error on login already ends in the generic
   500 branch (the two 401 branches at `app.ts:69–75` match only the texts "Invalid credentials" / "Login failed").
@@ -52,8 +53,13 @@ Body shape is the project's own (`src/app.ts` `onError`, manifest `errorEnvelope
 
 ## Search (BR-STD-07..12, 37, 38)
 `src/lib/safe-search.ts` exports:
-- `searchTermSchema` — `z.string().trim().max(100).optional()`; a term shorter than 2 characters after the trim
-  (empty included) becomes `undefined` = no filter. The one shared schema for every `q` field below.
+- `searchTermSchema` — `z.string().trim().max(100).optional()`: trim and max only, so the manifest type stays a
+  plain optional string. The one shared schema for every `q` field below.
+- The "shorter than 2 characters after the trim (empty included) = no filter" rule is applied in the helpers, not in
+  the schema: one private `usableTerm(term, minLength)` decides, and `safeSearch` / `safeSearchSql` pass
+  `MIN_SEARCH_LENGTH` (2).
+- `safeSearchMin(minLength, term, ...columns)` — same as `safeSearch` with the minimum chosen by the caller;
+  `safeSearch` calls it with 2. The employee picker uses `safeSearchMin(1, …)` (BR-STD-38).
 - `safeSearch(term, ...columns)` — returns `undefined` for no term, else `or(ilike(col, pattern), …)` with
   pattern `%<term>%` where `\`, `%`, `_` are escaped with `\` (Postgres default escape).
 - `safeSearchSql(term, sqlExpression)` for the three `sql` template sites (enum cast to text): same escape.
@@ -203,6 +209,7 @@ The limits live in one place (`src/lib/money.ts`, new) with `assertMoneyInRange(
 | Columns | 23 → `bigint`, `mode: "number"` (`design/data.md`) |
 | Request fields | `.max(MAX_MONEY_PAISE)` |
 | 400 message | Amount is above the largest value allowed (₹10,000 crore). |
+| 400 message, stock value (BR-STD-43) | Stock value is above the largest value allowed. (the second `AMOUNT_TOO_LARGE` text, used by `assertStockValueInRange` / `postStock`) |
 
 Request amount fields: `unitPricePaise` (po:103 / 115 / 126), `billedAmountPaise` (po:286), `serviceUnitPricePaise`
 (sco:59), `dailyRatePaise` (setup:39 / 59), plus the three fields bounded at 2,147,483,647 today, which move to
@@ -262,8 +269,10 @@ Why: quantity (up to 1,000,000,000) × cost (up to `MAX_MONEY_PAISE`) can reach 
 
 ## Blocking (BR-STD-29..32)
 - Backend `ci.yml`: the standards step becomes `bun run standards:check:strict`, no `continue-on-error`.
-- Frontend: new option `--strict-rules=mutation-invalidate,motion` (exit 1 only for those rules; all rules still
-  printed) behind a script `standards:check:blocking`; CI runs it without `continue-on-error`.
+- Frontend: option `--strict=mutation-invalidate,motion` (the same `--strict=rule1,rule2` form the backend script
+  has; exit 1 only for those rules; all rules still printed). CI runs
+  `bun run standards:check -- --strict=mutation-invalidate,motion` without `continue-on-error`; there is no
+  separate `standards:check:blocking` script.
 - Hooks (`.claude/hooks/spec-gate.sh`, `test-ownership.sh`): default of `SPEC_GATE_MODE` and
   `TEST_OWNERSHIP_MODE` becomes `deny`. Both resolve the target with `realpath` (for a new file: `realpath` of
   the nearest existing parent + the rest) before the path match, so a symlink cannot hide a path. In deny mode a
