@@ -18,10 +18,10 @@ const HERE = fileURLToPath(new URL(".", import.meta.url));
 const html = (doc: StatusDoc, status: string | null, className?: string) =>
 	renderToStaticMarkup(createElement(StatusBadge, { doc, status, className }));
 
-/** The Tabler icon class name (e.g. icon-tabler-clock) for a given icon component. */
+/** The Tabler icon class name (e.g. tabler-icon-clock) for a given icon component. */
 const iconClass = (Icon: typeof IconClock): string => {
 	const m = renderToStaticMarkup(createElement(Icon)).match(
-		/icon-tabler-[a-z0-9-]+/,
+		/tabler-icon-[a-z0-9-]+/,
 	);
 	if (!m) throw new Error("tabler icon class not found");
 	return m[0];
