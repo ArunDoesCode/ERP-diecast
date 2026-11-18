@@ -27,7 +27,8 @@ In your report, add a **Map updates** section (new routes, views, components, qu
 - In the report, add a **Screens touched** list: page URL, which role can reach it, and the buttons/fields
   added or changed. Do **not** write the manual test checklist — test-writer writes it from the spec so the
   user tests what the spec requires, not what you built.
-- Never create or edit test files (`*.test.ts`, `frontend/e2e/**`). If a test looks wrong, return BLOCKED
+- Never create or edit test files (`*.test.ts`, `frontend/e2e/**` — folder is created in the design phase,
+  plan P3; it does not exist yet). If a test looks wrong, return BLOCKED
   quoting the spec rule that contradicts it.
 
 Return the protocol block.

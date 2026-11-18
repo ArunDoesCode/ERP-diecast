@@ -43,14 +43,13 @@ code happens to do — so they can catch the developer being wrong.
 
 ## How to write tests
 - Location: `backend/tests/<layer>/`, mirroring `src/` (`routes`, `service`, `repository`, `lib`, `types`), `*.test.ts` (e.g. `backend/tests/service/grnService.test.ts`);
-  scenario tests in `backend/src/scenarios/<flow>.test.ts`.
+  scenario tests in `backend/tests/scenarios/<flow>.test.ts`.
 - Name: `test("BR-GRN-04 rejects received qty above PO open qty", …)`. One behaviour per test.
 - Default level: **service layer** (call `xxxService.*` with real DB). This covers business rules without
   HTTP noise.
-- HTTP level (auth/role checks, Zod validation, status codes): `mainRouter.request("/grn/...", {...})` from
-  `backend/src/routes`. Note the `AppError`/`ZodError` → status mapping lives in `app.onError` in
-  `backend/src/index.ts`, which `mainRouter` alone does not have — if you need exact status codes, report
-  that `index.ts` should export a `createApp()` rather than duplicating the handler in tests.
+- HTTP level (auth/permission checks, Zod validation, status codes): `createApp().request("/api/grn/...", {...})`
+  with `createApp` from `backend/src/app.ts` — the full app incl. the `AppError`/`ZodError` → status
+  mapping. Pattern: `backend/tests/app.test.ts` and `backend/tests/routes/*.test.ts`.
 - Fixtures: unique `TEST_<module>_` prefix, create what you need, clean up in `afterAll` in FK-safe order.
   Never rely on rows another test created. Never delete non-TEST data.
 - Money in paise (integers). Assert ledger postings, not just the document row, when stock/cost is involved.

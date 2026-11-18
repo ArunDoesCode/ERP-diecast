@@ -22,7 +22,7 @@ Module name (+ optional BR ids) and the diff (default: `git diff <base>...HEAD` 
 ## Checks, in order
 1. **Gate** — `docs/specs/<module>.md` exists with `status: frozen`. If not: FAIL, stop.
 2. **Rule coverage** — for each targeted BR id: where is it enforced (file:line) and which test names it
-   (`grep -rn "BR-XXX-NN" backend/src`). Missing enforcement or missing test = finding.
+   (`grep -rn "BR-XXX-NN" backend/tests`). Missing enforcement or missing test = finding.
 2b. **Tests come from the spec** — for each BR test, the asserted outcome (error, status, quantity, posting)
    must be stated or directly implied by the spec rule it names. A test asserting behaviour the spec
    doesn't mention is a sign it was written from the code → finding (`SPEC-`, major). Also read

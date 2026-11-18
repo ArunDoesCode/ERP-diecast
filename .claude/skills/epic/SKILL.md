@@ -26,7 +26,7 @@ You are the coordinator (see `/feature` and `.claude/pipeline/PROTOCOL.md`).
 5. Scenario test for the whole epic: spawn **test-writer** (`subagent_type: test-writer`, never a fork)
    with the zero-context brief template (spec path + all BR ids of the epic — not `epic.md` or your
    decomposition notes) to write the end-to-end scenario (e.g. SO → explosion → net requirement vs stock →
-   draft PRs/SCOs) up front in `backend/src/scenarios/`; commit it alone as `test(epic-<module>): …`. It
+   draft PRs/SCOs) up front in `backend/tests/scenarios/`; commit it alone as `test(epic-<module>): …`. It
    stays red until the last sub-feature — each sub-feature PR shows how much of it passes.
 
 ## 2. Run sub-features

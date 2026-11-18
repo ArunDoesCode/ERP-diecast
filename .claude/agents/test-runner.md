@@ -22,7 +22,7 @@ Read `.claude/pipeline/PROTOCOL.md` and your brief. You run commands and report;
 6. `cd frontend && bun run lint`
 7. `cd frontend && bun run build` (only if the brief says so; needs `NEXT_PUBLIC_API_URL`)
 8. **Test integrity** (PROTOCOL.md → Test independence). For each commit in `git log --format='%h %s' <base>..HEAD`:
-   - files = `git show --name-only --format= <sha>`; test files = `*.test.ts`, `backend/src/scenarios/**`,
+   - files = `git show --name-only --format= <sha>`; test files = `*.test.ts`, `backend/tests/**`,
      `frontend/e2e/**`.
    - A commit whose subject starts with `test(` must touch **only** test files.
    - A commit whose subject starts with `feat(` or `fix(` must touch **no** test files.

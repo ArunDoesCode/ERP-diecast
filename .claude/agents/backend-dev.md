@@ -31,7 +31,7 @@ you hit that the next developer should know (these go into the map's gotchas, no
   `requireAnyPermission`, key added to `src/lib/permissions.ts` first — no role-name checks); transactions for
   multi-table writes.
 - Make the test-writer's BR tests pass. **You never create, edit, delete, rename, skip (`.skip`/`.todo`)
-  or move a test file** (`*.test.ts`, `backend/src/scenarios/**`, `frontend/e2e/**`) — not even "just a
+  or move a test file** (`*.test.ts`, `backend/tests/**`, `frontend/e2e/**`) — not even "just a
   fixture" or an import path. Tests are written by a separate agent so they stay independent of your code.
   If you believe a test is wrong, return BLOCKED quoting the spec rule (BR id + text) that contradicts it.
   "My implementation does X" is not a reason; the coordinator decides against the spec, not your code.

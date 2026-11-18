@@ -89,7 +89,7 @@ Ids are `<agent-prefix>-<n>`: `CR-` code review, `SEC-` security, `PERF-` perfor
 ## Ownership (avoid edit collisions when agents run in parallel)
 - backend-dev: `backend/**` **except test files** (never, under any brief)
 - frontend-dev: `frontend/**` **except test files** (never, under any brief)
-- test-writer: **only** test files — `**/*.test.ts`, `backend/src/scenarios/**`, `frontend/e2e/**` — and the
+- test-writer: **only** test files — `**/*.test.ts`, `backend/tests/**`, `frontend/e2e/**` (created in the design phase) — and the
   manual UI test checklist. Never production code.
 
 ## Test independence (who writes tests vs code)
