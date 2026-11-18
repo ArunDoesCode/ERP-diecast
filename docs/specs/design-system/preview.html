@@ -1,0 +1,735 @@
+<!doctype html>
+<html lang="en" data-pal="A" data-theme="light" data-density="comfortable" data-side="soft" data-rm="off">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DiecastOS design proposal (draft)</title>
+<style>
+/* ---------- Proposed tokens. --nh = neutral hue: A 250 (steel), B 65 (warm). ---------- */
+:root{
+  --nh:250; --sc:0.03;
+  --radius:0.625rem;
+  --motion-fast:120ms; --motion-base:180ms; --motion-slow:260ms; --motion-emphasis:600ms;
+  --ease-out:cubic-bezier(0.2,0,0,1);
+  --font-sans:"Manrope",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --font-mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+[data-pal="B"]{--nh:65; --sc:0.018}
+
+:root{
+  --background:oklch(0.982 0.005 var(--nh));
+  --foreground:oklch(0.21 0.018 var(--nh));
+  --card:oklch(1 0 0);
+  --card-foreground:oklch(0.21 0.018 var(--nh));
+  --popover:oklch(1 0 0);
+  --popover-foreground:oklch(0.21 0.018 var(--nh));
+  --primary:oklch(0.508 0.118 165.612);
+  --primary-foreground:oklch(0.979 0.021 166.113);
+  --secondary:oklch(0.955 0.008 var(--nh));
+  --secondary-foreground:oklch(0.25 0.018 var(--nh));
+  --muted:oklch(0.962 0.006 var(--nh));
+  --muted-foreground:oklch(0.49 0.02 var(--nh));
+  --accent:oklch(0.95 0.01 var(--nh));
+  --accent-foreground:oklch(0.25 0.018 var(--nh));
+  --border:oklch(0.91 0.008 var(--nh));
+  --input:oklch(0.87 0.01 var(--nh));
+  --ring:oklch(0.62 0.1 165);
+
+  --success:oklch(0.5 0.125 150);
+  --success-foreground:oklch(0.985 0.02 150);
+  --success-subtle:oklch(0.95 0.04 152);
+  --warning:oklch(0.5 0.11 70);
+  --warning-foreground:oklch(0.99 0.02 85);
+  --warning-subtle:oklch(0.955 0.05 88);
+  --info:oklch(0.5 0.11 228);
+  --info-foreground:oklch(0.985 0.015 228);
+  --info-subtle:oklch(0.95 0.03 228);
+  --neutral:oklch(0.45 0.02 var(--nh));
+  --neutral-foreground:oklch(0.985 0.003 var(--nh));
+  --neutral-subtle:oklch(0.94 0.008 var(--nh));
+  --destructive:oklch(0.53 0.2 27);
+  --destructive-foreground:oklch(0.985 0.01 27);
+  --destructive-subtle:oklch(0.955 0.025 25);
+  --brand-accent:oklch(0.47 0.085 262);
+  --brand-accent-foreground:oklch(0.98 0.01 262);
+  --brand-accent-subtle:oklch(0.948 0.025 262);
+
+  --chart-1:oklch(0.58 0.13 165);
+  --chart-2:oklch(0.55 0.12 252);
+  --chart-3:oklch(0.64 0.14 70);
+  --chart-4:oklch(0.55 0.13 305);
+  --chart-5:oklch(0.6 0.15 20);
+
+  --sidebar:oklch(0.962 0.01 var(--nh));
+  --sidebar-foreground:oklch(0.3 0.02 var(--nh));
+  --sidebar-muted:oklch(0.49 0.02 var(--nh));
+  --sidebar-primary:oklch(0.508 0.118 165.612);
+  --sidebar-primary-foreground:oklch(0.979 0.021 166.113);
+  --sidebar-accent:oklch(0.925 0.045 165);
+  --sidebar-accent-foreground:oklch(0.36 0.09 166);
+  --sidebar-border:oklch(0.9 0.01 var(--nh));
+  --shadow:0 1px 2px oklch(0.2 0.02 var(--nh) / 6%),0 8px 24px oklch(0.2 0.02 var(--nh) / 10%);
+}
+[data-pal="B"]{
+  --brand-accent:oklch(0.5 0.115 45);
+  --brand-accent-foreground:oklch(0.985 0.012 60);
+  --brand-accent-subtle:oklch(0.955 0.028 55);
+  --chart-2:oklch(0.56 0.12 45);
+  --chart-3:oklch(0.55 0.12 252);
+  --chart-5:oklch(0.58 0.15 350);
+}
+[data-side="strong"]{
+  --sidebar:oklch(0.255 var(--sc) var(--nh));
+  --sidebar-foreground:oklch(0.9 0.012 var(--nh));
+  --sidebar-muted:oklch(0.72 0.015 var(--nh));
+  --sidebar-accent:oklch(0.37 0.065 165);
+  --sidebar-accent-foreground:oklch(0.94 0.07 165);
+  --sidebar-border:oklch(1 0 0 / 8%);
+}
+[data-theme="dark"]{
+  --background:oklch(0.17 0.012 var(--nh));
+  --foreground:oklch(0.95 0.006 var(--nh));
+  --card:oklch(0.215 0.014 var(--nh));
+  --card-foreground:oklch(0.95 0.006 var(--nh));
+  --popover:oklch(0.24 0.015 var(--nh));
+  --popover-foreground:oklch(0.95 0.006 var(--nh));
+  --primary:oklch(0.432 0.095 166.913);
+  --primary-foreground:oklch(0.979 0.021 166.113);
+  --secondary:oklch(0.27 0.014 var(--nh));
+  --secondary-foreground:oklch(0.95 0.006 var(--nh));
+  --muted:oklch(0.26 0.014 var(--nh));
+  --muted-foreground:oklch(0.72 0.015 var(--nh));
+  --accent:oklch(0.28 0.016 var(--nh));
+  --accent-foreground:oklch(0.95 0.006 var(--nh));
+  --border:oklch(1 0 0 / 10%);
+  --input:oklch(1 0 0 / 16%);
+  --ring:oklch(0.6 0.1 165);
+
+  --success:oklch(0.8 0.14 152);
+  --success-foreground:oklch(0.2 0.05 152);
+  --success-subtle:oklch(0.29 0.055 152);
+  --warning:oklch(0.83 0.13 82);
+  --warning-foreground:oklch(0.22 0.05 80);
+  --warning-subtle:oklch(0.31 0.055 75);
+  --info:oklch(0.79 0.1 228);
+  --info-foreground:oklch(0.2 0.04 232);
+  --info-subtle:oklch(0.29 0.05 232);
+  --neutral:oklch(0.78 0.012 var(--nh));
+  --neutral-foreground:oklch(0.2 0.01 var(--nh));
+  --neutral-subtle:oklch(0.29 0.012 var(--nh));
+  --destructive:oklch(0.76 0.14 22);
+  --destructive-foreground:oklch(0.2 0.05 25);
+  --destructive-subtle:oklch(0.29 0.06 22);
+  --brand-accent:oklch(0.78 0.085 262);
+  --brand-accent-foreground:oklch(0.2 0.03 262);
+  --brand-accent-subtle:oklch(0.3 0.045 262);
+
+  --chart-1:oklch(0.72 0.14 165);
+  --chart-2:oklch(0.7 0.12 252);
+  --chart-3:oklch(0.78 0.13 78);
+  --chart-4:oklch(0.7 0.13 305);
+  --chart-5:oklch(0.72 0.14 20);
+
+  --sidebar:oklch(0.2 0.014 var(--nh));
+  --sidebar-foreground:oklch(0.9 0.008 var(--nh));
+  --sidebar-muted:oklch(0.7 0.015 var(--nh));
+  --sidebar-primary:oklch(0.696 0.17 162.48);
+  --sidebar-primary-foreground:oklch(0.262 0.051 172.552);
+  --sidebar-accent:oklch(0.3 0.05 165);
+  --sidebar-accent-foreground:oklch(0.86 0.11 165);
+  --sidebar-border:oklch(1 0 0 / 10%);
+  --shadow:0 1px 2px oklch(0 0 0 / 30%),0 10px 28px oklch(0 0 0 / 40%);
+}
+[data-theme="dark"][data-pal="B"]{
+  --brand-accent:oklch(0.78 0.1 55);
+  --brand-accent-foreground:oklch(0.21 0.04 50);
+  --brand-accent-subtle:oklch(0.3 0.045 50);
+  --chart-2:oklch(0.72 0.12 50);
+  --chart-3:oklch(0.7 0.12 252);
+  --chart-5:oklch(0.72 0.13 350);
+}
+[data-theme="dark"][data-side="strong"]{
+  --sidebar:oklch(0.125 0.012 var(--nh));
+  --sidebar-accent:oklch(0.27 0.05 165);
+}
+@media (prefers-reduced-motion: reduce){
+  :root{--motion-fast:0ms;--motion-base:0ms;--motion-slow:0ms;--motion-emphasis:0ms}
+}
+[data-rm="on"]{--motion-fast:0ms;--motion-base:0ms;--motion-slow:0ms;--motion-emphasis:0ms}
+[data-density="compact"]{--row-h:30px;--table-fs:12px}
+[data-density="comfortable"]{--row-h:36px;--table-fs:13px}
+
+/* ---------- Page ---------- */
+*{box-sizing:border-box}
+html{font-family:var(--font-sans);font-size:14px;-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--background);color:var(--foreground);line-height:1.5}
+button{font:inherit;color:inherit}
+h1,h2,h3,p{margin:0}
+.num{font-variant-numeric:tabular-nums}
+.mono{font-family:var(--font-mono);font-size:0.92em;letter-spacing:-0.01em}
+.muted{color:var(--muted-foreground)}
+:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+
+.bar{position:sticky;top:0;z-index:20;background:var(--card);border-bottom:1px solid var(--border);
+  display:flex;flex-wrap:wrap;gap:10px 20px;align-items:center;padding:10px 24px}
+.bar h1{font-size:15px;font-weight:700;margin-right:auto}
+.bar h1 span{font-weight:500;color:var(--muted-foreground)}
+.ctl{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted-foreground)}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:8px;padding:2px;background:var(--muted)}
+.seg button{border:0;background:transparent;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600;
+  color:var(--muted-foreground);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--card);color:var(--foreground);box-shadow:0 1px 2px oklch(0 0 0 / 12%)}
+main{max-width:1280px;margin:0 auto;padding:8px 24px 80px}
+section{padding-top:36px}
+section>h2{font-size:20px;line-height:28px;font-weight:700;letter-spacing:-0.01em}
+section>.lead{color:var(--muted-foreground);max-width:72ch;margin:4px 0 16px}
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media (max-width:900px){.g2,.g3,.g4{grid-template-columns:1fr}.app{grid-template-columns:1fr!important}.side{display:none!important}}
+.card{background:var(--card);color:var(--card-foreground);border:1px solid var(--border);border-radius:var(--radius)}
+.pad{padding:16px}
+.cap{font-size:12px;font-weight:600;color:var(--muted-foreground);margin-bottom:10px}
+
+/* ---------- Icons ---------- */
+.i{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+
+/* ---------- Buttons ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:28px;padding:0 10px;border-radius:8px;
+  border:1px solid transparent;font-size:12px;font-weight:600;white-space:nowrap;cursor:pointer;
+  transition:background-color var(--motion-fast) var(--ease-out),transform var(--motion-fast) var(--ease-out)}
+.btn:active{transform:translateY(1px)}
+.btn .i{width:14px;height:14px}
+.btn-primary{background:var(--primary);color:var(--primary-foreground)}
+.btn-primary:hover{background:color-mix(in oklch,var(--primary),var(--foreground) 12%)}
+.btn-outline{border-color:var(--input);background:var(--card);color:var(--foreground)}
+.btn-outline:hover{background:var(--accent)}
+.btn-ghost{background:transparent;color:var(--foreground)}
+.btn-ghost:hover{background:var(--accent)}
+.btn-danger{background:var(--destructive);color:var(--destructive-foreground)}
+.btn-icon{width:28px;padding:0}
+
+/* ---------- Status badge ---------- */
+.badge{display:inline-flex;align-items:center;gap:6px;height:20px;padding:0 8px 0 7px;border-radius:999px;
+  font-size:11px;font-weight:600;white-space:nowrap;border:1px solid transparent;
+  background:var(--t-subtle);color:var(--t)}
+.badge::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.badge.terminal{background:transparent;border-color:var(--input);color:var(--muted-foreground)}
+.badge.terminal::before{background:transparent;box-shadow:inset 0 0 0 1.5px currentColor}
+.t-success{--t:var(--success);--t-subtle:var(--success-subtle)}
+.t-warning{--t:var(--warning);--t-subtle:var(--warning-subtle)}
+.t-info{--t:var(--info);--t-subtle:var(--info-subtle)}
+.t-neutral{--t:var(--neutral);--t-subtle:var(--neutral-subtle)}
+.t-danger{--t:var(--destructive);--t-subtle:var(--destructive-subtle)}
+.t-accent{--t:var(--brand-accent);--t-subtle:var(--brand-accent-subtle)}
+
+/* ---------- Today vs proposed ---------- */
+.today{
+  --background:oklch(1 0 0);--foreground:oklch(0.147 0.004 49.3);--card:oklch(1 0 0);--card-foreground:oklch(0.147 0.004 49.3);
+  --muted:oklch(0.96 0.002 17.2);--muted-foreground:oklch(0.547 0.021 43.1);--border:oklch(0.922 0.005 34.3);
+  --accent:oklch(0.96 0.002 17.2);--sidebar:oklch(0.986 0.002 67.8);--sidebar-foreground:oklch(0.147 0.004 49.3);
+  --sidebar-accent:oklch(0.96 0.002 17.2);--sidebar-accent-foreground:oklch(0.214 0.009 43.1);--sidebar-border:oklch(0.922 0.005 34.3);
+  --sidebar-muted:oklch(0.547 0.021 43.1);
+}
+[data-theme="dark"] .today{
+  --background:oklch(0.147 0.004 49.3);--foreground:oklch(0.986 0.002 67.8);--card:oklch(0.214 0.009 43.1);--card-foreground:oklch(0.986 0.002 67.8);
+  --muted:oklch(0.268 0.011 36.5);--muted-foreground:oklch(0.714 0.014 41.2);--border:oklch(1 0 0 / 10%);
+  --accent:oklch(0.268 0.011 36.5);--sidebar:oklch(0.214 0.009 43.1);--sidebar-foreground:oklch(0.986 0.002 67.8);
+  --sidebar-accent:oklch(0.268 0.011 36.5);--sidebar-accent-foreground:oklch(0.986 0.002 67.8);--sidebar-border:oklch(1 0 0 / 10%);
+  --sidebar-muted:oklch(0.714 0.014 41.2);
+}
+.cmp{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--background);color:var(--foreground);
+  display:grid;grid-template-columns:128px 1fr;min-height:236px}
+.cmp .mside{background:var(--sidebar);border-right:1px solid var(--sidebar-border);padding:10px 8px;font-size:12px;color:var(--sidebar-foreground)}
+.cmp .mside b{display:block;padding:2px 8px 8px;font-size:13px}
+.cmp .mside a{display:flex;gap:8px;align-items:center;padding:5px 8px;border-radius:6px}
+.cmp .mside a.on{background:var(--sidebar-accent);color:var(--sidebar-accent-foreground);font-weight:600}
+.cmp .mbody{padding:12px 14px;min-width:0;overflow-x:auto}
+.cmp .tb th,.cmp .tb td{padding:0 8px}
+.cmp h3{font-size:14px;font-weight:600;margin-bottom:8px}
+.today .mside .i{display:none}
+.today .tb td,.today .tb th{font-size:12px;height:30px}
+.tw{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:999px;font-size:10px;font-weight:500;border:1px solid}
+.sw-row{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.sw{width:34px;height:22px;border-radius:5px;border:1px solid var(--border)}
+
+/* ---------- Tables ---------- */
+.tb{width:100%;border-collapse:collapse;font-size:var(--table-fs,13px)}
+.tb th{height:32px;padding:0 10px;text-align:left;font-size:12px;font-weight:600;color:var(--muted-foreground);
+  border-bottom:1px solid var(--border);white-space:nowrap;background:var(--muted)}
+.tb td{height:var(--row-h,36px);padding:0 10px;border-bottom:1px solid var(--border);white-space:nowrap}
+.tb tr:last-child td{border-bottom:0}
+.tb tbody tr{transition:background-color var(--motion-fast) var(--ease-out)}
+.tb tbody tr:hover{background:var(--accent)}
+.tb .r{text-align:right}
+.tb a{color:inherit;text-decoration:none;font-weight:500}
+.tb a:hover{text-decoration:underline;text-underline-offset:3px}
+@keyframes flash{from{background:var(--success-subtle)}to{background:transparent}}
+.tb tr.flash{animation:flash var(--motion-emphasis) var(--ease-out) 1}
+
+/* ---------- Token cards ---------- */
+.tone{overflow:hidden}
+.tone h3{font-size:13px;font-weight:700;padding:10px 12px 0}
+.tone .use{font-size:12px;color:var(--muted-foreground);padding:0 12px 10px;min-height:46px}
+.chip{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 12px;font-size:12px;font-weight:600;
+  border-top:1px solid var(--border)}
+.chip code{font-family:var(--font-mono);font-size:11px;font-weight:500}
+.ratio{font-variant-numeric:tabular-nums;font-weight:700}
+.ratio.bad{text-decoration:underline wavy}
+.pairs{width:100%;border-collapse:collapse;font-size:12px}
+.pairs td{padding:6px 10px;border-bottom:1px solid var(--border)}
+.pairs tr:last-child td{border-bottom:0}
+.dot{display:inline-block;width:12px;height:12px;border-radius:3px;border:1px solid var(--border);vertical-align:-2px;margin-right:6px}
+.verdict{display:inline-flex;gap:8px;align-items:center;font-size:13px;font-weight:600;margin-bottom:14px}
+.chart{display:flex;align-items:flex-end;gap:14px;height:150px;padding-top:6px}
+.chart .col{flex:1;display:flex;flex-direction:column-reverse;gap:2px;height:100%}
+.chart .col i{display:block;border-radius:2px}
+.chart-x{display:flex;gap:14px;font-size:11px;color:var(--muted-foreground);margin-top:6px}
+.chart-x span{flex:1;text-align:center}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;margin-top:12px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px}
+
+/* ---------- App sample ---------- */
+.app{display:grid;grid-template-columns:auto 1fr;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--background);box-shadow:var(--shadow)}
+.side{width:216px;background:var(--sidebar);color:var(--sidebar-foreground);border-right:1px solid var(--sidebar-border);
+  display:flex;flex-direction:column;padding:10px 8px;overflow:hidden;transition:width var(--motion-slow) var(--ease-out)}
+.side.collapsed{width:52px}
+.brand{display:flex;align-items:center;gap:10px;padding:4px 6px 12px;font-weight:700;font-size:14px;white-space:nowrap}
+.brand .mark{width:24px;height:24px;border-radius:6px;background:var(--sidebar-primary);color:var(--sidebar-primary-foreground);
+  display:grid;place-items:center;flex:none}
+.brand .mark .i{width:14px;height:14px;stroke-width:2.25}
+.side .grp{font-size:11px;font-weight:600;color:var(--sidebar-muted);padding:10px 8px 4px;white-space:nowrap;
+  transition:opacity var(--motion-fast) var(--ease-out)}
+.side a{position:relative;display:flex;align-items:center;gap:10px;height:30px;padding:0 8px;border-radius:7px;font-size:13px;font-weight:500;
+  color:inherit;text-decoration:none;white-space:nowrap;transition:background-color var(--motion-fast) var(--ease-out)}
+.side a:hover{background:color-mix(in oklch,var(--sidebar-foreground) 8%,transparent)}
+.side a.on{background:var(--sidebar-accent);color:var(--sidebar-accent-foreground);font-weight:700}
+.side a.on::before{content:"";position:absolute;left:-8px;top:6px;bottom:6px;width:3px;border-radius:0 3px 3px 0;background:var(--sidebar-primary)}
+.side a .count{margin-left:auto;font-size:11px;font-weight:700;min-width:18px;height:18px;padding:0 5px;border-radius:9px;display:grid;place-items:center;
+  background:var(--warning-subtle);color:var(--warning)}
+[data-side="strong"] .side a .count{background:var(--warning);color:var(--warning-foreground)}
+.side.collapsed .grp{opacity:0}
+.side.collapsed .lbl,.side.collapsed .count{display:none}
+.side .foot{margin-top:auto;display:flex;align-items:center;gap:8px;padding:10px 6px 2px;border-top:1px solid var(--sidebar-border);font-size:12px;white-space:nowrap}
+.avatar{width:24px;height:24px;border-radius:50%;background:var(--brand-accent);color:var(--brand-accent-foreground);display:grid;place-items:center;font-size:11px;font-weight:700;flex:none}
+.work{min-width:0;display:flex;flex-direction:column}
+.top{display:flex;align-items:center;gap:10px;height:44px;padding:0 16px;border-bottom:1px solid var(--border);background:var(--card)}
+.crumbs{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted-foreground)}
+.crumbs b{color:var(--foreground);font-weight:600}
+.crumbs .i{width:12px;height:12px}
+.search{margin-left:auto;display:flex;align-items:center;gap:8px;height:28px;width:230px;padding:0 10px;border:1px solid var(--input);border-radius:8px;
+  font-size:12px;color:var(--muted-foreground);background:var(--background);white-space:nowrap;overflow:hidden}
+.search kbd{margin-left:auto;font-family:var(--font-mono);font-size:10px;border:1px solid var(--border);border-radius:4px;padding:0 4px}
+.page{padding:18px 20px 20px;display:flex;flex-direction:column;gap:14px}
+.ph{display:flex;align-items:flex-end;gap:12px}
+.ph h3{font-size:20px;line-height:28px;font-weight:700;letter-spacing:-0.01em}
+.ph p{font-size:13px;color:var(--muted-foreground)}
+.ph .acts{margin-left:auto;display:flex;gap:8px}
+.stat{padding:14px 16px;display:flex;flex-direction:column;gap:2px;position:relative}
+.stat .lbl{font-size:12px;font-weight:600;color:var(--muted-foreground);display:flex;align-items:center;gap:8px}
+.stat .ic{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;background:var(--t-subtle);color:var(--t)}
+.stat .val{font-size:26px;line-height:34px;font-weight:700;letter-spacing:-0.02em}
+.stat .sub{font-size:12px;color:var(--muted-foreground)}
+.stat .sub b{color:var(--t);font-weight:600}
+.fbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.fchip{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:999px;border:1px solid var(--input);font-size:12px;font-weight:600;
+  background:var(--card);color:var(--muted-foreground)}
+.fchip.on{background:var(--brand-accent-subtle);border-color:transparent;color:var(--brand-accent)}
+.fchip .n{font-variant-numeric:tabular-nums;font-weight:500}
+.tfoot{display:flex;align-items:center;gap:8px;padding:8px 10px;border-top:1px solid var(--border);font-size:12px;color:var(--muted-foreground)}
+.tfoot .pg{margin-left:auto;display:flex;gap:4px}
+.pgb{min-width:26px;height:26px;border-radius:6px;display:grid;place-items:center;font-weight:600;border:1px solid transparent}
+.pgb.on{background:var(--brand-accent-subtle);color:var(--brand-accent)}
+.matrix{display:grid;grid-template-columns:150px 1fr;gap:10px 16px;align-items:center;font-size:12px}
+.matrix b{font-weight:600}
+.matrix div{display:flex;flex-wrap:wrap;gap:6px}
+
+/* ---------- States ---------- */
+.empty{display:flex;flex-direction:column;align-items:center;text-align:center;padding:36px 20px;gap:6px}
+.empty .ic{width:44px;height:44px;border-radius:12px;background:var(--muted);color:var(--muted-foreground);display:grid;place-items:center;margin-bottom:6px}
+.empty .ic .i{width:22px;height:22px}
+.empty h3{font-size:15px;font-weight:700}
+.empty p{font-size:13px;color:var(--muted-foreground);max-width:36ch;margin-bottom:8px}
+.stage{position:relative;border-radius:var(--radius);overflow:hidden;border:1px solid var(--border);background:var(--background);min-height:250px;
+  display:grid;place-items:center;padding:20px}
+.stage.dim{background:color-mix(in oklch,var(--background),black 38%)}
+.dlg{width:min(100%,360px);background:var(--popover);color:var(--popover-foreground);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);padding:16px}
+.dlg h3{font-size:15px;font-weight:700}
+.dlg p{font-size:13px;color:var(--muted-foreground);margin:4px 0 12px}
+.dlg label{font-size:12px;font-weight:600;display:block;margin-bottom:4px}
+.field{width:100%;min-height:56px;border:1px solid var(--input);border-radius:8px;background:var(--background);padding:8px 10px;font-size:13px;color:var(--muted-foreground)}
+.dlg .acts{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+.toast{display:flex;gap:10px;align-items:flex-start;width:min(100%,340px);background:var(--popover);color:var(--popover-foreground);
+  border:1px solid var(--border);border-left:3px solid var(--t,var(--success));border-radius:10px;box-shadow:var(--shadow);padding:10px 12px}
+.toast .i{color:var(--t,var(--success));margin-top:2px}
+.toast b{display:block;font-size:13px;font-weight:700}
+.toast span{font-size:12px;color:var(--muted-foreground)}
+.flow{display:flex;align-items:stretch;gap:0;flex-wrap:wrap}
+.flow .step{flex:1;min-width:150px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--card);display:flex;flex-direction:column;gap:4px;font-size:12px}
+.flow .step.cur{border-color:var(--brand-accent);box-shadow:0 0 0 1px var(--brand-accent)}
+.flow .step.todo{border-style:dashed;background:transparent;color:var(--muted-foreground)}
+.flow .join{width:22px;align-self:center;height:2px;background:var(--input)}
+.flow .k{font-weight:600;color:var(--muted-foreground)}
+.flow .badge{align-self:flex-start}
+
+/* ---------- Motion ---------- */
+.mcard{padding:14px;display:flex;flex-direction:column;gap:10px}
+.mcard h3{font-size:13px;font-weight:700}
+.mcard .tok{font-family:var(--font-mono);font-size:11px;color:var(--brand-accent);background:var(--brand-accent-subtle);padding:2px 6px;border-radius:5px;align-self:flex-start}
+.mcard p{font-size:12px;color:var(--muted-foreground)}
+.mcard .mstage{margin-top:auto}
+.mcard>.btn{align-self:flex-start}
+.mstage .tb td{padding:0 8px}
+.mstage{position:relative;height:132px;border:1px dashed var(--input);border-radius:8px;overflow:hidden;background:var(--background)}
+.m-ov{position:absolute;inset:0;background:oklch(0 0 0 / 35%);opacity:0;transition:opacity var(--motion-fast) var(--ease-out)}
+.m-dlg{position:absolute;left:50%;top:50%;width:170px;padding:10px 12px;border-radius:9px;background:var(--popover);border:1px solid var(--border);
+  box-shadow:var(--shadow);font-size:12px;font-weight:600;opacity:0;transform:translate(-50%,-50%) scale(0.96);
+  transition:opacity var(--motion-fast) var(--ease-out),transform var(--motion-fast) var(--ease-out)}
+.open>.m-ov{opacity:1;transition-duration:var(--motion-base)}
+.open>.m-dlg{opacity:1;transform:translate(-50%,-50%) scale(1);transition-duration:var(--motion-base)}
+.m-toast{position:absolute;right:8px;bottom:8px;left:8px;opacity:0;transform:translateY(8px);
+  transition:opacity var(--motion-fast) var(--ease-out),transform var(--motion-fast) var(--ease-out)}
+.open>.m-toast{opacity:1;transform:none;transition-duration:var(--motion-base)}
+.m-side{position:absolute;inset:0 auto 0 0;width:120px;background:var(--sidebar);border-right:1px solid var(--sidebar-border);padding:8px 6px;
+  color:var(--sidebar-foreground);overflow:hidden;transition:width var(--motion-slow) var(--ease-out)}
+.open>.m-side{width:36px}
+.m-side div{display:flex;gap:8px;align-items:center;height:26px;padding:0 5px;font-size:12px;white-space:nowrap}
+.skel{height:12px;border-radius:4px;margin:14px 12px 0;background:var(--muted)}
+.loading .skel{background:linear-gradient(90deg,var(--muted) 25%,var(--accent) 37%,var(--muted) 63%);background-size:400% 100%;animation:shimmer 1.4s linear infinite}
+@keyframes shimmer{from{background-position:100% 0}to{background-position:0 0}}
+@media (prefers-reduced-motion: reduce){.loading .skel{animation:none;background:var(--muted)}.tb tr.flash{animation:none}}
+[data-rm="on"] .loading .skel{animation:none;background:var(--muted)}
+[data-rm="on"] .tb tr.flash{animation:none}
+.skel-done{display:none;padding:12px;font-size:12px}
+.mstage:not(.loading) .skel{display:none}
+.mstage:not(.loading) .skel-done{display:block}
+.never{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.never span{font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px;background:var(--destructive-subtle);color:var(--destructive)}
+.rm{display:inline-flex;gap:8px;align-items:center;font-size:13px;font-weight:600;margin-bottom:14px;cursor:pointer}
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <h1>DiecastOS design proposal <span>(draft, for owner approval)</span></h1>
+  <div class="ctl">Palette
+    <div class="seg" data-key="pal"><button data-v="A">A Industrial calm</button><button data-v="B">B Warm foundry</button></div></div>
+  <div class="ctl">Mode
+    <div class="seg" data-key="theme"><button data-v="light">Light</button><button data-v="dark">Dark</button></div></div>
+  <div class="ctl">Table
+    <div class="seg" data-key="density"><button data-v="compact">Compact</button><button data-v="comfortable">Larger</button></div></div>
+  <div class="ctl">Sidebar
+    <div class="seg" data-key="side"><button data-v="soft">Soft</button><button data-v="strong">Strong</button></div></div>
+</header>
+
+<main>
+
+<section>
+  <h2>Today and proposed</h2>
+  <p class="lead">The same list, before and after. Today almost everything is white, grey or black, and each module picks its own badge colours. Switch to dark mode to see that today's badges stay bright.</p>
+  <div class="grid g2">
+    <div>
+      <div class="cap">Today</div>
+      <div class="cmp today">
+        <div class="mside"><b>Role: owner</b><a>Purchase requisitions</a><a class="on">Purchase orders</a><a>GRN</a><a>Subcontracting</a></div>
+        <div class="mbody">
+          <h3>Purchase orders</h3>
+          <table class="tb"><thead><tr><th>PO no.</th><th>Supplier</th><th class="r">Value</th><th>Status</th></tr></thead><tbody>
+            <tr><td>PO-2026-0191</td><td>Shree Alloys</td><td class="r num">₹4,82,000</td><td><span class="tw" style="background:#fef3c7;border-color:#fde68a;color:#92400e">draft</span></td></tr>
+            <tr><td>PO-2026-0190</td><td>Kaveri Die Steels</td><td class="r num">₹1,26,500</td><td><span class="tw" style="background:#f1f5f9;border-color:#cbd5e1;color:inherit">pending approval</span></td></tr>
+            <tr><td>PO-2026-0187</td><td>Meenakshi Tools</td><td class="r num">₹68,400</td><td><span class="tw" style="background:#e0f2fe;border-color:#bae6fd;color:#075985">dispatched</span></td></tr>
+            <tr><td>PO-2026-0183</td><td>Shree Alloys</td><td class="r num">₹9,15,000</td><td><span class="tw" style="background:#dcfce7;border-color:#bbf7d0;color:#166534">fully received</span></td></tr>
+            <tr><td>PO-2026-0179</td><td>Vel Packaging</td><td class="r num">₹22,750</td><td><span class="tw" style="background:#ffe4e6;border-color:#fda4af;color:#9f1239">cancelled</span></td></tr>
+          </tbody></table>
+        </div>
+      </div>
+      <div class="sw-row today"><span class="sw" style="background:var(--background)"></span><span class="sw" style="background:var(--sidebar)"></span><span class="sw" style="background:oklch(0.508 0.118 165.612)"></span><span class="sw" style="background:var(--muted)"></span><span class="sw" style="background:var(--muted-foreground)"></span><span class="sw" style="background:var(--foreground)"></span></div>
+    </div>
+    <div>
+      <div class="cap">Proposed <span id="pal-name"></span></div>
+      <div class="cmp">
+        <div class="mside"><b>DiecastOS</b><a><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3v4a1 1 0 0 0 1 1h4 M17 21h-10a2 2 0 0 1-2-2v-14a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z M9 13h6 M9 17h6"/></svg>Requisitions</a><a class="on"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 19m-2 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0 M17 19m-2 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0 M17 17h-11v-14h-2 M6 5l14 1l-1 7h-13"/></svg>Orders</a><a><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.5v9l-8 4.5l-8-4.5v-9l8-4.5 M12 12l8-4.5 M12 12v9 M12 12l-8-4.5"/></svg>GRN</a><a><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10h14l-4-4 M17 14h-14l4 4"/></svg>Job work</a></div>
+        <div class="mbody">
+          <h3>Purchase orders</h3>
+          <table class="tb"><thead><tr><th>PO no.</th><th>Supplier</th><th class="r">Value</th><th>Status</th></tr></thead><tbody>
+            <tr><td class="mono">PO-2026-0191</td><td>Shree Alloys</td><td class="r num">₹4,82,000</td><td><span class="badge t-neutral">Draft</span></td></tr>
+            <tr><td class="mono">PO-2026-0190</td><td>Kaveri Die Steels</td><td class="r num">₹1,26,500</td><td><span class="badge t-warning">Pending approval</span></td></tr>
+            <tr><td class="mono">PO-2026-0187</td><td>Meenakshi Tools</td><td class="r num">₹68,400</td><td><span class="badge t-info">Dispatched</span></td></tr>
+            <tr><td class="mono">PO-2026-0183</td><td>Shree Alloys</td><td class="r num">₹9,15,000</td><td><span class="badge t-success">Fully received</span></td></tr>
+            <tr><td class="mono">PO-2026-0179</td><td>Vel Packaging</td><td class="r num">₹22,750</td><td><span class="badge terminal">Cancelled</span></td></tr>
+          </tbody></table>
+        </div>
+      </div>
+      <div class="sw-row"><span class="sw" title="--background" style="background:var(--background)"></span><span class="sw" title="--sidebar" style="background:var(--sidebar)"></span><span class="sw" title="--primary" style="background:var(--primary)"></span><span class="sw" title="--brand-accent" style="background:var(--brand-accent)"></span><span class="sw" title="--success" style="background:var(--success)"></span><span class="sw" title="--warning" style="background:var(--warning)"></span><span class="sw" title="--info" style="background:var(--info)"></span><span class="sw" title="--destructive" style="background:var(--destructive)"></span><span class="sw" title="--neutral" style="background:var(--neutral)"></span></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Colours</h2>
+  <p class="lead">Each colour has one job. Every colour comes in three parts: a strong version, the text that sits on it, and a soft tint for badges. The number on each sample is its contrast ratio; 4.5 or more passes the WCAG AA rule for text, 3 or more for chart shapes.</p>
+  <div class="verdict" id="verdict"></div>
+  <div class="grid g4">
+    <div class="card tone"><h3>Success</h3><div class="use">Approved, accepted, passed, fully received.</div>
+      <div class="chip" style="background:var(--success);color:var(--success-foreground)"><code>--success</code><span class="ratio" data-fg="--success-foreground" data-bg="--success" data-min="4.5"></span></div>
+      <div class="chip" style="background:var(--success-subtle);color:var(--success)"><code>--success-subtle</code><span class="ratio" data-fg="--success" data-bg="--success-subtle" data-min="4.5"></span></div>
+      <div class="chip" style="background:var(--card);color:var(--success)"><code>on card</code><span class="ratio" data-fg="--success" data-bg="--card" data-min="4.5"></span></div>
+    </div>
+    <div class="card tone"><h3>Warning</h3><div class="use">Waiting on someone: pending approval, pending QA, due soon.</div>
+      <div class="chip" style="background:var(--warning);color:var(--warning-foreground)"><code>--warning</code><span class="ratio" data-fg="--warning-foreground" data-bg="--warning" data-min="4.5"></span></div>
+      <div class="chip" style="background:var(--warning-subtle);color:var(--warning)"><code>--warning-subtle</code><span class="ratio" data-fg="--warning" data-bg="--warning-subtle" data-min="4.5"></span></div>
+      <div class="chip" style="background:var(--card);color:var(--warning)"><code>on card</code><span class="ratio" data-fg="--warning" data-bg="--card" data-min="4.5"></span></div>
+    </div>
+    <div class="card tone"><h3>Info</h3><div class="use">Moving: dispatched, partly received, material issued.</div>
+      <div class="chip" style="background:var(--info);color:var(--info-foreground)"><code>--info</code><span class="ratio" data-fg="--info-foreground" data-bg="--info" data-min="4.5"></span></div>
+      <div class="chip" style="background:var(--info-subtle);color:var(--info)"><code>--info-subtle</code><span class="ratio" data-fg="--info" data-bg="--info-subtle" data-min="4.5"></span></div>
+      <div class="chip" style="background:var(--card);color:var(--info)"><code>on card</code><span class="ratio" data-fg="--info" data-bg="--card" data-min="4.5"></span></div>
+    </div>
+    <div class="card tone"><h3>Neutral</h3><div class="use">Not started or no judgement: draft, waived.</div>
+      <div class="chip" style="background:var(--neutral);color:var(--neutral-foreground)"><code>--neutral</code><span class="ratio" data-fg="--neutral-foreground" data-bg="--neutral" data-min="4.5"></span></div>
+      <div class="chip" style="background:var(--neutral-subtle);color:var(--neutral)"><code>--neutral-subtle</code><span class="ratio" data-fg="--neutral" data-bg="--neutral-subtle" data-min="4.5"></span></div>
+      <div class="chip" style="background:var(--card);color:var(--neutral)"><code>on card</code><span class="ratio" data-fg="--neutral" data-bg="--card" data-min="4.5"></span></div>
+    </div>
+    <div class="card tone"><h3>Danger</h3><div class="use">Refused or late: rejected, failed, overdue. Delete buttons.</div>
+      <div class="chip" style="background:var(--destructive);color:var(--destructive-foreground)"><code>--destructive</code><span class="ratio" data-fg="--destructive-foreground" data-bg="--destructive" data-min="4.5"></span></div>
+      <div class="chip" style="background:var(--destructive-subtle);color:var(--destructive)"><code>--destructive-subtle</code><span class="ratio" data-fg="--destructive" data-bg="--destructive-subtle" data-min="4.5"></span></div>
+      <div class="chip" style="background:var(--card);color:var(--destructive)"><code>on card</code><span class="ratio" data-fg="--destructive" data-bg="--card" data-min="4.5"></span></div>
+    </div>
+    <div class="card tone"><h3>Accent</h3><div class="use">The second brand colour: selected filters, current step, avatars.</div>
+      <div class="chip" style="background:var(--brand-accent);color:var(--brand-accent-foreground)"><code>--brand-accent</code><span class="ratio" data-fg="--brand-accent-foreground" data-bg="--brand-accent" data-min="4.5"></span></div>
+      <div class="chip" style="background:var(--brand-accent-subtle);color:var(--brand-accent)"><code>--brand-accent-subtle</code><span class="ratio" data-fg="--brand-accent" data-bg="--brand-accent-subtle" data-min="4.5"></span></div>
+      <div class="chip" style="background:var(--card);color:var(--brand-accent)"><code>on card</code><span class="ratio" data-fg="--brand-accent" data-bg="--card" data-min="4.5"></span></div>
+    </div>
+    <div class="card tone"><h3>Primary (kept)</h3><div class="use">Emerald, unchanged. Main buttons and the active menu marker.</div>
+      <div class="chip" style="background:var(--primary);color:var(--primary-foreground)"><code>--primary</code><span class="ratio" data-fg="--primary-foreground" data-bg="--primary" data-min="4.5"></span></div>
+      <div class="chip" style="background:var(--sidebar-accent);color:var(--sidebar-accent-foreground)"><code>active menu tint</code><span class="ratio" data-fg="--sidebar-accent-foreground" data-bg="--sidebar-accent" data-min="4.5"></span></div>
+      <div class="chip" style="background:var(--sidebar);color:var(--sidebar-foreground)"><code>sidebar</code><span class="ratio" data-fg="--sidebar-foreground" data-bg="--sidebar" data-min="4.5"></span></div>
+    </div>
+  </div>
+  <div class="grid g2" style="margin-top:16px">
+    <div class="card pad">
+      <div class="cap">Base pairs</div>
+      <table class="pairs">
+        <tr><td><span class="dot" style="background:var(--foreground)"></span><span class="dot" style="background:var(--background)"></span>Text on page</td><td class="muted mono">foreground / background</td><td style="text-align:right"><span class="ratio" data-fg="--foreground" data-bg="--background" data-min="4.5"></span></td></tr>
+        <tr><td><span class="dot" style="background:var(--card-foreground)"></span><span class="dot" style="background:var(--card)"></span>Text on card</td><td class="muted mono">card-foreground / card</td><td style="text-align:right"><span class="ratio" data-fg="--card-foreground" data-bg="--card" data-min="4.5"></span></td></tr>
+        <tr><td><span class="dot" style="background:var(--muted-foreground)"></span><span class="dot" style="background:var(--background)"></span>Grey text on page</td><td class="muted mono">muted-foreground / background</td><td style="text-align:right"><span class="ratio" data-fg="--muted-foreground" data-bg="--background" data-min="4.5"></span></td></tr>
+        <tr><td><span class="dot" style="background:var(--muted-foreground)"></span><span class="dot" style="background:var(--card)"></span>Grey text on card</td><td class="muted mono">muted-foreground / card</td><td style="text-align:right"><span class="ratio" data-fg="--muted-foreground" data-bg="--card" data-min="4.5"></span></td></tr>
+        <tr><td><span class="dot" style="background:var(--muted-foreground)"></span><span class="dot" style="background:var(--muted)"></span>Grey text on table header</td><td class="muted mono">muted-foreground / muted</td><td style="text-align:right"><span class="ratio" data-fg="--muted-foreground" data-bg="--muted" data-min="4.5"></span></td></tr>
+        <tr><td><span class="dot" style="background:var(--foreground)"></span><span class="dot" style="background:var(--accent)"></span>Text on hovered row</td><td class="muted mono">foreground / accent</td><td style="text-align:right"><span class="ratio" data-fg="--foreground" data-bg="--accent" data-min="4.5"></span></td></tr>
+        <tr><td><span class="dot" style="background:var(--popover-foreground)"></span><span class="dot" style="background:var(--popover)"></span>Text in dialog</td><td class="muted mono">popover-foreground / popover</td><td style="text-align:right"><span class="ratio" data-fg="--popover-foreground" data-bg="--popover" data-min="4.5"></span></td></tr>
+        <tr><td><span class="dot" style="background:var(--sidebar-muted)"></span><span class="dot" style="background:var(--sidebar)"></span>Grey text in sidebar</td><td class="muted mono">sidebar-muted / sidebar</td><td style="text-align:right"><span class="ratio" data-fg="--sidebar-muted" data-bg="--sidebar" data-min="4.5"></span></td></tr>
+        <tr><td><span class="dot" style="background:var(--brand-accent)"></span><span class="dot" style="background:var(--brand-accent-subtle)"></span>Selected filter</td><td class="muted mono">brand-accent / brand-accent-subtle</td><td style="text-align:right"><span class="ratio" data-fg="--brand-accent" data-bg="--brand-accent-subtle" data-min="4.5"></span></td></tr>
+      </table>
+    </div>
+    <div class="card pad">
+      <div class="cap">Chart colours: purchase value by category, last six months (sample numbers)</div>
+      <div class="chart"><div class="col"><i style="height:42%;background:var(--chart-1)"></i><i style="height:14%;background:var(--chart-2)"></i><i style="height:9%;background:var(--chart-3)"></i><i style="height:12%;background:var(--chart-4)"></i><i style="height:5%;background:var(--chart-5)"></i></div><div class="col"><i style="height:38%;background:var(--chart-1)"></i><i style="height:10%;background:var(--chart-2)"></i><i style="height:11%;background:var(--chart-3)"></i><i style="height:15%;background:var(--chart-4)"></i><i style="height:6%;background:var(--chart-5)"></i></div><div class="col"><i style="height:51%;background:var(--chart-1)"></i><i style="height:8%;background:var(--chart-2)"></i><i style="height:10%;background:var(--chart-3)"></i><i style="height:11%;background:var(--chart-4)"></i><i style="height:5%;background:var(--chart-5)"></i></div><div class="col"><i style="height:47%;background:var(--chart-1)"></i><i style="height:18%;background:var(--chart-2)"></i><i style="height:12%;background:var(--chart-3)"></i><i style="height:14%;background:var(--chart-4)"></i><i style="height:7%;background:var(--chart-5)"></i></div><div class="col"><i style="height:55%;background:var(--chart-1)"></i><i style="height:12%;background:var(--chart-2)"></i><i style="height:9%;background:var(--chart-3)"></i><i style="height:16%;background:var(--chart-4)"></i><i style="height:6%;background:var(--chart-5)"></i></div><div class="col"><i style="height:49%;background:var(--chart-1)"></i><i style="height:15%;background:var(--chart-2)"></i><i style="height:11%;background:var(--chart-3)"></i><i style="height:13%;background:var(--chart-4)"></i><i style="height:6%;background:var(--chart-5)"></i></div></div>
+      <div class="chart-x"><span>Jun</span><span>Jul</span><span>Aug</span><span>Sep</span><span>Oct</span><span>Nov</span></div>
+      <div class="legend"><span><i style="background:var(--chart-1)"></i>Aluminium ingot <span class="ratio" data-fg="--chart-1" data-bg="--card" data-min="3"></span></span><span><i style="background:var(--chart-2)"></i>Die steel <span class="ratio" data-fg="--chart-2" data-bg="--card" data-min="3"></span></span><span><i style="background:var(--chart-3)"></i>Consumables <span class="ratio" data-fg="--chart-3" data-bg="--card" data-min="3"></span></span><span><i style="background:var(--chart-4)"></i>Job work <span class="ratio" data-fg="--chart-4" data-bg="--card" data-min="3"></span></span><span><i style="background:var(--chart-5)"></i>Packing <span class="ratio" data-fg="--chart-5" data-bg="--card" data-min="3"></span></span></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Sample screen</h2>
+  <p class="lead">A purchase order list built with the proposed colours, sidebar, top bar and page header. Use the switches at the top to compare. The button left of the breadcrumbs folds the sidebar.</p>
+  <div class="app">
+    <aside class="side" id="side">
+      <div class="brand"><span class="mark"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l-8 4l8 4l8-4l-8-4 M4 12l8 4l8-4 M4 16l8 4l8-4"/></svg></span><span class="lbl">DiecastOS</span></div>
+      <a href="#"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v8h-6z M4 16h6v4h-6z M14 12h6v8h-6z M14 4h6v4h-6z"/></svg><span class="lbl">Home</span></a>
+      <div class="grp">Purchase</div>
+      <a href="#"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3v4a1 1 0 0 0 1 1h4 M17 21h-10a2 2 0 0 1-2-2v-14a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z M9 13h6 M9 17h6"/></svg><span class="lbl">Requisitions</span></a>
+      <a href="#"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3l8-8 M20 12v6a2 2 0 0 1-2 2h-12a2 2 0 0 1-2-2v-12a2 2 0 0 1 2-2h9"/></svg><span class="lbl">Approvals</span><span class="count num">7</span></a>
+      <a href="#" class="on"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 19m-2 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0 M17 19m-2 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0 M17 17h-11v-14h-2 M6 5l14 1l-1 7h-13"/></svg><span class="lbl">Purchase orders</span></a>
+      <a href="#"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7m-4 0a4 4 0 1 0 8 0a4 4 0 1 0-8 0 M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2 M16 3.13a4 4 0 0 1 0 7.75 M21 21v-2a4 4 0 0 0-3-3.85"/></svg><span class="lbl">Suppliers</span></a>
+      <div class="grp">Stores</div>
+      <a href="#"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.5v9l-8 4.5l-8-4.5v-9l8-4.5 M12 12l8-4.5 M12 12v9 M12 12l-8-4.5"/></svg><span class="lbl">Goods receipt</span></a>
+      <a href="#"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l-8 4l8 4l8-4l-8-4 M4 12l8 4l8-4 M4 16l8 4l8-4"/></svg><span class="lbl">Inventory</span></a>
+      <a href="#"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10h14l-4-4 M17 14h-14l4 4"/></svg><span class="lbl">Subcontracting</span></a>
+      <div class="foot"><span class="avatar">RK</span><span class="lbl"><b>R. Karthik</b><br><span style="opacity:.75">Purchase</span></span></div>
+    </aside>
+    <div class="work">
+      <div class="top">
+        <button class="btn btn-ghost btn-icon" id="side-toggle" aria-label="Fold sidebar"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-12a2 2 0 0 1-2-2z M9 4v16"/></svg></button>
+        <nav class="crumbs" aria-label="Breadcrumb">Purchase <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6l-6 6"/></svg> <b>Purchase orders</b></nav>
+        <div class="search"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0-14 0 M21 21l-6-6"/></svg>Search orders, items, suppliers<kbd>/</kbd></div>
+        <span class="avatar">RK</span>
+      </div>
+      <div class="page">
+        <div class="ph">
+          <div><h3>Purchase orders</h3><p>23 open orders worth ₹18,42,500</p></div>
+          <div class="acts"><button class="btn btn-outline">Export</button><button class="btn btn-primary"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14 M5 12h14"/></svg>New purchase order</button></div>
+        </div>
+        <div class="grid g3">
+          <div class="card stat t-warning"><div class="lbl"><span class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3l8-8 M20 12v6a2 2 0 0 1-2 2h-12a2 2 0 0 1-2-2v-12a2 2 0 0 1 2-2h9"/></svg></span>Pending approvals</div><div class="val num" data-count="7">7</div><div class="sub"><b>2 waiting over 3 days</b></div></div>
+          <div class="card stat t-info"><div class="lbl"><span class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 19m-2 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0 M17 19m-2 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0 M17 17h-11v-14h-2 M6 5l14 1l-1 7h-13"/></svg></span>Open purchase orders</div><div class="val num" data-count="23">23</div><div class="sub">₹18,42,500 on order</div></div>
+          <div class="card stat t-accent"><div class="lbl"><span class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.5v9l-8 4.5l-8-4.5v-9l8-4.5 M12 12l8-4.5 M12 12v9 M12 12l-8-4.5"/></svg></span>GRNs awaiting QA</div><div class="val num" data-count="4">4</div><div class="sub">Oldest received 14 Nov</div></div>
+        </div>
+        <div class="fbar">
+          <span class="fchip on">All <span class="n">41</span></span><span class="fchip">Waiting on me <span class="n">3</span></span><span class="fchip">In transit <span class="n">9</span></span><span class="fchip">To invoice <span class="n">5</span></span>
+          <span style="margin-left:auto"></span><button class="btn btn-outline"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6 7v6l-4 2v-8z"/></svg>Supplier</button><button class="btn btn-outline"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0-18 0 M12 7v5l3 3"/></svg>This month</button>
+        </div>
+        <div class="card" style="overflow:hidden">
+          <div style="overflow-x:auto">
+          <table class="tb"><thead><tr><th>PO no.</th><th>Status</th><th>Supplier</th><th>Item</th><th class="r">Qty</th><th class="r">Value</th><th>Expected</th></tr></thead>
+          <tbody>
+            <tr><td class="mono"><a href="#">PO-2026-0191</a></td><td><span class="badge t-neutral">Draft</span></td><td>Shree Alloys</td><td>ADC12 aluminium ingot</td><td class="r num">2,000 kg</td><td class="r num">₹4,82,000.00</td><td class="num">28 Nov 2026</td></tr>
+            <tr><td class="mono"><a href="#">PO-2026-0190</a></td><td><span class="badge t-warning">Pending approval</span></td><td>Kaveri Die Steels</td><td>H13 die block 300 x 250</td><td class="r num">2 nos</td><td class="r num">₹1,26,500.00</td><td class="num">05 Dec 2026</td></tr>
+            <tr><td class="mono"><a href="#">PO-2026-0189</a></td><td><span class="badge t-success">Approved</span></td><td>Sri Lakshmi Chemicals</td><td>Die lubricant DL-40</td><td class="r num">200 L</td><td class="r num">₹38,000.00</td><td class="num">22 Nov 2026</td></tr>
+            <tr><td class="mono"><a href="#">PO-2026-0187</a></td><td><span class="badge t-info">Dispatched</span></td><td>Meenakshi Tools</td><td>Shot sleeve 60 mm</td><td class="r num">4 nos</td><td class="r num">₹68,400.00</td><td class="num">20 Nov 2026</td></tr>
+            <tr><td class="mono"><a href="#">PO-2026-0185</a></td><td><span class="badge t-info">Partly received</span></td><td>Shree Alloys</td><td>ADC12 aluminium ingot</td><td class="r num">3,500 kg</td><td class="r num">₹8,43,500.00</td><td class="num">18 Nov 2026</td></tr>
+            <tr><td class="mono"><a href="#">PO-2026-0183</a></td><td><span class="badge t-success">Fully received</span></td><td>Shree Alloys</td><td>LM6 aluminium ingot</td><td class="r num">3,000 kg</td><td class="r num">₹9,15,000.00</td><td class="num">12 Nov 2026</td></tr>
+            <tr><td class="mono"><a href="#">PO-2026-0181</a></td><td><span class="badge t-success">Invoiced</span></td><td>Coimbatore Fasteners</td><td>M8 insert, brass</td><td class="r num">5,000 nos</td><td class="r num">₹41,250.00</td><td class="num">08 Nov 2026</td></tr>
+            <tr><td class="mono"><a href="#">PO-2026-0180</a></td><td><span class="badge terminal">Closed</span></td><td>Vel Packaging</td><td>Corrugated box 400 x 300</td><td class="r num">1,200 nos</td><td class="r num">₹22,750.00</td><td class="num">04 Nov 2026</td></tr>
+            <tr><td class="mono"><a href="#">PO-2026-0179</a></td><td><span class="badge terminal">Cancelled</span></td><td>Vel Packaging</td><td>Stretch film 500 mm</td><td class="r num">40 rolls</td><td class="r num">₹14,800.00</td><td class="num">02 Nov 2026</td></tr>
+          </tbody></table>
+          </div>
+          <div class="tfoot"><span>1 to 9 of 41</span><span>25 per page</span><div class="pg"><span class="pgb on">1</span><span class="pgb">2</span><span class="pgb"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6l-6 6"/></svg></span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card pad" style="margin-top:16px">
+    <div class="cap">Every status, one colour per meaning: grey not started, amber waiting on someone, blue moving, green done or approved, red refused, outline finished and filed</div>
+    <div class="matrix">
+      <b>Purchase requisition</b><div><span class="badge t-neutral">Draft</span><span class="badge t-warning">Pending approval</span><span class="badge t-success">Approved</span><span class="badge t-danger">Rejected</span><span class="badge t-info">Partly ordered</span><span class="badge t-success">Fully ordered</span><span class="badge terminal">Cancelled</span></div>
+      <b>Purchase order</b><div><span class="badge t-neutral">Draft</span><span class="badge t-warning">Pending approval</span><span class="badge t-success">Approved</span><span class="badge t-info">Dispatched</span><span class="badge t-info">Partly received</span><span class="badge t-success">Fully received</span><span class="badge t-success">Invoiced</span><span class="badge terminal">Closed</span><span class="badge terminal">Cancelled</span></div>
+      <b>Goods receipt</b><div><span class="badge t-neutral">Draft</span><span class="badge t-warning">Pending QA</span><span class="badge t-success">Accepted</span><span class="badge t-warning">Partly accepted</span><span class="badge t-danger">Rejected</span></div>
+      <b>Goods receipt QA</b><div><span class="badge t-warning">Pending</span><span class="badge t-success">Passed</span><span class="badge t-danger">Failed</span><span class="badge t-neutral">Waived</span></div>
+      <b>Subcontract order</b><div><span class="badge t-neutral">Draft</span><span class="badge t-warning">Pending approval</span><span class="badge t-warning">Sent back</span><span class="badge t-success">Approved</span><span class="badge t-danger">Rejected</span><span class="badge t-info">Material issued</span><span class="badge t-success">Material received</span><span class="badge terminal">Closed</span><span class="badge terminal">Cancelled</span></div>
+      <b>Challan due date</b><div><span class="badge t-success">On time</span><span class="badge t-warning">Due soon</span><span class="badge t-danger">Overdue</span></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Empty screen, dialog, message, document chain</h2>
+  <p class="lead">The quieter pieces that today are either missing or different on every page.</p>
+  <div class="grid g3">
+    <div class="card empty">
+      <span class="ic"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-12a2 2 0 0 1-2-2z M4 13h3l3 3h4l3-3h3"/></svg></span>
+      <h3>No purchase requisitions yet</h3>
+      <p>Raise one when stock runs low or a job needs material.</p>
+      <button class="btn btn-primary"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14 M5 12h14"/></svg>New requisition</button>
+    </div>
+    <div class="stage dim">
+      <div class="dlg" role="dialog" aria-label="Cancel purchase order">
+        <h3>Cancel PO-2026-0187?</h3>
+        <p>Meenakshi Tools will not be told automatically. This cannot be undone.</p>
+        <label>Reason</label><div class="field">Supplier cannot deliver before 30 Nov</div>
+        <div class="acts"><button class="btn btn-outline">Keep order</button><button class="btn btn-danger">Cancel order</button></div>
+      </div>
+    </div>
+    <div class="stage" style="align-content:center;gap:12px">
+      <div class="toast"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0-18 0 M9 12l2 2l4-4"/></svg><div><b>Purchase order approved</b><span>PO-2026-0190 is ready to send to Kaveri Die Steels.</span></div></div>
+      <div class="toast t-danger" style="--t:var(--destructive)"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6l-12 12 M6 6l12 12"/></svg><div><b>Could not save the receipt</b><span>Received quantity is more than the order balance of 120 kg.</span></div></div>
+    </div>
+  </div>
+  <div class="card pad" style="margin-top:16px">
+    <div class="cap">Document chain shown at the top of a detail page</div>
+    <div class="flow">
+      <div class="step"><span class="k">Requisition</span><span class="mono">PR-2026-0412</span><span class="badge t-success">Fully ordered</span></div><span class="join"></span>
+      <div class="step cur"><span class="k">Purchase order</span><span class="mono">PO-2026-0187</span><span class="badge t-info">Dispatched</span></div><span class="join"></span>
+      <div class="step todo"><span class="k">Goods receipt</span><span>Not received yet</span></div><span class="join"></span>
+      <div class="step todo"><span class="k">Invoice</span><span>After receipt</span></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Motion</h2>
+  <p class="lead">Eight places may move, and nothing else. Three speeds, one curve that starts quick and settles. Press each button to see it. If your computer is set to reduce motion, everything below changes instantly instead.</p>
+  <label class="rm"><input type="checkbox" id="rm"> Show what a user with "reduce motion" switched on will see</label>
+  <div class="grid g4">
+    <div class="card mcard"><h3>1. Dialog, side sheet, dropdown</h3><span class="tok">in base 180 ms, out fast 120 ms</span><p>Fades in and grows slightly. Leaves faster than it arrives.</p>
+      <div class="mstage" id="m1"><div class="m-ov"></div><div class="m-dlg">Approve this order?</div></div><button class="btn btn-outline" data-toggle="m1">Open / close</button></div>
+    <div class="card mcard"><h3>2. Message (toast)</h3><span class="tok">in base 180 ms, out fast 120 ms</span><p>Slides up 8 px and fades in. Goes away by itself after 4 seconds.</p>
+      <div class="mstage" id="m2"><div class="toast m-toast"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0-18 0 M9 12l2 2l4-4"/></svg><div><b>Saved</b></div></div></div><button class="btn btn-outline" id="b2">Show message</button></div>
+    <div class="card mcard"><h3>3. Sidebar fold</h3><span class="tok">slow 260 ms</span><p>The width changes. Labels do not bounce or slide.</p>
+      <div class="mstage" id="m3"><div class="m-side"><div><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3v4a1 1 0 0 0 1 1h4 M17 21h-10a2 2 0 0 1-2-2v-14a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2z M9 13h6 M9 17h6"/></svg>Requisitions</div><div><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 19m-2 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0 M17 19m-2 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0 M17 17h-11v-14h-2 M6 5l14 1l-1 7h-13"/></svg>Orders</div><div><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 4.5v9l-8 4.5l-8-4.5v-9l8-4.5 M12 12l8-4.5 M12 12v9 M12 12l-8-4.5"/></svg>Receipts</div></div></div><button class="btn btn-outline" data-toggle="m3">Fold / unfold</button></div>
+    <div class="card mcard"><h3>4. Table row hover</h3><span class="tok">fast 120 ms</span><p>Background colour only. Move the mouse over the rows.</p>
+      <div class="mstage"><table class="tb" style="font-size:12px"><tbody><tr><td class="mono">PR-0412</td><td>ADC12 ingot</td></tr><tr><td class="mono">PR-0413</td><td>Die lubricant</td></tr><tr><td class="mono">PR-0414</td><td>Shot sleeve</td></tr></tbody></table></div><span class="btn" style="visibility:hidden"></span></div>
+    <div class="card mcard"><h3>5. Button press</h3><span class="tok">fast 120 ms</span><p>Moves down 1 px while pressed. Colour changes on hover.</p>
+      <div class="mstage" style="display:grid;place-items:center"><button class="btn btn-primary">Press and hold</button></div><span class="btn" style="visibility:hidden"></span></div>
+    <div class="card mcard"><h3>6. Loading placeholder</h3><span class="tok">1.4 s sweep, only while loading</span><p>Grey bars with a slow sweep until the data arrives, then it stops.</p>
+      <div class="mstage" id="m6"><div class="skel" style="width:70%"></div><div class="skel" style="width:85%"></div><div class="skel" style="width:55%"></div><div class="skel-done">3 requisitions loaded.</div></div><button class="btn btn-outline" id="b6">Load for 2 seconds</button></div>
+    <div class="card mcard"><h3>7. Status change highlight</h3><span class="tok">emphasis 600 ms, once</span><p>The changed row is tinted once and fades, so the eye finds it.</p>
+      <div class="mstage"><table class="tb" style="font-size:12px"><tbody><tr><td class="mono">PO-0189</td><td><span class="badge t-success">Approved</span></td></tr><tr id="m7"><td class="mono">PO-0190</td><td><span class="badge t-warning">Pending approval</span></td></tr><tr><td class="mono">PO-0191</td><td><span class="badge t-neutral">Draft</span></td></tr></tbody></table></div><button class="btn btn-outline" id="b7">Approve PO-0190</button></div>
+    <div class="card mcard"><h3>8. Number count-up</h3><span class="tok">emphasis 600 ms, once per page load</span><p>Home page cards only. Never in tables or forms.</p>
+      <div class="mstage" style="display:grid;place-items:center"><div class="stat t-info" style="padding:0;text-align:center"><div class="val num" id="m8">23</div><div class="sub">Open purchase orders</div></div></div><button class="btn btn-outline" id="b8">Replay</button></div>
+  </div>
+  <div class="cap" style="margin-top:20px;margin-bottom:0">Never used</div>
+  <div class="never"><span>Page-to-page transitions</span><span>Bounce or spring</span><span>Anything that loops</span><span>Movement on scroll</span><span>Decoration that moves</span></div>
+</section>
+
+</main>
+
+<script>
+(function(){
+var root=document.documentElement;
+function badge(label,tone){return '<span class="badge t-'+tone+'">'+label+'</span>';}
+
+/* ----- colour maths: OKLCH to sRGB, WCAG contrast ----- */
+var probe=document.createElement("span");probe.style.display="none";document.body.appendChild(probe);
+function resolve(name,scope){
+  var el=probe; if(scope){el=document.createElement("span");el.style.display="none";scope.appendChild(el);}
+  el.style.color="var("+name+")";var c=getComputedStyle(el).color; if(scope)scope.removeChild(el); return c;}
+function toRgb(str){
+  var n=(str.match(/-?[\d.]+%?/g)||[]).map(function(x){return x.slice(-1)==="%"?parseFloat(x)/100:parseFloat(x);});
+  if(str.indexOf("oklch")===0){
+    var L=n[0],C=n[1],h=n[2]*Math.PI/180,a=C*Math.cos(h),b=C*Math.sin(h);
+    var l=Math.pow(L+0.3963377774*a+0.2158037573*b,3),m=Math.pow(L-0.1055613458*a-0.0638541728*b,3),s=Math.pow(L-0.0894841775*a-1.291485548*b,3);
+    return [4.0767416621*l-3.3077115913*m+0.2309699292*s,-1.2684380046*l+2.6097574011*m-0.3413193965*s,-0.0041960863*l-0.7034186147*m+1.707614701*s]
+      .map(function(v){return Math.min(1,Math.max(0,v));});
+  }
+  if(str.indexOf("color(srgb")===0){return n.slice(0,3).map(lin);}
+  return n.slice(0,3).map(function(v){return lin(v/255);});
+}
+function lin(v){return v<=0.04045?v/12.92:Math.pow((v+0.055)/1.055,2.4);}
+function lum(rgb){return 0.2126*rgb[0]+0.7152*rgb[1]+0.0722*rgb[2];}
+function ratio(fg,bg){var a=lum(toRgb(resolve(fg))),b=lum(toRgb(resolve(bg)));var hi=Math.max(a,b),lo=Math.min(a,b);return (hi+0.05)/(lo+0.05);}
+
+function render(){
+  var fails=[];
+  [].forEach.call(document.querySelectorAll(".ratio[data-fg]"),function(el){
+    var r=ratio(el.dataset.fg,el.dataset.bg),ok=r>=+el.dataset.min;
+    el.textContent=r.toFixed(1)+(ok?"":" fails");el.classList.toggle("bad",!ok);
+    if(!ok)fails.push(el.dataset.fg.slice(2)+" on "+el.dataset.bg.slice(2)+" "+r.toFixed(2));});
+  document.getElementById("verdict").innerHTML=fails.length?'<span class="badge t-danger">'+fails.length+' pairs fail</span> '+fails.join("; "):
+    '<span class="badge t-success">All pairs pass</span> every text pair is 4.5 or more, every chart colour is 3 or more, in this palette and mode.';
+  document.body.setAttribute("data-fails",fails.length?fails.join(" | "):"none");
+  document.getElementById("pal-name").textContent=root.dataset.pal==="A"?"(A Industrial calm: steel blue next to emerald)":"(B Warm foundry: copper next to emerald)";
+  [].forEach.call(document.querySelectorAll(".seg"),function(seg){var cur=root.dataset[seg.dataset.key];
+    [].forEach.call(seg.children,function(b){b.setAttribute("aria-pressed",String(b.dataset.v===cur));});});
+}
+
+/* ----- controls; the same settings can be given in the address, e.g. preview.html#pal=B&theme=dark ----- */
+location.hash.slice(1).split("&").forEach(function(kv){var p=kv.split("=");if(p[0]&&p[1]&&p[0] in root.dataset)root.dataset[p[0]]=p[1];});
+[].forEach.call(document.querySelectorAll(".seg button"),function(b){b.addEventListener("click",function(){
+  root.dataset[b.parentNode.dataset.key]=b.dataset.v;render();});});
+document.getElementById("rm").addEventListener("change",function(e){root.dataset.rm=e.target.checked?"on":"off";});
+function reduced(){return root.dataset.rm==="on"||matchMedia("(prefers-reduced-motion: reduce)").matches;}
+
+/* ----- motion demos ----- */
+[].forEach.call(document.querySelectorAll("[data-toggle]"),function(b){b.addEventListener("click",function(){
+  document.getElementById(b.dataset.toggle).classList.toggle("open");});});
+document.getElementById("side-toggle").addEventListener("click",function(){document.getElementById("side").classList.toggle("collapsed");});
+var t2;document.getElementById("b2").addEventListener("click",function(){var m=document.getElementById("m2");m.classList.add("open");
+  clearTimeout(t2);t2=setTimeout(function(){m.classList.remove("open");},4000);});
+document.getElementById("b6").addEventListener("click",function(){var m=document.getElementById("m6");m.classList.add("loading");
+  setTimeout(function(){m.classList.remove("loading");},2000);});
+document.getElementById("b7").addEventListener("click",function(){var r=document.getElementById("m7"),done=r.dataset.done==="1";
+  r.cells[1].innerHTML=done?badge("Pending approval","warning"):badge("Approved","success");r.dataset.done=done?"0":"1";
+  this.textContent=done?"Approve PO-0190":"Undo";
+  r.classList.remove("flash");void r.offsetWidth;if(!done)r.classList.add("flash");});
+function countUp(el,to){if(reduced()){el.textContent=to;return;}var t0=performance.now();
+  (function step(now){var p=Math.min(1,(now-t0)/600),e=1-Math.pow(1-p,3);el.textContent=Math.round(to*e);if(p<1)requestAnimationFrame(step);})(t0);}
+document.getElementById("b8").addEventListener("click",function(){countUp(document.getElementById("m8"),23);});
+
+render();
+})();
+</script>
+</body>
+</html>
