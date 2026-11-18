@@ -1,6 +1,6 @@
 # Design system — assumptions
 
-> status: draft. Every choice made without the owner while drafting the spec. Append-only, never renumber.
+> status: frozen 2026-11-18. Every choice made without the owner while drafting the spec. Append-only, never renumber.
 > Tag `confirm` = changes what a factory user sees in a way that carries meaning → the owner answers
 > yes / no (these five are lines 1 to 5 in `OWNER.md` → "Decided for you — please confirm").
 > Tag `info` = technical or covered by an owner card; no answer needed.

@@ -1,6 +1,6 @@
 # Design system — screen patterns
 
-> status: draft. Four patterns every screen picks from. Tokens, status map, components and motion
+> status: frozen 2026-11-18. Four patterns every screen picks from. Tokens, status map, components and motion
 > rules are in `../spec.md`; nothing here invents a new one. Live sample: `../preview.html`.
 > Rule ids (`BR-DS-NN`) point into the spec's Rules table.
 > Pictures in `screens/` were rendered from `preview.html` at about 950 px wide (tablet width), so
