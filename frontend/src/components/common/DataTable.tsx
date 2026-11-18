@@ -1,6 +1,7 @@
 "use client";
 
 import { flexRender, type Table as TableInstance } from "@tanstack/react-table";
+import type { ReactNode } from "react";
 
 import { DataTablePagination } from "@/components/common/DataTablePagination";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -19,6 +20,12 @@ type DataTableProps<TData> = {
 	table: TableInstance<TData>;
 	isLoading?: boolean;
 	rowClassName?: (row: TData) => string | undefined;
+	/** Not wired yet (BR-DS-07): rendered in place of the empty row. */
+	emptyState?: ReactNode;
+	/** Not wired yet (BR-DS-07): rendered when set instead of the body. */
+	errorState?: ReactNode;
+	/** Not wired yet (BR-DS-07): skeleton row count while loading. */
+	skeletonRows?: number;
 };
 
 // Render-only: owns header/body/skeleton/pagination markup for any TanStack Table
