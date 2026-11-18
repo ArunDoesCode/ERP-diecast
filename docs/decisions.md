@@ -148,3 +148,7 @@ If a decision is reversed, add a new entry that references the old one — don't
 ### D-023 — One git model and one agent system (2026-11-18, workflow v2 phase 0)
 - **Decision:** (D1) every pipeline run gets its own `feature/<id>` branch + worktree and one small PR; epics use `epic/<name>`. The `work/<theme>` shared-branch rule is dropped. (D2) the package-level agents and skills (`ponytail`, `cavecrew-*`, `caveman-*`, `karpathy-guidelines`) are deleted; `hono-builder` / `hono-reviewer` / `nextjs-builder` / `nextjs-reviewer` became reference docs in `backend/.claude/reference/` and `frontend/.claude/reference/`, read by the root pipeline agents.
 - **Why:** skills, settings and history already followed `feature/<id>`; two orchestration systems gave agents two sets of rules. Plan: `docs/plans/agentic-workflow-v2.md`.
+
+### D-024 — End-to-end tests run locally before push; CI runs them only on PRs into main (2026-11-18, owner)
+- **Decision:** the test-runner runs the Playwright e2e suite locally (test DB, demo data, then reset) before the coordinator pushes (`.claude/agents/test-runner.md` step 9). The CI `e2e` job runs only on PRs into `main` and pushes to `main`; sub-feature PRs into `epic/*` skip it.
+- **Why:** epic design-system pushed one e2e test fix at a time and waited ~5 minutes of CI for each; local runs catch the same failures in about 2 minutes and the full suite still runs once on the epic PR.
