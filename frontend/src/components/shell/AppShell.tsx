@@ -5,9 +5,18 @@ import { type ReactNode, useEffect, useState } from "react";
 
 import { NavSidebar } from "@/components/common/Sidebar";
 import { TopBar } from "@/components/shell/TopBar";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import type { UserMenuProps } from "@/components/shell/UserMenu";
+import {
+	SidebarInset,
+	SidebarProvider,
+	useSidebar,
+} from "@/components/ui/sidebar";
 import { useLogoutMutation } from "@/lib/api/auth/queries";
 import { normalizeAllowedPath } from "@/lib/path-utils";
+import {
+	BreadcrumbLastProvider,
+	useBreadcrumbLastLabel,
+} from "@/lib/shell/breadcrumb-last";
 import { buildBreadcrumbs } from "@/lib/shell/breadcrumbs";
 import {
 	DEFAULT_DENSITY,
@@ -53,22 +62,18 @@ export function AppShell({ children }: { children: ReactNode }) {
 		const path = normalizeAllowedPath(screen.path);
 		return path && path.split("/").filter(Boolean)[0] === firstSegment;
 	})?.menuGroup;
-	const crumbs = buildBreadcrumbs(pathname, {
-		group: group || undefined,
-	});
 
 	return (
-		<SidebarProvider
-			open={!folded}
-			onOpenChange={(open) => changeFolded(!open)}
-			style={{ "--sidebar-width-icon": "52px" } as React.CSSProperties}
-		>
-			<NavSidebar />
-			<SidebarInset>
-				<TopBar
-					crumbs={crumbs}
-					sidebarFolded={folded}
-					onToggleSidebar={() => changeFolded(!folded)}
+		<BreadcrumbLastProvider>
+			<SidebarProvider
+				open={!folded}
+				onOpenChange={(open) => changeFolded(!open)}
+				style={{ "--sidebar-width-icon": "52px" } as React.CSSProperties}
+			>
+				<ShellFrame
+					pathname={pathname}
+					group={group || undefined}
+					folded={folded}
 					user={{
 						name: userName ?? "User",
 						role: role ?? "-",
@@ -82,9 +87,45 @@ export function AppShell({ children }: { children: ReactNode }) {
 							});
 						},
 					}}
+				>
+					{children}
+				</ShellFrame>
+			</SidebarProvider>
+		</BreadcrumbLastProvider>
+	);
+}
+
+type ShellFrameProps = {
+	pathname: string;
+	group: string | undefined;
+	folded: boolean;
+	user: UserMenuProps;
+	children: ReactNode;
+};
+
+/** Lives inside SidebarProvider so the fold button drives desktop collapse and the mobile sheet alike. */
+function ShellFrame({
+	pathname,
+	group,
+	folded,
+	user,
+	children,
+}: ShellFrameProps) {
+	const { toggleSidebar } = useSidebar();
+	const docNumber = useBreadcrumbLastLabel();
+	const crumbs = buildBreadcrumbs(pathname, { group, docNumber });
+	return (
+		<>
+			<NavSidebar />
+			<SidebarInset>
+				<TopBar
+					crumbs={crumbs}
+					sidebarFolded={folded}
+					onToggleSidebar={toggleSidebar}
+					user={user}
 				/>
 				<div className="p-5">{children}</div>
 			</SidebarInset>
-		</SidebarProvider>
+		</>
 	);
 }

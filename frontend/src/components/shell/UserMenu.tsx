@@ -46,6 +46,7 @@ export function UserMenu({
 			<DropdownMenuTrigger asChild>
 				<button
 					type="button"
+					aria-label={name}
 					className="flex items-center gap-2 rounded-md p-1 text-xs hover:bg-accent"
 				>
 					<span
