@@ -11,9 +11,10 @@
  * Rules (text-based heuristics, no AST — a finding is a pointer, not a proof):
  *   mutation-invalidate  a `useMutation(` neither invalidates / updates the query cache
  *                        nor carries a `// no-invalidate: <reason>` comment
- *   raw-palette          raw Tailwind palette class (bg-emerald-100 ...) outside src/components/ui/**
- *   motion               transition-* / animate-* / duration-* / motion.* outside
- *                        src/components/ui/** and design/motion-allowlist.json
+ *   raw-palette          raw Tailwind palette class (bg-emerald-100 ...) or hex colour outside
+ *                        src/components/ui/** (hex: also globals.css exempt)
+ *   motion               motion outside the allowed spellings and places (spec design-system,
+ *                        BR-DS-09), src/components/ui/** included; see scripts/standards-rules.ts
  */
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
@@ -65,7 +66,10 @@ function walk(dir: string, out: string[] = []): string[] {
 		const full = join(dir, name);
 		if (statSync(full).isDirectory()) {
 			if (name !== "node_modules") walk(full, out);
-		} else if (/\.(ts|tsx)$/.test(name) && !/\.(test|spec)\.tsx?$/.test(name)) {
+		} else if (
+			/\.(ts|tsx|css)$/.test(name) &&
+			!/\.(test|spec)\.tsx?$/.test(name)
+		) {
 			out.push(full);
 		}
 	}

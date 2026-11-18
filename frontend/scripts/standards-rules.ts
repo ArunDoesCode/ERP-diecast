@@ -55,37 +55,77 @@ export function maskComments(src: string): string {
 const PALETTE =
 	/(?<![\w-])(bg|text|border|ring|fill|stroke)-(red|rose|pink|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|slate|gray|zinc|neutral|stone)-\d{2,3}(?![\w])/g;
 
-const MOTION =
-	/(?<![\w-])(?:transition|animate|duration)-[\w[\]().%/-]+|(?<![\w.$])motion\.\w+/g;
+/** 3, 4, 6 or 8 digit hex colour literal. */
+const HEX =
+	/(?<![\w&/#-])#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})(?![\w-])/g;
+
+function isGlobalsCss(path: string): boolean {
+	return path.endsWith("globals.css");
+}
 
 /**
  * BR-DS-01. `path` is relative to frontend/ with forward slashes, `source` the raw file text.
- * Today: raw palette classes outside src/components/ui/**.
- * TODO (slice A): also flag hex colours outside src/components/ui/** and globals.css.
+ * Flags raw palette classes and hex colours outside src/components/ui/** (hex: also not globals.css).
  */
 export function checkPalette(path: string, source: string): Finding[] {
 	const found: Finding[] = [];
 	if (path.startsWith(UI_DIR)) return found;
+	const hexOk = isGlobalsCss(path);
 	maskComments(source)
 		.split("\n")
 		.forEach((text, i) => {
 			const hits = text.match(PALETTE);
-			if (!hits) return;
-			found.push({
-				file: path,
-				line: i + 1,
-				rule: "raw-palette",
-				message: `raw palette class ${[...new Set(hits)].join(", ")} - use a semantic token (status map / design tokens)`,
-			});
+			if (hits) {
+				found.push({
+					file: path,
+					line: i + 1,
+					rule: "raw-palette",
+					message: `raw palette class ${[...new Set(hits)].join(", ")} - use a semantic token (status map / design tokens)`,
+				});
+			}
+			const hex = hexOk ? null : text.match(HEX);
+			if (hex) {
+				found.push({
+					file: path,
+					line: i + 1,
+					rule: "raw-palette",
+					message: `hex colour ${[...new Set(hex)].join(", ")} - use a semantic token (design tokens)`,
+				});
+			}
 		});
 	return found;
 }
 
+/** A motion class: transition, ease-*, delay-*, duration-*, animate-*, or a motion.* call. */
+const MOTION =
+	/(?<![\w.$-])(?:transition(?![\w-]|\s*:)|(?:transition|ease|delay|duration|animate)-[\w[\]().%/,-]+|(?:fade|zoom|slide)-(?:in|out)(?:-[\w[\]().%/,-]+)?)|(?<![\w.$])motion\.\w+/g;
+
+/** Allowed in every file that may hold motion at all. */
+const MOTION_OK = new Set([
+	"transition-colors",
+	"transition-opacity",
+	"transition-transform",
+	"transition-[width]",
+	"duration-(--motion-fast)",
+	"duration-(--motion-base)",
+	"duration-(--motion-slow)",
+	"ease-standard",
+	"animate-skeleton",
+	"animate-status-flash",
+]);
+
+/** Allowed in src/components/ui/** only (dialog, sheet, popover, dropdown, toast enter and exit). */
+const MOTION_UI_OK =
+	/^(?:animate-(?:in|out)|(?:fade|zoom|slide)-(?:in|out)(?:-[\w[\]().%/,-]+)?)$/;
+
+const INLINE_STYLE = /(?<![\w.$-])(?:transition|animation)\s*:/;
+const KEYFRAMES = /@keyframes\b/;
+
 /**
  * BR-DS-09. `allowedFiles` = design/motion-allowlist.json `allowedFiles`.
- * Today: motion class outside ui/** and the allow-list.
- * TODO (slice A): the "checker must flag" list (ease-*, delay-*, duration-N, transition-all,
- * animate-* not allowed, inline transition/animation style, @keyframes outside globals.css), ui included.
+ * Flags, in every file (ui included): ease-* other than ease-standard, delay-*, duration-N / [..],
+ * transition-all and bare transition, animate-* not allowed, inline transition / animation style,
+ * @keyframes outside globals.css; and any motion class in a file that is neither ui nor allow-listed.
  */
 export function checkMotion(
 	path: string,
@@ -93,18 +133,31 @@ export function checkMotion(
 	allowedFiles: readonly string[],
 ): Finding[] {
 	const found: Finding[] = [];
-	if (path.startsWith(UI_DIR) || allowedFiles.includes(path)) return found;
+	if (isGlobalsCss(path)) return found;
+	const inUi = path.startsWith(UI_DIR);
+	const mayMove = inUi || allowedFiles.includes(path);
 	maskComments(source)
 		.split("\n")
 		.forEach((text, i) => {
-			const hits = text.match(MOTION);
-			if (!hits) return;
-			found.push({
-				file: path,
-				line: i + 1,
-				rule: "motion",
-				message: `${[...new Set(hits)].join(", ")} used outside src/components/ui and design/motion-allowlist.json`,
-			});
+			const add = (message: string) =>
+				found.push({ file: path, line: i + 1, rule: "motion", message });
+			for (const m of new Set(text.match(MOTION) ?? [])) {
+				if (!mayMove) {
+					add(
+						`${m} used outside src/components/ui and design/motion-allowlist.json`,
+					);
+				} else if (!MOTION_OK.has(m) && !(inUi && MOTION_UI_OK.test(m))) {
+					add(
+						`${m} is not an allowed motion spelling (spec: Allowed class spellings)`,
+					);
+				}
+			}
+			if (INLINE_STYLE.test(text)) {
+				add("inline transition / animation style - use the allowed classes");
+			}
+			if (KEYFRAMES.test(text)) {
+				add("@keyframes outside globals.css");
+			}
 		});
 	return found;
 }
