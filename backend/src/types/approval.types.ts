@@ -12,6 +12,9 @@ import {
 } from "../db/schemas/02_procurement-approval";
 import { prTypeEnum } from "../db/schemas/02_procurement-purchasing";
 
+// BR-STD-16: policy amount limits stop at 1,000,000,000,000 paise.
+const MAX_POLICY_AMOUNT_PAISE = 1_000_000_000_000;
+
 export const approvalDocTypeSchema = z.enum(["pr", "po", "sco"]);
 
 export const approvalChainStepSchema = z
@@ -194,6 +197,7 @@ export const createApprovalPolicySchema = createInsertSchema(approvalPolicies, {
       .int()
       .min(0)
       .nonnegative()
+      .max(MAX_POLICY_AMOUNT_PAISE)
       .nullable()
       .optional(),
     maxAmountPaise: z.coerce
@@ -201,6 +205,7 @@ export const createApprovalPolicySchema = createInsertSchema(approvalPolicies, {
       .int()
       .min(0)
       .nonnegative()
+      .max(MAX_POLICY_AMOUNT_PAISE)
       .nullable()
       .optional(),
   })
@@ -240,6 +245,7 @@ export const updateApprovalPolicySchema = createUpdateSchema(approvalPolicies, {
     .int()
     .min(0)
     .nonnegative()
+    .max(MAX_POLICY_AMOUNT_PAISE)
     .nullable()
     .optional(),
   maxAmountPaise: z.coerce
@@ -247,6 +253,7 @@ export const updateApprovalPolicySchema = createUpdateSchema(approvalPolicies, {
     .int()
     .min(0)
     .nonnegative()
+    .max(MAX_POLICY_AMOUNT_PAISE)
     .nullable()
     .optional(),
   approvalChain: () => approvalChainOrEmptySchema,

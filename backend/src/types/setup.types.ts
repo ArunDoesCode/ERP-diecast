@@ -1,6 +1,7 @@
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 import { employees } from "../db/schemas/03_hcm";
+import { MAX_MONEY_PAISE } from "../lib/money";
 
 export const moduleSchema = z.object({
   id: z.number(),
@@ -36,7 +37,12 @@ const employeeWriteBaseSchema = createInsertSchema(employees, {
 export const employeeInputSchema = employeeWriteBaseSchema
   .extend({
     phone: z.string().optional(),
-    dailyRatePaise: z.number().int().nonnegative().optional(),
+    dailyRatePaise: z
+      .number()
+      .int()
+      .nonnegative()
+      .max(MAX_MONEY_PAISE)
+      .optional(),
     loginMethod: loginMethodSchema,
     email: z.string().email().optional(),
     password: z.string().min(8).optional(),
@@ -56,7 +62,12 @@ export type employeeInputSchemaType = z.infer<typeof employeeInputSchema>;
 // layer enforces email+password only when flipping qr -> password.
 export const employeeUpdateSchema = employeeWriteBaseSchema.extend({
   phone: z.string().optional(),
-  dailyRatePaise: z.number().int().nonnegative().optional(),
+  dailyRatePaise: z
+    .number()
+    .int()
+    .nonnegative()
+    .max(MAX_MONEY_PAISE)
+    .optional(),
   loginMethod: loginMethodSchema,
   email: z.string().email().optional(),
   password: z.string().min(8).optional(),

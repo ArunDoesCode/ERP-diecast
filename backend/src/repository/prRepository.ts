@@ -26,6 +26,7 @@ import { supplierMaster } from "../db/schemas/02_procurement-suppliers";
 import { employees } from "../db/schemas/03_hcm";
 import { allocateDocumentSequence } from "../lib/document-number";
 import { AppError } from "../lib/errors";
+import { assertMoneyInRange } from "../lib/money";
 import type { prListQuerySchemaType } from "../types/pr.types";
 
 const purchaseRequestColumns = {
@@ -158,7 +159,9 @@ async function calculateEstimatedAmountPaiseByItems(
     return sum + item.requestedQty * averageCostPaise;
   }, 0);
 
-  return Math.round(total);
+  const estimated = Math.round(total);
+  assertMoneyInRange(estimated);
+  return estimated;
 }
 
 type ItemMasterLookupRow = Pick<
@@ -541,6 +544,7 @@ export const prRepository = {
       ),
     );
 
+    assertMoneyInRange(estimatedAmountPaise);
     const [row] = await executor
       .update(purchaseRequests)
       .set({ estimatedAmountPaise, updatedAt: new Date() })

@@ -7,6 +7,7 @@ import {
   locations,
 } from "../db/schemas/02_procurement-catalog";
 import { BadRequestError, ConflictError, NotFoundError } from "../lib/errors";
+import { assertMoneyInRange, assertStockValueInRange } from "../lib/money";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -38,15 +39,23 @@ export type PostStockInput = {
 const toMilli = (qty: number) => Math.round(qty * 1000);
 const fromMilli = (milli: number) => milli / 1000;
 
-const MAX_ROW_VALUE = Number.MAX_SAFE_INTEGER; // total_value_change_paise is bigint (number mode)
-
+// BR-STD-43: thousandths x paise can pass 2^53, so products run in BigInt and
+// are turned into a number only after the range check.
 // qty x cost in paise, rounded half away from zero (BR-GRN-24).
 function rowValuePaise(qtyMilli: number, unitCostPaise: number) {
-  const magnitude = Math.round(Math.abs(qtyMilli * unitCostPaise) / 1000);
-  if (magnitude > MAX_ROW_VALUE) {
-    throw new BadRequestError("Row value is too large");
-  }
-  return qtyMilli < 0 ? -magnitude : magnitude;
+  const product = BigInt(qtyMilli) * BigInt(unitCostPaise);
+  const abs = product < 0n ? -product : product;
+  const value = Number((abs + 500n) / 1000n);
+  assertMoneyInRange(value);
+  return qtyMilli < 0 ? -value : value;
+}
+
+// Math.round(numerator / divisor) (half up) for divisor > 0, exact in BigInt.
+function divRound(numerator: bigint, divisor: bigint) {
+  const n = 2n * numerator + divisor;
+  const d = 2n * divisor;
+  const q = n / d;
+  return n % d < 0n ? q - 1n : q;
 }
 
 // Runs inside the caller's transaction. The item row is locked first (also for
@@ -103,6 +112,31 @@ export async function postStock(tx: Tx, input: PostStockInput) {
     ? item.averageCostPaise
     : input.unitCostPaise;
 
+  const oldMilli = toMilli(item.currentStock);
+  const newMilli = oldMilli + qtyMilli;
+  const effect =
+    input.averageEffect ?? (qtyMilli > 0 ? "in" : ("none" as const));
+
+  let averageCostPaise = item.averageCostPaise;
+  const oldValue = BigInt(oldMilli) * BigInt(item.averageCostPaise);
+  const inValue = BigInt(qtyMilli) * BigInt(input.unitCostPaise);
+  if (effect === "in") {
+    if (oldMilli <= 0) {
+      averageCostPaise = input.unitCostPaise;
+    } else if (newMilli > 0) {
+      averageCostPaise = Number(divRound(oldValue + inValue, BigInt(newMilli)));
+    }
+  } else if (effect === "out_at_cost" && newMilli > 0) {
+    // BR-GRN-39: a negative result keeps the old average.
+    const candidate = Number(divRound(oldValue + inValue, BigInt(newMilli)));
+    assertMoneyInRange(candidate);
+    if (candidate >= 0) {
+      averageCostPaise = candidate;
+    }
+  }
+  assertMoneyInRange(averageCostPaise);
+  assertStockValueInRange(newMilli, averageCostPaise);
+
   const [created] = await tx
     .insert(inventoryLedger)
     .values({
@@ -121,32 +155,6 @@ export async function postStock(tx: Tx, input: PostStockInput) {
       createdBy: input.createdBy,
     })
     .returning();
-
-  const oldMilli = toMilli(item.currentStock);
-  const newMilli = oldMilli + qtyMilli;
-  const effect =
-    input.averageEffect ?? (qtyMilli > 0 ? "in" : ("none" as const));
-
-  let averageCostPaise = item.averageCostPaise;
-  if (effect === "in") {
-    averageCostPaise =
-      oldMilli <= 0
-        ? input.unitCostPaise
-        : Math.round(
-            (oldMilli * item.averageCostPaise +
-              qtyMilli * input.unitCostPaise) /
-              newMilli,
-          );
-  } else if (effect === "out_at_cost" && newMilli > 0) {
-    // BR-GRN-39: a negative result keeps the old average.
-    const candidate = Math.round(
-      (oldMilli * item.averageCostPaise + qtyMilli * input.unitCostPaise) /
-        newMilli,
-    );
-    if (candidate >= 0) {
-      averageCostPaise = candidate;
-    }
-  }
 
   await tx
     .update(itemMaster)

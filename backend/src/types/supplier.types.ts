@@ -8,6 +8,7 @@ import {
   supplierServices,
   supplierTypeEnum,
 } from "../db/schemas/02_procurement-suppliers";
+import { MAX_MONEY_PAISE } from "../lib/money";
 
 export const supplierTypeSchema = z.enum(supplierTypeEnum.enumValues);
 
@@ -134,7 +135,7 @@ const gstPercentField = z
   .refine((v) => (SUPPLIER_GST_SLABS as readonly number[]).includes(v), {
     message: "GST % must be one of 0, 0.1, 0.25, 1.5, 3, 5, 12, 18, 28, 40",
   });
-const pricePaiseField = z.number().int().min(1).max(2147483647);
+const pricePaiseField = z.number().int().min(1).max(MAX_MONEY_PAISE);
 const leadTimeField = z.number().int().min(0).max(365);
 const qtyField = z
   .number()

@@ -8,6 +8,7 @@ import {
   purchaseOrderItems,
   purchaseOrders,
 } from "../db/schemas/02_procurement-purchasing";
+import { MAX_MONEY_PAISE } from "../lib/money";
 
 export const poStatusSchema = z.enum(poStatusEnum.enumValues);
 export type poStatusSchemaType = z.infer<typeof poStatusSchema>;
@@ -100,7 +101,7 @@ export const createPoSchema = z.object({
         prItemId: z.number().int().positive(),
         // BR-PO-03: paise, >= 1. Omitted = the supplier price suggestion
         // (last PO rate, else price list, else average cost); editable in draft.
-        unitPricePaise: z.number().int().min(1).optional(),
+        unitPricePaise: z.number().int().min(1).max(MAX_MONEY_PAISE).optional(),
         // BR-PO-04: omitted = supplier's active price-list GST % (else 0).
         gstPercent: gstPercentSchema.optional(),
       }),
@@ -112,7 +113,7 @@ export type createPoSchemaType = z.infer<typeof createPoSchema>;
 // A new line added on update — pulls in a not-yet-drafted PR item.
 export const updatePoInsertItemSchema = z.object({
   prItemId: z.number().int().positive(),
-  unitPricePaise: z.number().int().min(1).optional(),
+  unitPricePaise: z.number().int().min(1).max(MAX_MONEY_PAISE).optional(),
   gstPercent: gstPercentSchema.optional(),
 });
 export type updatePoInsertItemSchemaType = z.infer<
@@ -123,7 +124,7 @@ export type updatePoInsertItemSchemaType = z.infer<
 // remaining PR-item quantity at draft time).
 export const updatePoUpdateItemSchema = z.object({
   id: z.number().int().positive(),
-  unitPricePaise: z.number().int().min(1).optional(),
+  unitPricePaise: z.number().int().min(1).max(MAX_MONEY_PAISE).optional(),
   gstPercent: gstPercentSchema.optional(),
 });
 export type updatePoUpdateItemSchemaType = z.infer<
@@ -283,7 +284,7 @@ export type confirmPoSchemaType = z.infer<typeof confirmPoSchema>;
 export const markPoInvoicedSchema = z.object({
   invoiceNumber: z.string().trim().min(1).max(100),
   invoiceDate: z.coerce.date(),
-  billedAmountPaise: z.number().int().nonnegative(),
+  billedAmountPaise: z.number().int().nonnegative().max(MAX_MONEY_PAISE),
   dueDate: z.coerce.date().optional(),
 });
 export type markPoInvoicedSchemaType = z.infer<typeof markPoInvoicedSchema>;

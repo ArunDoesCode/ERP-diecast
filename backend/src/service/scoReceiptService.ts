@@ -3,6 +3,7 @@ import type { Actor } from "../lib/auth-middleware";
 import { isUniqueViolation } from "../lib/db-errors";
 import { allocateDocumentSequence } from "../lib/document-number";
 import { BadRequestError, ConflictError, NotFoundError } from "../lib/errors";
+import { assertMoneyInRange } from "../lib/money";
 import { nothingLeftAtVendor, rawUsedFor } from "../lib/sco-math";
 import { scoChallanRepository } from "../repository/scoChallanRepository";
 import { scoReceiptRepository } from "../repository/scoReceiptRepository";
@@ -357,6 +358,7 @@ export const scoReceiptService = {
             (sum, seg) => sum + seg.qty * seg.unitIssueCostPaise,
             0,
           );
+          assertMoneyInRange(value);
           const base = {
             itemId: line.rawItemId,
             referenceType: "sco_receipt" as const,
@@ -461,6 +463,7 @@ export const scoReceiptService = {
         (s, r) => s + r.processedQty * r.unitIssueCostPaise,
         0,
       );
+      assertMoneyInRange(settledValue);
       const issueCost =
         settledQty > 0 ? Math.round(settledValue / settledQty) : 0;
 

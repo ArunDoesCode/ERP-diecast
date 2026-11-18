@@ -6,6 +6,7 @@ import {
   subcontractingOrders,
 } from "../db/schemas/02_procurement-purchasing";
 import { companySettings } from "../db/schemas/04_company";
+import { MAX_MONEY_PAISE } from "../lib/money";
 import { gstPercentSchema } from "./po.types";
 
 export const scoStatusSchema = z.enum(scoStatusEnum.enumValues);
@@ -56,7 +57,12 @@ export const scoLineInputSchema = z.object({
   rawQtyToIssue: wholeQtySchema,
   expectedReturnQty: wholeQtySchema,
   // BR-SCO-02: omitted = copied from the vendor's active service price list.
-  serviceUnitPricePaise: z.number().int().min(1).optional(),
+  serviceUnitPricePaise: z
+    .number()
+    .int()
+    .min(1)
+    .max(MAX_MONEY_PAISE)
+    .optional(),
   serviceTaxPercentage: gstPercentSchema.optional(),
   rawItemBatch: z.string().trim().min(1).max(100).optional(),
 });

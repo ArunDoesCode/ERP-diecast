@@ -18,6 +18,7 @@ export const roles = pgTable("roles", {
   name: text("name").notNull().unique(),
   isSystem: boolean("is_system").notNull().default(false), // seed Owner, BackOffice, super-admin as true
   // set null: removing an employee row must not be blocked by roles they created (the access log keeps who)
+  // no-index: audit who-did-it column, read only by joining to employees
   createdBy: integer("created_by").references((): AnyPgColumn => employees.id, {
     onDelete: "set null",
   }),
@@ -47,19 +48,24 @@ export const rolePermissions = pgTable(
     permissionKey: text("permission_key")
       .notNull()
       .references(() => permissions.key, { onDelete: "cascade" }),
+    // no-index: audit who-did-it column, read only by joining to employees
     grantedBy: integer("granted_by").references(
       (): AnyPgColumn => employees.id,
       { onDelete: "set null" },
     ),
     grantedAt: timestamp("granted_at").defaultNow().notNull(),
   },
-  (table) => [primaryKey({ columns: [table.roleId, table.permissionKey] })],
+  (table) => [
+    primaryKey({ columns: [table.roleId, table.permissionKey] }),
+    index("idx_role_permissions_permission_key").on(table.permissionKey),
+  ],
 );
 
 // Screens are defined in code: code owns key/path/permissionKey, the UI owns label/sortOrder/menuGroup.
 export const screens = pgTable("screens", {
   key: text("key").primaryKey(),
   path: text("path").notNull(),
+  // no-index: tiny static or config table, under about 100 rows
   permissionKey: text("permission_key").references(() => permissions.key, {
     onDelete: "set null",
   }), // null = any signed-in user
@@ -86,16 +92,22 @@ export const authAuditLog = pgTable(
   ],
 );
 
-export const refreshTokens = pgTable("refresh_tokens", {
-  id: serial("id").primaryKey(),
-  employeeId: integer("employee_id")
-    .notNull()
-    .references(() => employees.id, { onDelete: "cascade" }),
-  tokenHash: text("token_hash").notNull().unique(),
-  expiresAt: timestamp("expires_at").notNull(),
-  createdBy: integer("created_by").references(() => employees.id),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+export const refreshTokens = pgTable(
+  "refresh_tokens",
+  {
+    id: serial("id").primaryKey(),
+    employeeId: integer("employee_id")
+      .notNull()
+      .references(() => employees.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull().unique(),
+    // no-index: covered:refresh_tokens_token_hash_key token hash always given
+    expiresAt: timestamp("expires_at").notNull(),
+    // no-index: audit who-did-it column, read only by joining to employees
+    createdBy: integer("created_by").references(() => employees.id),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("idx_refresh_tokens_employee_id").on(table.employeeId)],
+);
 
 // Shared numbering series for business documents (PR/PO/SCO/etc.) by period.
 export const documentNumberCounters = pgTable(
@@ -105,8 +117,10 @@ export const documentNumberCounters = pgTable(
     docType: text("doc_type").notNull(),
     periodKey: text("period_key").notNull(), // Example: 2026-07 or FY26-27
     lastSeq: integer("last_seq").notNull().default(0),
+    // no-index: audit who-did-it column, read only by joining to employees
     createdBy: integer("created_by").references(() => employees.id),
     createdAt: timestamp("created_at").defaultNow().notNull(),
+    // no-index: audit who-did-it column, read only by joining to employees
     lastUpdatedBy: integer("last_updated_by").references(() => employees.id),
     lastUpdatedAt: timestamp("last_updated_at").defaultNow().notNull(),
   },

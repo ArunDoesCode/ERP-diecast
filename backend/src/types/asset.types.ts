@@ -11,6 +11,7 @@ import {
   machines,
   serviceMaster,
 } from "../db/schemas/02_procurement-catalog";
+import { MAX_MONEY_PAISE } from "../lib/money";
 
 // Fixed lists (BR-INV-02), kept in code.
 export const ITEM_CATEGORIES = [
@@ -39,7 +40,7 @@ const reorderLevelSchema = z
   });
 
 // Whole paise > 0 per unit (BR-INV-03); cost columns are int4.
-const standardRateSchema = z.number().int().min(1).max(2_147_483_647);
+const standardRateSchema = z.number().int().min(1).max(MAX_MONEY_PAISE);
 
 // BR-INV-09: optional; if given, 6 digits starting with 99.
 const sacCodeSchema = z
@@ -368,7 +369,7 @@ const qty3dp = z
   .refine((v) => Math.abs(v) <= 1e9, { message: "Quantity is too large" });
 const reasonSchema = z.string().trim().min(1).max(1000);
 const batchSchema = z.string().trim().min(1).max(100).nullish();
-const costSchema = z.number().int().min(1).max(2_147_483_647); // int4
+const costSchema = z.number().int().min(1).max(MAX_MONEY_PAISE); // int4
 
 export const assetManualMovementCreateSchema = z.discriminatedUnion(
   "referenceType",

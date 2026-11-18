@@ -31,6 +31,7 @@ import {
 import { employees } from "../db/schemas/03_hcm";
 import { allocateDocumentSequence } from "../lib/document-number";
 import { istMonthKey } from "../lib/ist-day";
+import { assertMoneyInRange } from "../lib/money";
 import type {
   scoListQuerySchemaType,
   scoResponseSchemaType,
@@ -79,6 +80,8 @@ export function computeScoLinePaise(
   const lineTaxPaise = Math.round(
     (lineValuePaise * Math.round(gstPercent * 100)) / 10000,
   );
+  assertMoneyInRange(lineValuePaise);
+  assertMoneyInRange(lineTaxPaise);
   return { lineValuePaise, lineTaxPaise };
 }
 
@@ -87,11 +90,11 @@ export function computeScoTotalsPaise(
 ) {
   const subtotalPaise = lines.reduce((sum, l) => sum + l.lineValuePaise, 0);
   const taxAmountPaise = lines.reduce((sum, l) => sum + l.lineTaxPaise, 0);
-  return {
-    subtotalPaise,
-    taxAmountPaise,
-    totalAmountPaise: subtotalPaise + taxAmountPaise,
-  };
+  const totalAmountPaise = subtotalPaise + taxAmountPaise;
+  assertMoneyInRange(subtotalPaise);
+  assertMoneyInRange(taxAmountPaise);
+  assertMoneyInRange(totalAmountPaise);
+  return { subtotalPaise, taxAmountPaise, totalAmountPaise };
 }
 
 // Inclusive upper bound for a `createdTo` filter: a bare date (midnight UTC)
