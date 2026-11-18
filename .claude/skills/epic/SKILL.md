@@ -31,7 +31,8 @@ You are the coordinator (see `/feature` and `.claude/pipeline/PROTOCOL.md`).
 
 ## 2. Run sub-features
 For each sub-feature in order whose dependencies are merged into `epic/<module>`:
-`/feature <module> --sub <sub> --base epic/<module>` (full pipeline, its own branch + PR into the epic).
+`/feature <module> --sub <sub> --base epic/<module>` (full pipeline, its own `feature/<module>-<sub>` branch +
+worktree, PR into the epic).
 Independent sub-features (no dependency between them) may run in parallel in separate worktrees (run `codegraph init -i` in each new one); never
 two that touch the same tables/screens.
 Wait for the user to merge each sub-PR (watcher reports merges), then `git pull` the epic branch and continue.
@@ -40,7 +41,8 @@ Wait for the user to merge each sub-PR (watcher reports merges), then `git pull`
 When all sub-features are merged: in a worktree of `epic/<module>`, run the Phase 3 verify loop from
 `/feature` on `git diff main...epic/<module>` (full reviews + test-runner, scenario must be green), then
 open the epic PR into `main` with: sub-PR links, BR coverage for the whole spec, audit summary, full manual
-UAT script. Label `agent-pipeline`. The user merges; then update the spec's Implementation status.
+UAT script. Label `agent-pipeline`. Never push to `main`; the user merges. The spec's Implementation status is updated
+in the epic branch before the PR, so it merges with it.
 
 Keep `epic.md` status current (todo / in-progress #PR / merged) so `--resume` in a new session knows where
 it is.

@@ -31,5 +31,6 @@ description: >
 7. **Log** — if this bug pattern could recur (e.g. path param vs body, stale enum after rename), add an entry
    to `frontend/docs/gotchas.md` or `docs/decisions.md`. Put `Closes #NN` in the fix PR body so the issue closes on merge.
    S1/S2 during UAT: fix now. S3/S4 during UAT: log and batch weekly.
-8. **Ship with the batch** — all commits go on the working branch (root `CLAUDE.md` → Git). No new branch,
-   no push, no PR for one bug; it goes out in the next batch PR (push earlier only for S1 when the user asks).
+8. **Ship as one small PR** — commits go on `feature/bug-<issue or short name>` in its own worktree (root
+   `CLAUDE.md` → Git); if the bug was found inside an active run, on that run's branch instead. Never on `main`.
+   Push and open the PR (label `agent-pipeline`, `Closes #NN`) when checks are green; the user merges.

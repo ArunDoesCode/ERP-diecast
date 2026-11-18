@@ -67,14 +67,15 @@ protocol: `.claude/pipeline/PROTOCOL.md`. Package agents (hono-*, nextjs-*) hold
 the dev/review agents read.
 
 ## Git
-- **One working branch, one worktree, few PRs.** Work happens on one local branch `work/<theme>` (now
-  `work/m1`) in the one worktree `.claude/worktrees/bl-006-test-db`. Re-enter it (EnterWorktree `path=`);
-  never create a new branch or worktree per bug, feature, spec or doc fix.
-- Every item is its own commit on that branch (`fix(BL-018): …`, `test(…)`, `feat(…)`, `docs(…)`).
-  STATUS/backlog/map updates are commits there too — never a PR of their own.
-- **Don't push until the batch is ready.** Push and open one PR only when the user asks, or when a group
-  of related items is done and checked. The user merges; then start the next batch from fresh `main`.
-- A second branch/worktree only for a truly parallel session or an epic. Never commit to `main`.
+- **One branch + one worktree per pipeline run, one small PR each.** A run (`/feature`, `/bug`, `/slice`)
+  works on `feature/<id>` in `.claude/worktrees/<id>`, cut from fresh `origin/main`. Resuming a run =
+  re-enter its worktree (EnterWorktree `path=`); never a second branch or worktree for the same id.
+- Epics: `epic/<name>` from `main`; each sub-feature is `feature/<id>` cut from the epic branch with a PR
+  into it; one final PR `epic/<name>` → `main`.
+- Every item is its own commit (`fix(<id>): …`, `test(…)`, `feat(…)`, `docs(…)`). STATUS/map/spec-status
+  updates are commits in the same PR — never a PR of their own.
+- Never commit or push to `main`. The pipeline pushes only `feature/*` and `epic/*`; the user merges into
+  `main`. After the merge: remove the worktree, delete the local branch.
 - Pipeline PRs carry label `agent-pipeline`. Pipeline replies on GitHub start with `🤖`.
 - CI (`.github/workflows/ci.yml`) must be green before a PR is handed to the user.
 

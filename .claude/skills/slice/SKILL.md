@@ -13,7 +13,8 @@ If the user gives no BR ids, read the spec and propose the next slice (rules not
 
 ## 0. Gate
 - `docs/specs/<module>.md` must have `status: frozen`. If not → stop, suggest `/spec` / `/freeze`.
-- Work on the working branch in the shared worktree (root `CLAUDE.md` → Git), not on `main`. Commit; don't push.
+- Work on `feature/<module>-<slice>` in its own worktree `.claude/worktrees/<module>-<slice>` (root
+  `CLAUDE.md` → Git), never on `main`. Commit; push and open the PR only when the user says so.
 - Enter plan mode and present: BRs in scope, endpoints touched, files expected to change, tests to add.
   Get approval before step 1.
 

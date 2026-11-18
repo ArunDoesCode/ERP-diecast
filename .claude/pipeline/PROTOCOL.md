@@ -22,6 +22,12 @@ explorer  backend-dev  frontend-dev  test-writer  reviewers ×4   test-runner
   `backend/src/routes/end-points.ts` + generated `backend/.contracts/api-manifest.json` + the run's
   `contract.md`). Frontend never reads backend source to guess shapes.
 
+## Git model
+One branch + one worktree per run: `feature/<id>` in `.claude/worktrees/<id>`, cut from the base (`main`, or
+`epic/<name>` for an epic sub-feature), one small PR into the base. Never commit or push to `main`; the user
+merges into `main`. PRs carry label `agent-pipeline`; CI must be green before hand-over. Full rule: root
+`CLAUDE.md` → Git.
+
 ## Run folder: `.pipeline/<feature>/` (committed on the feature branch)
 | File | Written by | Purpose |
 |---|---|---|

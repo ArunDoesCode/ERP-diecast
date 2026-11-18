@@ -21,11 +21,12 @@ limit hit, (c) the PR is ready. Everything else you decide and record.
 ## Phase 0 — Preflight
 1. Spec gate: `docs/specs/<module>.md` has `status: frozen`. If not → stop: "run `/spec` then `/freeze`".
 2. `gh auth status` works, `git status` clean on the base. Base = `--base` or `main`.
-3. Feature id: `<module>` or `<module>-<sub>` (used for `.pipeline/<id>/` and commit scopes only).
-4. Branch + worktree: use the **working branch** in the shared worktree (root `CLAUDE.md` → Git):
-   EnterWorktree `path=.claude/worktrees/bl-006-test-db`; if its branch is `work/<theme>`, build on it.
-   Only if no working branch exists, create `work/<theme>` there from fresh `origin/main`. Never create a
-   per-feature branch or worktree. Epic sub-features are the one exception (`feature/<epic>--<sub>`).
+3. Feature id: `<module>` or `<module>-<sub>` (used for the branch, the worktree, `.pipeline/<id>/` and
+   commit scopes).
+4. Branch + worktree (root `CLAUDE.md` → Git): one per run. `git fetch origin`, then
+   `git worktree add .claude/worktrees/<id> -b feature/<id> origin/<base>` and EnterWorktree
+   `path=.claude/worktrees/<id>`. On `--resume` the worktree exists: re-enter it, never create a second
+   one. Epic sub-features use the same naming with `<base>` = `epic/<module>`. Never work on `main`.
 5. Infra: `cd backend && docker compose up -d && bun run db:test:prepare` (migrates + seeds the test DB; dev DB: `bun run db:reset` — see docs/specs/db-migrations.md).
    Code index: `[ -d .codegraph ] && codegraph sync || codegraph init -i` at the worktree root (also on
    `--resume`). Keep it fresh: `codegraph sync` after each slice commit and before Phase 3 step A. Agents
@@ -98,11 +99,8 @@ loop:
      matching skill, one line — only if it would have prevented a finding. Respect budgets in `docs/KNOWLEDGE.md`.
    - `docs/STATUS.md` — module row + Active pipelines (phase: pr).
    Commit: `docs(<id>): module map, spec status`.
-0. **Batch, don't ship each feature.** By default stop here: tell the user the feature is done and
-   committed on the working branch, and ask whether to add more items or open the PR now. Push and open a
-   PR only when the user says so; one PR then covers every item on the branch (a section per item).
-1. `git push -u origin <working branch>`.
-2. `gh pr create --base <base> --head <working branch> --label agent-pipeline --title "<theme>: <summary>"` with body:
+1. `git push -u origin feature/<id>` (one small PR per run — don't batch other features into it).
+2. `gh pr create --base <base> --head feature/<id> --label agent-pipeline --title "<id>: <summary>"` with body:
    - Spec + version, BR coverage table (BR | enforced at | test)
    - What changed (backend / frontend), contract changes (from `contract.md`)
    - Audit summary: security / performance / code review — fixed, backlogged, rejected (with reason)
@@ -135,7 +133,7 @@ loop:
    what changed (written by test-writer, checklist mode). Update `lastProcessedCommentAt`.
 
 ## After merge (detected by /watch-prs)
-Docs already merged with the PR (Phase 4 step 0). Keep the worktree: switch it to a new working branch from
-fresh `origin/main` (`git switch -c work/<next-theme> origin/main`) and delete the merged branch locally.
-Note the merge in `docs/STATUS.md` "Recently done" as the first commit of the new branch (never its own PR).
-If part of an epic, hand back to `/epic` for the next sub-feature.
+Docs already merged with the PR (Phase 4 step 0). From the main checkout: `git worktree remove
+.claude/worktrees/<id>` and `git branch -d feature/<id>` (the remote branch is deleted by GitHub on merge).
+The merge is noted in `docs/STATUS.md` "Recently done" by the next run's docs commit or `/status` (never a
+PR of its own). If part of an epic, hand back to `/epic` for the next sub-feature.

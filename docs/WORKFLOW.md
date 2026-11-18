@@ -27,7 +27,7 @@ have to be re-explained.
 ## The autonomous pipeline
 ```
  /freeze ─► /feature <module>        (main session = Opus coordinator)
-   0 preflight: spec frozen? worktree feature/<id> off base, docker up, baseline test-runner
+   0 preflight: spec frozen? branch feature/<id> + worktree .claude/worktrees/<id> off base, docker up, baseline test-runner
    1 plan:      explorer(haiku) → plan.md (slices) → questions to you only if spec can't answer
    2 build:     per slice: test-writer (red) → backend-dev contract → backend-dev ∥ frontend-dev (sonnet)
    3 verify:  ┌► code-reviewer ∥ security-auditor ∥ performance-auditor ∥ spec-reviewer   (sonnet)
@@ -71,7 +71,7 @@ Change a model by editing `model:` in `.claude/agents/<name>.md`. Use the family
 ### Really large features (`/epic`)
 Spec → coordinator splits it into ordered sub-features (5–15 BRs each, e.g. `bom-master` →
 `bom-explosion-engine` → `sale-order` → `so-explosion-to-pr`), you approve the split once, then:
-`epic/<name>` branch ← one `feature/<name>--<sub>` branch + PR per sub-feature (full pipeline each). The
+`epic/<name>` branch ← one `feature/<name>-<sub>` branch + worktree + PR per sub-feature (full pipeline each). The
 end-to-end scenario test is written first and turns green as sub-features land. Final epic PR into `main`
 gets a full re-audit.
 
@@ -81,6 +81,12 @@ gets a full re-audit.
 3. Permissions: `.claude/settings.json` (committed) allows the git/gh/bun/docker commands the pipeline needs
    and **denies** force-push, pushing to `main`, `gh pr merge` (merging is yours), hard reset, `rm -rf` and
    reading `.env`. Add more with `/fewer-permission-prompts` after a first run.
+
+### Git model (one rule — full text in root `CLAUDE.md` → Git)
+- One branch `feature/<id>` + one worktree `.claude/worktrees/<id>` per pipeline run, one small PR each.
+- Epics: `epic/<name>`; sub-feature PRs go into the epic branch, one final PR into `main`.
+- Never commit or push to `main`. You merge into `main`. PRs carry the label `agent-pipeline`; CI is green
+  before a PR is handed to you. After the merge the worktree and local branch are removed.
 
 ### Documentation & picking up work
 - **Pick up:** `/status` (or open `docs/STATUS.md`) — what's waiting on you, active pipelines, next action.
