@@ -4,7 +4,7 @@ import {
 	parseAsStringLiteral,
 	useQueryState,
 } from "nuqs";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { type PRType, prTypeValues } from "@/types/purchase-requisitions";
@@ -12,15 +12,16 @@ import { type PRType, prTypeValues } from "@/types/purchase-requisitions";
 export type POQueueSearchField = "prNumber" | "type";
 export type POQueueStatusFilter = "all" | "approved" | "partial_ordered";
 
+const PAGE_SIZES = [10, 20, 50];
 const statusValues = ["all", "approved", "partial_ordered"] as const;
 
 // Filter and page state live in the URL (BR-DS-17, nuqs).
 export function usePOQueueControls() {
-	const [page, setPageRaw] = useQueryState(
+	const [pageRaw, setPageRaw] = useQueryState(
 		"page",
 		parseAsInteger.withDefault(1),
 	);
-	const [pageSize, setPageSizeRaw] = useQueryState(
+	const [pageSizeRaw, setPageSizeRaw] = useQueryState(
 		"pageSize",
 		parseAsInteger.withDefault(10),
 	);
@@ -45,9 +46,21 @@ export function usePOQueueControls() {
 		parseAsStringLiteral(["asc", "desc"] as const).withDefault("desc"),
 	);
 
+	// A hand-edited URL (?page=-3, ?pageSize=7) falls back to the defaults.
+	const page = pageRaw >= 1 ? pageRaw : 1;
+	const pageSize = PAGE_SIZES.includes(pageSizeRaw) ? pageSizeRaw : 10;
+
 	// Typing stays local so every keystroke is not a URL write; the debounced value
 	// is what the query and the URL use.
 	const [typing, setTyping] = useState<string | null>(null);
+	// Back/forward changes the URL search: drop local typing that no longer matches it.
+	useEffect(() => {
+		setTyping((current) =>
+			current !== null && (current.trim() ? current : "") !== urlSearch
+				? null
+				: current,
+		);
+	}, [urlSearch]);
 	const prNumberSearch = typing ?? urlSearch;
 	const debouncedPRNumber = useDebouncedValue(prNumberSearch, 350);
 

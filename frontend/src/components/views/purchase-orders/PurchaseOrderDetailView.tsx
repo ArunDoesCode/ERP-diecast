@@ -213,7 +213,7 @@ export function PurchaseOrderDetailView({ prId }: { prId: number }) {
 		<div className="flex w-full max-w-[1100px] flex-col gap-4">
 			{detailQuery.isLoading ? (
 				<DetailSkeleton />
-			) : detailQuery.isError ? (
+			) : detailQuery.isError && !detail ? (
 				<ErrorState
 					message="Could not load this document."
 					onRetry={() => detailQuery.refetch()}
@@ -858,34 +858,36 @@ function PoMoreMenu({
  */
 function useOwnActionStatuses(linkedPos: PRLinkedPo[]) {
 	const queryClient = useQueryClient();
-	const armed = useRef(false);
+	// poId (or "all" when the mutation does not name one) -> time the arm expires
+	const armed = useRef<Map<number | "all", number>>(new Map());
 	const [own, setOwn] = useState<Record<number, string>>({});
 
 	useEffect(() => {
-		let timer: ReturnType<typeof setTimeout> | undefined;
 		const unsubscribe = queryClient.getMutationCache().subscribe((event) => {
 			if (
 				event.type === "updated" &&
 				event.mutation.state.status === "success"
 			) {
-				armed.current = true;
-				clearTimeout(timer);
-				timer = setTimeout(() => {
-					armed.current = false;
-				}, 10_000);
+				const variables = event.mutation.state.variables as
+					| { poId?: unknown }
+					| undefined;
+				const key =
+					typeof variables?.poId === "number" ? variables.poId : "all";
+				armed.current.set(key, Date.now() + 10_000);
 			}
 		});
-		return () => {
-			unsubscribe();
-			clearTimeout(timer);
-		};
+		return unsubscribe;
 	}, [queryClient]);
 
 	useEffect(() => {
+		const now = Date.now();
+		const isArmed = (id: number) =>
+			(armed.current.get(id) ?? 0) > now ||
+			(armed.current.get("all") ?? 0) > now;
 		setOwn((current) => {
 			let next = current;
 			for (const po of linkedPos) {
-				if (current[po.id] === undefined || armed.current) {
+				if (current[po.id] === undefined || isArmed(po.id)) {
 					if (current[po.id] !== po.status) {
 						if (next === current) next = { ...current };
 						next[po.id] = po.status;
