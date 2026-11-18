@@ -18,10 +18,15 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+	checkMotion,
+	checkPalette,
+	type Finding,
+	maskComments,
+} from "./standards-rules";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = join(ROOT, "src");
-const UI_DIR = "src/components/ui/";
 const ALLOWLIST = "design/motion-allowlist.json";
 
 // Strict switch: `--strict` / STANDARDS_STRICT=1 = every rule blocks;
@@ -45,7 +50,6 @@ const strict = strictAll || strictRules.size > 0;
 const blocks = (rule: string) => strictAll || strictRules.has(rule);
 const summaryOnly = process.argv.includes("--summary");
 
-type Finding = { file: string; line: number; rule: string; message: string };
 const findings: Finding[] = [];
 const notes: string[] = [];
 
@@ -69,46 +73,6 @@ function walk(dir: string, out: string[] = []): string[] {
 }
 
 const rel = (file: string) => relative(ROOT, file).split("\\").join("/");
-
-/** Blanks out comments (same length, newlines kept) so offsets and lines still match. */
-function maskComments(src: string): string {
-	const out = src.split("");
-	let i = 0;
-	let quote: string | null = null;
-	while (i < src.length) {
-		const ch = src[i];
-		const next = src[i + 1];
-		if (quote) {
-			if (ch === "\\") i += 2;
-			else {
-				if (ch === quote) quote = null;
-				i += 1;
-			}
-			continue;
-		}
-		if (ch === '"' || ch === "`") {
-			// Single quotes are skipped on purpose: JSX text has apostrophes.
-			quote = ch;
-			i += 1;
-		} else if (ch === "/" && next === "/" && src[i - 1] !== ":") {
-			while (i < src.length && src[i] !== "\n") {
-				out[i] = " ";
-				i += 1;
-			}
-		} else if (ch === "/" && next === "*") {
-			while (i < src.length && !(src[i] === "*" && src[i + 1] === "/")) {
-				if (src[i] !== "\n") out[i] = " ";
-				i += 1;
-			}
-			out[i] = " ";
-			out[i + 1] = " ";
-			i += 2;
-		} else {
-			i += 1;
-		}
-	}
-	return out.join("");
-}
 
 function lineAt(src: string, offset: number): number {
 	let line = 1;
@@ -189,32 +153,13 @@ function checkMutations() {
 
 // ─── (b) raw palette classes ────────────────────────────────────────────────
 
-const PALETTE =
-	/(?<![\w-])(bg|text|border|ring|fill|stroke)-(red|rose|pink|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|slate|gray|zinc|neutral|stone)-\d{2,3}(?![\w])/g;
-
-function checkPalette() {
-	for (const f of files) {
-		if (f.rel.startsWith(UI_DIR)) continue;
-		const lines = f.code.split("\n");
-		lines.forEach((text, i) => {
-			const hits = text.match(PALETTE);
-			if (!hits) return;
-			add(
-				f.rel,
-				i + 1,
-				"raw-palette",
-				`raw palette class ${[...new Set(hits)].join(", ")} - use a semantic token (status map / design tokens)`,
-			);
-		});
-	}
+function runPalette() {
+	for (const f of files) findings.push(...checkPalette(f.rel, f.raw));
 }
 
 // ─── (c) motion outside the allow-list ──────────────────────────────────────
 
-const MOTION =
-	/(?<![\w-])(?:transition|animate|duration)-[\w[\]().%/-]+|(?<![\w.$])motion\.\w+/g;
-
-function checkMotion() {
+function runMotion() {
 	let allowed: string[] = [];
 	const allowPath = join(ROOT, ALLOWLIST);
 	if (existsSync(allowPath)) {
@@ -235,28 +180,15 @@ function checkMotion() {
 	} else {
 		add(ALLOWLIST, 0, "motion", "allow-list file is missing");
 	}
-	for (const f of files) {
-		if (f.rel.startsWith(UI_DIR) || allowed.includes(f.rel)) continue;
-		const lines = f.code.split("\n");
-		lines.forEach((text, i) => {
-			const hits = text.match(MOTION);
-			if (!hits) return;
-			add(
-				f.rel,
-				i + 1,
-				"motion",
-				`${[...new Set(hits)].join(", ")} used outside src/components/ui and ${ALLOWLIST}`,
-			);
-		});
-	}
+	for (const f of files) findings.push(...checkMotion(f.rel, f.raw, allowed));
 	notes.push(`motion: ${allowed.length} file(s) on the allow-list.`);
 }
 
 // ─── run + report ───────────────────────────────────────────────────────────
 
 checkMutations();
-checkPalette();
-checkMotion();
+runPalette();
+runMotion();
 
 const RULES = ["mutation-invalidate", "raw-palette", "motion"];
 
