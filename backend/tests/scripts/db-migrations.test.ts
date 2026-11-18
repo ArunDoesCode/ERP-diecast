@@ -388,9 +388,9 @@ describe("migration files (BR-MIG-02, 03, 04)", () => {
   });
 
   test("BR-MIG-03 baseline SQL has every index, partial index and check constraint of the schema, by name", () => {
-    const [baseline] = folders();
-    expect(baseline).toBeDefined();
-    const sql = sqlOf(baseline);
+    // the rule is about the migrations as a whole (later ones may add indexes), so read every folder
+    expect(folders().length).toBeGreaterThan(0);
+    const sql = folders().map(sqlOf).join("\n");
     const required = [
       "uq_locations_name_norm",
       "uq_locations_one_main_store",
@@ -638,7 +638,16 @@ describe("db:migrate behaviour (BR-MIG-04, 13, 14, 15, 22)", () => {
       );
       await s.unsafe(`INSERT INTO public.pages (path) VALUES ('/x')`);
       await s.unsafe(`INSERT INTO public.role_pages VALUES (1, 1)`);
-      await removeLastJournalRow(s); // as if the DB was built before the second migration
+      // as if the DB was built before the second migration: keep only the baseline's journal row
+      await s.unsafe(
+        `DELETE FROM drizzle.__drizzle_migrations
+         WHERE id <> (SELECT min(id) FROM drizzle.__drizzle_migrations)`,
+      );
+      // undo what the later migrations added, so they can run again on this DB
+      const later = folders().slice(2).map(sqlOf).join("\n");
+      for (const m of later.matchAll(/CREATE (?:UNIQUE )?INDEX "([^"]+)"/g)) {
+        await s.unsafe(`DROP INDEX IF EXISTS public."${m[1]}"`);
+      }
     });
     const modulesBefore = await q(SCRATCH, (s) => count(s, "modules"));
     const r = await migrate();

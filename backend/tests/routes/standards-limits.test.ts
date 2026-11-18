@@ -262,11 +262,12 @@ afterAll(async () => {
       .delete(subcontractingOrders)
       .where(inArray(subcontractingOrders.id, scoIds));
   }
-  if (poIds.length) {
-    await db
-      .delete(purchaseOrderItems)
-      .where(inArray(purchaseOrderItems.poId, poIds));
-  }
+  // PRs created by tests that failed before recording their id still belong to this actor
+  const strayPrs = await db
+    .select({ id: purchaseRequests.id })
+    .from(purchaseRequests)
+    .where(eq(purchaseRequests.requestedBy, actorId));
+  prIds.push(...strayPrs.map((p) => p.id).filter((id) => !prIds.includes(id)));
   const prItems = prIds.length
     ? await db
         .select({ id: purchaseRequestItems.id })
@@ -280,6 +281,11 @@ afterAll(async () => {
         prItems.map((i) => i.id),
       ),
     );
+  }
+  if (poIds.length) {
+    await db
+      .delete(purchaseOrderItems)
+      .where(inArray(purchaseOrderItems.poId, poIds));
   }
   if (poIds.length) {
     await db.delete(purchaseOrders).where(inArray(purchaseOrders.id, poIds));
