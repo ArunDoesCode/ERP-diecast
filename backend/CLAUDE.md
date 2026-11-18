@@ -45,6 +45,8 @@ tests/            all *.test.ts, mirroring src/ + setup-env.ts (bun test preload
 docker compose up -d        # dev Postgres :5432 + test Postgres :5433
 bun run db:migrate          # apply pending migrations to DATABASE_URL (dev DB)
 bun run db:test:prepare     # apply migrations + role/permission seed to the test DB
+bun run db:test:rebuild     # wipe + rebuild the test DB exactly as CI does (DATABASE_URL_TEST only; --dry-run, --fixtures)
+bun run try                 # try the branch: DBs + safe db:migrate + API :4000 + UI :3000 (--check = show only)
 ```
 **Tests never touch the dev DB.** `bunfig.toml` preloads `tests/setup-env.ts`, which replaces `DATABASE_URL`
 with `DATABASE_URL_TEST` before any module loads, and refuses to run if that variable is missing, equals

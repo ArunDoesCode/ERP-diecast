@@ -18,10 +18,8 @@
 
 ## Try it
 ```bash
-# missing — to be added: one command that starts backend + frontend with seeded demo data (`bun run try`).
-# Until then, from the worktree .claude/worktrees/<id>, two terminals:
-cd backend && docker compose up -d && bun run db:migrate && bun run dev      # API on :4000
-cd frontend && bun run dev                                                   # UI on :3000
+# From the worktree .claude/worktrees/<id>. Starts the DBs, asks before migrating the dev DB, starts API :4000 + UI :3000.
+cd backend && bun run try            # `bun run try --check` first shows what it would do; Ctrl-C stops both
 ```
 Demo data: the dev DB as it is. Logins `<role>@diecast.local` (password = your `SEED_USER_PASSWORD`).
 No `backend/.env` in the worktree → `bun --env-file=<state.json envFile> run …`. Never `bun run db:reset` here.

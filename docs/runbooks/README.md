@@ -39,8 +39,6 @@ For pipeline agents in an unattended run (first) and the owner (second). One pag
 | Env file | file with `DATABASE_URL`, `DATABASE_URL_TEST`, secrets, `SEED_USER_PASSWORD`. A new worktree has no `backend/.env` (gitignored). Past runs stored the path in `state.json` → `envFile` and ran `bun --env-file=<path> …` |
 
 ## Not there yet (the runbooks say "missing — to be added" where they need these)
-- One command that starts backend + frontend with demo data for "Try it" (`HANDOVER.md` says so).
-- A script that prints the reset target and refuses a non-test DB (see [test-db-reset.md](test-db-reset.md)).
 - Allow rules for `gh issue create`, `gh issue list`, `git revert`, `git worktree remove`,
   `.claude/pipeline/state.sh`, `.claude/pipeline/merge-sub-pr.sh` are not all in `.claude/settings.json`
   today; only the owner changes that file.
