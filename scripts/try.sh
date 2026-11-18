@@ -10,6 +10,7 @@
 # Safety: never resets, drops or seeds over data. Migrations go only through `bun run db:migrate`
 # (backup + typed confirm on the dev DB, docs/specs/db-migrations.md BR-MIG-13..17). The only
 # other DB access is scripts/try-status.ts, one READ ONLY transaction. Never prints a password.
+# Both servers listen on 127.0.0.1 only (BR-STD T-1): nothing is reachable from the network.
 # Ctrl-C stops the API and the UI this script started; the Docker DBs keep running.
 set -u
 
@@ -30,7 +31,7 @@ while [ $# -gt 0 ]; do
     --skip-migrate) SKIP_MIGRATE=1 ;;
     --env-file) shift; ENV_FILE="${1:-}" ;;
     --env-file=*) ENV_FILE="${1#--env-file=}" ;;
-    -h|--help) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n "2,15p" "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown option: $1 (see --help)"; exit 64 ;;
   esac
   shift
@@ -158,7 +159,7 @@ if [ "$PROBLEMS" -eq 0 ] && [ "$DEV_DB_UP" -eq 1 ]; then
 fi
 
 if [ "$CHECK" -eq 1 ]; then
-  would "start the API on $API_URL (cd backend && bun run dev) and the UI on $UI_URL (cd frontend && bun run dev)"
+  would "start the API on $API_URL (cd backend && LISTEN_HOST=127.0.0.1 bun run dev) and the UI on $UI_URL (cd frontend && bun run dev -H 127.0.0.1); both listen on 127.0.0.1 only, not on the network"
   would "wait until both answer, print the URL and the demo login names, stop both on Ctrl-C"
   say ""
   if [ "$PROBLEMS" -gt 0 ]; then
@@ -253,10 +254,10 @@ trap 'stop_all' EXIT
 
 say ""
 say "Starting API (:$API_PORT) and UI (:$UI_PORT)…"
-if [ -n "$ENV_ARG" ]; then start api "$BACKEND" env PORT="$API_PORT" bun "$ENV_ARG" run dev
-else start api "$BACKEND" env PORT="$API_PORT" bun run dev; fi
+if [ -n "$ENV_ARG" ]; then start api "$BACKEND" env PORT="$API_PORT" LISTEN_HOST=127.0.0.1 bun "$ENV_ARG" run dev
+else start api "$BACKEND" env PORT="$API_PORT" LISTEN_HOST=127.0.0.1 bun run dev; fi
 API_PG="$LAST_PG"
-start ui "$FRONTEND" bun run dev --port "$UI_PORT"
+start ui "$FRONTEND" bun run dev --port "$UI_PORT" -H 127.0.0.1
 UI_PG="$LAST_PG"
 
 answers() { curl -s -o /dev/null --max-time 3 "$1"; }
