@@ -1,5 +1,5 @@
 ---
-title: Proposed changes to .claude/settings.json (not applied)
+title: Proposed changes to .claude/settings.json (applied)
 created: 2026-11-18
 status: applied 2026-11-18 (owner approved)
 ---
