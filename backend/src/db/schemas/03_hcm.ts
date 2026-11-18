@@ -1,4 +1,5 @@
 import {
+  bigint,
   boolean,
   index,
   integer,
@@ -22,10 +23,13 @@ export const employees = pgTable(
     roleId: integer("role_id")
       .notNull()
       .references(() => roles.id),
-    dailyRatePaise: integer("daily_rate_paise").default(0),
+    dailyRatePaise: bigint("daily_rate_paise", { mode: "number" }).default(0),
+    // no-index: low-card few distinct values, index would not be used
     isActive: boolean("is_active").notNull().default(true),
+    // no-index: audit who-did-it column, read only by joining to employees
     createdBy: integer("created_by").references((): any => employees.id),
     createdAt: timestamp("created_at").defaultNow().notNull(),
+    // no-index: audit who-did-it column, read only by joining to employees
     lastUpdatedBy: integer("last_updated_by").references(
       (): any => employees.id,
     ),

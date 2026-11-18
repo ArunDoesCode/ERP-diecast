@@ -1,14 +1,4 @@
-import {
-  and,
-  asc,
-  count,
-  desc,
-  eq,
-  ilike,
-  inArray,
-  or,
-  sql,
-} from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, or, sql } from "drizzle-orm";
 
 import { alias } from "drizzle-orm/pg-core";
 
@@ -26,6 +16,8 @@ import { supplierMaster } from "../db/schemas/02_procurement-suppliers";
 import { employees } from "../db/schemas/03_hcm";
 import { allocateDocumentSequence } from "../lib/document-number";
 import { AppError } from "../lib/errors";
+import { assertMoneyInRange } from "../lib/money";
+import { safeSearch, safeSearchSql } from "../lib/safe-search";
 import type { prListQuerySchemaType } from "../types/pr.types";
 
 const purchaseRequestColumns = {
@@ -158,7 +150,9 @@ async function calculateEstimatedAmountPaiseByItems(
     return sum + item.requestedQty * averageCostPaise;
   }, 0);
 
-  return Math.round(total);
+  const estimated = Math.round(total);
+  assertMoneyInRange(estimated);
+  return estimated;
 }
 
 type ItemMasterLookupRow = Pick<
@@ -182,18 +176,12 @@ export const prRepository = {
         : purchaseRequests.id;
     const orderFn = params.sortDir === "desc" ? desc : asc;
 
-    const q = params.q?.trim();
-    const pattern = q ? `%${q}%` : undefined;
-
     const filters = [
-      pattern
-        ? or(
-            ilike(purchaseRequests.prNumber, pattern),
-            ilike(purchaseRequests.notes, pattern),
-            sql`${purchaseRequests.type}::text ilike ${pattern}`,
-            sql`${purchaseRequests.status}::text ilike ${pattern}`,
-          )
-        : undefined,
+      or(
+        safeSearch(params.q, purchaseRequests.prNumber, purchaseRequests.notes),
+        safeSearchSql(params.q, sql`${purchaseRequests.type}::text`),
+        safeSearchSql(params.q, sql`${purchaseRequests.status}::text`),
+      ),
       params.status && params.status.length > 0
         ? inArray(purchaseRequests.status, params.status)
         : undefined,
@@ -541,6 +529,7 @@ export const prRepository = {
       ),
     );
 
+    assertMoneyInRange(estimatedAmountPaise);
     const [row] = await executor
       .update(purchaseRequests)
       .set({ estimatedAmountPaise, updatedAt: new Date() })

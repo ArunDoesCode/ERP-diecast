@@ -42,7 +42,7 @@ Test DB URL (from `backend/.env.example`): `postgres://postgres:postgres@localho
    Any other database → hard stop. Then `bun test`.
 
 `SEED_USER_PASSWORD` comes from the env file (CI sets a throw-away value in `ci.yml`; test DB only).
-A wrapper script that does steps 2–3 and refuses a non-`_test` name is **missing — to be added**.
+Steps 2–3 in one command: `cd backend && bun run db:test:rebuild` (`--dry-run` shows the target and steps only; `--fixtures` adds demo data). It takes the target only from `DATABASE_URL_TEST` and exits 2, nothing changed, unless the name ends in `_test` and the host is local.
 
 ## If it fails twice
 `db:test:prepare` and the reset both fail → [docker-or-port-problem.md](docker-or-port-problem.md).

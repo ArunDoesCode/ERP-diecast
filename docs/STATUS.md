@@ -4,8 +4,8 @@
 > PR), `/watch-prs` (merges), `/status` (on demand) and `/wrap`. Humans: read this, then run `/status`.
 
 **Updated:** 2026-11-18 · **Milestone:** M1 Procurement hardening and M2 Subcontracting are merged. UAT-1 at the factory has not started. BOM and Sale Order have no spec, tables or code.
-**Now:** Workflow v2 build in progress — plan: [plans/agentic-workflow-v2.md](plans/agentic-workflow-v2.md). No product feature is built until its pilot (landing dashboard) is done.
-**Next action:** finish workflow v2 (phases 1–6 of the plan), then `/brief bom-explosion`. In parallel: prepare UAT-1 (list under "Waiting on you").
+**Now:** Workflow v2 is merged (PR #92). Standards hardening is in PR #96 (CI green, waits for your merge and 9 yes/no lines). Plan: [plans/agentic-workflow-v2.md](plans/agentic-workflow-v2.md).
+**Next action:** merge #96, then `/build design-system` (first pilot of `/goal` + `/feature`), then `/brief bom-explosion`. In parallel: prepare UAT-1.
 
 ## Modules
 | Module | Spec | Map | Code | State |
@@ -28,13 +28,15 @@ Legend — Code: none / schema only / partial / full. Tests per module: see each
 ## Active work
 | Item | Branch | Phase | PR | Waiting on |
 |---|---|---|---|---|
-| Workflow v2 (process only, no product code) | claude/erp-agentic-review-1af233 | Phase 0 truth pass done; phases 1, 2, 5 in progress | not opened | coordinator |
+| Standards hardening (409 mapping, safe search, input limits, 64-bit money, 17 indexes, blocking checks) | feature/standards-hardening | handover | #96 | you: merge + 9 confirm lines |
 | Tick manual UI checklist items (M1) | claude/quizzical-shamir-a5a596 | open since 2026-10-02, no `agent-pipeline` label | #87 | you: merge or close |
 
 No `/feature` pipeline is running.
 
 ## Waiting on you
+- [ ] PR #96 — merge; answer the 9 yes/no lines in its body. Run its migration in a quiet window (locks 23 tables ~1 min).
 - [ ] PR #87 — merge or close.
+- [ ] Set `permissions.defaultMode` to `auto` in `~/.claude/settings.json`.
 - [ ] Issues #16, #44, #63 are still open although PR #86 says it fixes them — close them if you agree.
 - [ ] Before UAT-1: enter real **Company details** (plant name, address, GSTIN, state) and an HSN code on each raw item — a challan is refused (400) without them. The demo seed fills dummy values only.
 - [ ] Before UAT-1: run the subcontracting manual UI checklist (PR #14 body).
@@ -42,6 +44,7 @@ No `/feature` pipeline is running.
 - [ ] Open issues: 51, none P1 (`gh issue list`). Date/guard follow-ups: #82, #83, #84, #85.
 
 ## Recently done
+- 2026-11-18 — PR #92 merged: workflow v2 (brief/research/build skills, new agents, hooks, runbooks, design-system spec frozen v1). Standards hardening built, PR #96 open.
 - 2026-11-18 — Workflow v2 phase 0 (truth pass): one git model (`feature/<id>` per run), `requirePermission` in all rules, one build order, one spec size rule, package agents retired into reference docs, `backend/CLAUDE.md` cut to conventions. Decision D-023
 - 2026-10-01 — PR #86 merged: `db:reset` guard checks the real DB target (known-defects v5), SCO dates use the IST day (subcontracting v4), generated migrations replace `db:push` (db-migrations v1). Decisions D-020..D-022
 - 2026-09-30 — PR #80 merged: all backend tests moved to `backend/tests`, scripts trimmed, SCO demo seed · PR #79: old docs removed · PR #81: dependabot config removed · PRs #65–#78: dependency bumps

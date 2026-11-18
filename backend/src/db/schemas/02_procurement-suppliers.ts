@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  bigint,
   boolean,
   doublePrecision,
   index,
@@ -37,7 +38,9 @@ export const supplierMaster = pgTable(
     defaultPaymentTermsDays: integer("default_payment_terms_days")
       .default(0)
       .notNull(), // e.g., 30 days
+    // no-index: low-card few distinct values, index would not be used
     isActive: boolean("is_active").notNull().default(true),
+    // no-index: audit who-did-it column, read only by joining to employees
     createdBy: integer("created_by").references(() => employees.id),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
@@ -64,12 +67,14 @@ export const supplierHistory = pgTable(
     supplierId: integer("supplier_id")
       .references(() => supplierMaster.id)
       .notNull(),
+    // no-index: covered:idx_supplier_history_supplier_changed supplier_id always given
     entity: supplierHistoryEntityEnum("entity").notNull(),
     // supplier_items.id / supplier_services.id for entity item/service; supplier id for entity supplier
     entityId: integer("entity_id").notNull(),
     field: text("field").notNull(), // e.g. name, gstNumber, supplierUnitPricePaise, taxPercentage, isActive
     oldValue: text("old_value"), // null = was empty / row created
     newValue: text("new_value"), // null = cleared
+    // no-index: audit who-did-it column, read only by joining to employees
     changedBy: integer("changed_by")
       .references(() => employees.id)
       .notNull(),
@@ -90,15 +95,21 @@ export const supplierServices = pgTable(
     supplierId: integer("supplier_id")
       .references(() => supplierMaster.id)
       .notNull(),
+    // no-index: covered:unique_supplier_service_idx supplier_id always given
     serviceId: integer("service_id")
       .references(() => serviceMaster.id)
       .notNull(),
-    serviceUnitPricePaise: integer("service_unit_price_paise").notNull(),
+    serviceUnitPricePaise: bigint("service_unit_price_paise", {
+      mode: "number",
+    }).notNull(),
     taxPercentage: doublePrecision("tax_percentage").default(0).notNull(),
     leadTimeDays: integer("lead_time_days").default(0).notNull(),
+    // no-index: covered:unique_supplier_service_idx queries always give the leading column of that index
     isActive: boolean("is_active").notNull().default(true),
+    // no-index: audit who-did-it column, read only by joining to employees
     createdBy: integer("created_by").references(() => employees.id),
     createdAt: timestamp("created_at").defaultNow().notNull(),
+    // no-index: audit who-did-it column, read only by joining to employees
     lastUpdatedBy: integer("last_updated_by").references(() => employees.id),
     lastUpdatedAt: timestamp("last_updated_at").defaultNow().notNull(),
   },
@@ -127,7 +138,9 @@ export const supplierItems = pgTable(
     supplierSku: text("supplier_sku"),
 
     // The negotiated price for THIS specific supplier providing THIS specific item
-    supplierUnitPricePaise: integer("supplier_unit_price_paise").notNull(),
+    supplierUnitPricePaise: bigint("supplier_unit_price_paise", {
+      mode: "number",
+    }).notNull(),
 
     // Tax rate for this specific item/supplier combo (e.g., 18% GST on metals, 12% on some chemicals)
     taxPercentage: doublePrecision("tax_percentage").default(0).notNull(),
@@ -138,9 +151,12 @@ export const supplierItems = pgTable(
     uom: text("uom").notNull(), // 'kg', 'pcs', 'ltr' - should match the item's UOM
 
     // Is this supplier still approved for this item?
+    // no-index: covered:unique_supplier_item_idx supplier_id + item_id given
     isActive: boolean("is_active").notNull().default(true),
+    // no-index: audit who-did-it column, read only by joining to employees
     createdBy: integer("created_by").references(() => employees.id),
     createdAt: timestamp("created_at").defaultNow().notNull(),
+    // no-index: audit who-did-it column, read only by joining to employees
     lastUpdatedBy: integer("last_updated_by").references(() => employees.id),
     lastUpdatedAt: timestamp("last_updated_at").defaultNow().notNull(),
   },

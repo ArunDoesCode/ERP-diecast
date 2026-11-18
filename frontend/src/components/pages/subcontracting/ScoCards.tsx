@@ -62,7 +62,7 @@ export function ScoCards({ orders, isLoading }: ScoCardsProps) {
 				return (
 					<Card
 						key={sco.id}
-						className="cursor-pointer transition-colors hover:bg-accent/40"
+						className="cursor-pointer hover:bg-accent/40"
 						onClick={() => router.push(`/subcontracting/${sco.id}`)}
 					>
 						<CardHeader className="space-y-2">

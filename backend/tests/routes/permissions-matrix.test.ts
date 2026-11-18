@@ -238,3 +238,116 @@ describe("BR-AUTH-21 seed grants give each seed role the intended API access", (
     expect(missing).toEqual([]);
   });
 });
+
+/**
+ * docs/specs/api-standards/spec.md (v1) T-3 and BR-STD-42: every route of getRegistry() (= the contract
+ * manifest) is guarded by its declared auth type. The public routes are exactly the three auth routes
+ * (held below; a fourth needs an owner-approved spec line). GET /health is not in the manifest and is checked
+ * on its own.
+ */
+const PUBLIC_ROUTES = [
+  "POST /api/auth/login",
+  "POST /api/auth/refresh",
+  "POST /api/auth/logout",
+];
+const KNOWN_AUTH_TYPES = new Set(["public", "any-authenticated", "permission"]);
+
+describe("T-3 / BR-STD-42 every registered route is guarded by its auth type", () => {
+  const EMPTY_PREFIX = "test_stdmx_";
+  let emptyRoleId: number;
+  let emptyToken: string;
+
+  const urlOf = (path: string) => path.replace(/:[A-Za-z]+/g, ID);
+  async function hit(d: { method: string; path: string }, token?: string) {
+    const headers: Record<string, string> = {
+      "content-type": "application/json",
+    };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const init: RequestInit = { method: d.method, headers };
+    if (d.method !== "GET" && d.method !== "DELETE") init.body = "{}";
+    const res = await app.request(urlOf(d.path), init);
+    // biome-ignore lint/suspicious/noExplicitAny: loose JSON in test responses
+    const json = (await res.json().catch(() => null)) as any;
+    return { status: res.status, json };
+  }
+
+  beforeAll(async () => {
+    await db.delete(employees).where(like(employees.email, `${EMPTY_PREFIX}%`));
+    await db.delete(roles).where(like(roles.name, `${EMPTY_PREFIX}%`));
+    const [role] = await db
+      .insert(roles)
+      .values({ name: `${EMPTY_PREFIX}nokeys`, isSystem: false })
+      .returning({ id: roles.id });
+    if (!role) throw new Error("Fixture setup: role insert");
+    emptyRoleId = role.id;
+    const email = `${EMPTY_PREFIX}nokeys@diecast.test`;
+    await db.insert(employees).values({
+      name: "TEST_stdmx_nokeys",
+      email,
+      passwordHash: await Bun.password.hash(PASSWORD),
+      roleId: emptyRoleId,
+      isActive: true,
+    });
+    emptyToken = (await authService.login(email, PASSWORD)).accessToken;
+  });
+
+  afterAll(async () => {
+    await db.delete(employees).where(like(employees.email, `${EMPTY_PREFIX}%`));
+    await db.delete(roles).where(eq(roles.id, emptyRoleId));
+  });
+
+  test("T-3 the registry is not empty and holds only the known auth types (BR-AUTH-10)", () => {
+    const reg = getRegistry();
+    expect(reg.length).toBeGreaterThan(0);
+    const unknown = reg
+      .filter((d) => !KNOWN_AUTH_TYPES.has((d.auth as { type: string }).type))
+      .map(
+        (d) => `${d.method} ${d.path} (${(d.auth as { type: string }).type})`,
+      );
+    expect(unknown).toEqual([]);
+  });
+
+  test("BR-STD-42 the public routes are exactly login, refresh and logout", () => {
+    const pub = getRegistry()
+      .filter((d) => d.auth.type === "public")
+      .map((d) => `${d.method} ${d.path}`)
+      .sort();
+    expect(pub).toEqual([...PUBLIC_ROUTES].sort());
+  });
+
+  test("BR-STD-42 GET /health with no token -> 200", async () => {
+    const res = await app.request("/health");
+    expect(res.status).toBe(200);
+  });
+
+  test("T-3 every permission route answers 401 with no token", async () => {
+    const wrong: string[] = [];
+    for (const d of getRegistry().filter((r) => r.auth.type === "permission")) {
+      const { status } = await hit(d);
+      if (status !== 401) wrong.push(`${d.method} ${d.path}: ${status}`);
+    }
+    expect(wrong).toEqual([]);
+  });
+
+  test("T-3 every any-signed-in route answers 401 with no token", async () => {
+    const wrong: string[] = [];
+    for (const d of getRegistry().filter(
+      (r) => r.auth.type === "any-authenticated",
+    )) {
+      const { status } = await hit(d);
+      if (status !== 401) wrong.push(`${d.method} ${d.path}: ${status}`);
+    }
+    expect(wrong).toEqual([]);
+  });
+
+  test("T-3 every permission route answers 403 PERMISSION_DENIED for a role that holds none of its keys", async () => {
+    const wrong: string[] = [];
+    for (const d of getRegistry().filter((r) => r.auth.type === "permission")) {
+      const { status, json } = await hit(d, emptyToken);
+      if (status !== 403 || json?.code !== "PERMISSION_DENIED") {
+        wrong.push(`${d.method} ${d.path}: ${status} ${json?.code ?? ""}`);
+      }
+    }
+    expect(wrong).toEqual([]);
+  });
+});

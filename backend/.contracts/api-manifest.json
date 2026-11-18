@@ -28,7 +28,7 @@
           "pageSize": "integer.nonnegative.required",
           "docType": "enum:pr,po,sco.optional",
           "isActive": "boolean.optional",
-          "q": "string.nonempty.optional",
+          "q": "string.optional",
           "sortBy": "enum:name,priority,docType,isActive,createdAt.optional",
           "sortDir": "enum:asc,desc.required"
         }
@@ -623,7 +623,7 @@
         "body": {
           "sku": "string.nonempty.required",
           "name": "string.nonempty.required",
-          "description": "unknown.optional",
+          "description": "string.nullable.optional",
           "category": "enum:Raw Material,Consumable,Spare Part,Tooling,Packing.required",
           "uom": "enum:kg,pcs,ltr,m,set.required",
           "reorderLevel": "number.nonnegative.optional",
@@ -670,7 +670,7 @@
         "body": {
           "sku": "string.nonempty.optional",
           "name": "string.nonempty.optional",
-          "description": "unknown.optional",
+          "description": "string.nullable.optional",
           "category": "enum:Raw Material,Consumable,Spare Part,Tooling,Packing.optional",
           "uom": "enum:kg,pcs,ltr,m,set.optional",
           "reorderLevel": "number.nonnegative.optional",
@@ -1337,7 +1337,7 @@
           "poId": "integer.positive.optional",
           "status": "enum:draft,pending_qa,accepted,rejected,partial_accepted.optional",
           "qaStatus": "enum:pending,passed,failed,waived.optional",
-          "q": "string.nonempty.optional"
+          "q": "string.optional"
         }
       },
       "responses": {
@@ -1668,7 +1668,7 @@
           "sortDir": "enum:asc,desc.required",
           "status": "array<enum:draft,pending_approval,approved,dispatched,partial_received,fully_received,invoiced,closed,cancelled>.optional",
           "supplierId": "integer.positive.optional",
-          "q": "string.nonempty.optional",
+          "q": "string.optional",
           "overdue": "unrepresentable.required"
         }
       },
@@ -2422,7 +2422,7 @@
           "sortDir": "enum:asc,desc.required",
           "status": "array<enum:draft,pending_approval,approved,rejected,partial_ordered,fully_ordered,cancelled>.optional",
           "type": "enum:sale_order,stock_reorder,maintenance,tooling,subcontracting,misc.optional",
-          "q": "string.nonempty.optional"
+          "q": "string.optional"
         }
       },
       "responses": {
@@ -2711,7 +2711,7 @@
           "sortDir": "enum:asc,desc.required",
           "status": "array<enum:draft,pending_approval,approved,rejected,require_more_info,material_issued,material_received,closed,cancelled>.optional",
           "vendorId": "integer.positive.optional",
-          "q": "string.nonempty.optional",
+          "q": "string.optional",
           "createdFrom": "unrepresentable.optional",
           "createdTo": "unrepresentable.optional"
         }

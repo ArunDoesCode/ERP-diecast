@@ -8,6 +8,8 @@ import {
   supplierServices,
   supplierTypeEnum,
 } from "../db/schemas/02_procurement-suppliers";
+import { MAX_MONEY_PAISE } from "../lib/money";
+import { searchTermSchema } from "../lib/safe-search";
 
 export const supplierTypeSchema = z.enum(supplierTypeEnum.enumValues);
 
@@ -110,11 +112,13 @@ export const SUPPLIER_GST_SLABS = [
 const gstinField = z
   .string()
   .trim()
+  .max(15)
   .toUpperCase()
   .refine((v) => v === "" || GSTIN_RE.test(v), "Invalid GST number");
 const panField = z
   .string()
   .trim()
+  .max(10)
   .toUpperCase()
   .refine((v) => v === "" || PAN_RE.test(v), "Invalid PAN");
 const emailField = z
@@ -122,7 +126,7 @@ const emailField = z
   .trim()
   .max(254)
   .refine((v) => v === "" || z.email().safeParse(v).success, "Invalid email");
-const optText = z.string().trim(); // SEC-40: give every use its own .max() below
+const optText = z.string().trim().max(2000); // SEC-40: give every use its own .max() below
 const shortText = optText.max(200);
 const phoneField = optText.max(30);
 const addressField = optText.max(500);
@@ -131,10 +135,11 @@ const nameField = z.string().trim().min(1, "Name is required").max(200);
 const paymentTermsField = z.number().int().min(0).max(365);
 const gstPercentField = z
   .number()
+  .max(40)
   .refine((v) => (SUPPLIER_GST_SLABS as readonly number[]).includes(v), {
     message: "GST % must be one of 0, 0.1, 0.25, 1.5, 3, 5, 12, 18, 28, 40",
   });
-const pricePaiseField = z.number().int().min(1).max(2147483647);
+const pricePaiseField = z.number().int().min(1).max(MAX_MONEY_PAISE);
 const leadTimeField = z.number().int().min(0).max(365);
 const qtyField = z
   .number()
@@ -172,7 +177,7 @@ export const supplierListQuerySchema = z.object({
     .optional(),
   sortDir: z.enum(["asc", "desc"]).default("asc"),
   // BR-SUP-23: matches name, contact person, email, phone, GSTIN, or SKU of a supplied item (ignore case, any part)
-  q: z.string().optional(),
+  q: searchTermSchema,
   // BR-SUP-24: the PO supplier picker sends "active"
   status: z.enum(["all", "active", "inactive"]).default("all"),
 });
@@ -183,7 +188,7 @@ export type supplierListQuerySchemaType = z.infer<
 export const supplierServiceListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(10),
-  q: z.string().optional(),
+  q: searchTermSchema,
 });
 export type supplierServiceListQuerySchemaType = z.infer<
   typeof supplierServiceListQuerySchema
@@ -197,7 +202,7 @@ export const supplierItemCreateSchema = z.object({
   leadTimeDays: leadTimeField.default(0),
   qty: qtyField.default(0), // 0 = no limit
   // must equal the item's own unit, else 400 (BR-SUP-14); the form locks it to the item unit
-  uom: z.string().trim().min(1),
+  uom: z.string().trim().min(1).max(20),
   isActive: z.boolean().optional(),
 });
 export type supplierItemCreateSchemaType = z.infer<
@@ -227,7 +232,7 @@ export const supplierCreateSchema = z
     address: addressField.optional(),
     defaultPaymentTermsDays: paymentTermsField.default(0),
     isActive: z.boolean().optional(),
-    supplierItems: z.array(supplierItemCreateSchema).optional(),
+    supplierItems: z.array(supplierItemCreateSchema).max(500).optional(),
   })
   .superRefine(refinePanMatchesGstin);
 export type supplierCreateSchemaType = z.infer<typeof supplierCreateSchema>;
@@ -268,7 +273,7 @@ const supplierItemUpdateSchema = z
     taxPercentage: gstPercentField.optional(),
     leadTimeDays: leadTimeField.optional(),
     qty: qtyField.optional(),
-    uom: z.string().trim().min(1).optional(),
+    uom: z.string().trim().min(1).max(20).optional(),
     isActive: z.boolean().optional(),
   })
   .superRefine((data, ctx) => {
@@ -296,7 +301,7 @@ export type supplierUpdateSchemaType = z.infer<typeof supplierUpdateSchema>;
 export const supplierItemListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(10),
-  q: z.string().optional(),
+  q: searchTermSchema,
 });
 export type supplierItemListQuerySchemaType = z.infer<
   typeof supplierItemListQuerySchema
@@ -312,7 +317,7 @@ export const supplierItemEditSchema = z.object({
   taxPercentage: gstPercentField.optional(),
   leadTimeDays: leadTimeField.optional(),
   qty: qtyField.optional(),
-  uom: z.string().trim().min(1).optional(),
+  uom: z.string().trim().min(1).max(20).optional(),
   isActive: z.boolean().optional(),
 });
 export type supplierItemEditSchemaType = z.infer<typeof supplierItemEditSchema>;

@@ -35,3 +35,15 @@ export function istDaysBetween(from: Date, to: Date): number {
     (istDayStart(to).getTime() - istDayStart(from).getTime()) / DAY_MS,
   );
 }
+
+const IST_OFFSET_MS = 5.5 * 3_600_000;
+
+/** The instant of 00:00 IST on the IST calendar day of `date`. */
+export function istDayStartInstant(date: Date): Date {
+  return new Date(istDayStart(date).getTime() - IST_OFFSET_MS);
+}
+
+/** The instant of 00:00 IST on the day after the IST calendar day of `date`. */
+export function istNextDayStartInstant(date: Date): Date {
+  return new Date(istDayStartInstant(date).getTime() + DAY_MS);
+}

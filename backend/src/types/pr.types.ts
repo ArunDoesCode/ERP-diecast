@@ -12,6 +12,7 @@ import {
   purchaseRequestItems,
   purchaseRequests,
 } from "../db/schemas/02_procurement-purchasing";
+import { searchTermSchema } from "../lib/safe-search";
 
 export const prTypeSchema = z.enum(prTypeEnum.enumValues);
 
@@ -140,7 +141,7 @@ export const createPrSchema = prCreateBaseSchema
     notes: true,
   })
   .extend({
-    items: z.array(createPrItemSchema).min(1),
+    items: z.array(createPrItemSchema).min(1).max(500),
   })
   .superRefine((data, ctx) => {
     if (data.type === "maintenance" && data.assetId == null) {
@@ -208,14 +209,17 @@ export const updatePrSchema = prUpdateBaseSchema
     prId: z.number().int().positive(),
     inserts: z
       .array(updatePrInsertItemSchema)
+      .max(500)
       .nullish()
       .transform((v) => v ?? []),
     updates: z
       .array(updatePrUpdateItemSchema)
+      .max(500)
       .nullish()
       .transform((v) => v ?? []),
     deletes: z
       .array(updatePrDeleteItemSchema)
+      .max(500)
       .nullish()
       .transform((v) => v ?? []),
   })
@@ -258,6 +262,7 @@ export const prListQuerySchema = z
     // Comma-separated list of statuses, e.g. "approved,partial_ordered".
     status: z
       .string()
+      .max(200)
       .optional()
       .transform((value) =>
         value
@@ -267,9 +272,9 @@ export const prListQuerySchema = z
               .filter(Boolean)
           : undefined,
       )
-      .pipe(z.array(prStatusSchema).optional()),
+      .pipe(z.array(prStatusSchema).max(20).optional()),
     type: prTypeSchema.optional(),
-    q: z.string().trim().min(1).optional(),
+    q: searchTermSchema,
   })
   .strict();
 

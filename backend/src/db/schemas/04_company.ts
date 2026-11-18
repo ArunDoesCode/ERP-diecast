@@ -13,6 +13,7 @@ export const companySettings = pgTable(
     gstin: text("gstin").notNull(),
     // Two-digit GST state code (first two digits of the GSTIN), used by BR-SCO-10.
     stateCode: text("state_code").notNull(),
+    // no-index: audit one row
     updatedBy: integer("updated_by").references(() => employees.id),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },

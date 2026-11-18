@@ -63,11 +63,9 @@ jobs:
       - run: bun test
       - name: Contract manifest is committed and current
         run: bun run contract:check
-      - name: Standards check (report mode, non-blocking)
-        # Plan agentic-workflow-v2 1.3 / 1.7. Blocking later: `bun run standards:check:strict`.
+      - name: Standards check (blocking, BR-STD-29)
         if: ${{ !cancelled() }}
-        continue-on-error: true
-        run: bun run standards:check
+        run: bun run standards:check:strict
       - name: Dependency audit (non-blocking)
         if: ${{ !cancelled() }}
         continue-on-error: true
@@ -87,15 +85,80 @@ jobs:
       - run: bunx tsc --noEmit
       - run: bun run lint
       - run: bun run build
-      - name: Standards check (report mode, non-blocking)
-        # Plan agentic-workflow-v2 1.4. Blocking later: `bun run standards:check:strict`.
+      - name: Standards check (blocking for mutation-invalidate and motion, BR-STD-30)
+        # raw-palette stays report-only until issue #91.
         if: ${{ !cancelled() }}
-        continue-on-error: true
-        run: bun run standards:check
+        run: bun run standards:check -- --strict=mutation-invalidate,motion
       - name: Dependency audit (non-blocking)
         if: ${{ !cancelled() }}
         continue-on-error: true
         run: bun audit
+
+  e2e:
+    # UI end-to-end tests (Playwright, frontend/e2e). Non-blocking for now.
+    # Every step after "Find specs" is skipped while frontend/e2e has no *.spec.ts, so the job is green.
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: diecast_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      # Only the throw-away test DB exists in CI; the API under test runs on it.
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/diecast_test
+      ACCESS_TOKEN_SECRET: ci-access-token-secret-0123456789abcdef
+      REFRESH_TOKEN_SECRET: ci-refresh-token-secret-0123456789abcdef
+      APP_ORIGIN: http://localhost:3000
+      PORT: 4000
+      NEXT_PUBLIC_API_URL: http://localhost:4000/api
+      SEED_USER_PASSWORD: ci-seed-password-1
+    steps:
+      - uses: actions/checkout@v7
+      - name: Find specs
+        id: specs
+        run: |
+          if find frontend/e2e -name '*.spec.ts' 2>/dev/null | grep -q .; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "No *.spec.ts in frontend/e2e yet: e2e skipped."
+          fi
+      - uses: oven-sh/setup-bun@v2
+        if: steps.specs.outputs.found == 'true'
+      - name: Backend - install, demo data (db:reset with fixtures), start API
+        if: steps.specs.outputs.found == 'true'
+        working-directory: backend
+        run: |
+          bun install --frozen-lockfile
+          bun run db:reset
+          nohup bun src/index.ts > ../api.log 2>&1 &
+          for i in $(seq 1 30); do curl -fs http://localhost:4000/health > /dev/null && exit 0; sleep 1; done
+          cat ../api.log; exit 1
+      - name: Frontend - install, Chromium, run Playwright
+        if: steps.specs.outputs.found == 'true'
+        working-directory: frontend
+        env:
+          PORT: 3000
+        run: |
+          bun install --frozen-lockfile
+          bunx playwright install --with-deps chromium
+          bun run e2e
+      - name: Keep screenshots and report
+        if: ${{ !cancelled() && steps.specs.outputs.found == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright
+          path: |
+            frontend/playwright-report
+            frontend/test-results
+          if-no-files-found: ignore
 
   secret-scan:
     # gitleaks over the full history of the pushed range. Non-blocking for the first run.

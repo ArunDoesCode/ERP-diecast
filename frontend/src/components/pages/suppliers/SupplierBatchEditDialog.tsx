@@ -34,6 +34,7 @@ import {
 	useEditSupplierItemMutation,
 	useEditSupplierServiceMutation,
 } from "@/lib/api/suppliers/queries";
+import { MAX_MONEY_PAISE } from "@/lib/money";
 import {
 	GST_SLABS,
 	paiseToRupees,
@@ -41,11 +42,10 @@ import {
 	type SupplierItem,
 	type SupplierService,
 } from "@/types/suppliers";
-
 import type { OfferingsTab } from "./use-supplier-offerings-state";
 
 const MAX_BATCH_ROWS = 100;
-const MAX_PRICE_PAISE = 2147483647;
+const MAX_PRICE_PAISE = MAX_MONEY_PAISE;
 
 type DraftRow = {
 	id: number;

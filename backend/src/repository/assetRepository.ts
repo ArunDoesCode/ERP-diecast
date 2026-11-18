@@ -6,7 +6,6 @@ import {
   eq,
   getTableColumns,
   gte,
-  ilike,
   inArray,
   lt,
   or,
@@ -27,6 +26,8 @@ import {
   supplierMaster,
 } from "../db/schemas/02_procurement";
 import { BadRequestError, ConflictError, NotFoundError } from "../lib/errors";
+import { istDayStartInstant, istNextDayStartInstant } from "../lib/ist-day";
+import { safeSearch, safeSearchSql } from "../lib/safe-search";
 import type { PartialUpdate } from "../lib/types";
 import type {
   assetInventoryMovementListQuerySchemaType,
@@ -126,23 +127,6 @@ type MachineUpdateData = PartialUpdate<
   Omit<typeof machines.$inferInsert, "id" | "createdBy" | "createdAt">
 >;
 
-// SEC-20: escape LIKE wildcards in user search text (Postgres default escape is \).
-function likePattern(q: string) {
-  return `%${q.replace(/[\\%_]/g, "\\$&")}%`;
-}
-
-function toStartOfDay(date: Date) {
-  const normalized = new Date(date);
-  normalized.setHours(0, 0, 0, 0);
-  return normalized;
-}
-
-function toNextDayStart(date: Date) {
-  const normalized = toStartOfDay(date);
-  normalized.setDate(normalized.getDate() + 1);
-  return normalized;
-}
-
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 // BR-INV-04: any ledger row, PR line, PO line or supplier-item line.
@@ -165,17 +149,13 @@ export const assetRepository = {
         : itemMaster.id;
     const orderFn = params.sortDir === "desc" ? desc : asc;
 
-    const q = params.q?.trim();
-    const pattern = q ? likePattern(q) : undefined;
-
     const whereClause = and(
-      pattern
-        ? or(
-            ilike(itemMaster.name, pattern),
-            ilike(itemMaster.sku, pattern),
-            ilike(itemMaster.category, pattern),
-          )
-        : undefined,
+      safeSearch(
+        params.q,
+        itemMaster.name,
+        itemMaster.sku,
+        itemMaster.category,
+      ),
       params.isActive !== undefined
         ? eq(itemMaster.isActive, params.isActive)
         : undefined,
@@ -350,16 +330,8 @@ export const assetRepository = {
         : serviceMaster.id;
     const orderFn = params.sortDir === "desc" ? desc : asc;
 
-    const q = params.q?.trim();
-    const pattern = q ? likePattern(q) : undefined;
-
     const whereClause = and(
-      pattern
-        ? or(
-            ilike(serviceMaster.name, pattern),
-            ilike(serviceMaster.code, pattern),
-          )
-        : undefined,
+      safeSearch(params.q, serviceMaster.name, serviceMaster.code),
       params.isActive !== undefined
         ? eq(serviceMaster.isActive, params.isActive)
         : undefined,
@@ -427,10 +399,10 @@ export const assetRepository = {
         ? eq(inventoryLedger.transactionType, params.transactionType)
         : undefined,
       params.fromDate !== undefined
-        ? gte(inventoryLedger.createdAt, toStartOfDay(params.fromDate))
+        ? gte(inventoryLedger.createdAt, istDayStartInstant(params.fromDate))
         : undefined,
       params.toDate !== undefined
-        ? lt(inventoryLedger.createdAt, toNextDayStart(params.toDate))
+        ? lt(inventoryLedger.createdAt, istNextDayStartInstant(params.toDate))
         : undefined,
     );
 
@@ -478,16 +450,11 @@ export const assetRepository = {
         : locations.id;
     const orderFn = params.sortDir === "desc" ? desc : asc;
 
-    const q = params.q?.trim();
-    const pattern = q ? likePattern(q) : undefined;
-
     const whereClause = and(
-      pattern
-        ? or(
-            ilike(locations.name, pattern),
-            sql`${locations.type}::text ilike ${pattern}`,
-          )
-        : undefined,
+      or(
+        safeSearch(params.q, locations.name),
+        safeSearchSql(params.q, sql`${locations.type}::text`),
+      ),
       params.isActive !== undefined
         ? eq(locations.isActive, params.isActive)
         : undefined,
@@ -712,8 +679,6 @@ export const assetRepository = {
   // Stock view (BR-INV-19, 07, 06): active items plus inactive items that
   // still hold stock; per-location balance = last ledger balance.
   async listStock(params: assetStockListQuerySchemaType) {
-    const q = params.q?.trim();
-    const pattern = q ? likePattern(q) : undefined;
     const valueExpr = sql`round(${itemMaster.currentStock} * ${itemMaster.averageCostPaise})`;
     const belowExpr = and(
       eq(itemMaster.isActive, true),
@@ -722,9 +687,7 @@ export const assetRepository = {
     );
     const whereClause = and(
       or(eq(itemMaster.isActive, true), sql`${itemMaster.currentStock} <> 0`),
-      pattern
-        ? or(ilike(itemMaster.sku, pattern), ilike(itemMaster.name, pattern))
-        : undefined,
+      safeSearch(params.q, itemMaster.sku, itemMaster.name),
       params.category ? eq(itemMaster.category, params.category) : undefined,
       params.belowReorder === true ? belowExpr : undefined,
       params.belowReorder === false ? sql`not (${belowExpr})` : undefined,
@@ -875,17 +838,8 @@ export const assetRepository = {
         : machines.id;
     const orderFn = params.sortDir === "desc" ? desc : asc;
 
-    const q = params.q?.trim();
-    const pattern = q ? likePattern(q) : undefined;
-
     const whereClause = and(
-      pattern
-        ? or(
-            ilike(machines.name, pattern),
-            ilike(machines.code, pattern),
-            ilike(machines.type, pattern),
-          )
-        : undefined,
+      safeSearch(params.q, machines.name, machines.code, machines.type),
       params.status ? eq(machines.status, params.status) : undefined,
       params.isActive !== undefined
         ? eq(machines.isActive, params.isActive)

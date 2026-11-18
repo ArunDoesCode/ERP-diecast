@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { MAX_MONEY_PAISE } from "@/lib/money";
+
 export type PaginationMeta = {
 	page: number;
 	pageSize: number;
@@ -303,7 +305,7 @@ export const assetStockTakeSchema = z.object({
 	referenceType: z.literal("stock_adjustment"),
 	countedQty: z.number().min(0, "Counted quantity cannot be negative"),
 	reason: reasonSchema,
-	unitCostPaise: z.number().int().min(1).max(2147483647).optional(),
+	unitCostPaise: z.number().int().min(1).max(MAX_MONEY_PAISE).optional(),
 	batchNumber: z.string().trim().nullable().optional(),
 });
 
@@ -372,7 +374,7 @@ export type AssetMovementCreatePayload = z.infer<
 	typeof assetMovementCreateSchema
 >;
 
-const MAX_PAISE = 2147483647;
+const MAX_PAISE = MAX_MONEY_PAISE;
 
 // Wire shape: POST /items is strict (no isActive / stock fields).
 export const assetItemCreateSchema = z.object({

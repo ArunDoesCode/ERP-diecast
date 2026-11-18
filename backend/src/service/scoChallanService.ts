@@ -3,6 +3,7 @@ import type { Actor } from "../lib/auth-middleware";
 import { allocateFinancialYearSequence } from "../lib/document-number";
 import { BadRequestError, ConflictError, NotFoundError } from "../lib/errors";
 import { istDayKey, istDayStart, istDaysBetween } from "../lib/ist-day";
+import { assertMoneyInRange } from "../lib/money";
 import { scoChallanRepository } from "../repository/scoChallanRepository";
 import { scoRepository, type Tx } from "../repository/scoRepository";
 import { postStock } from "../repository/stockPostingRepository";
@@ -196,10 +197,14 @@ export const scoChallanService = {
           hsnCode: item.hsnCode as string,
         };
       });
+      for (const l of prepared) {
+        assertMoneyInRange(l.qty * l.unitIssueCostPaise);
+      }
       const valuePaise = prepared.reduce(
         (sum, l) => sum + l.qty * l.unitIssueCostPaise,
         0,
       );
+      assertMoneyInRange(valuePaise);
 
       // BR-SCO-10: e-way bill number.
       const vendor = await scoChallanRepository.findVendor(locked.vendorId, tx);

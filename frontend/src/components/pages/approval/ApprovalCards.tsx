@@ -198,7 +198,7 @@ export function ApprovalCards({
 										}
 									>
 										{isThisAction ? (
-											<IconRefresh className="size-3.5 animate-spin" />
+											<IconRefresh className="size-3.5" />
 										) : (
 											<Icon className="size-3.5" />
 										)}

@@ -13,6 +13,8 @@
     "db:migrate": "bun scripts/db-migrate.ts",
     "db:reset": "bun scripts/db-reset.ts",
     "db:test:prepare": "bun scripts/prepare-test-db.ts",
+    "db:test:rebuild": "bun scripts/test-db-rebuild.ts",
+    "try": "bash ../scripts/try.sh",
     "seed": "bun scripts/seed-sco-demo.ts",
     "bootstrap-admin": "bun scripts/bootstrap-admin.ts",
     "contract:generate": "bun scripts/generate-api-manifest.ts",

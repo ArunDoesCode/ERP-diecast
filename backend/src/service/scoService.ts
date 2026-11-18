@@ -7,6 +7,7 @@ import {
   NotFoundError,
 } from "../lib/errors";
 import { istDaysBetween } from "../lib/ist-day";
+import { assertMoneyInRange } from "../lib/money";
 import { qtyAtVendor } from "../lib/sco-math";
 import { approvalRepository } from "../repository/approvalRepository";
 import { scoReceiptRepository } from "../repository/scoReceiptRepository";
@@ -396,6 +397,7 @@ export const scoService = {
             heat = heat ?? cl.heatNumber;
             await scoReceiptRepository.addSettledQty(cl.id, take, tx);
           }
+          assertMoneyInRange(value);
           const costed = qty - left;
           await postStock(tx, {
             itemId: line.rawItemId,

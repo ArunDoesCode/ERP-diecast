@@ -9,6 +9,7 @@ import {
 import { subcontractingOrders } from "../db/schemas/02_procurement-purchasing";
 import { supplierMaster } from "../db/schemas/02_procurement-suppliers";
 import { employees } from "../db/schemas/03_hcm";
+import { toSafePaise } from "../lib/money";
 import type {
   lossLogQuerySchemaType,
   lossLogRowSchemaType,
@@ -77,7 +78,7 @@ export const scoReportRepository = {
       rows: rows.map((r) => ({
         ...r,
         qty: Number(r.qty),
-        valuePaise: Number(r.valuePaise),
+        valuePaise: toSafePaise(r.valuePaise),
       })),
       total: totalRow?.value ?? 0,
     };
@@ -152,7 +153,7 @@ export const scoReportRepository = {
         .where(where),
     ]);
     return {
-      rows: rows.map((r) => ({ ...r, costPaise: Number(r.costPaise) })),
+      rows: rows.map((r) => ({ ...r, costPaise: toSafePaise(r.costPaise) })),
       total: totalRow?.value ?? 0,
     };
   },

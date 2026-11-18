@@ -89,8 +89,8 @@ export const receiptLineInputSchema = z
   .object({
     scoItemId: z.number().int().positive(),
     // BR-SCO-12: whole pieces >= 0; processed + unprocessed must be >= 1.
-    processedQty: z.number().int().min(0),
-    unprocessedQty: z.number().int().min(0).default(0),
+    processedQty: z.number().int().min(0).max(1_000_000_000),
+    unprocessedQty: z.number().int().min(0).max(1_000_000_000).default(0),
   })
   .refine((l) => l.processedQty + l.unprocessedQty >= 1, {
     message: "Line needs a processed or unprocessed qty",
@@ -102,14 +102,14 @@ export const createReceiptSchema = z.object({
   // Default = now.
   receivedDate: z.coerce.date().optional(),
   notes: z.string().max(2000).optional(),
-  lines: z.array(receiptLineInputSchema).min(1),
+  lines: z.array(receiptLineInputSchema).min(1).max(500),
 });
 export type createReceiptSchemaType = z.infer<typeof createReceiptSchema>;
 
 // BR-SCO-13: accepted + rejected = processed (checked in the service, 400).
 export const qaDecisionSchema = z.object({
-  acceptedQty: z.number().int().min(0),
-  rejectedQty: z.number().int().min(0),
+  acceptedQty: z.number().int().min(0).max(1_000_000_000),
+  rejectedQty: z.number().int().min(0).max(1_000_000_000),
   notes: z.string().trim().min(1).max(500).optional(),
 });
 export type qaDecisionSchemaType = z.infer<typeof qaDecisionSchema>;

@@ -5,6 +5,7 @@ import {
   grnStatusEnum,
   grns,
 } from "../db/schemas/02_procurement-purchasing";
+import { searchTermSchema } from "../lib/safe-search";
 
 // Quantities: up to 3 decimals (BR-GRN-02). Whole-number rule for pcs/set items
 // needs the item's unit, so the service enforces that one (400).
@@ -74,7 +75,7 @@ export const createGrnSchema = z.object({
   driverName: z.string().max(200).optional(),
   driverPhone: z.string().max(30).optional(),
   remarks: z.string().max(1000).optional(),
-  lines: z.array(createGrnLineSchema).min(1),
+  lines: z.array(createGrnLineSchema).min(1).max(500),
 });
 export type createGrnSchemaType = z.infer<typeof createGrnSchema>;
 
@@ -99,6 +100,7 @@ export const updateGrnSchema = z
     remarks: z.string().max(1000).nullish(),
     lines: z
       .array(updateGrnLineSchema)
+      .max(500)
       .nullish()
       .transform((v) => v ?? []),
   })
@@ -182,7 +184,7 @@ export const grnListQuerySchema = z
     poId: z.coerce.number().int().positive().optional(),
     status: grnStatusSchema.optional(),
     qaStatus: grnQaStatusSchema.optional(),
-    q: z.string().trim().min(1).optional(),
+    q: searchTermSchema,
   })
   .strict();
 export type grnListQuerySchemaType = z.infer<typeof grnListQuerySchema>;

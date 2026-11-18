@@ -1,14 +1,4 @@
-import {
-  and,
-  asc,
-  count,
-  desc,
-  eq,
-  ilike,
-  inArray,
-  ne,
-  sql,
-} from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, ne, sql } from "drizzle-orm";
 
 import { db } from "../db/client";
 import {
@@ -26,6 +16,7 @@ import {
 } from "../db/schemas/02_procurement-purchasing";
 import { allocateDocumentSequence } from "../lib/document-number";
 import { NotFoundError } from "../lib/errors";
+import { safeSearch } from "../lib/safe-search";
 import type { grnListQuerySchemaType } from "../types/grn.types";
 
 export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -537,11 +528,8 @@ export const grnRepository = {
         : grns.id;
     const orderFn = params.sortDir === "desc" ? desc : asc;
 
-    const q = params.q?.trim();
-    const pattern = q ? `%${q}%` : undefined;
-
     const filters = [
-      pattern ? ilike(grns.grnNumber, pattern) : undefined,
+      safeSearch(params.q, grns.grnNumber),
       params.poId !== undefined ? eq(grns.poId, params.poId) : undefined,
       params.status !== undefined ? eq(grns.status, params.status) : undefined,
       // qaStatus filters at the line level — a GRN "matches" if any of its

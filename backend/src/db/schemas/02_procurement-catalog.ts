@@ -23,20 +23,28 @@ export const itemMaster = pgTable(
     sku: text("sku").unique().notNull(), //internal SKU
     name: text("name").notNull(),
     description: text("description"),
+    // no-index: low-card 5 values
     category: text("category").notNull(), // 'Raw Material', 'Consumable', 'Spare Part'
     uom: text("uom").notNull(), // 'kg', 'pcs', 'ltr'
     reorderLevel: doublePrecision("reorder_level").default(0).notNull(),
     currentStock: doublePrecision("current_stock").default(0).notNull(),
-    averageCostPaise: integer("average_cost_paise").default(0).notNull(),
+    averageCostPaise: bigint("average_cost_paise", { mode: "number" })
+      .default(0)
+      .notNull(),
+    // no-index: low-card few distinct values, index would not be used
     isActive: boolean("is_active").notNull().default(true),
     // BR-SCO-09: HSN printed on the job-work challan; nullable, challan refused if missing.
     hsnCode: text("hsn_code"),
     // BR-INV-03: PR estimate / last-rate fallback; > 0 enforced by the API.
     // DB default 0 keeps db:push safe on rows that already exist.
-    standardRatePaise: integer("standard_rate_paise").default(0).notNull(),
+    standardRatePaise: bigint("standard_rate_paise", { mode: "number" })
+      .default(0)
+      .notNull(),
+    // no-index: audit who-did-it column, read only by joining to employees
     createdBy: integer("created_by").references(() => employees.id),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     // BR-INV-25
+    // no-index: audit who-did-it column, read only by joining to employees
     lastUpdatedBy: integer("last_updated_by").references(() => employees.id),
     lastUpdatedAt: timestamp("last_updated_at").defaultNow().notNull(),
   },
@@ -57,9 +65,12 @@ export const serviceMaster = pgTable(
     description: text("description"),
     sacCode: text("sac_code"),
     defaultUom: text("default_uom").notNull(), // 'job', 'hour', 'lot'
+    // no-index: low-card few distinct values, index would not be used
     isActive: boolean("is_active").notNull().default(true),
+    // no-index: audit who-did-it column, read only by joining to employees
     createdBy: integer("created_by").references(() => employees.id),
     createdAt: timestamp("created_at").defaultNow().notNull(),
+    // no-index: audit who-did-it column, read only by joining to employees
     lastUpdatedBy: integer("last_updated_by").references(() => employees.id),
     lastUpdatedAt: timestamp("last_updated_at").defaultNow().notNull(),
   },
@@ -110,9 +121,12 @@ export const locations = pgTable(
     linkedVendorId: integer("linked_vendor_id").references(
       () => supplierMaster.id,
     ),
+    // no-index: tiny static or config table, under about 100 rows
     isActive: boolean("is_active").notNull().default(true),
+    // no-index: audit who-did-it column, read only by joining to employees
     createdBy: integer("created_by").references(() => employees.id),
     createdAt: timestamp("created_at").defaultNow().notNull(),
+    // no-index: audit who-did-it column, read only by joining to employees
     lastUpdatedBy: integer("last_updated_by").references(() => employees.id),
     lastUpdatedAt: timestamp("last_updated_at").defaultNow().notNull(),
   },
@@ -150,6 +164,7 @@ export const inventoryLedger = pgTable(
     batchNumber: text("batch_number"),
 
     // MOVEMENT DATA
+    // no-index: low-card the list is paged in primary-key order
     transactionType: inventoryTxTypeEnum("transaction_type").notNull(),
     referenceType: inventoryRefTypeEnum("reference_type").notNull(),
     referenceId: integer("reference_id").notNull(), // ID of the GRN, SCO, or Job Order
@@ -161,19 +176,24 @@ export const inventoryLedger = pgTable(
     balanceAfter: doublePrecision("balance_after").notNull(),
 
     // FINANCIAL VALUATION (Costing at the exact moment of movement)
-    unitCostPaise: integer("unit_cost_paise").notNull(),
+    unitCostPaise: bigint("unit_cost_paise", { mode: "number" }).notNull(),
     totalValueChangePaise: bigint("total_value_change_paise", {
       mode: "number",
     }).notNull(),
 
     // METADATA
     notes: text("notes"),
+    // no-index: audit largest table: an unused index costs every posting
     createdBy: integer("created_by")
       .references(() => employees.id)
       .notNull(), // System uses a 'System' user ID for backflush
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => ({
+    refTypeIdIdx: index("idx_inventory_ledger_reftype_id").on(
+      table.referenceType,
+      table.id,
+    ),
     itemLocationIdx: index("idx_inventory_ledger_item_location").on(
       table.itemId,
       table.locationId,
@@ -209,12 +229,16 @@ export const machines = pgTable(
     // BR-INV-16: required by the API; nullable in the DB so db:push is safe on
     // rows that predate the column.
     code: text("code"),
+    // no-index: tiny static or config table, under about 100 rows
     isActive: boolean("is_active").notNull().default(true),
     type: text("type"),
+    // no-index: tiny static or config table, under about 100 rows
     status: machineStatusEnum("status").default("idle").notNull(),
     lastMaintenanceAt: timestamp("last_maintenance_at"),
+    // no-index: audit who-did-it column, read only by joining to employees
     createdBy: integer("created_by").references(() => employees.id),
     createdAt: timestamp("created_at").defaultNow().notNull(),
+    // no-index: audit who-did-it column, read only by joining to employees
     lastUpdatedBy: integer("last_updated_by").references(() => employees.id),
     lastUpdatedAt: timestamp("last_updated_at").defaultNow().notNull(),
   },

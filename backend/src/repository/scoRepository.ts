@@ -6,10 +6,8 @@ import {
   eq,
   getTableColumns,
   gte,
-  ilike,
   inArray,
   lt,
-  or,
   sql,
 } from "drizzle-orm";
 
@@ -31,15 +29,12 @@ import {
 import { employees } from "../db/schemas/03_hcm";
 import { allocateDocumentSequence } from "../lib/document-number";
 import { istMonthKey } from "../lib/ist-day";
+import { assertMoneyInRange } from "../lib/money";
+import { safeSearch } from "../lib/safe-search";
 import type {
   scoListQuerySchemaType,
   scoResponseSchemaType,
 } from "../types/sco.types";
-
-// Escape LIKE wildcards so a search term is matched literally (SEC-2).
-function escapeLike(value: string) {
-  return value.replace(/[\\%_]/g, (ch) => `\\${ch}`);
-}
 
 export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type ScoInsert = typeof subcontractingOrders.$inferInsert;
@@ -79,6 +74,8 @@ export function computeScoLinePaise(
   const lineTaxPaise = Math.round(
     (lineValuePaise * Math.round(gstPercent * 100)) / 10000,
   );
+  assertMoneyInRange(lineValuePaise);
+  assertMoneyInRange(lineTaxPaise);
   return { lineValuePaise, lineTaxPaise };
 }
 
@@ -87,11 +84,11 @@ export function computeScoTotalsPaise(
 ) {
   const subtotalPaise = lines.reduce((sum, l) => sum + l.lineValuePaise, 0);
   const taxAmountPaise = lines.reduce((sum, l) => sum + l.lineTaxPaise, 0);
-  return {
-    subtotalPaise,
-    taxAmountPaise,
-    totalAmountPaise: subtotalPaise + taxAmountPaise,
-  };
+  const totalAmountPaise = subtotalPaise + taxAmountPaise;
+  assertMoneyInRange(subtotalPaise);
+  assertMoneyInRange(taxAmountPaise);
+  assertMoneyInRange(totalAmountPaise);
+  return { subtotalPaise, taxAmountPaise, totalAmountPaise };
 }
 
 // Inclusive upper bound for a `createdTo` filter: a bare date (midnight UTC)
@@ -119,12 +116,7 @@ export const scoRepository = {
       params.vendorId !== undefined
         ? eq(subcontractingOrders.vendorId, params.vendorId)
         : undefined,
-      params.q
-        ? or(
-            ilike(subcontractingOrders.scoNumber, `%${escapeLike(params.q)}%`),
-            ilike(supplierMaster.name, `%${escapeLike(params.q)}%`),
-          )
-        : undefined,
+      safeSearch(params.q, subcontractingOrders.scoNumber, supplierMaster.name),
       params.createdFrom
         ? gte(subcontractingOrders.createdAt, params.createdFrom)
         : undefined,

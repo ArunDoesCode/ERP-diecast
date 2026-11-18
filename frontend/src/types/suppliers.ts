@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { MAX_MONEY_PAISE } from "@/lib/money";
+
 export const supplierTypeValues = [
 	"raw_material",
 	"consumables",
@@ -140,7 +142,7 @@ export const GST_SLABS = [0, 0.1, 0.25, 1.5, 3, 5, 12, 18, 28, 40] as const;
 
 const GSTIN_PATTERN = /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
 const PAN_PATTERN = /^[A-Z]{5}\d{4}[A-Z]$/;
-const MAX_PRICE_PAISE = 2147483647;
+const MAX_PRICE_PAISE = MAX_MONEY_PAISE;
 
 // PAN sits at GSTIN chars 3-12 (BR-SUP-03).
 export function isValidGstin(gstin: string) {

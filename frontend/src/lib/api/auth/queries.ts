@@ -78,6 +78,7 @@ export function useLogoutMutation() {
 
 	return useMutation({
 		mutationFn: logout,
+		// no-invalidate: logout clears the whole query cache
 		onSettled: async () => {
 			clearAccessToken();
 			useAuthSessionStore.getState().clearSession();

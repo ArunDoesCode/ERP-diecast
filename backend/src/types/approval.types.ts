@@ -11,6 +11,10 @@ import {
   procurementCategoryEnum,
 } from "../db/schemas/02_procurement-approval";
 import { prTypeEnum } from "../db/schemas/02_procurement-purchasing";
+import { searchTermSchema } from "../lib/safe-search";
+
+// BR-STD-16: policy amount limits stop at 1,000,000,000,000 paise.
+const MAX_POLICY_AMOUNT_PAISE = 1_000_000_000_000;
 
 export const approvalDocTypeSchema = z.enum(["pr", "po", "sco"]);
 
@@ -18,7 +22,7 @@ export const approvalChainStepSchema = z
   .object({
     level: z.number().int().min(1),
     approverType: z.enum(["role", "specific"]),
-    role: z.string().min(1).optional(),
+    role: z.string().min(1).max(200).optional(),
     employeeId: z.number().int().positive().optional(),
   })
   .superRefine((data, ctx) => {
@@ -84,6 +88,7 @@ const approvalChainLevelsCheck = (
 export const approvalChainSchema = z
   .array(approvalChainStepSchema)
   .min(1)
+  .max(20)
   .superRefine(approvalChainLevelsCheck);
 
 // May be empty (BR-APR-05: auto-approve policies and their requests carry no
@@ -91,6 +96,7 @@ export const approvalChainSchema = z
 // is checked next to `autoApprove` (create schema / service on edit).
 export const approvalChainOrEmptySchema = z
   .array(approvalChainStepSchema)
+  .max(20)
   .superRefine(approvalChainLevelsCheck);
 
 export type approvalChainSchemaType = z.infer<typeof approvalChainSchema>;
@@ -153,7 +159,7 @@ export const approvalPolicyListQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(10),
   docType: approvalDocTypeSchema.optional(),
   isActive: z.coerce.boolean().optional(),
-  q: z.string().trim().min(1).optional(),
+  q: searchTermSchema,
   sortBy: z
     .enum(["name", "priority", "docType", "isActive", "createdAt"])
     .optional(),
@@ -184,7 +190,7 @@ export const createApprovalPolicySchema = createInsertSchema(approvalPolicies, {
     // schema derives them as `.optional().nullable()`. The create contract
     // only ever accepts omission (never an explicit null), so they're kept
     // hand-authored here instead of silently widening the accepted shape.
-    description: z.string().optional(),
+    description: z.string().max(1000).optional(),
     subDocType: z.enum(procurementCategoryEnum.enumValues).default("any"),
     // BR-APR-15: `isSaleOrderLinked` is gone; a stray value is ignored (never stored).
     // Whole paise (BR-APR-06). The form takes rupees (up to 2 decimals) and
@@ -194,6 +200,7 @@ export const createApprovalPolicySchema = createInsertSchema(approvalPolicies, {
       .int()
       .min(0)
       .nonnegative()
+      .max(MAX_POLICY_AMOUNT_PAISE)
       .nullable()
       .optional(),
     maxAmountPaise: z.coerce
@@ -201,6 +208,7 @@ export const createApprovalPolicySchema = createInsertSchema(approvalPolicies, {
       .int()
       .min(0)
       .nonnegative()
+      .max(MAX_POLICY_AMOUNT_PAISE)
       .nullable()
       .optional(),
   })
@@ -240,6 +248,7 @@ export const updateApprovalPolicySchema = createUpdateSchema(approvalPolicies, {
     .int()
     .min(0)
     .nonnegative()
+    .max(MAX_POLICY_AMOUNT_PAISE)
     .nullable()
     .optional(),
   maxAmountPaise: z.coerce
@@ -247,6 +256,7 @@ export const updateApprovalPolicySchema = createUpdateSchema(approvalPolicies, {
     .int()
     .min(0)
     .nonnegative()
+    .max(MAX_POLICY_AMOUNT_PAISE)
     .nullable()
     .optional(),
   approvalChain: () => approvalChainOrEmptySchema,
@@ -348,7 +358,7 @@ export const approvalActionSchema = z.enum([
 // withdraw (BR-APR-39). There is no approval `cancel` action (approval v2).
 export const approvalActionRequestSchema = z.object({
   action: approvalActionSchema,
-  notes: z.string().optional(),
+  notes: z.string().max(2000).optional(),
 });
 
 export type approvalActionRequestSchemaType = z.infer<

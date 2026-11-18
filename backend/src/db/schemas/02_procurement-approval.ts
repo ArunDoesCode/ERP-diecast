@@ -63,18 +63,24 @@ export const approvalPolicies = pgTable(
   "approval_policies",
   {
     id: serial("id").primaryKey(),
+    // no-index: tiny static or config table, under about 100 rows
     name: text("name").notNull(),
     description: text("description"),
+    // no-index: tiny static or config table, under about 100 rows
     isActive: boolean("is_active").notNull().default(true),
     priority: integer("priority").notNull(), // 1 = checked first
 
     // Match conditions (null = matches anything)
+    // no-index: tiny static or config table, under about 100 rows
     docType: approvalDocTypeEnum("doc_type").notNull(),
+    // no-index: tiny static or config table, under about 100 rows
     subDocType: procurementCategoryEnum("sub_doc_type")
       .default("any")
       .notNull(),
     isSaleOrderLinked: boolean("is_sale_order_linked"), // null = any
+    // no-index: tiny static or config table, under about 100 rows
     minAmountPaise: bigint("min_amount_paise", { mode: "number" }),
+    // no-index: tiny static or config table, under about 100 rows
     maxAmountPaise: bigint("max_amount_paise", { mode: "number" }),
 
     // What happens
@@ -93,8 +99,10 @@ export const approvalPolicies = pgTable(
     // ]
 
     createdAt: timestamp("created_at").defaultNow().notNull(),
+    // no-index: audit who-did-it column, read only by joining to employees
     createdBy: integer("created_by").references(() => employees.id),
     lastUpdatedAt: timestamp("last_updated_at").defaultNow().notNull(),
+    // no-index: audit who-did-it column, read only by joining to employees
     lastUpdatedBy: integer("last_updated_by").references(() => employees.id),
   },
   (table) => ({
@@ -113,6 +121,7 @@ export const approvalRequests = pgTable(
   {
     id: serial("id").primaryKey(),
     docType: approvalDocTypeEnum("doc_type").notNull(),
+    // no-index: covered:idx_approval_requests_doc doc_type always given
     docId: integer("doc_id").notNull(), // FK to pr.id or po.id
 
     policyId: integer("policy_id")
@@ -132,11 +141,14 @@ export const approvalRequests = pgTable(
     // Materialized copy of the current chain step's approver, kept in sync
     // whenever currentLevel changes, so pending-approval lookups can filter
     // in SQL instead of scanning chainSnapshot in JS.
+    // no-index: covered:idx_approval_requests_status_role queries always give the leading column of that index
     currentApproverRole: text("current_approver_role"),
+    // no-index: covered:idx_approval_requests_status_employee status is always given
     currentApproverEmployeeId: integer(
       "current_approver_employee_id",
     ).references(() => employees.id),
 
+    // no-index: audit who-did-it column, read only by joining to employees
     requestedBy: integer("requested_by")
       .references(() => employees.id)
       .notNull(),
@@ -144,6 +156,7 @@ export const approvalRequests = pgTable(
     completedAt: timestamp("completed_at"), // when fully approved/rejected
   },
   (table) => ({
+    policyIdIdx: index("idx_approval_requests_policy_id").on(table.policyId),
     uniqueOpenRequestPerDoc: uniqueIndex("uq_open_approval_request_per_doc")
       .on(table.docType, table.docId)
       .where(sql`${table.status} = 'pending_approval'`),
@@ -169,7 +182,9 @@ export const approvalTrails = pgTable(
     docType: approvalDocTypeEnum("doc_type").notNull(),
     docId: integer("doc_id").notNull(),
     level: integer("level").notNull(),
+    // no-index: covered:idx_approval_trails_request_id queries always give the leading column of that index
     action: approvalActionEnum("action").notNull(),
+    // no-index: covered:idx_approval_trails_request_id always with request_id; under 10 rows per request
     actionBy: integer("action_by")
       .references(() => employees.id)
       .notNull(),

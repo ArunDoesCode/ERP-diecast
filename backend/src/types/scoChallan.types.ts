@@ -62,7 +62,7 @@ export type challanPrintSchemaType = z.infer<typeof challanPrintSchema>;
 export const challanLineInputSchema = z.object({
   scoItemId: z.number().int().positive(),
   // BR-SCO-07: whole pieces > 0, at most send qty - already issued.
-  qty: z.number().int().min(1),
+  qty: z.number().int().min(1).max(1_000_000_000),
   // Optional override; default = the SCO line's heat number (BR-SCO-08, 25).
   heatNumber: z.string().trim().min(1).max(100).optional(),
 });
@@ -72,7 +72,7 @@ export const createChallanSchema = z.object({
   challanDate: z.coerce.date().optional(),
   // BR-SCO-10: required in the cases listed there (checked in the service, 400).
   ewayBillNo: z.string().trim().min(1).max(50).optional(),
-  lines: z.array(challanLineInputSchema).min(1),
+  lines: z.array(challanLineInputSchema).min(1).max(500),
 });
 export type createChallanSchemaType = z.infer<typeof createChallanSchema>;
 

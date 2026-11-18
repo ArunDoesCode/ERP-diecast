@@ -4,6 +4,8 @@
  *   bun scripts/standards-check.ts             report mode: prints findings, exit 0
  *   bun scripts/standards-check.ts --strict    exit 1 when there is any finding
  *   STANDARDS_STRICT=1 bun scripts/...         same as --strict
+ *   --strict=rule1,rule2                       exit 1 only for findings of those rules
+ *   STANDARDS_STRICT=rule1,rule2               same
  *   --summary                                  counts per rule + top files only
  *
  * Rules (text-based heuristics, no AST — a finding is a pointer, not a proof):
@@ -22,8 +24,25 @@ const SRC = join(ROOT, "src");
 const UI_DIR = "src/components/ui/";
 const ALLOWLIST = "design/motion-allowlist.json";
 
-const strict =
-	process.argv.includes("--strict") || process.env.STANDARDS_STRICT === "1";
+// Strict switch: `--strict` / STANDARDS_STRICT=1 = every rule blocks;
+// `--strict=rule1,rule2` / STANDARDS_STRICT=rule1,rule2 = only those rules block.
+const strictArg = process.argv.find(
+	(a) => a === "--strict" || a.startsWith("--strict="),
+);
+const strictSpec =
+	strictArg !== undefined
+		? strictArg === "--strict"
+			? "1"
+			: strictArg.slice("--strict=".length)
+		: (process.env.STANDARDS_STRICT ?? "");
+const strictAll = strictSpec === "1" || strictSpec === "true";
+const strictRules = new Set(
+	strictAll || strictSpec === ""
+		? []
+		: strictSpec.split(",").filter((x) => x.length > 0),
+);
+const strict = strictAll || strictRules.size > 0;
+const blocks = (rule: string) => strictAll || strictRules.has(rule);
 const summaryOnly = process.argv.includes("--summary");
 
 type Finding = { file: string; line: number; rule: string; message: string };
@@ -242,7 +261,7 @@ checkMotion();
 const RULES = ["mutation-invalidate", "raw-palette", "motion"];
 
 console.log(
-	`frontend standards-check (${strict ? "strict" : "report"} mode) - ${findings.length} finding(s)\n`,
+	`frontend standards-check (${strictAll ? "strict" : strict ? `strict: ${[...strictRules].join(",")}` : "report"} mode) - ${findings.length} finding(s)\n`,
 );
 if (!summaryOnly) {
 	for (const rule of RULES) {
@@ -278,7 +297,8 @@ if (notes.length > 0) {
 	for (const n of notes) console.log(`- ${n}`);
 }
 
-if (strict && findings.length > 0) {
+const blocking = findings.filter((f) => blocks(f.rule));
+if (strict && blocking.length > 0) {
 	console.log("\nstandards-check failed (strict mode).");
 	process.exit(1);
 }
