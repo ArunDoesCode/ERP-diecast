@@ -123,7 +123,7 @@ seven places (BR-DS-26), nothing rendered that the user has no permission for (B
   five rows each ("Waiting on me", "Late deliveries") with a "See all" link. No charts until a
   charts feature is specified; when they come they use `--chart-1` to `--chart-5` in order.
 - **States:** each card and panel loads on its own (skeleton value, skeleton rows) · a failed card
-  shows "–" with a retry icon, the rest of the page still works · zero is shown as "0" with a calm
+  shows "–" with a "Try again" button, the rest of the page still works · zero is shown as "0" with a calm
   hint ("Nothing waiting"), not as an empty state.
 - **Permission-hidden (BR-DS-27):** a card or panel for a module the user may not see is not
   rendered and the row closes up; no card shows a count the user could not open.

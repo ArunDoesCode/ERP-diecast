@@ -16,13 +16,16 @@ research:
 > this file and the preview disagree, this file wins and the preview gets fixed.
 
 ## Summary
-One set of colour, type and motion tokens, one status map and ten shared components for the
+One set of colour, type and motion tokens, one status map, nine shared components and one formatter for the
 frontend (Next.js 16, Tailwind v4, shadcn radix-mira, Manrope, Tabler icons, next-themes).
 Users: purchase, stores and planning staff on desktops, long sessions, dense tables. Tone: calm,
 industrial, precise: emerald primary, steel-blue accent, cool grey neutrals (hue 250).
 Done = tokens, shared components and shell are in place, purchase orders (list, detail, form) use
 them as the reference module, light and dark both pass contrast, and motion exists only in the
 eight allowed places. No backend change, no new library, no business rule of any module changes.
+
+> Flow, Who can do what, Security, data and API sections: n/a — frontend-only module with no routes,
+> no data and no states of its own. Permission-hidden states follow BR-DS-27.
 
 ## Tokens — colour
 Add to `frontend/src/app/globals.css` (`:root` and `.dark`). In the `@theme inline` block map
@@ -85,7 +88,8 @@ pair 4.90 light, 4.93 dark; lowest field border or ring on its surface 3.01; low
 card 3.72. Accent against info: ΔE 11.3 light, 11.4 dark (OKLab × 100). Chart colours differ from
 each other by ΔE ≥ 11.6 light and ≥ 15.0 dark, also under simulated red-green colour blindness.
 
-**Where colour carries weight** (BR-DS-26). Exactly these seven places, nowhere else:
+**Where colour carries weight** (BR-DS-26). Exactly these seven places, plus status tones (BR-DS-03),
+selection and position (BR-DS-07) and the brand mark (BR-DS-06); nowhere else:
 | # | Place | Colour |
 |---|---|---|
 | 1 | Active sidebar item | `--sidebar-accent` tint + 3 px `--sidebar-primary` bar on the left edge + bold text |
@@ -324,7 +328,7 @@ until plan 3.6–3.9 lands a human does the same steps) · **screenshot** (light
 | BR-DS-22 | Each page has exactly one `h1` (from `PageHeader` or `DetailHeader`) and one breadcrumb trail, in the top bar, that matches the route. | PO detail → "Purchase / Purchase orders / PO-2026-0187" | Playwright |
 | BR-DS-24 | A new tone, a new motion place, a new weight place or a change to a token value is an owner decision recorded in `docs/decisions.md` before code. | Dev wants a hover lift on cards → stop, raise an issue | human |
 | BR-DS-25 | Adoption changes look only: no route, permission, API call, validation or business rule changes in the same commit. | Commit that adopts `StatusBadge` in PO also changes a PO action rule → rejected | human |
-| BR-DS-26 | Colour carries weight in exactly the seven places of "Where colour carries weight"; no gradients, no coloured page background, no coloured card fill. | A dashboard card gets a blue background → review finding | screenshot |
+| BR-DS-26 | Colour carries weight only in the seven places of "Where colour carries weight", status tones (BR-DS-03), selection and position (BR-DS-07) and the brand mark (BR-DS-06); no gradients, no coloured page background, no coloured card fill. | A dashboard card gets a blue background → review finding | screenshot |
 | BR-DS-27 | An element the user has no permission for is not rendered: no disabled ghost, no gap. Shared components take no permission input; the view decides with the existing permission checks. | User without PO create permission opens the PO list → no "New purchase order" button, header keeps its height | Playwright |
 
 BR-DS-23 (toast timing) is not used: moved to "Not now".

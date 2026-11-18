@@ -33,12 +33,12 @@
 | A-24 | 2026-11-18 | spec | Where do shared components live? | `frontend/src/components/shared/`; maps and formatters in `src/lib/` | path already named in `frontend/design/motion-allowlist.json` | info | — |
 | A-25 | 2026-11-18 | spec | Chart colours | Five hues in fixed order (emerald, blue, amber, violet, rose); no charts library chosen. Values: see A-38 | plan 3.1 "five distinct hues" | info | — |
 | A-26 | 2026-11-18 | spec | How were the pictures in `design/screens/` made? | macOS Quick Look rendering of `preview.html`, one section per picture (styles only, no script, about 950 px wide, system font instead of Manrope). The installed browser would not run headless in the sandbox. Motion was not captured; contrast numbers in the pictures come from the same formula run in Node. Re-rendered after the pre-freeze fixes; option B pictures deleted | tooling limit on this machine | info | — |
-| A-27 | 2026-11-18 | spec | Open question 1: second brand colour | Steel blue with cool grey neutrals | owner card 1, answer A | info | — |
-| A-28 | 2026-11-18 | spec | Open question 2: default table density | 13 px text, 36 px rows by default, with a per-user Compact switch | owner card 2, answer B | info | — |
-| A-29 | 2026-11-18 | spec | Open question 3: sidebar strength | Soft: light tinted sidebar, emerald tint on the active item | owner card 3, answer A | info | — |
-| A-30 | 2026-11-18 | spec | Open question 4: motion allow-list | The eight places, no others | owner card 4, answer A | info | — |
-| A-31 | 2026-11-18 | spec | Open question 5: touch density | Later, after the first tablet trial | owner card 5, answer A | info | — |
-| A-32 | 2026-11-18 | spec | Open question 6: home number cards | Later, as its own feature; this work builds `StatCard` only | owner card 6, answer A | info | — |
+| A-27 | 2026-11-18 | spec | Decision: second brand colour | Steel blue with cool grey neutrals | owner card 1, answer A | info | — |
+| A-28 | 2026-11-18 | spec | Decision: default table density | 13 px text, 36 px rows by default, with a per-user Compact switch | owner card 2, answer B | info | — |
+| A-29 | 2026-11-18 | spec | Decision: sidebar strength | Soft: light tinted sidebar, emerald tint on the active item | owner card 3, answer A | info | — |
+| A-30 | 2026-11-18 | spec | Decision: motion allow-list | The eight places, no others | owner card 4, answer A | info | — |
+| A-31 | 2026-11-18 | spec | Decision: touch density | Later, after the first tablet trial | owner card 5, answer A | info | — |
+| A-32 | 2026-11-18 | spec | Decision: home number cards | Later, as its own feature; this work builds `StatCard` only | owner card 6, answer A | info | — |
 | A-33 | 2026-11-18 | spec | How strong is the accent, and how far from the info blue? | Light `oklch(0.42 0.14 262)`, dark `oklch(0.7 0.12 264)`. The reviewer's values (L 0.45 / 0.76) gave ΔE 9.2 / 7.7 against info, so lightness was lowered until ΔE ≥ 10 (now 11.3 / 11.4). Subtle light chroma 0.035 → 0.03 and foreground L 0.975 to stay inside sRGB; subtle dark L 0.33 → 0.31 for contrast margin (4.93) | design review DES-01; WCAG AA; contrast script | info | — |
 | A-34 | 2026-11-18 | spec | What besides colour tells statuses apart? | One Tabler icon per tone before the label (dashed circle, clock, arrow, check, warning triangle, archive) instead of the dot | design review DES-05; WCAG 1.4.1 use of colour | info | — |
 | A-35 | 2026-11-18 | spec | Look of the selected filter, current page and current step | Solid accent fill with light text for filter chip and page number; current step has a solid accent label strip and `aria-current="step"` | design review DES-02, DES-08 | info | — |
