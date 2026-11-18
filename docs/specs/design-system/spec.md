@@ -360,7 +360,20 @@ One commit per step; each step leaves every page working.
 ## Open questions
 None.
 
+## Implementation status
+Built in epic `epic/design-system` (PRs #101 foundation, #102 shell, #103 purchase orders). Map: `docs/modules/design-system.md`.
+| Rules | Status | Tests |
+|---|---|---|
+| BR-DS-01, 02, 09 | done | `frontend/tests/scripts/standards-rules.test.ts`, `contrast-check.test.ts` |
+| BR-DS-03, 04, 05 | done | `frontend/tests/lib/status-tone.test.ts`, `frontend/tests/components/StatusBadge.test.tsx` |
+| BR-DS-10, 11, 15, 20 | done | `frontend/e2e/design-system.spec.ts` |
+| BR-DS-13 | done | `frontend/tests/components/StatCard.test.tsx` |
+| BR-DS-06, 16, 21, 22, 26 | done | `frontend/tests/lib/shell/*.test.ts`, `frontend/tests/components/shell/Shell.test.tsx`, `frontend/e2e/design-system-shell.spec.ts` |
+| BR-DS-07, 12, 14, 17, 18, 19, 27 | done | `frontend/tests/components/shared-views.test.tsx`, `frontend/tests/lib/{pagination,status-flash,format}.test.ts`, `frontend/e2e/design-system-po.spec.ts` |
+| BR-DS-08, 24, 25 | done | human review (spec) |
+
 ## Changelog
 - 2026-11-18 v0 — draft
 - 2026-11-18 v0 — pre-freeze review fixes: one design (owner picked A / B / A / A / A / A), stronger accent, solid selection, blue focus ring, tone icons, approval statuses, scope cut to one reference module
 - 2026-11-18 v1 — frozen. Owner answered 6 cards and confirmed 5 choices; spec and design reviews passed in round 2
+- 2026-11-18 v1 — built (epic design-system). Choices made during the build: assumptions A-46 to A-57 (all info). Decision D-024 (e2e locally before push).

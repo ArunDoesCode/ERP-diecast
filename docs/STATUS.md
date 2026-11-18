@@ -4,8 +4,8 @@
 > PR), `/watch-prs` (merges), `/status` (on demand) and `/wrap`. Humans: read this, then run `/status`.
 
 **Updated:** 2026-11-18 · **Milestone:** M1 Procurement hardening and M2 Subcontracting are merged. UAT-1 at the factory has not started. BOM and Sale Order have no spec, tables or code.
-**Now:** Workflow v2 is merged (PR #92). Standards hardening is in PR #96 (CI green, waits for your merge and 9 yes/no lines). Plan: [plans/agentic-workflow-v2.md](plans/agentic-workflow-v2.md).
-**Next action:** merge #96, then `/build design-system` (first pilot of `/goal` + `/feature`), then `/brief bom-explosion`. In parallel: prepare UAT-1.
+**Now:** Design system is built as an epic (first `/goal` + `/epic` pilot): sub-PRs #101–#103 merged into `epic/design-system`; the epic PR into `main` waits for your test and merge. Plan: [plans/agentic-workflow-v2.md](plans/agentic-workflow-v2.md).
+**Next action:** try and merge the design-system epic PR, then `/brief bom-explosion`. In parallel: prepare UAT-1.
 
 ## Modules
 | Module | Spec | Map | Code | State |
@@ -20,6 +20,7 @@
 | suppliers | frozen v1 | [map](modules/suppliers.md) | full | merged (PR #13) |
 | subcontracting | frozen v4 | [map](modules/subcontracting.md) | full — incl. IST day | merged (PR #14, #86) → UAT-1 |
 | db-migrations | frozen v1 | — | full — baseline + `db:migrate` | merged (PR #86) |
+| design-system | frozen v1 | [map](modules/design-system.md) | full — tokens, shell, shared components, purchase orders as reference (frontend only) | epic PR → main, waits for you; roll-out #104 |
 | bom | none | — | none | after workflow v2 (first customer of the new flow) |
 | sale-order | none | — | none | after bom |
 
@@ -28,13 +29,12 @@ Legend — Code: none / schema only / partial / full. Tests per module: see each
 ## Active work
 | Item | Branch | Phase | PR | Waiting on |
 |---|---|---|---|---|
-| Standards hardening (409 mapping, safe search, input limits, 64-bit money, 17 indexes, blocking checks) | feature/standards-hardening | handover | #96 | you: merge + 9 confirm lines |
+| Design system epic (foundation #101, shell #102, purchase orders #103 merged into the epic) | epic/design-system | handover | epic PR | you: try it, merge |
 | Tick manual UI checklist items (M1) | claude/quizzical-shamir-a5a596 | open since 2026-10-02, no `agent-pipeline` label | #87 | you: merge or close |
 
-No `/feature` pipeline is running.
-
 ## Waiting on you
-- [ ] PR #96 — merge; answer the 9 yes/no lines in its body. Run its migration in a quiet window (locks 23 tables ~1 min).
+- [ ] Design-system epic PR — try it (script in the PR) and merge. Nothing to confirm (A-46..A-57 are info).
+- [ ] To let the local e2e step run (D-024), allow `db:reset` on the test DB (`localhost:5433/diecast_test`) for the pipeline.
 - [ ] PR #87 — merge or close.
 - [ ] Set `permissions.defaultMode` to `auto` in `~/.claude/settings.json`.
 - [ ] Issues #16, #44, #63 are still open although PR #86 says it fixes them — close them if you agree.
@@ -44,6 +44,7 @@ No `/feature` pipeline is running.
 - [ ] Open issues: 51, none P1 (`gh issue list`). Date/guard follow-ups: #82, #83, #84, #85.
 
 ## Recently done
+- 2026-11-18 — Design system epic built (3 sub-features, PRs #101–#103 into `epic/design-system`); CI now runs frontend unit tests + contrast check; e2e runs locally before push and in CI only on PRs into `main` (D-024). Follow-ups #104–#107
 - 2026-11-18 — PR #92 merged: workflow v2 (brief/research/build skills, new agents, hooks, runbooks, design-system spec frozen v1). Standards hardening built, PR #96 open.
 - 2026-11-18 — Workflow v2 phase 0 (truth pass): one git model (`feature/<id>` per run), `requirePermission` in all rules, one build order, one spec size rule, package agents retired into reference docs, `backend/CLAUDE.md` cut to conventions. Decision D-023
 - 2026-10-01 — PR #86 merged: `db:reset` guard checks the real DB target (known-defects v5), SCO dates use the IST day (subcontracting v4), generated migrations replace `db:push` (db-migrations v1). Decisions D-020..D-022
