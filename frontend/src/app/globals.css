@@ -223,9 +223,26 @@ html[data-density="compact"] {
 	.animate-status-flash {
 		animation: none;
 	}
+	/* BR-DS-11: utilities without a motion token (Tailwind default 150ms) must also be instant. */
+	*,
+	*::before,
+	*::after {
+		transition-duration: 0ms !important;
+		animation-duration: 0ms !important;
+	}
 }
 
-/* BR-DS-20: one solid 2px ring with 2px offset on keyboard focus. Unlayered so it beats utility classes. */
+/* BR-DS-20: one solid 2px ring with 2px offset on keyboard focus. Unlayered so it beats utility classes.
+   The ring colour is also set in the resting state: otherwise `transition-colors` animates outline-color
+   from currentcolor to --ring, so the ring shows the text colour for the first frames. */
+:where(*) {
+	outline-color: var(--ring);
+}
+
+[data-sidebar="sidebar"] :where(*) {
+	outline-color: var(--sidebar-ring);
+}
+
 :is(a, button, input, select, textarea, [role], [tabindex]):focus-visible {
 	outline: 2px solid var(--ring);
 	outline-offset: 2px;
