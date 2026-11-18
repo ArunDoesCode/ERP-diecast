@@ -21,6 +21,7 @@ export type Tone =
 
 export type StatusDoc =
 	| "pr"
+	| "prLine"
 	| "po"
 	| "grn"
 	| "grnQa"
@@ -63,6 +64,12 @@ const MAP: Record<StatusDoc, Record<string, Entry>> = Object.assign(
 			rejected: ["Rejected", "danger"],
 			partial_ordered: ["Partly ordered", "info"],
 			fully_ordered: ["Fully ordered", "success"],
+			cancelled: ["Cancelled", "closed"],
+		}),
+		prLine: table({
+			pending: ["Pending", "warning"],
+			po_draft: ["PO draft", "info"],
+			ordered: ["Ordered", "success"],
 			cancelled: ["Cancelled", "closed"],
 		}),
 		po: table({

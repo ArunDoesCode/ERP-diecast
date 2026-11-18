@@ -1,3 +1,6 @@
+/** Page sizes offered by every list; the first is the default. */
+export const PAGE_SIZE_OPTIONS = [10, 20, 50];
+
 /** "1 to 25 of 41"; total 0 → "0 of 0". */
 export function formatPageRange(
 	page: number,

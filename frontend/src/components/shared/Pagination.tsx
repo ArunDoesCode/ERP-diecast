@@ -7,7 +7,11 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import { formatPageRange, getPageNumbers } from "@/lib/pagination";
+import {
+	formatPageRange,
+	getPageNumbers,
+	PAGE_SIZE_OPTIONS,
+} from "@/lib/pagination";
 import { cn } from "@/lib/utils";
 
 export type PaginationProps = {
@@ -18,7 +22,6 @@ export type PaginationProps = {
 	onPageSizeChange?: (pageSize: number) => void;
 };
 
-const PAGE_SIZE_OPTIONS = [10, 20, 50];
 const ARROW =
 	"inline-flex size-7 items-center justify-center rounded-md border border-border text-xs hover:bg-muted aria-disabled:pointer-events-none aria-disabled:opacity-50";
 

@@ -183,7 +183,7 @@ export function PurchaseOrdersView() {
 	);
 
 	return (
-		<div className="flex w-full flex-col gap-4 p-6">
+		<div className="flex w-full flex-col gap-4">
 			<PageHeader
 				title="Purchase orders"
 				description="Approved PR lines waiting for PO draft."

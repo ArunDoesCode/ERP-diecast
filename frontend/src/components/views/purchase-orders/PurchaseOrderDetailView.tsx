@@ -102,7 +102,6 @@ import {
 	PO_IN_TRANSIT_STATUSES,
 	PO_TERMINAL_STATUSES,
 } from "@/lib/po-status-badge";
-import { humanizeStatusLabel } from "@/lib/pr-status-badge";
 import { useBreadcrumbLast } from "@/lib/shell/breadcrumb-last";
 import { useAuthSessionStore } from "@/lib/store/auth-session-store";
 import {
@@ -148,17 +147,6 @@ function sameDefaultSupplier(lines: PurchaseRequisitionItem[]) {
 	);
 
 	return supplierIds.size === 1 ? [...supplierIds][0] : undefined;
-}
-
-function statusBadgeClass(status: string) {
-	if (status === "pending")
-		return "border-amber-200 bg-amber-100 text-amber-800";
-	if (status === "po_draft") return "border-sky-200 bg-sky-100 text-sky-800";
-	if (status === "ordered")
-		return "border-emerald-200 bg-emerald-100 text-emerald-800";
-	if (status === "cancelled")
-		return "border-zinc-300 bg-zinc-100 text-zinc-700";
-	return "border-slate-300 bg-slate-100 text-slate-800";
 }
 
 export function PurchaseOrderDetailView({ prId }: { prId: number }) {
@@ -459,12 +447,7 @@ function LinesTable({
 								{formatMoney(line.estRatePaise)}
 							</TableCell>
 							<TableCell>
-								<Badge
-									variant="outline"
-									className={statusBadgeClass(line.status ?? "pending")}
-								>
-									{humanizeStatusLabel(line.status)}
-								</Badge>
+								<StatusBadge doc="prLine" status={line.status ?? "pending"} />
 							</TableCell>
 							<TableCell>{line.linkedPoNumber ?? "-"}</TableCell>
 							{onCancelLine ? (
@@ -858,8 +841,8 @@ function PoMoreMenu({
  */
 function useOwnActionStatuses(linkedPos: PRLinkedPo[]) {
 	const queryClient = useQueryClient();
-	// poId (or "all" when the mutation does not name one) -> time the arm expires
-	const armed = useRef<Map<number | "all", number>>(new Map());
+	// poId -> time the arm expires (only mutations that name the document arm a row)
+	const armed = useRef<Map<number, number>>(new Map());
 	const [own, setOwn] = useState<Record<number, string>>({});
 
 	useEffect(() => {
@@ -871,9 +854,9 @@ function useOwnActionStatuses(linkedPos: PRLinkedPo[]) {
 				const variables = event.mutation.state.variables as
 					| { poId?: unknown }
 					| undefined;
-				const key =
-					typeof variables?.poId === "number" ? variables.poId : "all";
-				armed.current.set(key, Date.now() + 10_000);
+				if (typeof variables?.poId === "number") {
+					armed.current.set(variables.poId, Date.now() + 10_000);
+				}
 			}
 		});
 		return unsubscribe;
@@ -881,9 +864,7 @@ function useOwnActionStatuses(linkedPos: PRLinkedPo[]) {
 
 	useEffect(() => {
 		const now = Date.now();
-		const isArmed = (id: number) =>
-			(armed.current.get(id) ?? 0) > now ||
-			(armed.current.get("all") ?? 0) > now;
+		const isArmed = (id: number) => (armed.current.get(id) ?? 0) > now;
 		setOwn((current) => {
 			let next = current;
 			for (const po of linkedPos) {

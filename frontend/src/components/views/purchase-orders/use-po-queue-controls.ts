@@ -7,12 +7,12 @@ import {
 import { useEffect, useState } from "react";
 
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { PAGE_SIZE_OPTIONS } from "@/lib/pagination";
 import { type PRType, prTypeValues } from "@/types/purchase-requisitions";
 
 export type POQueueSearchField = "prNumber" | "type";
 export type POQueueStatusFilter = "all" | "approved" | "partial_ordered";
 
-const PAGE_SIZES = [10, 20, 50];
 const statusValues = ["all", "approved", "partial_ordered"] as const;
 
 // Filter and page state live in the URL (BR-DS-17, nuqs).
@@ -48,7 +48,7 @@ export function usePOQueueControls() {
 
 	// A hand-edited URL (?page=-3, ?pageSize=7) falls back to the defaults.
 	const page = pageRaw >= 1 ? pageRaw : 1;
-	const pageSize = PAGE_SIZES.includes(pageSizeRaw) ? pageSizeRaw : 10;
+	const pageSize = PAGE_SIZE_OPTIONS.includes(pageSizeRaw) ? pageSizeRaw : 10;
 
 	// Typing stays local so every keystroke is not a URL write; the debounced value
 	// is what the query and the URL use.
