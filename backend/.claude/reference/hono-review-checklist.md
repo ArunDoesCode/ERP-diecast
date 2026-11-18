@@ -1,33 +1,10 @@
----
-name: hono-reviewer
-description: >
-  Deep DiecastOS Hono backend review for architecture violations, API contract drift,
-  performance bottlenecks, and optimization. Enforces 3-layer boundaries, end-points.ts,
-  async-handler, OpenAPI, pagination-contract.
-  Delegate target, routed through ponytail for multi-step features. Invoke directly for
-  isolated backend review / api audit when depth and rationale are needed.
-  Trigger: review backend, hono review, api audit, controller service repository check,
-  performance review, optimize api.
-tools: Read, Grep, Glob, Skill, mcp__codegraph__codegraph_explore
----
+# Hono review checklist (backend/src)
 
-You are the backend review specialist for DiecastOS Hono API. **You review read-only, by design — your tool access is scoped to `Read`/`Grep`/`Glob`/`Skill`/codegraph. Describe every fix in prose precisely enough that the caller or a builder agent can apply it directly.**
-
-Primary job: detect correctness risks first, then performance risks, then optimization suggestions.
-
-## Tools
-
-| Need       | Tool                                 |
-| ---------- | -------------------------------------- |
-| Codegraph  | `mcp__codegraph__codegraph_explore`   |
-| Read files | `Read`                                |
-| Search     | `Grep`, `Glob`                        |
-| Skill      | `Skill` (e.g. `pagination-contract`)  |
-
-## Codegraph First
-
-- Start review with `mcp__codegraph__codegraph_explore` on target symbols/routes to build call-path-accurate context.
-- Use `Read`/`Grep` only to fill detail gaps after Codegraph results.
+Reference doc, not an agent. Read by the pipeline agent `code-reviewer` (and `performance-auditor` for the
+performance sections) when a diff touches `backend/`. Converted from the retired `hono-reviewer` agent on
+2026-11-18 (workflow v2, 0.7); the checks are unchanged. Order of concern: correctness risks first, then
+performance risks, then optimization suggestions. Severity mapping to the pipeline protocol:
+High → blocker, Medium → major, Low → minor.
 
 ## Scope
 
@@ -94,25 +71,9 @@ Optimization patterns to prefer:
 - Reuse shared clients/utilities in src/lib.
 - Introduce cache only when data staleness is acceptable and invalidation path is clear.
 
-## Report Format
-
-Output: caveman-compressed report, code unchanged.
-
-Return findings in this order:
-
-1. High severity findings (bugs/security/contract breaks)
-2. Medium severity findings (architecture/performance risks)
-3. Optimization suggestions (only for observed bottlenecks)
-4. Residual risks/testing gaps
-
-For each finding include:
+## Per finding, always give
 
 - file and line
 - problem
 - why it matters
-- precise fix pattern
-
-If no findings:
-
-- state: No critical or medium findings.
-- still include: possible optimization opportunities and confidence level.
+- precise fix pattern (described precisely enough that a developer agent can apply it directly)

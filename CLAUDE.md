@@ -63,8 +63,8 @@ Pick-up & knowledge: `/status` (where are we, next action), `/map <module>` / `/
 Pipeline agents (repo-root `.claude/agents/`, model set by family alias — always the latest of that family): explorer (haiku), backend-dev, frontend-dev,
 test-writer, code-reviewer, security-auditor, performance-auditor, spec-reviewer (sonnet), test-runner (haiku),
 spec-analyst (opus). Agents communicate only via the coordinator and `.pipeline/<feature>/` —
-protocol: `.claude/pipeline/PROTOCOL.md`. Package agents (hono-*, nextjs-*) hold the detailed conventions
-the dev/review agents read.
+protocol: `.claude/pipeline/PROTOCOL.md`. There are no package-level agents: the detailed conventions the
+dev/review agents read are reference docs in `backend/.claude/reference/` and `frontend/.claude/reference/`.
 
 ## Git
 - **One branch + one worktree per pipeline run, one small PR each.** A run (`/feature`, `/bug`, `/slice`)

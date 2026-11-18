@@ -1,40 +1,15 @@
----
-name: hono-builder
-description: >
-  Hono backend implementation specialist for backend/src. Enforces controller→service→repository,
-  end-points.ts SoT, OpenAPI, RBAC, Zod validation, pagination-contract.
-  Delegate target for 3+ file / new-feature builds, routed through ponytail for multi-step features.
-  Invoke directly only when ponytail hands off a scoped build brief.
-  Trigger: hono route, new endpoint, backend feature, controller service repository, requirePermission,
-  async handler, openapi spec.
-tools: Read, Edit, Write, Grep, Glob, Bash, Skill, AskUserQuestion, mcp__codegraph__codegraph_explore
----
+# Hono build conventions (backend/src)
 
-You are a backend implementation specialist for the DiecastOS Hono API (`backend/src`). Your job is to build and refactor API features that are maintainable, type-safe, and consistent — with a single source of truth for every concern.
+Reference doc, not an agent. Read by the pipeline agent `backend-dev` (and by `/slice`, `/bug`) before
+writing backend code. Converted from the retired `hono-builder` agent on 2026-11-18 (workflow v2, 0.7);
+the conventions are unchanged. Goal: API features that are maintainable, type-safe and consistent, with a
+single source of truth for every concern.
 
-## Tools
+## Mandatory API intake
 
-| Need             | Tool                                                      |
-| ---------------- | ----------------------------------------------------------- |
-| Codegraph        | `mcp__codegraph__codegraph_explore`                        |
-| Read files       | `Read`                                                     |
-| Edit / create    | `Edit`, `Write`                                            |
-| Search           | `Grep`, `Glob`                                             |
-| Lint after edit  | `Bash` (`bunx biome check <file>`)                         |
-| Validate         | `Bash` (`bun run lint`, `bun run typecheck`, `bun test`)   |
-| Load a skill     | `Skill` (`api-endpoint-intake`, `pagination-contract`)     |
-| Clarify contract | `AskUserQuestion`                                          |
-
-## Mandatory API Intake
-
-- Before implementing or refactoring any endpoint contract, invoke `Skill` with `skill: "api-endpoint-intake"` and follow it.
-- If checklist has unresolved items, ask clarifying questions first.
-- Start coding only after route/method, request/response shape, pagination/filter rules, RBAC, and error contract are explicit.
-
-## Codegraph First
-
-- Start each task with `mcp__codegraph__codegraph_explore` for symbols, call paths, and blast radius before editing.
-- Fall back to `Read`/`Grep`/`Glob` only for gaps not covered in Codegraph output.
+- Before implementing or refactoring any endpoint contract, load the skill `api-endpoint-intake` and follow it.
+- Answer its checklist from the frozen spec. An item the spec does not answer → return BLOCKED with the question.
+- Start coding only after route/method, request/response shape, pagination/filter rules, permission key, and error contract are explicit.
 
 ## Conventions to Follow
 
@@ -110,12 +85,3 @@ The frontend agent (or you, to sanity-check your own work) queries the manifest 
 - Every endpoint has OpenAPI summary/tags/schemas/security metadata.
 - Every value is precisely typed.
 - `bun run contract:generate` re-run after any route/schema/auth change — manifest matches current code.
-
-## Output Format
-
-Return concise build report. Output: caveman-compressed report, code unchanged.
-
-1. what implemented
-2. files changed and why
-3. validation run (lint/typecheck/tests)
-4. risks or assumptions

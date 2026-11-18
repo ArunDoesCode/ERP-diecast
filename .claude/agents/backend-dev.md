@@ -9,7 +9,7 @@ tools: Read, Edit, Write, Grep, Glob, Bash, Skill, mcp__codegraph__codegraph_exp
 ---
 
 Read first, in order: `.claude/pipeline/PROTOCOL.md`, your brief, `backend/CLAUDE.md`,
-`backend/.claude/agents/hono-builder.md` (the full conventions — follow them exactly), the module map
+`backend/.claude/reference/hono-build-conventions.md` (the full conventions — follow them exactly), the module map
 `docs/modules/<module>.md` (where the code is + module gotchas — don't re-explore what it describes), and
 the spec sections for your BR ids.
 

@@ -684,13 +684,13 @@ test("BR-GRN-04 rejects received qty above PO open qty", async () => {
 │   └── worktrees/             <span class="n">← agent work folders (git-ignored locally)</span>
 ├── backend/
 │   ├── CLAUDE.md              <span class="n">← read when working on backend files: Hono/Drizzle conventions</span>
-│   └── .claude/               <span class="n">← BACKEND layer: backend-only agents and skills</span>
-│       ├── agents/            <span class="n">← hono-builder, hono-reviewer (detailed backend rules)</span>
+│   └── .claude/               <span class="n">← BACKEND layer: backend-only reference docs and skills</span>
+│       ├── reference/         <span class="n">← hono-build-conventions, hono-review-checklist (detailed backend rules)</span>
 │       └── skills/            <span class="n">← api-endpoint-intake, pagination-contract…</span>
 └── frontend/
     ├── CLAUDE.md              <span class="n">← read when working on frontend files: Next.js 16 conventions</span>
     └── .claude/               <span class="n">← FRONTEND layer</span>
-        ├── agents/            <span class="n">← nextjs-builder, nextjs-reviewer</span>
+        ├── reference/         <span class="n">← nextjs-build-conventions, nextjs-review-checklist</span>
         └── skills/            <span class="n">← data-table, ui-form-standards, structure-guard…</span></div>
 
       <h3>Why some things are at the root and others aren't</h3>
@@ -704,7 +704,7 @@ test("BR-GRN-04 rejects received qty above PO open qty", async () => {
           </tbody>
         </table>
       </div>
-      <p>The backend and frontend folders were there first. The root one was added for the workflow so the process rules aren't copied into both packages. The pipeline's <code>backend-dev</code> agent (root) is told to read <code>backend/.claude/agents/hono-builder.md</code> for the detailed rules, so the two layers work together.</p>
+      <p>The backend and frontend folders were there first. The root one was added for the workflow so the process rules aren't copied into both packages. The pipeline's <code>backend-dev</code> agent (root) is told to read <code>backend/.claude/reference/hono-build-conventions.md</code> for the detailed rules, so the two layers work together.</p>
 
       <h3>How Claude Code reads them</h3>
       <ul>

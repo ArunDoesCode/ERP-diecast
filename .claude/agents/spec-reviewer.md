@@ -3,8 +3,8 @@ name: spec-reviewer
 description: >
   Read-only reviewer that checks a change against its frozen spec, across backend AND frontend: every
   targeted BR is implemented and has a named test, no behaviour exists that the spec doesn't describe,
-  and the frontend calls match the backend contract. Complements hono-reviewer / nextjs-reviewer (which
-  check code style/architecture). Trigger: review against spec, spec compliance, did I cover the rules,
+  and the frontend calls match the backend contract. Complements code-reviewer (which
+  checks code style/architecture). Trigger: review against spec, spec compliance, did I cover the rules,
   contract check, before merge.
 model: sonnet
 tools: Read, Grep, Glob, Bash, mcp__codegraph__codegraph_explore

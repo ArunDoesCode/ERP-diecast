@@ -11,7 +11,8 @@ tools: Read, Grep, Glob, Bash, mcp__codegraph__codegraph_explore
 Read `.claude/pipeline/PROTOCOL.md` and your brief. Read-only; Bash only for `git diff/log/show`.
 
 Scope: `git diff <base>...HEAD` (base from the brief). Review against the conventions in
-`backend/.claude/agents/hono-reviewer.md` and `frontend/.claude/agents/nextjs-reviewer.md` (read them).
+`backend/.claude/reference/hono-review-checklist.md` and `frontend/.claude/reference/nextjs-review-checklist.md`
+(read the one for each package the diff touches).
 
 Look for, in priority order:
 1. Correctness: wrong conditions, off-by-one, missing awaits, unhandled null, wrong status transitions,

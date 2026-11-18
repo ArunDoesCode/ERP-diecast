@@ -110,15 +110,14 @@ not generic REST nouns — never guess an alternate path.
 
 ## Agents & skills
 
-Claude Code subagents live in [`.claude/agents/`](.claude/agents/README.md) — `ponytail`
-(orchestrator), `nextjs-builder`/`nextjs-reviewer` (feature build/deep review), and the
-`cavecrew-*` trio (fast locate/surgical-edit/quick-review). They exist only in this project
-(not installed globally) and are scoped to never read or write outside this repository except
-via the read-only backend contract-lookup commands above.
+There are no frontend-only agents. All agents (`frontend-dev`, `code-reviewer`, `test-writer`, …) and
+workflow skills (`/spec`, `/freeze`, `/feature`, `/slice`, `/bug`, `/wrap`) live in the repo-root
+`.claude/` — see `docs/WORKFLOW.md`. Frontend code is never written outside this package except via the
+read-only backend contract-lookup commands above.
+
+Reference docs the agents read: [`.claude/reference/nextjs-build-conventions.md`](.claude/reference/nextjs-build-conventions.md)
+(before building) and [`.claude/reference/nextjs-review-checklist.md`](.claude/reference/nextjs-review-checklist.md)
+(when reviewing).
 
 Skills live in [`.claude/skills/`](.claude/skills/): `structure-guard`, `client-data-state`,
-`ui-form-standards`, `data-table`, `shadcn`, `karpathy-guidelines`, `pwa-runtime-ux` (shelved
-— no PWA infra yet), and `cavecrew` (delegation decision guide).
-
-Workflow-level agents and skills (`spec-analyst`, `test-writer`, `spec-reviewer`, `/spec`,
-`/freeze`, `/slice`, `/bug`, `/wrap`) live in the repo-root `.claude/` — see `docs/WORKFLOW.md`.
+`ui-form-standards`, `data-table`, `shadcn`, `pwa-runtime-ux` (shelved — no PWA infra yet).

@@ -28,26 +28,26 @@ Delegate to **test-writer** (`subagent_type: test-writer`, never a fork) with th
 template** from `.claude/pipeline/PROTOCOL.md`: spec path + version, BR ids, contract path — nothing from
 this conversation or your own reading of the spec/code. Commit its tests alone as `test(<module>): …`.
 Expect FAIL-EXPECTED for new behaviour. Any FAIL-BUG on existing code is in scope only if it's one of the
-slice's BRs; otherwise open a GitHub issue for it. From here on neither you nor the builder agents edit
+slice's BRs; otherwise open a GitHub issue for it. From here on neither you nor the developer agents edit
 test files (see PROTOCOL.md → Test independence).
 
 ## 3. Green — backend
-Delegate to **hono-builder** (`backend/.claude/agents/hono-builder.md`) with: the BR list, the failing test
-files, the contract. If the agent type isn't registered in this session, spawn a general-purpose agent and
-tell it to read and follow that file. Loop until `cd backend && bun test` passes and
-`bun run typecheck && bun run lint` are clean.
+Delegate to **backend-dev** (`subagent_type: backend-dev`, brief per PROTOCOL.md) with: the BR list, the
+failing test files, the contract. It follows `backend/.claude/reference/hono-build-conventions.md`. Loop
+until `cd backend && bun test` passes and `bun run typecheck && bun run lint` are clean.
 
 ## 4. Contract regen
 `cd backend && bun run contract:generate`. Then confirm the endpoints with `bun run contract:query "<METHOD /path>"`.
 
 ## 5. Frontend
-Delegate to **nextjs-builder** (`frontend/.claude/agents/nextjs-builder.md`) with: the spec's acceptance
-criteria for these BRs, the contract query output, and which view/page to change. Then
+Delegate to **frontend-dev** (`subagent_type: frontend-dev`) with: the spec's acceptance criteria for these
+BRs, the contract query output, and which view/page to change. It follows
+`frontend/.claude/reference/nextjs-build-conventions.md`. Then
 `cd frontend && bunx tsc --noEmit && bun run lint`.
 
 ## 6. Review
-Run **spec-reviewer** (module + BRs) and **hono-reviewer** / **nextjs-reviewer** in parallel. Fix blockers,
-re-run. Minor findings → mention to user.
+Run **spec-reviewer** (module + BRs) and **code-reviewer** (it reads the package review checklists) in
+parallel. Blockers go back to backend-dev / frontend-dev (test changes only via test-writer); re-run. Minor findings → mention to user.
 
 ## 7. Close
 - In the spec's "Implementation status" table, mark each BR `done` with the test file.

@@ -1,18 +1,16 @@
----
-name: nextjs-builder
-description: "Use when building frontend features in src: Next.js App Router pages, views, components, fetchers, query hooks, and UI state. Enforces repo API client usage, local schema/type usage, and frontend architecture conventions. Trigger phrases: nextjs feature, frontend build, app router page, tanstack query, shadcn react-hook-form form, nuqs, tanstack table, new screen, list page, detail page."
-tools: Read, Edit, Write, Bash, Skill, AskUserQuestion, ToolSearch, mcp__codegraph__codegraph_explore
----
+# Next.js build conventions (frontend/src)
 
-You are the frontend build agent for the ERP Diecast frontend. Implement `src` features only.
+Reference doc, not an agent. Read by the pipeline agent `frontend-dev` (and by `/slice`, `/bug`) before
+writing frontend code. Converted from the retired `nextjs-builder` agent on 2026-11-18 (workflow v2, 0.7);
+the conventions are unchanged. `CLAUDE.md` below means `frontend/CLAUDE.md`.
 
 ## Scope boundary
 
-Work only within this `frontend/` repository (this directory and its subtree) — never read or write files under `../backend` or any sibling project. The one exception is running `bun run --cwd ../backend contract:query`/`contract:generate` via `Bash`, which is a **read-only** contract lookup against the sibling backend package, not a file edit — do that, never touch backend source directly. If a task genuinely requires a backend change, say so and stop; that belongs to the backend's own agents.
+Work only within this `frontend/` repository (this directory and its subtree) — never read or write files under `../backend` or any sibling project. The one exception is running `bun run --cwd ../backend contract:query`/`contract:generate` via `Bash`, which is a **read-only** contract lookup against the sibling backend package, not a file edit — do that, never touch backend source directly. If a task genuinely requires a backend change, say so and stop; that belongs to `backend-dev`.
 
 ## Next.js version facts
 
-Read `CLAUDE.md` (repo root) before writing any App Router code — it has a distilled,
+Read `frontend/CLAUDE.md` before writing any App Router code — it has a distilled,
 confirmed list of Next.js 16 breaking changes that actually apply to this codebase
 (async `params`/`searchParams`, `proxy.ts`, `loading.tsx`'s auto-Suspense, etc.), sourced
 from `node_modules/next/dist/docs/`. If a feature you build surfaces a new Next.js
@@ -64,8 +62,6 @@ version-specific fact/gotcha not already listed there, add a one-line bullet to 
 | Table, card-grid list page, pagination, sort  | `data-table`         | Fetcher/query design also needed → `client-data-state`    |
 | PWA runtime/offline behavior                  | `pwa-runtime-ux`     | Only if the user explicitly asks for PWA setup            |
 | shadcn component add/fix/style/compose        | `shadcn`             | Form involved → `ui-form-standards`                       |
-| Deciding whether to delegate a sub-piece      | `cavecrew`           | —                                                          |
-| Every coding task (always active)             | `karpathy-guidelines`| —                                                          |
 
 ## Backend Contract Lookup (mandatory, before writing types/fetchers)
 
@@ -76,7 +72,7 @@ bun run --cwd ../backend contract:query "<resource or search term>"     # e.g. "
 bun run --cwd ../backend contract:query "<METHOD> /api/<path>"          # e.g. "POST /api/pr/createpr" — full descriptor: request/response schema, auth roles, pagination fields
 ```
 
-If `../backend/.contracts/api-manifest.json` doesn't exist yet or looks stale (backend changed recently), run `bun run --cwd ../backend contract:generate` — this repo does not commit that file, it's generated on demand.
+The manifest `../backend/.contracts/api-manifest.json` is committed and checked in CI (`contract:check`). If it looks stale (backend changed recently), `bun run --cwd ../backend contract:generate` refreshes it — in a pipeline run the run's `contract.md` and the committed manifest are the input; a missing endpoint means BLOCKED, not guessing.
 
 Use the queried descriptor to write `src/types/[feature].ts` and the fetcher's generic type args in step 1 and 3 below — don't invent field names/types that aren't in the descriptor. Route paths follow this backend's own convention (`/pr/getprs`, `/po/createpo`, comma-separated `status` filters, etc.), not generic REST nouns — never guess an alternate path.
 
@@ -112,8 +108,3 @@ Use the queried descriptor to write `src/types/[feature].ts` and the fetcher's g
 - [ ] New route pages follow page → view → pages-component pattern
 - [ ] `src/lib/Providers.tsx` remains single provider entrypoint
 - [ ] `npx tsc --noEmit -p .` and `npx biome check <touched files>` both clean
-
-## Output Format
-
-- Short summary: files changed + why.
-- Verification performed (typecheck/lint command + result) + remaining risks.

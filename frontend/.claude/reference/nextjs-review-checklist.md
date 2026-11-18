@@ -1,12 +1,10 @@
----
-name: nextjs-reviewer
-description: "Use when reviewing ERP Diecast frontend code in src for architecture violations, API-client bypass, server/client state boundary breaks, Next.js App Router misuse, render/perf risks, or responsiveness gaps. Enforces page -> view -> pages-component pattern, api.* + API_ROUTES usage (no raw fetch/axios/Supabase in feature modules), TanStack Query for server state, Zustand for UI state only, and feature key-factory invalidation. Trigger phrases: review frontend, nextjs review, react review, ui audit, app router check, query cache review, render performance, client state boundary, responsiveness audit."
-tools: Read, ToolSearch, mcp__codegraph__codegraph_explore, Skill
----
+# Next.js review checklist (frontend/src)
 
-You are the frontend review specialist for the ERP Diecast Next.js App Router app (`src`). Read-only: you have no Edit/Write/Bash tools, this is enforced, not just instructed.
-
-Primary job: detect correctness risks first, then performance/render risks, then optimization suggestions.
+Reference doc, not an agent. Read by the pipeline agent `code-reviewer` (and `performance-auditor` for the
+render/performance sections) when a diff touches `frontend/`. Converted from the retired `nextjs-reviewer`
+agent on 2026-11-18 (workflow v2, 0.7); the checks are unchanged. Order of concern: correctness risks
+first, then performance/render risks, then optimization suggestions. Severity mapping to the pipeline
+protocol: High → blocker, Medium → major, Low → minor. `CLAUDE.md` below means `frontend/CLAUDE.md`.
 
 ## Scope boundary
 
@@ -14,16 +12,11 @@ Review only within this `frontend/` repository. If a finding actually traces to 
 
 ## Next.js version facts
 
-`CLAUDE.md` (repo root) lists confirmed Next.js 16 breaking changes for this codebase
+`frontend/CLAUDE.md` lists confirmed Next.js 16 breaking changes for this codebase
 (async `params`/`searchParams`, `proxy.ts` vs `middleware.ts`, `loading.tsx`'s auto-Suspense
 requirement, etc.) — check reviewed code against it. You're read-only, so if you spot a
 version-specific issue not yet listed there, call it out in your findings so the caller can
 add it rather than adding it yourself.
-
-## Codegraph First
-
-- Start review with `mcp__codegraph__codegraph_explore` on target symbols/components/hooks to build call-path-accurate context.
-- Use `Read` only to fill detail gaps after codegraph results.
 
 ## Scope
 
@@ -123,23 +116,9 @@ Prefer:
 - Tune `staleTime`/`gcTime` when data staleness is acceptable.
 - Keep heavy deps out of client bundles; lazy-load where staleness/UX allows.
 
-## Report Format
-
-Return findings, most severe first:
-
-1. High severity findings (bugs/security/contract breaks)
-2. Medium severity findings (architecture/performance/responsiveness risks)
-3. Optimization suggestions (only for observed bottlenecks)
-4. Residual risks/testing gaps
-
-For each finding include:
+## Per finding, always give
 
 - file and line
 - problem
 - why it matters
 - precise fix pattern
-
-If no findings:
-
-- state: No critical or medium findings.
-- still include: possible optimization opportunities and confidence level.
