@@ -3,46 +3,57 @@ name: epic
 description: >
   Run a really large feature (e.g. Sale Order + BOM explosion) as an epic: split a frozen spec into ordered
   sub-features, create epic/<name> branch, run /feature for each sub-feature on its own branch with a PR into
-  the epic, then a final scenario test and an epic PR into main. Use when: /epic <module>, "large feature",
-  "break this into parts", a spec with more than ~15 BRs or several screens/modules.
+  the epic (merged automatically when every gate is green), then a final scenario test and an epic PR into
+  main for the owner. Never waits for the owner. Use when: /epic <module>, "large feature", "break this into
+  parts", a spec with more than ~15 BRs or several screens/modules.
 model: opus
 ---
 
 # /epic <module> [--resume]
 
-You are the coordinator (see `/feature` and `.claude/pipeline/PROTOCOL.md`).
+You are the coordinator. `/feature` and `.claude/pipeline/PROTOCOL.md` apply in full: never-wait policy,
+hard stops, run state, test independence. **Every turn ends with the gate table** (`.claude/pipeline/state.sh
+gates`) of the epic run, plus one line per sub-feature: `<sub> · phase · PR · merged / waiting / parked`.
 
 ## 1. Decompose (once)
-1. Spec gate: `docs/specs/<module>.md` frozen (plus every spec in `depends_on`).
-2. Spawn **explorer** for the whole area. Then write `.pipeline/epic-<module>/epic.md`:
-   | # | sub-feature | BR ids | depends on | backend/frontend | demo-able outcome |
-   Rules: each sub-feature 5–15 BRs, independently testable, merges without breaking the app (hidden page or
-   not linked in sidebar until the last one if needed), ordered by dependency (data model/master data →
-   core transaction → integrations → reports).
-   Example for BOM: `bom-master` → `bom-explosion-engine` → `sale-order` → `so-explosion-to-pr` → `reports`.
-3. Show the decomposition to the user **once** (AskUserQuestion: approve / adjust). This is the only extra
-   approval an epic needs.
-4. `git switch -c epic/<module> main && git push -u origin epic/<module>`; commit `epic.md` there.
-5. Scenario test for the whole epic: spawn **test-writer** (`subagent_type: test-writer`, never a fork)
-   with the zero-context brief template (spec path + all BR ids of the epic — not `epic.md` or your
-   decomposition notes) to write the end-to-end scenario (e.g. SO → explosion → net requirement vs stock →
-   draft PRs/SCOs) up front in `backend/tests/scenarios/`; commit it alone as `test(epic-<module>): …`. It
-   stays red until the last sub-feature — each sub-feature PR shows how much of it passes.
+1. Spec gate: the spec is frozen (plus every spec in `depends_on`). Not frozen → say so and end.
+2. `git fetch origin && git worktree add .claude/worktrees/epic-<module> -b epic/<module> origin/main`,
+   enter it, `git push -u origin epic/<module>`. `state.sh init epic-<module> <module> epic epic/<module> main`.
+3. **explorer** for the whole area, then write `.pipeline/epic-<module>/epic.md`:
+   `| # | sub-feature | BR ids | depends on | backend/frontend | demo-able outcome | status |`
+   Each sub-feature 5–15 BRs, testable alone, merges without breaking the app (page hidden or unlinked
+   until the last one), ordered by dependency (master data → core transaction → integrations → reports).
+4. No approval step: the split is yours. Log it as an assumption tagged `info`; the owner sees it in the
+   epic hand-over.
+5. Scenario test for the whole epic: **test-writer** (`subagent_type: test-writer`, never a fork),
+   zero-context brief (spec path + all BR ids — not `epic.md`), in `backend/tests/scenarios/`. Commit it
+   alone, `test(epic-<module>): …`, push. Red until the last sub-feature.
 
 ## 2. Run sub-features
-For each sub-feature in order whose dependencies are merged into `epic/<module>`:
-`/feature <module> --sub <sub> --base epic/<module>` (full pipeline, its own `feature/<module>-<sub>` branch +
-worktree, PR into the epic).
-Independent sub-features (no dependency between them) may run in parallel in separate worktrees (run `codegraph init -i` in each new one); never
-two that touch the same tables/screens.
-Wait for the user to merge each sub-PR (watcher reports merges), then `git pull` the epic branch and continue.
+For each sub-feature whose dependencies are merged into `epic/<module>`:
+`/feature <module> --sub <sub> --base epic/<module>` — full pipeline, own branch + worktree, PR into the epic.
+Independent sub-features may run in parallel in separate worktrees; never two that touch the same tables
+or screens, and never two test runs at once (one shared test DB).
+
+**Merge of a sub-feature PR** (after its `/feature` reached `handover` with every gate green, nothing
+parked, CI green):
+1. `.claude/pipeline/merge-sub-pr.sh <n>` — it refuses any PR whose base is not `epic/*`.
+2. Merged → `pr.merge = "merged"`, `git pull` in the epic worktree, sub-feature status `merged`, go on.
+3. Script denied, refused, or the sub-feature has parked slices → `pr.merge = "owner"`, status `waiting`.
+   Do **not** stop: run every sub-feature that does not depend on it. When nothing else can run, go to §3
+   with what is merged, and list the waiting PRs first in the hand-over ("merge these, then
+   `/epic <module> --resume`"). `/watch-prs` picks up the merge.
+Never `gh pr merge` on a PR into `main`.
+
+A sub-feature that fails as a whole (hard stop, or all slices parked) → its issue links go in `epic.md`;
+sub-features that depend on it get status `parked` with the same issue; continue with the rest.
 
 ## 3. Close the epic
-When all sub-features are merged: in a worktree of `epic/<module>`, run the Phase 3 verify loop from
-`/feature` on `git diff main...epic/<module>` (full reviews + test-runner, scenario must be green), then
-open the epic PR into `main` with: sub-PR links, BR coverage for the whole spec, audit summary, full manual
-UAT script. Label `agent-pipeline`. Never push to `main`; the user merges. The spec's Implementation status is updated
-in the epic branch before the PR, so it merges with it.
+When every sub-feature is merged, waiting or parked: in the epic worktree run `/feature` Phase 3 (review
+loop) on `git diff main...epic/<module>` — full reviewers + test-runner; the scenario test must be green
+unless a parked sub-feature explains the red part. Then `/feature` Phase 4: docs commit, `HANDOVER.md`,
+push, epic PR into `main` (templates as in `/feature`; body adds the sub-PR links and the full manual
+UAT script). Label `agent-pipeline`. The owner merges; never push to `main`.
 
-Keep `epic.md` status current (todo / in-progress #PR / merged) so `--resume` in a new session knows where
-it is.
+Keep `epic.md` status current (todo / in-progress #PR / merged / waiting / parked #issue) so `--resume`
+knows where it is: [resume-after-crash](../../../docs/runbooks/resume-after-crash.md).

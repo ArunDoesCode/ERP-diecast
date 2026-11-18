@@ -11,8 +11,9 @@ git status --short                                   # must be clean; commit or 
 git log --format='%h %s' <base>..HEAD                # find the slice's commits
 cat .pipeline/<id>/plan.md                           # does a later slice depend on this one?
 ```
-- **Last green** = `state.json` → `lastGreen` (**missing — to be added**, plan 4.1). Until then: the last
-  commit before the slice's first commit (`feat(<id>): <slice> contract`).
+- **Last green** = `state.json` → `lastGreen`. If it is `null`: the last commit before the slice's first
+  commit (`feat(<id>): <slice> contract`).
+- Uncommitted docs (spec changelog, assumptions) → commit them first: `docs(<id>): assumptions so far`.
 - Sort the slice's commits into **code** (`feat(`, `fix(`) and **tests** (`test(`).
 - A later slice depends on it → park that one too, in the same issue.
 
@@ -41,10 +42,10 @@ cat .pipeline/<id>/plan.md                           # does a later slice depend
    shas>` on branch `<branch>`) · **Needs from owner** (yes/no question, or "nothing").
    Labels: priority `P1` blocks the milestone / `P2` default / `P3` cosmetic · one type `feature` (rules not
    built), `defect` (bug in code already on base), `change` (needs a spec decision) · `mod:<module>`.
-6. `state.json`: add to `parked` (**missing — to be added**):
-   `{ "slice": "<S>", "brs": ["BR-…"], "issue": <n>, "reverts": ["<sha>", "<sha>"], "reason": "<one line>" }`,
-   set `iteration` to 0 and `currentSlice` to the next slice. In `findings.md` mark the slice's open
-   findings `parked #<n>`. Commit `chore(<id>): park slice <S> (#<n>)`.
+6. `state.json`: add to `parked`:
+   `{ "slice": "<S>", "brs": ["BR-…"], "issue": "<issue url>", "reverts": ["<sha>", "<sha>"], "reason": "<one line>" }`,
+   set the slice's status to `parked`, `fixRounds` to 0, `currentSlice` to the next slice, and `lastGreen`
+   to HEAD after step 4. In `findings.md` mark the slice's open findings `parked #<n>`. No commit for this.
 7. Continue with the next slice. List the parked slice with its issue link in `HANDOVER.md` and the PR body.
 
 ## If it fails twice
@@ -57,4 +58,4 @@ Every slice parked → still open the PR with the docs commits and the issue lis
 - Never mix test files and code in one revert commit (test-runner flags it as `TEST-INTEGRITY`).
 - Never park by skipping or deleting the failing tests and keeping the code.
 - Never revert a commit that is already on the base branch.
-- Never park without an issue number in `state.json` and the hand-over.
+- Never park without an issue link in `state.json` and the hand-over.

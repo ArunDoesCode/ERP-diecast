@@ -22,14 +22,16 @@ Not found → sort the gap:
 | Everything else (limits, pagination, error codes, names, indexes) | benchmark or project standard, tag `info` |
 
 ## Fix
-1. Get the benchmark: how ERPNext, Odoo and SAP Business One handle the case. Use the `researcher` agent
-   (**missing — to be added**, plan item 2.2); until then the coordinator does a short WebSearch itself.
+1. Get the benchmark: how ERPNext, Odoo and SAP Business One handle the case. Spawn the `researcher`
+   agent (it writes `docs/research/<id>-gaps.md`); if it is not available, do a short WebSearch yourself.
 2. Pick what most of them do. If they disagree, pick the stricter one (refuse rather than allow).
-3. Append one row to `assumptions.md` (new modules: `docs/specs/<module>/assumptions.md`; for a flat
-   `docs/specs/<module>.md` spec the place is not decided — use `.pipeline/<id>/assumptions.md`):
+3. Append one row to the assumptions file (`docs/specs/<module>/assumptions.md`; for a flat
+   `docs/specs/<module>.md` spec: `docs/specs/<module>.assumptions.md`) and count it in `state.json` →
+   `assumptions`:
    `| A-NN | date | BR or area | question | what we chose | source (product + link, or "standard") | confirm / info |`
 4. Add the rule to the spec so tests can be written from it: a line in the spec **Changelog**
-   ("assumed during build, A-NN"), bump the version, spec stays `frozen`. Commit `docs(<id>): assumption A-NN`.
+   ("assumed during build, A-NN"), bump the version, spec stays `frozen`. No commit of its own: it goes in
+   the run's one `docs(<id>)` commit at hand-over.
 5. Re-brief in this order: test-writer (pointer to the new spec version + BR id, nothing else) → developer.
    The answer goes in the spec, never in the test-writer brief.
 6. Add the row to `.pipeline/<id>/questions.md` (question, "benchmark", answer, A-NN).

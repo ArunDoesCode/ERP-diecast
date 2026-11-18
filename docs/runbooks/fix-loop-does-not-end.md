@@ -1,13 +1,13 @@
 # Fix loop does not end
 
 ## Symptom
-- `state.json` → `iteration` is 3, or
+- `state.json` → `fixRounds` is 3, or
 - the same finding id is still open in `.pipeline/<id>/findings.md` after 2 fix commits, or
 - each fix round brings new findings of the same kind.
 
 ## Check
 ```bash
-cat .pipeline/<id>/state.json                       # iteration, currentSlice
+cat .pipeline/<id>/state.json                       # fixRounds, currentSlice, lastGreen
 grep -c "fix now" .pipeline/<id>/findings.md        # how many are still to fix
 git log --oneline <base>..HEAD | grep -E "fix\(|test\(" | head -20   # what the rounds changed
 ```
@@ -30,14 +30,14 @@ Then put every open blocker / major in one of these boxes (seen in past runs):
 4. Box D → run the checks yourself before the next review round, not after:
    `cd backend && bun run typecheck && bun run lint && bun test`
    `cd frontend && bunx tsc --noEmit && bun run lint`
-5. Box E → one more round only if `iteration` < 3. Give the developer the failing test name, the BR text
+5. Box E → one more round only if `fixRounds` < 3. Give the developer the failing test name, the BR text
    and the two earlier fix commits (`git show <sha>`), and ask for a different approach.
 6. Minor findings never keep the loop open: one GitHub issue each (labels in
    [park-a-slice.md](park-a-slice.md)), status `backlog #NN`.
-7. After each round: `iteration += 1` in `state.json`, commit `chore(<id>): pipeline state`.
+7. Each round: `.claude/pipeline/state.sh phase fix` (it adds 1 to `fixRounds`). No commit — the run folder is not in git.
 
 ## If it fails twice
-`iteration` > 3, or one finding id survived 2 fixes → **park the slice that owns the finding**:
+`fixRounds` is 3 and still not green, or one finding id survived 2 fixes → **park the slice that owns the finding**:
 [park-a-slice.md](park-a-slice.md). Record in the issue: finding ids, the fix commits tried, the last
 test-runner report path. Then continue with the next slice. Do not ask the owner.
 

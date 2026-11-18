@@ -1,7 +1,7 @@
 # Runbooks — what to do when a build goes wrong
 
 For pipeline agents in an unattended run (first) and the owner (second). One page per case, same shape:
-**Symptom · Check · Fix · If it fails twice · Never**. Policy behind them: `docs/plans/agentic-workflow-v2.md`
+**Symptom · Check · Fix · If it fails twice · Never**. Policy behind them: `.claude/pipeline/PROTOCOL.md`
 → "Never-wait build policy".
 
 | Symptom | Runbook |
@@ -31,15 +31,17 @@ For pipeline agents in an unattended run (first) and the owner (second). One pag
 ## Words used
 | Word | Meaning |
 |---|---|
-| `<id>` | feature id = folder name `.pipeline/<id>/` |
-| Last green | newest commit where typecheck, lint, tests and contract check all passed |
+| `<id>` | run id = folder name `.pipeline/<id>/` (local to the worktree, not in git; only `summary.md` is committed) |
+| `state.json` | the run's state; fields in `.claude/pipeline/state.schema.json` (`phase`, `currentSlice`, `fixRounds`, `lastGreen`, `parked`, `failures`, `gates`, `pr`). Update with `.claude/pipeline/state.sh` |
+| Assumptions file | `docs/specs/<module>/assumptions.md`, or `docs/specs/<module>.assumptions.md` for a flat spec |
+| Hand-over | `.pipeline/<id>/HANDOVER.md` from `.claude/pipeline/templates/HANDOVER.md`; also the top of the PR body |
+| Last green | `state.json` → `lastGreen`: newest commit where typecheck, lint, tests and contract check all passed |
 | Park | revert one slice to last green, open an issue with the evidence, continue with the rest |
 | Env file | file with `DATABASE_URL`, `DATABASE_URL_TEST`, secrets, `SEED_USER_PASSWORD`. A new worktree has no `backend/.env` (gitignored). Past runs stored the path in `state.json` → `envFile` and ran `bun --env-file=<path> …` |
 
 ## Not there yet (the runbooks say "missing — to be added" where they need these)
-- `state.json` fields `lastGreen`, `parked`, `failures` (plan item 4.1).
-- `assumptions.md` and `HANDOVER.md` (plan Phase 2b).
-- `researcher` agent (plan item 2.2).
+- One command that starts backend + frontend with demo data for "Try it" (`HANDOVER.md` says so).
 - A script that prints the reset target and refuses a non-test DB (see [test-db-reset.md](test-db-reset.md)).
-- Allow rules for `gh issue create`, `gh issue list`, `git revert`, `git worktree remove` are not all in
-  `.claude/settings.json` today; only the owner changes that file.
+- Allow rules for `gh issue create`, `gh issue list`, `git revert`, `git worktree remove`,
+  `.claude/pipeline/state.sh`, `.claude/pipeline/merge-sub-pr.sh` are not all in `.claude/settings.json`
+  today; only the owner changes that file.

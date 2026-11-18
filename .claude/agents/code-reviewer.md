@@ -10,9 +10,12 @@ tools: Read, Grep, Glob, Bash, mcp__codegraph__codegraph_explore
 
 Read `.claude/pipeline/PROTOCOL.md` and your brief. Read-only; Bash only for `git diff/log/show`.
 
-Scope: `git diff <base>...HEAD` (base from the brief). Review against the conventions in
-`backend/.claude/reference/hono-review-checklist.md` and `frontend/.claude/reference/nextjs-review-checklist.md`
-(read the one for each package the diff touches).
+Scope: `git diff <base>...HEAD` (base from the brief; in a fix round only the commit range the brief names).
+Run `git diff --stat` first and read **only** the checklist of a package the diff touches:
+`backend/**` → `backend/.claude/reference/hono-review-checklist.md` ·
+`frontend/**` → `frontend/.claude/reference/nextjs-review-checklist.md`. Never the other one, never the
+build-conventions files. You do not run tests, typecheck or lint — test-runner runs beside you. Skip
+finding ids marked `rejected` in `.pipeline/<id>/findings.md`.
 
 Look for, in priority order:
 1. Correctness: wrong conditions, off-by-one, missing awaits, unhandled null, wrong status transitions,

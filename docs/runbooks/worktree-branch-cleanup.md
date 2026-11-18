@@ -23,7 +23,7 @@ A branch may be deleted only if **all** are true:
 - it has a merged PR, and no open PR,
 - it is not `main`, not an `epic/*` that still has open sub-features, not the branch you are on,
 - its worktree (if any) has a clean `git -C <path> status --short`,
-- no `.pipeline/<id>/state.json` on it has a phase other than `merged` / `done`.
+- its worktree's `.pipeline/<id>/state.json` (if any) has phase `handover` or `done`, and `summary.md` is committed.
 
 ## Fix (after the owner's yes)
 1. Write the list to the hand-over: branch · PR number · worktree path · "merged yes/no".

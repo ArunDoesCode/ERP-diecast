@@ -11,14 +11,16 @@ tools: Read, Edit, Write, Grep, Glob, Bash, Skill, mcp__codegraph__codegraph_exp
 Read first, in order: `.claude/pipeline/PROTOCOL.md`, your brief, `backend/CLAUDE.md`,
 `backend/.claude/reference/hono-build-conventions.md` (the full conventions — follow them exactly), the module map
 `docs/modules/<module>.md` (where the code is + module gotchas — don't re-explore what it describes), and
-the spec sections for your BR ids.
+the spec sections for your BR ids (new layout: also `design/data.md` and `design/api.md` — follow them).
+The brief gives pointers, not text: read the files it names.
 
 In your report, add a **Map updates** section: new/renamed files, endpoints, tables/statuses, and any trap
 you hit that the next developer should know (these go into the map's gotchas, not CLAUDE.md).
 
 ## Contract step (when the brief says "contract")
 1. Load skills `api-endpoint-intake` and (for lists) `pagination-contract`; answer their questions **from the
-   spec**. Anything the spec doesn't answer → STATUS: BLOCKED with the question.
+   spec**. Anything the spec doesn't answer → STATUS: BLOCKED with the question + your recommendation (the
+   coordinator settles it by benchmark; nobody waits for the owner).
 2. Add/alter route descriptors in `backend/src/routes/end-points.ts` and register them with Zod request/
    response schemas (handlers may return 501 for now).
 3. `bun run contract:generate`, then write `.pipeline/<feature>/contract.md` (method, path, params, body,
@@ -38,8 +40,11 @@ you hit that the next developer should know (these go into the map's gotchas, no
 - Don't special-case test data (`TEST_` prefixes, fixture ids) or detect the test environment in
   production code to make a test pass.
 - Schema change → `bun run db:generate` (commit the migration with the schema change), then `bun run db:test:prepare` (test DB) locally; schema push is removed. Note it in the report.
-- Before returning: `bun run typecheck && bun run lint && bun test` (all must pass, or report which fail
-  and why) and re-run `contract:generate` if routes changed.
+- Before returning: `bun run typecheck && bun run lint && bun test <the test files named in your brief>`
+  (all must pass, or report which fail and why) and re-run `contract:generate` if routes changed. **Never
+  the whole suite** — test-runner runs it once per round. `bun run standards:check` on your change is free.
+- A check that fails for an environment reason (DB down, port, permission denied) → STATUS: FAILED, with
+  the matching `docs/runbooks/` page in `NEXT:`. Never run `db:reset`.
 
 ## Fix step (findings)
 Fix only the finding ids in the brief. For each: what changed, file:line. Don't touch unrelated code.

@@ -10,7 +10,7 @@ tools: Read, Edit, Write, Grep, Glob, Bash, Skill, mcp__codegraph__codegraph_exp
 
 Read first, in order: `.claude/pipeline/PROTOCOL.md`, your brief, `frontend/CLAUDE.md` (+ `AGENTS.md`),
 `frontend/.claude/reference/nextjs-build-conventions.md` (full conventions — follow them exactly), the spec's
-screens + acceptance criteria for your BR ids, `.pipeline/<feature>/contract.md`, and the module map
+screens (new layout: `design/screens.md`) + acceptance criteria for your BR ids, `.pipeline/<feature>/contract.md`, and the module map
 `docs/modules/<module>.md` (existing pages/views/query keys — don't re-explore what it describes).
 In your report, add a **Map updates** section (new routes, views, components, query keys, traps hit).
 
@@ -22,13 +22,15 @@ In your report, add a **Map updates** section (new routes, views, components, qu
 - Load the relevant skills: `structure-guard`, `client-data-state`, `data-table`, `ui-form-standards`.
 - Show only actions the spec allows for the current status + role (spec §4/§8).
 - Every form field has a linked `<Label htmlFor>` (a11y lint rule).
+- If the `design-system` skill exists, load it and use only its tokens, components and motion allow-list.
 - Before returning: `bunx tsc --noEmit && bun run lint` clean for files you touched (report pre-existing
-  errors separately, don't fix them unless the brief says so).
+  errors separately, don't fix them unless the brief says so). No backend test runs — test-runner does that.
+- Contract missing something, or the spec silent on a screen → BLOCKED with the question + your
+  recommendation. Environment or permission failure → FAILED, runbook name in `NEXT:`.
 - In the report, add a **Screens touched** list: page URL, which role can reach it, and the buttons/fields
   added or changed. Do **not** write the manual test checklist — test-writer writes it from the spec so the
   user tests what the spec requires, not what you built.
-- Never create or edit test files (`*.test.ts`, `frontend/e2e/**` — folder is created in the design phase,
-  plan P3; it does not exist yet). If a test looks wrong, return BLOCKED
+- Never create or edit test files (`*.test.ts`, `frontend/e2e/**`). If a test looks wrong, return BLOCKED
   quoting the spec rule that contradicts it.
 
 Return the protocol block.

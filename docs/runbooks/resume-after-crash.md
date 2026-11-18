@@ -8,7 +8,7 @@ The session ended in the middle of a run (terminal closed, machine slept, contex
 ```bash
 git worktree list                                  # find the run's worktree (branch feature/<id>)
 cd <worktree path>                                 # coordinator: EnterWorktree path=<worktree path>
-cat .pipeline/<id>/state.json                      # phase, currentSlice, iteration, pr, envFile
+cat .pipeline/<id>/state.json                      # phase, currentSlice, fixRounds, lastGreen, pr, envFile
 git status --short                                 # work a dead agent left uncommitted?
 git log --format='%h %s' <base>..HEAD | head -20   # last thing that was committed
 ls .pipeline/<id>/briefs .pipeline/<id>/reports    # a brief NN with no report NN = the agent that died
@@ -17,7 +17,7 @@ gh pr list --head <branch> --state all --json number,state,url
 If the worktree folder is gone but the branch exists:
 `git worktree add .claude/worktrees/<id> feature/<id>` (from the main checkout, no new branch).
 
-**Last green** = `state.json` → `lastGreen` (**missing — to be added**, plan 4.1). Until then: the newest
+**Last green** = `state.json` → `lastGreen`. If it is `null`: the newest
 commit for which a test-runner report in `.pipeline/<id>/reports/` shows every check passing.
 
 ## Fix
@@ -29,7 +29,8 @@ commit for which a test-runner report in `.pipeline/<id>/reports/` shows every c
    - Red → leave the files in place and re-brief the **same** agent type with the brief that had no report,
      adding one input line: "work in progress is in the working tree; finish it or undo your own files".
 3. Compare `state.json` with the log. If commits exist that are newer than the state says, trust the
-   commits: move `phase` / `currentSlice` forward to match, commit `chore(<id>): pipeline state after crash`.
+   commits: move `phase` / `currentSlice` forward to match (`.claude/pipeline/state.sh phase <name>`) and add
+   a `failures[]` entry of kind `crash`. No commit — the run folder is not in git.
 4. Resume with `/feature <module> --resume` (epic: `/epic <module> --resume`). It continues from
    `state.json.phase`. Do not re-plan and do not re-explore.
 5. Resuming phase by phase:
@@ -38,8 +39,8 @@ commit for which a test-runner report in `.pipeline/<id>/reports/` shows every c
    |---|---|
    | preflight / plan | redo the phase; cheap |
    | build | current slice: contract committed? → tests committed? → then the developers |
-   | verify | step A (reviews) of the current iteration; keep `iteration` as it is |
-   | pr | `git push` if the branch is ahead, then `gh pr checks <n>` |
+   | review / fix | step A (reviewers + test-runner) of the current round; keep `fixRounds` as it is |
+   | handover | docs commit done? → `HANDOVER.md` written? → `git push` if ahead, then `gh pr checks <n>` |
 6. If a PR exists, post nothing new until the loop is green again.
 
 ## If it fails twice
@@ -53,4 +54,4 @@ found to `.pipeline/<id>/HANDOVER.md`.
 - Never throw away uncommitted work (`git checkout -- .`, `git restore .`, `git clean`, `git reset --hard`).
 - Never create a second branch or worktree for the same `<id>`.
 - Never use `git stash`: the stash is shared with every other worktree and session.
-- Never lower `iteration` to win more fix rounds.
+- Never lower `fixRounds` to win more fix rounds.

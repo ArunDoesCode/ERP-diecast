@@ -29,5 +29,10 @@ Rules:
 - Deduplicate: search the target file before adding; update an existing line rather than adding a near-copy.
 - Budgets (`docs/KNOWLEDGE.md`): root `CLAUDE.md` ≤ 100 lines, package ≤ 150, map ≤ 250. Over budget →
   propose moving detail down a layer and leaving a one-line pointer.
+- **Run metrics:** for every pipeline run that reached `handover` or `done` in this session and has no
+  row yet in `docs/metrics/runs.md` (search for its run id), run `.claude/pipeline/state.sh line` in that
+  run's worktree and append the printed row — one line per run, no approval needed. Script not allowed →
+  build the row by hand from `state.json` (columns: the header of `docs/metrics/runs.md`). The row rides
+  with the run's docs commit, or stays uncommitted on `main`.
 - Finish by updating `docs/STATUS.md` **Next action** (one concrete command) so the next session — or
   `/status` — starts from it.
