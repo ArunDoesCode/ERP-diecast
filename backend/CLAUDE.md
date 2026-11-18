@@ -184,7 +184,7 @@ router.post(
 
 - `requirePermission(key)`: 401 if not authenticated, 403 `PERMISSION_DENIED` (body carries `key`) if the caller lacks it.
 - `requireAnyPermission(...keys)`: same, but holding any one key is enough (e.g. a `.manage` key admitting `.view` routes).
-- Add a new key to `src/lib/permissions.ts` first, then use it. `requireRole` does not exist.
+- Add a new key to `src/lib/permissions.ts` first, then use it. Never check role names in route code.
 
 Never retrofit authorization. Every new route gets a permission guard on day one — check
 `src/routes/*.ts` for the existing pattern before adding a new router.

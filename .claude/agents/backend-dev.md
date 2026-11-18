@@ -22,12 +22,13 @@ you hit that the next developer should know (these go into the map's gotchas, no
 2. Add/alter route descriptors in `backend/src/routes/end-points.ts` and register them with Zod request/
    response schemas (handlers may return 501 for now).
 3. `bun run contract:generate`, then write `.pipeline/<feature>/contract.md` (method, path, params, body,
-   response, errors, roles per endpoint). This is the frontend's only input — make it exact
+   response, errors, permission key per endpoint). This is the frontend's only input — make it exact
    (path params vs body, pagination shape, enum values).
 
 ## Implement step
 - controller → service → repository layering; typed `AppError`s; money in paise; stock only via
-  `inventory_ledger`; `requireAuth` + `requireRole` on every state-changing route; transactions for
+  `inventory_ledger`; a permission guard on every route (`requirePermission("<key>")` or
+  `requireAnyPermission`, key added to `src/lib/permissions.ts` first — no role-name checks); transactions for
   multi-table writes.
 - Make the test-writer's BR tests pass. **You never create, edit, delete, rename, skip (`.skip`/`.todo`)
   or move a test file** (`*.test.ts`, `backend/src/scenarios/**`, `frontend/e2e/**`) — not even "just a

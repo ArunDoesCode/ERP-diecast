@@ -88,4 +88,5 @@ the dev/review agents read.
 ## Domain invariants (never break)
 - Money = integer paise. Quantities: check the spec for units/decimals before assuming.
 - Stock changes only through `inventory_ledger` postings — never edit `currentStock` directly.
-- Every state change on PR/PO/GRN/SCO is role-checked (`requireRole`) and audit-trailed.
+- Every state change on PR/PO/GRN/SCO is permission-checked (`requirePermission("<key>")`, keys in
+  `backend/src/lib/permissions.ts`; no role-name checks in route code) and audit-trailed.

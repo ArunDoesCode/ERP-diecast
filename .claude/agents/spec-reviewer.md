@@ -33,7 +33,7 @@ Module name (+ optional BR ids) and the diff (default: `git diff <base>...HEAD` 
 4. **Contract** — every path in `frontend/src/lib/api/routes.ts` that the diff touches exists with the same
    method and param shape in the backend (`backend/src/routes/end-points.ts`, `bun run contract:query`).
    Check path params (`/:id`) vs body usage in `frontend/src/lib/api/**/fetchers.ts`.
-5. **Invariants** — money in paise, stock only through `inventory_ledger`, role checks on state changes,
+5. **Invariants** — money in paise, stock only through `inventory_ledger`, permission checks (`requirePermission`) on state changes,
    no raw `throw new Error` in services.
 6. **Tests pass** — `cd backend && bun test` (report the summary line).
 

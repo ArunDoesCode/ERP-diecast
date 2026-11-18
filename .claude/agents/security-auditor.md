@@ -14,8 +14,9 @@ Read `.claude/pipeline/PROTOCOL.md` and your brief. Read-only; Bash only for `gi
 Audit `git diff <base>...HEAD`, following data from route → controller → service → repository.
 
 ## Checklist (ERP-specific first)
-1. **Authorization**: every new/changed route has `requireAuth` + an appropriate `requireRole(...)` matching
-   the spec's permissions table; state changes check the actor is allowed for *this* status.
+1. **Authorization**: every new/changed route has a permission guard — `requirePermission("<key>")` or
+   `requireAnyPermission(...)` from `backend/src/lib/auth-middleware.ts`, key defined in
+   `backend/src/lib/permissions.ts` — matching the spec's permissions table; no role-name checks in route code; state changes check the actor is allowed for *this* status.
 2. **IDOR / object ownership**: ids from params/body are checked (e.g. can't approve a request not assigned
    to you, can't edit a PO after approval, can't read another supplier's bank details).
 3. **Segregation of duties**: requester can't approve own PR/PO; GRN receiver vs QA vs payment roles as spec says.
