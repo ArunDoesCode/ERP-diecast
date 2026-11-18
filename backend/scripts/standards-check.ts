@@ -700,8 +700,17 @@ function checkDbErrorMapping() {
     add(ERROR_HANDLER, 0, "db-error-409", "error handler file not found");
     return;
   }
-  const at = handler.code.indexOf("onError(");
-  const open = at < 0 ? -1 : handler.code.indexOf("(", at);
+  // Follow `app.onError(handleAppError)`: the shared handler is a named
+  // function; fall back to an inline `onError(` callback.
+  const fnAt = handler.code.indexOf("function handleAppError(");
+  const at = fnAt >= 0 ? fnAt : handler.code.indexOf("onError(");
+  const paramsOpen = at < 0 ? -1 : handler.code.indexOf("(", at);
+  const paramsClose =
+    paramsOpen < 0 ? -1 : matchClose(handler.code, paramsOpen);
+  const open =
+    fnAt >= 0 && paramsClose >= 0
+      ? handler.code.indexOf("{", paramsClose)
+      : paramsOpen;
   const close = open < 0 ? -1 : matchClose(handler.code, open);
   const body = close < 0 ? "" : handler.code.slice(at, close);
   const line = at < 0 ? 0 : lineAt(handler.code, at);
