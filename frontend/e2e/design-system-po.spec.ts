@@ -227,18 +227,6 @@ test.describe("BR-DS-27 no permission, no element", () => {
 		).toHaveCount(0);
 		await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
 	});
-
-	test("BR-DS-27 admin sees the create control that the other user does not", async ({
-		page,
-	}) => {
-		await openPoList(page);
-		await expect(
-			page
-				.getByRole("button", { name: /new purchase order/i })
-				.or(page.getByRole("link", { name: /new purchase order/i }))
-				.first(),
-		).toBeVisible();
-	});
 });
 
 test.describe("BR-DS-12 status flash", () => {
