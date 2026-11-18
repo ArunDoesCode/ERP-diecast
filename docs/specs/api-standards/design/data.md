@@ -1,13 +1,13 @@
 # API standards — data design (index plan, money columns)
 
 > One row per `idx-fk` (72) and `idx-filter` (35) finding of the 2026-11-18 baseline. No table is added.
-> Rules: `../spec.md` BR-STD-20..23, 39, 40. Conventions: `backend/CLAUDE.md`, `docs/specs/db-migrations.md`.
+> Rules: `../spec.md` BR-STD-20..23, 39, 40, 43. Conventions: `backend/CLAUDE.md`, `docs/specs/db-migrations.md`.
 
 ## How a decision is recorded
 - **index** → add the index in the table's `pgTable` extras in `backend/src/db/schemas/`, name as given.
 - **exempt** → put `// no-index: <tag> <free text>` at the end of the column's line (or on the line above it) in
   the schema file. One comment covers both rules for that column.
-- Totals: 20 findings → index (17 new indexes), 87 findings → exempt (84 columns get a comment):
+- Totals: 107 findings = 20 findings → index (17 new indexes) + 87 findings → exempt (87 findings = 84 columns get a comment):
   `audit` 52, `covered` 13, `tiny` 10, `low-card` 8, `pk-join` 1.
 
 Exemption tags (BR-STD-40). The reason must start with exactly one of them:
@@ -40,8 +40,8 @@ skip `idx-fk` and `idx-filter` for that column; one finding each for an empty re
 | 8 | supplier_invoices | po_id | idx_supplier_invoices_po_id | fk | invoice of a PO |
 | 9 | supplier_bank_details | supplier_id | idx_supplier_bank_details_supplier_id | fk | bank details of a supplier |
 | 10 | supplier_payments | invoice_id | idx_supplier_payments_invoice_id | fk | payments of an invoice |
-| 11 | inventory_ledger | reference_type, created_at desc, id desc | idx_inventory_ledger_reftype_created | filter | `listInventoryMovements` filtered by reference type, newest first |
-| 12 | grns | status, received_date desc | idx_grns_status_received | filter | GRN list by status, newest first. `grns` has no `created_at`; `received_date` (default now) is its date column and a list sort option |
+| 11 | inventory_ledger | reference_type, id | idx_inventory_ledger_reftype_id | filter | `listInventoryMovements` with a `referenceType` filter and the default ordering (`assetRepository.ts:423–424`, `:455` `orderFn(sortCol), asc(id)`, default sort column `id`, `:408–413`): `WHERE reference_type = $1 ORDER BY id LIMIT n`, read straight from the index, either direction; also its count query (`:458`). A chosen sort (created date, type, quantity) uses the index for the filter, then sorts |
+| 12 | grns | status, id | idx_grns_status_id | filter | GRN list with a `status` filter and the default ordering (`grnRepository.ts:546`, `:566` `orderFn(sortCol), asc(grns.id)`, default sort column `grns.id`, `:534–537`): `WHERE status = $1 ORDER BY id LIMIT n`, either direction; also its count query (`:569`). `received_date` is not in the index: it is nullable (`02_procurement-purchasing.ts:450`) and only one of four sort options |
 | 13 | approval_requests | policy_id | idx_approval_requests_policy_id | fk | growth table, no tag fits; requests of a policy |
 | 14 | subcontracting_order_items | raw_item_id | idx_sco_items_raw_item_id | fk | growth table, no tag fits; where-used of an item |
 | 15 | subcontracting_order_items | service_id | idx_sco_items_service_id | fk | growth table, no tag fits; where-used of a service |
@@ -146,7 +146,7 @@ Not added: a single-column index on `subcontracting_orders.status`. Nine values;
 | item_master | category | exempt | — | `low-card` (5 values) |
 | supplier_items | is_active | exempt | — | `covered:unique_supplier_item_idx` (supplier_id + item_id given) |
 | service_master | is_active | exempt | — | `low-card` |
-| inventory_ledger | reference_type | index | #11 | largest table; movement list by type, newest first |
+| inventory_ledger | reference_type | index | #11 | largest table; movement list by type in id order (the default) |
 | inventory_ledger | transaction_type | exempt | — | `low-card` ; the list is paged in primary-key order |
 | locations | is_active | exempt | — | `tiny` |
 | machines | status | exempt | — | `tiny` |
@@ -154,7 +154,7 @@ Not added: a single-column index on `subcontracting_orders.status`. Nine values;
 | refresh_tokens | expires_at | exempt | — | `covered:refresh_tokens_token_hash_key` (token hash always given) |
 | refresh_tokens | employee_id | index | #2 | delete by employee |
 | grns | challan_no | exempt | — | `covered:uq_grns_supplier_challan` (supplier_id always given) |
-| grns | status | index | #12 | list filter, newest first |
+| grns | status | index | #12 | list filter in id order (the default) |
 | role_permissions | permission_key | index | #1 | `inArray` filter |
 | supplier_invoices | invoice_number | exempt | — | `covered:uq_supplier_invoice_number` (supplier_id always given) |
 | purchase_requests | type | exempt | — | `low-card` (used with the indexed status filter) |
@@ -194,23 +194,25 @@ Already 64-bit (`bigint`, `mode: "number"`): `approval_policies.min_amount_paise
 Card 1 answered: 64-bit now (`../spec.md` → Money limit):
 - All 23 columns become `bigint("…", { mode: "number" })` in the same generated migration as the
   indexes (`ALTER COLUMN … TYPE bigint`; no value changes, row counts before = after).
+- `mode: "number"` is exact only up to 2^53 − 1. Stored amounts stay at or below `MAX_MONEY_PAISE` (BR-STD-39);
+  stock value and money sums are kept in range by BR-STD-43 (`design/api.md` → JS-number safety). No new column.
 
 ## Volumes and locks
 | Table | Rows per year | Hot query | Lock needed |
 |---|---|---|---|
-| inventory_ledger | tens of thousands | movement list by type and date, stock balance | none new |
+| inventory_ledger | tens of thousands | movement list by type in id order, stock balance | none new (`postStock` already locks the item row; BR-STD-43 adds checks, no lock) |
 | all others touched | under 10,000 | lists by status | none new |
 
 ## Migration notes
 - One migration, made by `bun run db:generate` after the schema edit; committed in the same PR (BR-MIG-06). Never typed by hand, never pushed.
 - Forward-only (BR-MIG-08): a wrong index is fixed by a new migration.
 - `db:migrate` applies all pending migrations in one transaction (BR-MIG-13), so `CREATE INDEX CONCURRENTLY`
-  is not possible. Plain `CREATE INDEX` (and, for answer A, `ALTER COLUMN … TYPE bigint`) is accepted because
+  is not possible. Plain `CREATE INDEX` (and `ALTER COLUMN … TYPE bigint` for the 23 money columns) is accepted because
   no production data exists yet.
 - A later index on a populated ledger needs a maintenance window and the backup step first (BR-MIG-16, 17).
 - CI must find nothing more to generate (BR-MIG-12). No backfill, no data change.
 
 ## Choices made
-Moved to `../assumptions.md` (A-13..A-18, A-38..A-42).
+Moved to `../assumptions.md` (A-13..A-18, A-38..A-42, A-45, A-46).
 | Question | Choice | Source |
 |---|---|---|

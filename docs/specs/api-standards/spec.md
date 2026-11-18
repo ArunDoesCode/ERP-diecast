@@ -1,8 +1,8 @@
 ---
 module: api-standards
-status: draft            # draft | frozen (set only by /freeze)
-version: 0
-frozen_on:
+status: frozen           # draft | frozen (set only by /freeze)
+version: 1
+frozen_on: 2026-11-18
 owner: Arun
 depends_on: [auth-setup, suppliers, inventory, purchase-requisition, purchase-order, grn, grn-stock, subcontracting, approval, approval-policies, db-migrations, known-defects, design-system]
 brief: docs/plans/standards-baseline-2026-11-18.md   # owner instruction of 2026-11-18, quoted below; no separate brief
@@ -29,7 +29,7 @@ Example data used below: item `ADC12` (kg), item "50% flux", supplier "Hindalco"
 Baseline (commit 930eec2): backend 216 = idx-fk 72, idx-filter 35, raw-ilike 32, zod-string 55, zod-number 18,
 db-error-409 2, ist-date 2. Frontend 65 = mutation-invalidate 1, motion 2, raw-palette 62 (not in scope).
 Added by the pre-freeze review: new check rule `zod-array` (24 hits today), `raw-ilike` also inside `sql`
-templates (3 more hits), exemption tags for the index rules. The one owner decision (Card 1, money limit) is answered: 64-bit now.
+templates (3 more hits), exemption tags for the index rules, BR-STD-43 (round 2). The one owner decision (Card 1, money limit) is answered: 64-bit now.
 
 ## Who can do what
 No new permission key, no new route, no change to who may do what.
@@ -55,9 +55,9 @@ IDs are permanent. Tests are named by rule id. "400" = the existing validation a
 | BR-STD-04 | The error is recognised anywhere in the cause chain (Drizzle wraps the driver error), through `isUniqueViolation()` / `isForeignKeyViolation()` in `backend/src/lib/db-errors.ts`. | `DrizzleQueryError` whose `cause.code` is `"23503"` → 409 `LINKED_RECORD` | backend test |
 | BR-STD-05 | The hand-written catches stay and win: a service that catches 23505 keeps its own message and code; the shared handler is only the safety net. | second submit of the same document → still 409 `APPROVAL_ALREADY_OPEN`; active policy into a taken slot → still 409 `POLICY_PRIORITY_TAKEN` | backend test |
 | BR-STD-06 | Any other database error stays a 500 with message "Internal server error" outside development. | Postgres 23502 (not-null violation) → 500, not 409 | backend test |
-| BR-STD-34 | Every mapped 409 is logged on the server: level `error` for 23503, `warn` for 23505, with the Postgres code, constraint name, table, HTTP method, path and actor id. The log never holds the request body, any value or the driver `detail`. | duplicate email `a@x.in` → one `warn` line with `23505`, `employees_email_key`, `employees`, `POST`, `/api/setup/employees`, actor id; the line has no "a@x.in" | backend test |
+| BR-STD-34 | Every mapped 409 is logged once, by `onError`: `console.error("db-conflict", fields)` for 23503, `console.warn("db-conflict", fields)` for 23505 (no logger module exists in `backend/src/lib`). `fields` is exactly `{ pgCode, constraint, table, method, path, actorId }`. The log never holds the request body, any value or the driver `detail`; `asyncHandler` (`src/lib/async-handler.ts:15`), which today prints the whole error object, skips its print for 23505 / 23503. | duplicate email `a@x.in`, with spies on `console.warn` and `console.error` → one `warn` call with `{ pgCode: "23505", constraint: "employees_email_key", table: "employees", method: "POST", path: "/api/setup/employees", actorId }`, no `error` call; no call argument, as JSON, holds "a@x.in" or "Key (" | backend test |
 | BR-STD-35 | A 23505 / 23503 raised inside a transaction rolls the whole transaction back: nothing of that request is saved. | the duplicate-email create writes the employee and an audit row in one transaction → after the 409 there is no second employee and no new audit row | backend test |
-| BR-STD-36 | Whether a unique value already exists is shown only to callers who hold the create or edit permission of that module: the permission check runs first (403), and the public routes (BR-STD-42) never answer 409. | a role without `setup.employees.manage` posts the duplicate email → 403 `PERMISSION_DENIED`; a 23505 thrown on `POST /api/auth/login` → 500 "Internal server error" | backend test |
+| BR-STD-36 | Whether a unique value already exists is shown only to callers who hold the create or edit permission of that module: the permission check runs first (403), and the public routes (BR-STD-42) never answer 409: `onError` (exported from `src/app.ts` as `handleAppError`) matches `c.req.path` against the public list and skips the 23505 / 23503 branch there, answering 500 "Internal server error" in every `NODE_ENV`. | a role without `setup.employees.manage` posts the duplicate email → 403 `PERMISSION_DENIED`; a bare Hono app with `onError(handleAppError)` and a route that throws an error whose `cause.code` is `"23505"`: mounted at `POST /api/auth/login` → 500 "Internal server error", no `code`; mounted at `POST /api/x` → 409 `DUPLICATE_RECORD` | backend test |
 
 ### Search (check rule `raw-ilike`)
 | ID | Rule | Example (given → then) | Checked by |
@@ -77,7 +77,7 @@ IDs are permanent. Tests are named by rule id. "400" = the existing validation a
 | BR-STD-13 | Every text field in a request (body, query, path) has a maximum length from `design/api.md` → Standard limits; text at the limit is accepted, one character more is refused with 400 and nothing is saved. Text is never cut silently. | item name of 200 characters → saved; 201 → 400, no item row | `zod-string`, backend test |
 | BR-STD-14 | Fields with a legal fixed length use it: GSTIN 15, PAN 10 (format rules of BR-SUP-02/04 unchanged). | GSTIN of 16 characters → 400 | `zod-string`, backend test |
 | BR-STD-15 | A password is at most 128 characters on login, employee create and employee update (minimum 8 on create/update unchanged). | login with a 129-character password → 400, no password check runs | `zod-string`, backend test |
-| BR-STD-16 | Money in a request is whole paise with an upper bound: the money limit of "Money limit" for prices, rates and billed amounts; 1,000,000,000,000 paise (₹1,000 crore) for approval-policy amount limits. | PO line `unitPricePaise` at the limit → accepted; limit + 1 → 400; policy `maxAmountPaise` 1000000000001 → 400 | `zod-number`, backend test |
+| BR-STD-16 | Money in a request is whole paise with an upper bound: `MAX_MONEY_PAISE` (10,000,000,000,000, see "Money limit") for prices, rates and billed amounts; 1,000,000,000,000 paise (₹1,000 crore) for approval-policy amount limits. The frontend forms take the same limit from one shared constant (`frontend/src/lib/money.ts`, same value as the backend); no 32-bit cap (`2147483647`) is left in `frontend/src` (4 sites, `design/screens.md`), so the UI accepts what the API accepts. | PO line `unitPricePaise` 10000000000000 → accepted; 10000000000001 → 400; policy `maxAmountPaise` 1000000000001 → 400; supplier price ₹3,00,00,000.00 (3000000000 paise) typed in the batch-edit dialog → no form error, saved (today: form error above ₹2,14,74,836.47); `grep -rnE "2147483647\|2_147_483_647" frontend/src` → no hit | `zod-number`, backend test, script, human |
 | BR-STD-17 | A quantity in a request is at most 1,000,000,000; decimals stay as the module spec says (up to 3; whole numbers for `pcs`/`set`, BR-INV-08; whole pieces on subcontracting, BR-SCO-02). | a complete, valid SCO create with send qty 1000 → 201; the same request with send qty 1000000001 → 400, no SCO | `zod-number`, backend test |
 | BR-STD-18 | GST % stays the fixed slab list (top slab 40). Already bounded today: no behaviour change. | supplier item `taxPercentage` 41 → 400; 18 → ok | `zod-number`, backend test |
 | BR-STD-19 | Limits are checked before any database write, so a refused request changes nothing. | PR create with one 2,001-character note → 400, no PR, no number used | backend test |
@@ -94,14 +94,15 @@ Approval-policy limits stay ₹1,000 crore; quantities stay BR-STD-17.
 
 | ID | Rule | Example (given → then) | Checked by |
 |---|---|---|---|
-| BR-STD-39 | Every computed line value, line tax, subtotal, tax, total, estimated amount, challan value and average cost is checked on the server before it is saved. A value above the money limit answers 400 `AMOUNT_TOO_LARGE` with a plain message naming the limit, and nothing is saved. A computed amount can never produce a 500. Compute sites: `design/api.md` → Money. | PO line of 3 pcs at ₹1,00,00,000.00 each (total ₹3 crore) → 201, total 3000000000 paise; PO whose computed total is above ₹10,000 crore → 400 "Amount is above the largest value allowed (₹10,000 crore).", no PO, no number used | backend test |
+| BR-STD-39 | Every computed line value, line tax, subtotal, tax, total, estimated amount, challan value and average cost is checked on the server before it is saved. A value above the money limit answers 400 `AMOUNT_TOO_LARGE` with a plain message naming the limit, and nothing is saved. A computed amount can never produce a 500. Compute sites: `design/api.md` → Money. | PO line of 3 pcs at ₹1,00,00,000.00 each, GST 0% (total ₹3 crore) → 201, total 3000000000 paise; PO whose computed total is above ₹10,000 crore → 400 "Amount is above the largest value allowed (₹10,000 crore).", no PO, no number used | backend test |
+| BR-STD-43 | Money stays an exact JS number (at most 2^53 − 1 = `Number.MAX_SAFE_INTEGER`). (a) `postStock` does its money maths exactly (`BigInt`) and, besides BR-STD-39, refuses a posting whose resulting item stock value (stock × average cost) is above `MAX_STOCK_VALUE_PAISE` = 9,000,000,000,000,000 paise (₹90 lakh crore, just under 2^53): 400 `AMOUNT_TOO_LARGE`, nothing saved. So the stock-list value is always exact. (b) Every SQL money aggregate is mapped by `toSafePaise()` (`Number()` + safe-integer check); a sum above 2^53 − 1 answers 400 `AMOUNT_TOO_LARGE`, never a rounded figure, never a 500. Response schemas stay `z.number().int()`. Sites: `design/api.md` → Money. | `assertStockValueInRange(900_000_000_000, 10_000_000)` (900,000,000 pcs at ₹1,00,000.00) → ok; `(900_000_001_000, 10_000_000)` → `AMOUNT_TOO_LARGE`; item seeded at 900,000,000 pcs and that average cost: stock-in of 1 pc at ₹1,00,000.00 → 400, no ledger row, stock unchanged; `toSafePaise("9007199254740991")` → 9007199254740991; `toSafePaise("9007199254740992")` → `AMOUNT_TOO_LARGE` | backend test |
 
 ### Indexes (check rules `idx-fk`, `idx-filter`)
 | ID | Rule | Example (given → then) | Checked by |
 |---|---|---|---|
 | BR-STD-20 | Every foreign-key column and every column filtered in a repository query is the primary key, unique, the first column of an index, or carries an exemption comment `// no-index: <tag> <reason>` on its line in the schema file. | new FK column with neither → `standards:check:strict` exits 1 | `idx-fk`, `idx-filter` |
-| BR-STD-21 | An exemption needs a reason; `// no-index:` with no text after it is itself a finding. The check prints how many columns are exempt, in total and per tag. | `// no-index:` alone → 1 finding; summary line "exempt: 84 (audit 52, covered 13, tiny 10, low-card 8, pk-join 1)" | `idx-fk`, `idx-filter` |
-| BR-STD-22 | The 17 indexes of `design/data.md` exist in the database by name after `bun run db:migrate`, and the 87 other findings are exempt with the tag given there. | `pg_indexes` has `idx_inventory_ledger_reftype_created` on `(reference_type, created_at DESC, id DESC)` | backend test |
+| BR-STD-21 | An exemption needs a reason; `// no-index:` with no text after it is itself a finding. The check prints how many columns are exempt, in total and per tag. | `// no-index:` alone → 1 finding; summary line "exempt: 84 (audit 52, covered 13, tiny 10, low-card 8, pk-join 1)" (87 findings = 84 columns) | `idx-fk`, `idx-filter` |
+| BR-STD-22 | The 17 indexes of `design/data.md` exist in the database by name after `bun run db:migrate`, and the other 87 findings = 84 columns are exempt with the tag given there. | `pg_indexes` has `idx_inventory_ledger_reftype_id` on `(reference_type, id)` and `idx_grns_status_id` on `(status, id)` | backend test |
 | BR-STD-23 | Indexes come only from a schema edit plus one generated migration (`bun run db:generate`); no hand-typed SQL, no merged migration edited (BR-MIG-06, 08). The migration changes no row. | CI step "Migrations are in sync with the schema" passes; row counts before = after | script (CI) |
 | BR-STD-40 | The exemption reason starts with one tag: `audit`, `tiny`, `covered:<index name>`, `low-card`, `pk-join`. `covered:` must name an index that exists. `audit`, `tiny` and `pk-join` are refused on growth tables (list in `design/data.md`), except `audit` on a who-did-it column (`…_by`). A column that fits no tag gets an index. | `// no-index: pk-join` on `sco_challan_lines.item_id` → finding; `// no-index: covered:idx_nope` → finding; `// no-index: audit` on `inventory_ledger.created_by` → accepted | `idx-fk`, `idx-filter` |
 
@@ -126,7 +127,7 @@ Approval-policy limits stay ₹1,000 crore; quantities stay BR-STD-17.
 | BR-STD-31 | The hooks `spec-gate.sh` and `test-ownership.sh` deny by default; `SPEC_GATE_MODE=warn` / `TEST_OWNERSHIP_MODE=warn` still gives warn-only. | env unset, a non-test-writer agent edits a test file → hook exits 2 with the reason | script |
 | BR-STD-32 | Blocking is switched on only in the commit where the count is 0, so `main` is never red because of this spec. | backend 0 findings → same PR flips the CI step | human |
 | BR-STD-41 | Both hooks resolve the target path with `realpath` before matching it, and in deny mode they fail closed: a missing `jq` or unreadable input blocks the call (today it allows). | `docs/link.ts` is a symlink to `backend/tests/a.test.ts`, edited by a non-test-writer → exit 2; `jq` not on `PATH`, mode deny → exit 2 | script |
-| BR-STD-42 | The public routes are exactly `GET /health`, `POST /api/auth/login`, `POST /api/auth/refresh`, `POST /api/auth/logout`. Adding a route to the public list needs an owner-approved spec line. | a new route with `auth: { type: "public" }` that is not on the list → permission matrix test (T-3) fails | backend test |
+| BR-STD-42 | The public routes are exactly `POST /api/auth/login`, `POST /api/auth/refresh`, `POST /api/auth/logout` (the 3 manifest routes with `auth: public`) and `GET /health` (a raw `app.get` in `src/app.ts:44`, not in the manifest). Adding a route to the public list needs an owner-approved spec line. | a new route with `auth: { type: "public" }` that is not on the list → permission matrix test (T-3) fails; `GET /health` with no token → 200 | backend test |
 
 ## Tooling
 Same run, no business rules. Each line is an acceptance check. Details and choices: `design/api.md` → Tooling.
@@ -134,7 +135,7 @@ Same run, no business rules. Each line is an acceptance check. Details and choic
 |---|---|---|---|
 | T-1 | `cd backend && bun run try` (`scripts/try.sh`) | Starts the Docker databases, then API (:4000) and UI (:3000) from the current branch on the dev database with the demo data it already holds. API and UI listen on 127.0.0.1 only: a request to the machine's LAN address is refused. It never resets, drops or seeds: pending migrations go only through `bun run db:migrate` after a typed yes (BR-MIG-13..17); an empty database gets a message with the command to run by hand, nothing else. `--check` starts and changes nothing. | script, human |
 | T-2 | `cd backend && bun run db:test:rebuild` | Rebuilds the database in `DATABASE_URL_TEST` exactly as CI does (`db:reset --no-fixtures` steps). Refuses with exit 2, changing nothing, when the database name does not end in `_test` or `DATABASE_URL_TEST` is missing. Never reads `DATABASE_URL` as its target. | script |
-| T-3 | Permission matrix test (`backend/tests`, written by test-writer) | For every route in `.contracts/api-manifest.json`: permission routes answer 401 with no token and 403 `PERMISSION_DENIED` with a token of a role that holds none of the route's keys; "any signed-in user" routes answer 401 with no token; public routes are exactly the list of BR-STD-42, held in the test. A route that is none of these fails the test (BR-AUTH-10). | backend test |
+| T-3 | Permission matrix test: extends the existing `backend/tests/routes/permissions-matrix.test.ts` (today: the BR-AUTH-21 seed-role matrix; its coverage check filters on auth type `"roles"`, which no route has any more). Edited only by test-writer. | Added, for every route of `getRegistry()` (= `backend/.contracts/api-manifest.json`; today 99 permission, 8 any-signed-in, 3 public): permission routes answer 401 with no token and 403 `PERMISSION_DENIED` with a token of a role that holds none of the route's keys; "any signed-in user" routes answer 401 with no token; the manifest's public routes are exactly the 3 auth routes of BR-STD-42, held in the test. `GET /health` is not in the manifest: checked on its own (200 with no token). A route of any other auth type fails the test (BR-AUTH-10). The existing BR-AUTH-21 tests stay. | backend test |
 | T-4 | Playwright smoke (`frontend/e2e`, written by test-writer) | `cd frontend && bun run e2e` against the `try` stack: log in as the seeded admin, open the purchase requisitions list, see at least one row; exits non-zero on failure. CI job `e2e` stays non-blocking in this run. | Playwright |
 
 ## Security
@@ -157,6 +158,7 @@ Abuse cases:
 | any signed-in user | send megabytes of text into a text column | BR-STD-13, 19 |
 | any signed-in user | send a list with a million lines, keys or role ids | BR-STD-33 |
 | any signed-in user | enter a price and quantity whose total overflows, to crash the save | BR-STD-39 |
+| any signed-in user | pile up stock value past what a JS number holds exactly, to get wrong money figures | BR-STD-43 |
 | anyone | send a huge password to burn CPU in hashing | BR-STD-15 |
 | anyone, or a user without the module's key | learn which emails, codes or GSTINs exist from a 409 | BR-STD-36 |
 | any signed-in user | read schema names from an error message | BR-STD-03 |
@@ -178,8 +180,8 @@ Full list: `design/edge-cases.md`. Every row names a rule in this file.
 | Source | Count |
 |---|---|
 | benchmark | 14 |
-| owner | 4 |
-| invariant | 13 |
+| owner | 5 |
+| invariant | 14 |
 
 ## Not now
 - The 62 `raw-palette` findings: the frozen design-system spec replaces those files (issues #88 and #91). The rule stays report-only until #91.
@@ -197,3 +199,5 @@ Full list: `design/edge-cases.md`. Every row names a rule in this file.
 ## Changelog
 - 2026-11-18 v0 — draft
 - 2026-11-18 v0 — pre-freeze review round 1: SEC-1..9, PERF-1..4, SPEC-1..5 folded in (rules BR-STD-33..42 added)
+- 2026-11-18 v0 — pre-freeze review round 2: F1..F14 folded in (BR-STD-43 added; indexes #11, #12 reshaped; frontend money cap; 43 rules)
+- 2026-11-18 v1 — frozen. Two review rounds passed their blockers; Card 1 answered (64-bit money); the 9 confirm lines go to the hand-over

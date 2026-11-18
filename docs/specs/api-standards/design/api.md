@@ -3,7 +3,7 @@
 > No new endpoint, no permission change. Rules: `../spec.md`. Files are under `backend/`. Line numbers are
 > from the 2026-11-18 baseline (commit 930eec2). The developer decides nothing here: every finding has its value.
 
-## Error contract (BR-STD-01..06, 34..36, 39)
+## Error contract (BR-STD-01..06, 34..36, 39, 43)
 Body shape is the project's own (`src/app.ts` `onError`, manifest `errorEnvelope`): `{ success: false, message, code }`.
 | Case | Status | `code` | `message` |
 |---|---|---|---|
@@ -11,19 +11,34 @@ Body shape is the project's own (`src/app.ts` `onError`, manifest `errorEnvelope
 | uncaught 23503 foreign-key violation | 409 | `LINKED_RECORD` | This record is linked to another record that is missing or still in use. |
 | caught by a service (below) | 409 | the service's own | the service's own |
 | Zod validation (limits, list sizes, search length) | 400 | — | Validation failed (unchanged) |
-| computed amount above the money limit (Money, below) | 400 | `AMOUNT_TOO_LARGE` | names the limit, see Money |
+| computed amount above the money limit, stock value or money sum above the JS-safe range (Money, below) | 400 | `AMOUNT_TOO_LARGE` | names the limit, see Money |
 | any other DB / unknown error | 500 | — | Internal server error (unchanged) |
 
-- `onError` checks `AppError` first (unchanged), then `isUniqueViolation(error)` / `isForeignKeyViolation(error)`,
-  then the existing branches. `isForeignKeyViolation` is new in `src/lib/db-errors.ts`, same cause-chain walk.
+- `onError` (`src/app.ts:48`) becomes a named export `handleAppError(error, c)`; `createApp()` passes it to
+  `app.onError`. It checks `AppError` first (unchanged), then `isUniqueViolation(error)` /
+  `isForeignKeyViolation(error)`, then the existing branches. `isForeignKeyViolation` is new in
+  `src/lib/db-errors.ts`, same cause-chain walk.
 - The 409 body is built from constants only: nothing from the error object reaches the client, also when
   `NODE_ENV=development`.
-- Log line for every mapped 409 (BR-STD-34): level `error` for 23503, `warn` for 23505; fields: Postgres code,
-  constraint name, table, HTTP method, path, actor id (or "none"). Never the request body, column values or the
-  driver `detail` (it holds the offending values).
-- Public routes (list under Blocking) are never mapped: a 23505 / 23503 there stays the generic 500, so a caller
-  without a login learns nothing (BR-STD-36). On every other route the permission check runs before the handler,
-  so a caller without the module's create / edit key gets 403, never 409.
+- Log (BR-STD-34). No logger module exists in `src/lib`; the code logs with `console.*` (`app.ts:27`,
+  `async-handler.ts:15`). `handleAppError` makes exactly one call per 23505 / 23503:
+  `console.warn("db-conflict", fields)` for 23505, `console.error("db-conflict", fields)` for 23503, with
+  `fields = { pgCode, constraint, table, method, path, actorId }` (`constraint` / `table` = the driver's
+  `constraint_name` / `table_name`; `actorId` = the id of `c.get("actor")`, set at `auth-middleware.ts:117`, or `"none"`). Never the request body,
+  column values, the error object or the driver `detail` (it holds the offending values).
+- `asyncHandler` (`src/lib/async-handler.ts:15`) today calls `console.error("Route error…", error)` with the whole
+  error object, `detail` included. It skips that call when the error is a 23505 / 23503; other errors as today.
+- Tests spy on `console.warn` and `console.error` and assert: the call count, the six fields, and that no call
+  argument (as JSON) holds the duplicate value or the text `Key (`.
+- Public routes (BR-STD-36, mechanism): the list `PUBLIC_PATHS` (the four paths of BR-STD-42) lives in
+  `src/lib/public-routes.ts` (new). `handleAppError` compares `c.req.path` with it; on a public path the
+  23505 / 23503 branch is skipped and the answer is `{ success: false, message: "Internal server error" }`, 500,
+  in every `NODE_ENV` (the log call above still runs). Today such an error on login already ends in the generic
+  500 branch (the two 401 branches at `app.ts:69–75` match only the texts "Invalid credentials" / "Login failed").
+  Test, at handler level: a bare `new Hono()` with `onError(handleAppError)` and one route that throws an error
+  whose `cause.code` is `"23505"`; mounted at `POST /api/auth/login` → 500, no `code`; at `POST /api/x` → 409.
+  On every other route the permission check runs before the handler, so a caller without the module's
+  create / edit key gets 403, never 409.
 - A 23505 / 23503 raised inside `db.transaction` is re-thrown, never swallowed, so the whole transaction rolls
   back (BR-STD-35).
 - Tests (BR-STD-01, 02, 35): (a) the shared handler given a thrown error whose `cause.code` is `"23505"` / `"23503"`;
@@ -141,18 +156,18 @@ numbers are that many findings: 41 rows = 55 findings.
 |---|---|---|---|
 | approval:192 / 238 | createApprovalPolicySchema / updateApprovalPolicySchema | minAmountPaise | 1,000,000,000,000 |
 | approval:199 / 245 | createApprovalPolicySchema / updateApprovalPolicySchema | maxAmountPaise | 1,000,000,000,000 |
-| po:103 / 115 / 126 | createPoSchema / updatePoInsertItemSchema / updatePoUpdateItemSchema | unitPricePaise | 2,147,483,647 |
-| po:286 | markPoInvoicedSchema | billedAmountPaise | 2,147,483,647 |
+| po:103 / 115 / 126 | createPoSchema / updatePoInsertItemSchema / updatePoUpdateItemSchema | unitPricePaise | `MAX_MONEY_PAISE` |
+| po:286 | markPoInvoicedSchema | billedAmountPaise | `MAX_MONEY_PAISE` |
 | sco:49 | wholeQtySchema | (send qty, return qty) | 1,000,000,000 |
-| sco:59 | scoLineInputSchema | serviceUnitPricePaise | 2,147,483,647 |
+| sco:59 | scoLineInputSchema | serviceUnitPricePaise | `MAX_MONEY_PAISE` |
 | scoChallan:65 | challanLineInputSchema | qty | 1,000,000,000 |
 | scoReceipt:92 / 93 | receiptLineInputSchema | processedQty / unprocessedQty | 1,000,000,000 |
 | scoReceipt:111 / 112 | qaDecisionSchema | acceptedQty / rejectedQty | 1,000,000,000 |
-| setup:39 / 59 | employeeInputSchema / employeeUpdateSchema | dailyRatePaise | 2,147,483,647 |
+| setup:39 / 59 | employeeInputSchema / employeeUpdateSchema | dailyRatePaise | `MAX_MONEY_PAISE` |
 | supplier:132 | gstPercentField | (GST %) | no change in behaviour: already bounded by `SUPPLIER_GST_SLABS` (top 40); `.max(40)` only clears the finding. `po.types.ts` `gstPercentSchema` is a union of literals: no change |
 
-Money rows above (`unitPricePaise`, `billedAmountPaise`, `serviceUnitPricePaise`, `dailyRatePaise`): the bound is
-the Card 1 value, see Money.
+Money rows above (`unitPricePaise`, `billedAmountPaise`, `serviceUnitPricePaise`, `dailyRatePaise`):
+`MAX_MONEY_PAISE` = 10,000,000,000,000 paise (Card 1 = A), see Money. No 2,147,483,647 bound stays in `src/types`.
 
 ## zod-array (26 sites, new check rule, BR-STD-33)
 Every `z.array(` / `.array(` in a request-side schema needs `.max(N)` (same request detection as `zod-string`).
@@ -178,18 +193,21 @@ Over the max → 400, nothing saved. 24 sites get a max, 2 keep theirs.
 | supplier:342 | supplierServiceBatchEditSchema | (batch) | 100 (existing, no change) |
 | approval:85 / 93 | approvalChainSchema / approvalChainOrEmptySchema (`approvalChain` of create and update policy) | steps | 20 |
 
-## Money (BR-STD-16, 39 — Card 1 answered: 64-bit now)
-Limit `MAX_MONEY_PAISE` lives in one place (`src/lib/money.ts`, new) with `assertMoneyInRange(valuePaise)`:
+## Money (BR-STD-16, 39, 43 — Card 1 answered: 64-bit now)
+The limits live in one place (`src/lib/money.ts`, new) with `assertMoneyInRange(valuePaise)`,
+`assertStockValueInRange(stockMilli, averageCostPaise)` and `toSafePaise(value)`:
 | | Value |
 |---|---|
 | `MAX_MONEY_PAISE` | 10,000,000,000,000 (₹10,000 crore; far below 2^53) |
+| `MAX_STOCK_VALUE_PAISE` | 9,000,000,000,000,000 (₹90 lakh crore; just under 2^53 − 1 = 9,007,199,254,740,991) |
 | Columns | 23 → `bigint`, `mode: "number"` (`design/data.md`) |
 | Request fields | `.max(MAX_MONEY_PAISE)` |
 | 400 message | Amount is above the largest value allowed (₹10,000 crore). |
 
 Request amount fields: `unitPricePaise` (po:103 / 115 / 126), `billedAmountPaise` (po:286), `serviceUnitPricePaise`
-(sco:59), `dailyRatePaise` (setup:39 / 59), plus the already bounded `standardRateSchema`, `pricePaiseField`
-and manual-movement `unitCostPaise`, which move to the same constant.
+(sco:59), `dailyRatePaise` (setup:39 / 59), plus the three fields bounded at 2,147,483,647 today, which move to
+the same constant: `standardRateSchema` (asset:42), manual-movement `costSchema` (asset:371), `pricePaiseField`
+(supplier:137). The frontend copies of this cap: `design/screens.md` fixes 4–7.
 Every computed value is checked before the write (400 `AMOUNT_TOO_LARGE`, nothing saved):
 | Site | Computes |
 |---|---|
@@ -197,9 +215,44 @@ Every computed value is checked before the write (400 `AMOUNT_TOO_LARGE`, nothin
 | `repository/scoRepository.ts:78–93` | SCO line value, line tax, subtotal, tax, total |
 | `service/scoChallanService.ts:72, 199` | challan line value, challan value |
 | `repository/prRepository.ts:410, 536` | PR estimated amount |
-| `repository/stockPostingRepository.ts:44, 119, 130–147` | ledger row value, new average cost |
-| `service/scoService.ts:409` | unit cost of a received lot |
-Read-only sums (`scoService.ts:200` charge due, `assetRepository.ts:795` stock value) are not stored: no check.
+| `repository/stockPostingRepository.ts:41–48, 119, 130–147` | ledger row value, new average cost, resulting stock value (BR-STD-43) |
+| `service/scoReceiptService.ts:357` | issue value of the unprocessed raw that comes back (Σ qty × issue cost); its unit cost at :366 |
+| `service/scoReceiptService.ts:461` | issue value of the processed pieces at the QA decision (Σ processed qty × issue cost); issue cost at :464–465 |
+| `service/scoService.ts:395, 409` | issue value of the pieces written off at close (Σ taken qty × issue cost); unit cost of that loss posting |
+The three SCO sums are checked with `assertMoneyInRange` after the sum and before the division (a sum that
+passes is exact: every term is a whole number below 2^53).
+
+`stockPostingRepository.ts:41–48` today throws `BadRequestError("Row value is too large")` when a row value is
+above `Number.MAX_SAFE_INTEGER` (2^53 − 1). That check is replaced: a row value above `MAX_MONEY_PAISE` answers
+400 `AMOUNT_TOO_LARGE` with the Money message; the text "Row value is too large" is gone.
+
+### JS-number safety (BR-STD-43)
+Why: quantity (up to 1,000,000,000) × cost (up to `MAX_MONEY_PAISE`) can reach 1e22, far above 2^53; and
+`stockPostingRepository.ts:45` multiplies thousandths × paise (up to 1e25) before it divides by 1,000.
+- Guard, where it lives: `postStock` (`repository/stockPostingRepository.ts`), the only writer of
+  `inventory_ledger`, `item_master.current_stock` and `average_cost_paise`. Row value (:45), the average-cost
+  numerator (:136–138, :143–144) and the stock value are computed with `BigInt`, rounded as today (half away
+  from zero), then checked, then turned into a number.
+- Checks, in this order, before the `item_master` update (:151): row value ≤ `MAX_MONEY_PAISE`; new average
+  cost ≤ `MAX_MONEY_PAISE`; `assertStockValueInRange(newMilli, averageCostPaise)`: |newMilli| ≤ 2^53 − 1 and
+  |newMilli| × average cost ÷ 1,000 ≤ `MAX_STOCK_VALUE_PAISE`. A failure throws 400 `AMOUNT_TOO_LARGE`; the
+  caller's transaction rolls back, so no ledger row, no stock change, no document. No clamp anywhere.
+- Result: the read-only stock value `Math.round(currentStock × averageCostPaise)` (`assetRepository.ts:795`)
+  is always ≤ 9e15 < 2^53, an exact integer. `scoService.ts:200` (charge due) sums stored line values of one
+  SCO, each at most one line value (BR-STD-39), at most 500 lines (5e15): exact, no check.
+- SQL money aggregates (all of them; `sum(` / `::bigint` searched in `src/repository`, `src/service`):
+  `scoReportRepository.ts:26` `sum(total_value_change_paise)::bigint` (vendor stock value, mapped at :80) and
+  `scoReportRepository.ts:102` `abs(total_value_change_paise)::bigint` (loss cost per row, mapped at :155). The
+  driver returns `bigint` as text; both maps change from `Number(...)` to `toSafePaise(...)` = `Number()`, then
+  `Number.isSafeInteger`, else 400 `AMOUNT_TOO_LARGE`. Line :102 is one row value (≤ `MAX_MONEY_PAISE`), so
+  it cannot fail; line :26 fails only above 900 maximum-size rows for one vendor and item. A new money
+  aggregate must use `toSafePaise`.
+- Response schemas: Zod 4 `z.number().int()` accepts safe integers only (−(2^53 − 1) … 2^53 − 1), so
+  `assetStockRowSchema.valuePaise` (`asset.types.ts:438`), `vendorStockRowSchema.valuePaise`
+  (`scoReport.types.ts:14`) and `lossLogRowSchema.costPaise` already accept every value up to
+  `Number.MAX_SAFE_INTEGER` and nothing above it: no schema change, no `.max()`. They are manifest-only
+  (`route-registry.ts:26`, `scripts/generate-api-manifest.ts:165`); the server never parses a response with
+  them, so they cannot cause a 500. The guards above keep every real value inside what they describe.
 
 ## India day (BR-STD-24..26)
 - `service/prService.ts:34` `assertNotPastDate`: compare with `istDayStart()`.
@@ -215,8 +268,10 @@ Read-only sums (`scoService.ts:200` charge due, `assetRepository.ts:795` stock v
   `TEST_OWNERSHIP_MODE` becomes `deny`. Both resolve the target with `realpath` (for a new file: `realpath` of
   the nearest existing parent + the rest) before the path match, so a symlink cannot hide a path. In deny mode a
   missing `jq` or unreadable input exits 2 (fail closed); today `command -v jq || exit 0` allows.
-- Public routes, the whole list (BR-STD-42): `GET /health`, `POST /api/auth/login`, `POST /api/auth/refresh`,
-  `POST /api/auth/logout`. T-3 holds this list; a fifth entry needs an owner-approved spec line.
+- Public routes, the whole list (BR-STD-42): `POST /api/auth/login`, `POST /api/auth/refresh`,
+  `POST /api/auth/logout` (the 3 descriptors with `auth: { type: "public" }`, `routes/auth.ts:49, 69, 81`) and
+  `GET /health` (raw `app.get`, `app.ts:44`; no descriptor, so not in the manifest). T-3 holds the 3 manifest
+  routes and checks `/health` on its own; a fifth entry needs an owner-approved spec line.
 - Standards check gains: rule `zod-array`; `raw-ilike` inside `sql` templates; exemption tags and per-tag
   counts (`design/data.md`).
 
@@ -228,8 +283,12 @@ Read-only sums (`scoService.ts:200` charge due, `assetRepository.ts:795` stock v
   `src/index.ts`; unset = as today) and starts `next dev -H 127.0.0.1`. Today both listen on every interface.
 - `db:test:rebuild`: `backend/scripts/test-db-rebuild.ts`; runs `db:reset --no-fixtures` as a child with
   `DATABASE_URL` set from `DATABASE_URL_TEST` for that child only; `_test` check via `src/lib/test-db-url.ts`.
-- Permission matrix (`backend/tests`) and Playwright smoke (`frontend/e2e`, script `e2e`): tests, written only
-  by `test-writer`.
+- Permission matrix: T-3 extends the existing `backend/tests/routes/permissions-matrix.test.ts` (BR-AUTH-21
+  seed-role matrix, 240 lines). Its last test filters `getRegistry()` on auth type `"roles"`; the types are
+  `public` / `any-authenticated` / `permission` (`route-registry.ts:4–13`), so it matches nothing today. Added: one
+  loop over the whole registry (401 without a token; 403 `PERMISSION_DENIED` for a role with none of the keys;
+  public = exactly the 3 auth routes; unknown auth type fails) and one `GET /health` check. Existing tests stay.
+- Playwright smoke (`frontend/e2e`, script `e2e`). Both are tests, written only by `test-writer`.
 
 ## Choices made
 Moved to `../assumptions.md`.
