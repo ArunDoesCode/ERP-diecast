@@ -27,14 +27,9 @@ import {
 	useUpdatePurchaseOrderMutation,
 } from "@/lib/api/purchase-orders/queries";
 import { useSupplierItemsQuery } from "@/lib/api/suppliers/queries";
+import { formatMoney } from "@/lib/format";
 import { GST_PERCENT_VALUES } from "@/types/purchase-orders";
 import type { PurchaseRequisitionItem } from "@/types/purchase-requisitions";
-
-function formatMoney(paise?: number | null) {
-	return `₹${((paise ?? 0) / 100).toLocaleString("en-IN", {
-		maximumFractionDigits: 0,
-	})}`;
-}
 
 function GstSelect({
 	id,
@@ -333,7 +328,7 @@ export function EditPOModal({
 														[item.id]: event.target.value,
 													}))
 												}
-												className="pl-7"
+												className="pl-7 text-right tabular-nums"
 											/>
 										</div>
 										<GstSelect
@@ -346,7 +341,7 @@ export function EditPOModal({
 												}))
 											}
 										/>
-										<div className="text-right font-medium">
+										<div className="text-right font-medium tabular-nums">
 											{formatMoney(
 												Math.round(
 													Number(rates[item.id] || 0) * 100 * item.qty,
@@ -404,7 +399,7 @@ export function EditPOModal({
 															[line.id]: event.target.value,
 														}))
 													}
-													className="pl-7"
+													className="pl-7 text-right tabular-nums"
 												/>
 											</div>
 											<GstSelect
@@ -417,7 +412,7 @@ export function EditPOModal({
 													}))
 												}
 											/>
-											<div className="text-right font-medium">
+											<div className="text-right font-medium tabular-nums">
 												{formatMoney(
 													Math.round(
 														Number(addedRates[line.id] || 0) *
@@ -502,7 +497,9 @@ export function EditPOModal({
 								disabled={activeItems.length === 0 || updateMutation.isPending}
 								onClick={onSubmit}
 							>
-								Save changes · {formatMoney(totalPaise)} incl. GST
+								{updateMutation.isPending
+									? "Saving…"
+									: `Save changes · ${formatMoney(totalPaise)} incl. GST`}
 							</Button>
 						</DialogFooter>
 					</>

@@ -1,7 +1,9 @@
-/** True when `next` differs from `prev` and prev was already set (no flash on first load). Stub. */
+/** True when `next` differs from `prev` and prev was already set (no flash on first load). BR-DS-12. */
 export function shouldFlashStatus(
-	_prev: string | null | undefined,
-	_next: string | null | undefined,
+	prev: string | null | undefined,
+	next: string | null | undefined,
 ): boolean {
-	throw new Error("not implemented");
+	if (prev === null || prev === undefined || prev === "") return false;
+	if (next === null || next === undefined) return false;
+	return prev !== next;
 }

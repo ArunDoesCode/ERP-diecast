@@ -23,9 +23,14 @@ import { PO_REASON_MAX, PO_REASON_MIN } from "@/types/purchase-orders";
 export function ShortClosePoAlert({
 	poId,
 	poNumber,
+	open,
+	onOpenChange,
 }: {
 	poId: number;
 	poNumber: string;
+	/** Controlled mode (opened from a menu): no trigger button is rendered. */
+	open?: boolean;
+	onOpenChange?: (open: boolean) => void;
 }) {
 	const [reason, setReason] = useState("");
 	const mutation = useShortClosePoMutation();
@@ -33,15 +38,19 @@ export function ShortClosePoAlert({
 
 	return (
 		<AlertDialog
-			onOpenChange={(open) => {
-				if (!open) setReason("");
+			open={open}
+			onOpenChange={(next) => {
+				onOpenChange?.(next);
+				if (!next) setReason("");
 			}}
 		>
-			<AlertDialogTrigger asChild>
-				<Button type="button" size="sm" variant="outline">
-					Short-close
-				</Button>
-			</AlertDialogTrigger>
+			{open === undefined ? (
+				<AlertDialogTrigger asChild>
+					<Button type="button" size="sm" variant="outline">
+						Short-close
+					</Button>
+				</AlertDialogTrigger>
+			) : null}
 			<AlertDialogContent>
 				<AlertDialogHeader>
 					<AlertDialogTitle>Short-close {poNumber}?</AlertDialogTitle>
