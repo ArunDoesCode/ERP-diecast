@@ -5,6 +5,8 @@
  * BR-DS-27 also needs a login WITHOUT the PO create permission: E2E_NOCREATE_EMAIL (+ E2E_NOCREATE_PASSWORD,
  * default = admin password); skipped when unset. Written by test-writer from the spec only.
  *
+ * The PO list reads the requisition list endpoint GET /api/pr/getprs (not /po/getpos).
+ *
  * Not automated: BR-DS-08 (danger only for destructive actions: human review), BR-DS-25 (adoption changes
  * look only: commit review). BR-DS-18 and the rest are unit tests in tests/.
  */
@@ -54,7 +56,7 @@ test.describe("BR-DS-17 the PO list is header + filter bar + table + pagination"
 	test("BR-DS-17 a failed list request shows an alert with 'Try again', not an empty table", async ({
 		page,
 	}) => {
-		await page.route("**/getpos*", (route) =>
+		await page.route("**/pr/getprs*", (route) =>
 			route.fulfill({
 				status: 500,
 				contentType: "application/json",
@@ -74,7 +76,7 @@ test.describe("BR-DS-14 skeleton sweep only while loading", () => {
 		page,
 	}) => {
 		await login(page);
-		await page.route("**/getpos*", async (route) => {
+		await page.route("**/pr/getprs*", async (route) => {
 			await new Promise((r) => setTimeout(r, 1500));
 			await route.continue();
 		});
