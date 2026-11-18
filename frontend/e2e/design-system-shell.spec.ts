@@ -3,45 +3,8 @@
  * The PO-detail breadcrumb case (doc number) belongs to po-adoption (BR-DS-22 example) and lives in that e2e.
  * Runs against the `bun run try` stack (see e2e/README.md). Written by test-writer from the spec only.
  */
-import { test as base, expect, type Page } from "@playwright/test";
-
-const EMAIL = process.env.E2E_ADMIN_EMAIL ?? "admin@diecast.local";
-const PASSWORD =
-	process.env.E2E_ADMIN_PASSWORD ?? process.env.SEED_USER_PASSWORD ?? "";
-const BASE_URL = process.env.E2E_BASE_URL ?? "http://localhost:3000";
-
-type AuthState = Awaited<
-	ReturnType<import("@playwright/test").BrowserContext["storageState"]>
->;
-
-/** Login once per worker, reuse the session (per-test login trips the backend rate limiter). */
-const test = base.extend<{ storageState: AuthState }, { authState: AuthState }>(
-	{
-		authState: [
-			async ({ browser }, use) => {
-				if (!PASSWORD) {
-					throw new Error(
-						"Set E2E_ADMIN_PASSWORD (or SEED_USER_PASSWORD): the password of the seeded admin",
-					);
-				}
-				const context = await browser.newContext({ baseURL: BASE_URL });
-				const page = await context.newPage();
-				await page.goto("/login");
-				await page.getByLabel("Email").fill(EMAIL);
-				await page.getByLabel("Password").fill(PASSWORD);
-				await page.getByRole("button", { name: "Sign in" }).click();
-				await page.waitForURL("**/landing");
-				const state = await context.storageState();
-				await context.close();
-				await use(state);
-			},
-			{ scope: "worker" },
-		],
-		storageState: async ({ authState }, use) => {
-			await use(authState);
-		},
-	},
-);
+import { expect, type Page } from "@playwright/test";
+import { test } from "./support/auth";
 
 async function open(page: Page, path: string) {
 	await page.goto(path);

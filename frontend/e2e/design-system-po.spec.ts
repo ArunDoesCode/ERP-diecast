@@ -11,45 +11,8 @@
  * Not automated: BR-DS-08 (danger only for destructive actions: human review), BR-DS-25 (adoption changes
  * look only: commit review). BR-DS-18 and the rest are unit tests in tests/.
  */
-import { test as base, expect, type Page } from "@playwright/test";
-
-const EMAIL = process.env.E2E_ADMIN_EMAIL ?? "admin@diecast.local";
-const PASSWORD =
-	process.env.E2E_ADMIN_PASSWORD ?? process.env.SEED_USER_PASSWORD ?? "";
-const BASE_URL = process.env.E2E_BASE_URL ?? "http://localhost:3000";
-
-type AuthState = Awaited<
-	ReturnType<import("@playwright/test").BrowserContext["storageState"]>
->;
-
-/** Login once per worker, reuse the session (per-test login trips the backend rate limiter). */
-const test = base.extend<{ storageState: AuthState }, { authState: AuthState }>(
-	{
-		authState: [
-			async ({ browser }, use) => {
-				if (!PASSWORD) {
-					throw new Error(
-						"Set E2E_ADMIN_PASSWORD (or SEED_USER_PASSWORD): the password of the seeded admin",
-					);
-				}
-				const context = await browser.newContext({ baseURL: BASE_URL });
-				const page = await context.newPage();
-				await page.goto("/login");
-				await page.getByLabel("Email").fill(EMAIL);
-				await page.getByLabel("Password").fill(PASSWORD);
-				await page.getByRole("button", { name: "Sign in" }).click();
-				await page.waitForURL("**/landing");
-				const state = await context.storageState();
-				await context.close();
-				await use(state);
-			},
-			{ scope: "worker" },
-		],
-		storageState: async ({ authState }, use) => {
-			await use(authState);
-		},
-	},
-);
+import { expect, type Page } from "@playwright/test";
+import { PASSWORD, test } from "./support/auth";
 
 /** Separate login, only for the no-create-permission user (one login, one test). */
 async function loginAs(page: Page, email: string, password: string) {
@@ -165,10 +128,18 @@ test.describe("BR-DS-07 selection uses the accent", () => {
 		await openPoList(page);
 		const toolbar = page.getByRole("toolbar", { name: "Filters" });
 		const target = toolbar.locator("button[aria-pressed='false']").first();
-		const name = (await target.textContent()) ?? "";
+		// The chip text carries a count ("–" while loading); match the label part only.
+		const raw = (await target.textContent()) ?? "";
+		const label = raw.replace(/^[\s–\-\d.,]+|[\s–\-\d.,]+$/g, "");
+		expect(label.length).toBeGreaterThan(0);
 		await target.click();
 		await expect(
-			toolbar.getByRole("button", { name, pressed: true }).first(),
+			toolbar
+				.getByRole("button", {
+					name: new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+					pressed: true,
+				})
+				.first(),
 		).toBeVisible();
 	});
 });
@@ -178,7 +149,11 @@ test.describe("BR-DS-19 mono document numbers, right-aligned tabular numbers", (
 		page,
 	}) => {
 		await openPoList(page);
-		const doc = page.getByRole("link", { name: /^PO-\S+/ }).first();
+		const doc = page
+			.locator("table tbody tr")
+			.first()
+			.getByRole("link")
+			.first();
 		await expect(doc).toBeVisible({ timeout: 15_000 });
 		const mono = await doc.evaluate((el) => {
 			const fam = getComputedStyle(el).fontFamily;
@@ -369,7 +344,11 @@ test.describe("BR-DS-22 PO detail breadcrumb", () => {
 		page,
 	}) => {
 		await openPoList(page);
-		const link = page.getByRole("link", { name: /^PO-\S+/ }).first();
+		const link = page
+			.locator("table tbody tr")
+			.first()
+			.getByRole("link")
+			.first();
 		await expect(link).toBeVisible({ timeout: 15_000 });
 		const docNo = ((await link.textContent()) ?? "").trim();
 		await link.click();
