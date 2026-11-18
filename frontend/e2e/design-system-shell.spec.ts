@@ -1,25 +1,47 @@
 /**
  * docs/specs/design-system/spec.md (v1): BR-DS-06, BR-DS-16, BR-DS-21, BR-DS-22, BR-DS-26.
+ * The PO-detail breadcrumb case (doc number) belongs to po-adoption (BR-DS-22 example) and lives in that e2e.
  * Runs against the `bun run try` stack (see e2e/README.md). Written by test-writer from the spec only.
  */
-import { expect, type Page, test } from "@playwright/test";
+import { test as base, expect, type Page } from "@playwright/test";
 
 const EMAIL = process.env.E2E_ADMIN_EMAIL ?? "admin@diecast.local";
 const PASSWORD =
 	process.env.E2E_ADMIN_PASSWORD ?? process.env.SEED_USER_PASSWORD ?? "";
+const BASE_URL = process.env.E2E_BASE_URL ?? "http://localhost:3000";
 
-async function login(page: Page) {
-	if (!PASSWORD) {
-		throw new Error(
-			"Set E2E_ADMIN_PASSWORD (or SEED_USER_PASSWORD): the password of the seeded admin",
-		);
-	}
-	await page.goto("/login");
-	await page.getByLabel("Email").fill(EMAIL);
-	await page.getByLabel("Password").fill(PASSWORD);
-	await page.getByRole("button", { name: "Sign in" }).click();
-	await page.waitForURL("**/landing");
-}
+type AuthState = Awaited<
+	ReturnType<import("@playwright/test").BrowserContext["storageState"]>
+>;
+
+/** Login once per worker, reuse the session (per-test login trips the backend rate limiter). */
+const test = base.extend<{ storageState: AuthState }, { authState: AuthState }>(
+	{
+		authState: [
+			async ({ browser }, use) => {
+				if (!PASSWORD) {
+					throw new Error(
+						"Set E2E_ADMIN_PASSWORD (or SEED_USER_PASSWORD): the password of the seeded admin",
+					);
+				}
+				const context = await browser.newContext({ baseURL: BASE_URL });
+				const page = await context.newPage();
+				await page.goto("/login");
+				await page.getByLabel("Email").fill(EMAIL);
+				await page.getByLabel("Password").fill(PASSWORD);
+				await page.getByRole("button", { name: "Sign in" }).click();
+				await page.waitForURL("**/landing");
+				const state = await context.storageState();
+				await context.close();
+				await use(state);
+			},
+			{ scope: "worker" },
+		],
+		storageState: async ({ authState }, use) => {
+			await use(authState);
+		},
+	},
+);
 
 async function open(page: Page, path: string) {
 	await page.goto(path);
@@ -40,10 +62,6 @@ const resolveColour = (page: Page, value: string) =>
 	}, value);
 
 test.describe("BR-DS-22 one h1 and one breadcrumb trail in the top bar", () => {
-	test.beforeEach(async ({ page }) => {
-		await login(page);
-	});
-
 	test("BR-DS-22 the PO list has one h1 and one Breadcrumb nav inside the top bar", async ({
 		page,
 	}) => {
@@ -53,33 +71,6 @@ test.describe("BR-DS-22 one h1 and one breadcrumb trail in the top bar", () => {
 		await expect(trail).toHaveCount(1);
 		await expect(trail).toContainText("Purchase orders");
 		await expect(trail.locator("[aria-current='page']")).toHaveCount(1);
-	});
-
-	test("BR-DS-22 PO detail shows Purchase / Purchase orders / <PO number>", async ({
-		page,
-	}) => {
-		await open(page, "/purchase-orders");
-		const firstDoc = page.getByRole("link", { name: /^PO-\S+/ }).first();
-		await expect(firstDoc).toBeVisible({ timeout: 15_000 });
-		const docNumber = (await firstDoc.innerText()).trim();
-		await firstDoc.click();
-		await page.waitForURL(/\/purchase-orders\/.+/);
-		await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
-		const trail = page.getByRole("navigation", { name: "Breadcrumb" });
-		await expect(trail).toHaveCount(1);
-		const items = trail.getByRole("listitem");
-		await expect(items).toHaveCount(3);
-		await expect(items.nth(0)).toContainText("Purchase");
-		await expect(items.nth(1)).toContainText("Purchase orders");
-		await expect(items.nth(1).getByRole("link")).toHaveAttribute(
-			"href",
-			"/purchase-orders",
-		);
-		await expect(items.nth(2)).toContainText(docNumber);
-		await expect(items.nth(2).locator("a")).toHaveCount(0);
-		await expect(trail.locator("[aria-current='page']")).toContainText(
-			docNumber,
-		);
 	});
 
 	test("BR-DS-22 the top bar fold button toggles its name", async ({
@@ -98,17 +89,15 @@ test.describe("BR-DS-22 one h1 and one breadcrumb trail in the top bar", () => {
 });
 
 test.describe("BR-DS-21 sidebar icons and active item", () => {
-	test.beforeEach(async ({ page }) => {
-		await login(page);
-	});
-
 	test("BR-DS-21 every sidebar link has an icon", async ({ page }) => {
 		await open(page, "/purchase-orders");
-		const links = page.getByRole("complementary").getByRole("link");
+		const links = page.locator("[data-sidebar='sidebar']").getByRole("link");
 		const n = await links.count();
 		expect(n).toBeGreaterThan(0);
 		for (let i = 0; i < n; i++) {
-			await expect(links.nth(i).locator("svg").first()).toBeVisible();
+			await expect(
+				links.nth(i).locator("svg.tabler-icon").first(),
+			).toBeVisible();
 		}
 	});
 
@@ -116,7 +105,7 @@ test.describe("BR-DS-21 sidebar icons and active item", () => {
 		page,
 	}) => {
 		await open(page, "/purchase-orders");
-		const side = page.getByRole("complementary");
+		const side = page.locator("[data-sidebar='sidebar']");
 		const current = side.locator("a[aria-current='page']");
 		await expect(current).toHaveCount(1);
 		await expect(current).toContainText("Purchase orders");
@@ -143,7 +132,7 @@ test.describe("BR-DS-21 sidebar icons and active item", () => {
 	}) => {
 		await open(page, "/purchase-orders");
 		const current = page
-			.getByRole("complementary")
+			.locator("[data-sidebar='sidebar']")
 			.locator("a[aria-current='page']");
 		const bar = await resolveColour(page, "var(--sidebar-primary)");
 		const found = await current.evaluate((el, expected) => {
@@ -171,10 +160,6 @@ test.describe("BR-DS-21 sidebar icons and active item", () => {
 });
 
 test.describe("BR-DS-16 table density", () => {
-	test.beforeEach(async ({ page }) => {
-		await login(page);
-	});
-
 	const rowHeight = async (page: Page) => {
 		const row = page.locator("tbody tr").first();
 		await expect(row).toBeVisible({ timeout: 15_000 });
@@ -231,10 +216,6 @@ test.describe("BR-DS-16 table density", () => {
 });
 
 test.describe("BR-DS-06 and BR-DS-26 colour carries weight only where allowed", () => {
-	test.beforeEach(async ({ page }) => {
-		await login(page);
-	});
-
 	test("BR-DS-06 at most one solid --primary button in the PO list page header", async ({
 		page,
 	}) => {
@@ -256,7 +237,7 @@ test.describe("BR-DS-06 and BR-DS-26 colour carries weight only where allowed", 
 		await open(page, "/purchase-orders");
 		const primary = await resolveColour(page, "var(--primary)");
 		const filled = await page
-			.getByRole("complementary")
+			.locator("[data-sidebar='sidebar']")
 			.getByRole("link")
 			.evaluateAll(
 				(els, expected) =>
