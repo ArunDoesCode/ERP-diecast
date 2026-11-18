@@ -21,8 +21,9 @@ function istParts(iso: string | null | undefined) {
 	if (iso === null || iso === undefined || iso === "") return null;
 	const d = new Date(iso);
 	if (Number.isNaN(d.getTime())) return null;
-	const get = (type: string) =>
-		IST_PARTS.formatToParts(d).find((p) => p.type === type)?.value ?? "";
+	const map: Record<string, string> = {};
+	for (const part of IST_PARTS.formatToParts(d)) map[part.type] = part.value;
+	const get = (type: string) => map[type] ?? "";
 	return {
 		day: get("day"),
 		month: get("month"),
@@ -44,7 +45,7 @@ export function formatDateTime(iso: string | null | undefined): string {
 	return p ? `${p.day} ${p.month} ${p.year}, ${p.hour}:${p.minute}` : EMPTY;
 }
 
-/** Paise to rupees. `whole: true` drops the paise. */
+/** Paise to rupees. `whole: true` rounds to the nearest rupee. */
 export function formatMoney(
 	paise: number | null | undefined,
 	opts?: { whole?: boolean },
@@ -52,14 +53,16 @@ export function formatMoney(
 	if (paise === null || paise === undefined || !Number.isFinite(paise)) {
 		return EMPTY;
 	}
-	const negative = paise < 0;
-	const abs = Math.abs(Math.round(paise));
-	const rupees = Math.floor(abs / 100);
-	const rest = abs % 100;
+	const whole = opts?.whole === true;
+	// Round first so the sign follows the displayed amount (no `-₹0.00`).
+	const units = whole ? Math.round(paise / 100) : Math.round(paise);
+	const negative = units < 0;
+	const abs = Math.abs(units);
+	const rupees = whole ? abs : Math.floor(abs / 100);
 	const body = INR_INT.format(rupees);
-	const text = opts?.whole
+	const text = whole
 		? `₹${body}`
-		: `₹${body}.${String(rest).padStart(2, "0")}`;
+		: `₹${body}.${String(abs % 100).padStart(2, "0")}`;
 	return negative ? `-${text}` : text;
 }
 

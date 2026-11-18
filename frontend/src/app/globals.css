@@ -231,7 +231,8 @@ html[data-density="compact"] {
 	outline-offset: 2px;
 }
 
-[data-sidebar="sidebar"] :focus-visible {
+[data-sidebar="sidebar"]
+	:is(a, button, input, select, textarea, [role], [tabindex]):focus-visible {
 	outline-color: var(--sidebar-ring);
 }
 

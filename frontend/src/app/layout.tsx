@@ -9,6 +9,7 @@ const manrope = Manrope({ subsets: ["latin"], variable: "--font-sans" });
 const geistMono = Geist_Mono({
 	subsets: ["latin"],
 	variable: "--font-geist-mono",
+	preload: false,
 });
 
 export const metadata: Metadata = {

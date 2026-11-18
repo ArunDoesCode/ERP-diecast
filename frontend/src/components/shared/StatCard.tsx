@@ -1,7 +1,9 @@
 "use client";
 
 import { type Icon, IconRefresh } from "@tabler/icons-react";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 export type StatCardProps = {
@@ -57,27 +59,33 @@ function easeStandard(t: number): number {
  */
 function useCountUp(value: number | string, enabled: boolean) {
 	const [shown, setShown] = useState<number | null>(null);
-	const started = useRef(false);
+	const latest = useRef(value);
+	latest.current = value;
 
+	// Depends on `enabled` only: value changes never restart the run, and the
+	// frame reads the latest value, so the end state is always the current value.
 	useEffect(() => {
-		if (started.current || !enabled || typeof value !== "number") return;
-		started.current = true;
+		if (!enabled || typeof latest.current !== "number") return;
 		if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 		let raf = 0;
 		const t0 = performance.now();
 		const step = (now: number) => {
+			const target = latest.current;
 			const t = Math.min((now - t0) / COUNT_UP_MS, 1);
-			if (t >= 1) {
+			if (t >= 1 || typeof target !== "number") {
 				setShown(null);
 				return;
 			}
-			setShown(Math.round(value * easeStandard(t)));
+			setShown(Math.round(target * easeStandard(t)));
 			raf = requestAnimationFrame(step);
 		};
 		setShown(0);
 		raf = requestAnimationFrame(step);
-		return () => cancelAnimationFrame(raf);
-	}, [enabled, value]);
+		return () => {
+			cancelAnimationFrame(raf);
+			setShown(null);
+		};
+	}, [enabled]);
 
 	return shown;
 }
@@ -122,7 +130,7 @@ export function StatCard({
 					{label}
 				</span>
 				{loading ? (
-					<span className="h-[34px] w-16 rounded bg-muted" aria-hidden="true" />
+					<Skeleton className="h-[34px] w-16" aria-hidden="true" />
 				) : error ? (
 					<>
 						<span className="text-[26px] leading-[34px] font-bold tabular-nums">
@@ -164,18 +172,24 @@ export function StatCard({
 
 	if (href && !error) {
 		return (
-			<a
+			<Link
 				href={href}
 				className={className}
 				aria-label={accessibleName}
 				aria-busy={loading ? "true" : undefined}
 			>
 				{body}
-			</a>
+			</Link>
 		);
 	}
 	return (
-		<div className={className} aria-busy={loading ? "true" : undefined}>
+		// biome-ignore lint/a11y/useSemanticElements: fieldset is for form controls; a section would add a landmark per card
+		<div
+			className={className}
+			role="group"
+			aria-label={accessibleName}
+			aria-busy={loading ? "true" : undefined}
+		>
 			{body}
 		</div>
 	);
