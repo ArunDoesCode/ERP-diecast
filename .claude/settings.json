@@ -19,7 +19,6 @@
       "Bash(git push -u origin epic/*)",
       "Bash(git push origin feature/*)",
       "Bash(git push origin epic/*)",
-      "Bash(git push)",
       "Bash(git worktree *)",
       "Bash(git ls-files *)",
       "Bash(git check-ignore *)",
@@ -43,17 +42,28 @@
       "Bash(bun scripts/*)",
       "Bash(bunx tsc *)",
       "Bash(bunx biome *)",
-      "Bash(bunx drizzle-kit push*)",
       "Bash(docker compose up *)",
       "Bash(docker compose ps*)",
       "Bash(docker compose logs *)",
-      "Bash(psql *)",
       "Bash(ls *)",
       "Bash(cat *)",
       "Bash(head *)",
       "Bash(tail *)",
       "Bash(wc *)",
       "Bash(mkdir -p *)",
+      "Bash(.claude/pipeline/state.sh *)",
+      "Bash(.claude/skills/watch-prs/precheck.sh*)",
+      "Bash(.claude/pipeline/merge-sub-pr.sh *)",
+      "Bash(gh issue create *)",
+      "Bash(gh issue list *)",
+      "Bash(gh issue view *)",
+      "Bash(git revert *)",
+      "Bash(codegraph sync*)",
+      "Bash(codegraph init*)",
+      "Bash(codegraph explore*)",
+      "Bash(bun --env-file=* run *)",
+      "Bash(bun --env-file=* test*)",
+      "Bash(jq *)",
       "WebSearch",
       "WebFetch",
       "mcp__codegraph__codegraph_explore"
@@ -76,11 +86,33 @@
       "Bash(gh api -X DELETE *)",
       "Bash(docker compose down -v*)",
       "Bash(rm -rf *)",
+      "Bash(*db:reset*)",
+      "Bash(docker volume rm*)",
+      "Bash(git worktree remove --force*)",
       "Read(**/.env)",
       "Read(**/.env.*.local)"
     ]
   },
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/spec-gate.sh",
+            "timeout": 10,
+            "statusMessage": "spec gate"
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/test-ownership.sh",
+            "timeout": 10,
+            "statusMessage": "test ownership"
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write|MultiEdit",

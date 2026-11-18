@@ -1,12 +1,12 @@
 ---
 title: Proposed changes to .claude/settings.json (not applied)
 created: 2026-11-18
-status: waiting for owner approval
+status: applied 2026-11-18 (owner approved)
 ---
 
-# Proposed `.claude/settings.json` changes
+# `.claude/settings.json` changes (applied)
 
-Nothing here is applied. Agents do not edit permission settings; the owner approves this list first.
+Applied on 2026-11-18 after owner approval. Agents do not edit permission settings without it.
 
 ## 1. Register the two guardrail hooks (start in warn mode)
 
