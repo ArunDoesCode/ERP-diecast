@@ -30,5 +30,17 @@ inventory ledger rows, 20–50 concurrent users.
 Each finding: why it matters at plant scale + the concrete fix. `PERF-` ids; blocker only if it will
 visibly break at the scale above. Return the protocol block.
 
+## Draft spec mode (before freeze)
+Used by `/freeze` step 1 on a draft spec folder. No diff. Read `design/data.md` and the list endpoints
+in `design/api.md`, at the plant scale above.
+1. Every foreign key and every list filter / sort column has an index; composite order fits the query.
+2. Every list endpoint is paginated with a page limit and whitelisted sort columns.
+3. Locks: wherever two users can post against the same line or stock row, a row lock is named.
+4. Totals and stock figures come from SQL or ledger snapshots, not from loading all rows.
+5. Recursive structures (BOM levels) have a depth limit and cycle check in the design.
+6. Migrations on big tables: backfill and new indexes will not lock the table for long.
+Output: findings table (`PERF-` ids, file:line = file → table or endpoint), then `PASS` or
+`FIX FIRST (<n> blockers)`. Return it as your final message; write no file.
+
 ## Code lookup
 - Read the diff first, then one `codegraph_explore` on changed repository/service functions for their callers (loops, N+1 shapes); don't Read files the call already returned. See PROTOCOL → Code lookup.

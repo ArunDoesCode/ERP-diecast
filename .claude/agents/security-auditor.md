@@ -35,5 +35,18 @@ Audit `git diff <base>...HEAD`, following data from route → controller → ser
 Report each finding with an exploit scenario (who, what request, what they gain) — no scenario, no finding.
 `SEC-` ids, severity blocker for any authz/IDOR/injection/data-exposure issue. Return the protocol block.
 
+## Draft spec mode (before freeze)
+Used by `/freeze` step 1 on a draft spec. No diff; the checklist above does not apply. Read `spec.md`
+(Security, Who can do what, Flow), `design/api.md`, `design/data.md` (flat spec: the spec file only).
+1. Every action and every route has exactly one permission key; state changes are limited by status.
+2. Segregation of duties is a rule (maker ≠ approver, receiver vs QA) where the Flow has an approval.
+3. Every abuse case ends in a rule; missing ones: IDOR on ids, replay of a state change, over-quantity,
+   editing after approval, acting on another user's document.
+4. Sensitive data (prices, bank details, other users' data) has a "who may see" row and is absent from
+   list payloads that roles without the key can call.
+5. Every payload field has bounds; every state change writes an audit row.
+Output: findings table (`SEC-` ids, file:line = file → section), each with the abuse scenario, then
+`PASS` or `FIX FIRST (<n> blockers)`. Return it as your final message; write no file.
+
 ## Code lookup
 - Read the diff first, then one `codegraph_explore` on the changed routes/services to trace who reaches them and where the permission check sits; don't Read files the call already returned. See PROTOCOL → Code lookup.

@@ -41,5 +41,19 @@ Module name (+ optional BR ids) and the diff (default: `git diff <base>...HEAD` 
 A table: `# | severity (blocker/major/minor) | check | file:line | finding | fix`. Then a one-line verdict:
 `READY` / `NOT READY (<n> blockers)`. No praise, no restating the diff.
 
+## Draft spec mode (before freeze)
+Used by `/freeze` step 1 on a spec that is still `draft`. No diff, no tests; skip the checks above.
+Read the spec (`docs/specs/<module>/spec.md` + `design/edge-cases.md` + `OWNER.md`, or the flat file).
+1. **Rule ↔ example** — every BR has an example a test can be written from (concrete given → then).
+2. **Flow ↔ rules** — every transition names a rule; every status is reachable and can end.
+3. **Edge cases** — every row in `edge-cases.md` names an existing rule; negative paths (reject, cancel,
+   partial, over/under, no permission) are covered.
+4. **Cross-spec conflicts** — rules that contradict a spec in `depends_on`, or change another module's
+   behaviour without saying so.
+5. **Owner file** — each OWNER.md card answer matches the rule it led to; the worked example agrees with
+   the rules; nothing in "Not included" is covered by a rule.
+Output: findings table (`SPEC-` ids, file:line = spec file → section or rule id), then `PASS` or
+`FIX FIRST (<n> blockers)`. Return it as your final message; write no file.
+
 ## Code lookup
 - Map each BR to code with one `codegraph_explore` per BR group (symbol names in the query) and to tests via the blast-radius list; Read only to confirm behaviour. See PROTOCOL → Code lookup.
