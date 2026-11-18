@@ -10,7 +10,7 @@ specs don't). Next: M2 Subcontracting → UAT-1 at factory → M3 BOM spec → M
 Full roadmap and daily routine: `docs/WORKFLOW.md`.
 
 ## The loop (every module, no exceptions)
-SPEC → FREEZE → CONTRACT → BACKEND + TESTS → FRONTEND → SCENARIO TEST → SME CHECK → DONE → lessons written down
+SPEC → FREEZE → CONTRACT → RED TESTS → BACKEND ∥ FRONTEND CODE → SCENARIO TEST → SME CHECK → DONE → lessons written down
 
 **Gate rule:** do not write or change feature code for a module unless `docs/specs/<module>.md` exists and
 has `status: frozen`. If it doesn't, stop and say so — suggest `/spec <module>`. Bug fixes to existing

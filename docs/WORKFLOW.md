@@ -29,7 +29,7 @@ have to be re-explained.
  /freeze ─► /feature <module>        (main session = Opus coordinator)
    0 preflight: spec frozen? branch feature/<id> + worktree .claude/worktrees/<id> off base, docker up, baseline test-runner
    1 plan:      explorer(haiku) → plan.md (slices) → questions to you only if spec can't answer
-   2 build:     per slice: test-writer (red) → backend-dev contract → backend-dev ∥ frontend-dev (sonnet)
+   2 build:     per slice: backend-dev contract → test-writer (red tests) → backend-dev ∥ frontend-dev code (sonnet)
    3 verify:  ┌► code-reviewer ∥ security-auditor ∥ performance-auditor ∥ spec-reviewer   (sonnet)
               │  coordinator triages → fixes routed to backend-dev / frontend-dev / test-writer
               │  test-runner (haiku): typecheck, lint, tests, contract check vs baseline
@@ -52,7 +52,7 @@ have to be re-explained.
   the spec/decisions if it can, otherwise asks you, then records the answer in the spec changelog.
 - **File ownership** (backend-dev → `backend/**`, frontend-dev → `frontend/**`, test-writer → tests)
   prevents parallel agents from editing the same files.
-- **Tests are independent of the code.** test-writer writes tests from the spec *before* the code, in a
+- **Tests are independent of the code.** test-writer writes tests from the spec after the contract step and *before* the code, in a
   fresh context, with a brief that contains only file paths and rule ids — the coordinator adds nothing of
   its own. Developers can't edit tests; if they think one is wrong they must quote the spec. Test and code
   changes go in separate commits and `test-runner` blocks the PR if that's broken. Your manual checklist in

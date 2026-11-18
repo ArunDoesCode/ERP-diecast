@@ -96,7 +96,8 @@ Ids are `<agent-prefix>-<n>`: `CR-` code review, `SEC-` security, `PERF-` perfor
 Tests are the spec turned into code. They must not be shaped by the implementation, so:
 1. **Different agents.** test-writer writes and changes tests; backend-dev / frontend-dev write code. No
    agent does both, and the coordinator never edits tests or production code itself during `/feature`.
-2. **Tests first.** For each slice, test-writer runs **before** the developers, and its tests are committed
+2. **Contract → red tests → code.** For each slice, backend-dev writes the contract (interfaces only, no
+   logic), then test-writer runs **before** any implementation, and its tests are committed
    on their own: `test(<id>): BR-… tests` — before any implementation commit.
 3. **Zero-context brief for test-writer.** The coordinator passes **no context of its own** — not its
    understanding of the feature, not a summary or paraphrase of the rules (a paraphrase is already an
