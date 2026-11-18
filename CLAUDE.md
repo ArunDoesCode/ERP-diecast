@@ -5,9 +5,9 @@ Die-casting plant ERP. Solo developer + Claude Code. `backend/` = Bun + Hono + D
 read the one for the package you touch. This file only covers **how work flows**.
 
 ## Current milestone
-M1 — Procurement hardening: write specs + business-rule tests for PR, Approval, PO, GRN (code exists,
-specs don't). Next: M2 Subcontracting → UAT-1 at factory → M3 BOM spec → M4 Sale Order + BOM explosion.
-Full roadmap and daily routine: `docs/WORKFLOW.md`.
+M1 Procurement hardening and M2 Subcontracting are merged. UAT-1 at the factory has not started. BOM and
+Sale Order are not started (no spec). In progress: workflow v2 (`docs/plans/agentic-workflow-v2.md`); BOM
+explosion is the first feature after it. Live state: `docs/STATUS.md`. Roadmap and routine: `docs/WORKFLOW.md`.
 
 ## The loop (every module, no exceptions)
 SPEC → FREEZE → CONTRACT → RED TESTS → BACKEND ∥ FRONTEND CODE → SCENARIO TEST → SME CHECK → DONE → lessons written down
