@@ -18,7 +18,7 @@ const startServer = async () => {
       fetch: app.fetch,
       port: env.PORT,
       // LISTEN_HOST=127.0.0.1 (set by scripts/try.sh) keeps the dev server off the LAN; unset = all interfaces, as before.
-      hostname: process.env.LISTEN_HOST || undefined,
+      ...(process.env.LISTEN_HOST ? { hostname: process.env.LISTEN_HOST } : {}),
     },
     (info) => {
       console.log(`Backend listening on http://localhost:${info.port}`);
