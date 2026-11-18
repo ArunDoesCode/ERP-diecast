@@ -3,42 +3,67 @@
  * Runs against the `bun run try` stack (see e2e/README.md). Credentials as in smoke.spec.ts.
  * Written by test-writer from the spec only.
  *
- * Not covered here: BR-DS-13 (count-up). No page hosts a StatCard yet (home cards are a later
- * feature), so there is nothing to drive in a browser. The first-paint part is a unit test
- * (tests/components/StatCard.test.tsx). Add an e2e once a page renders a StatCard with countUp.
+ * Scope: only what the foundation delivers on today's pages (tokens, motion, focus ring, dark theme).
+ * Cases that need the adopted PO list/detail (doc-number links, one h1, status badges, PO-to-detail
+ * navigation) belong to BR-DS-17/19/22 of sub-feature po-adoption and live in that sub-feature's e2e.
+ * Also not covered: BR-DS-13 (count-up) - no page hosts a StatCard yet; first paint is a unit test.
+ *
+ * Login: once per worker (worker-scoped fixture), session reused via storage state. Logging in per test
+ * trips the backend login rate limiter.
  */
-import { expect, type Page, test } from "@playwright/test";
+import { test as base, expect, type Page } from "@playwright/test";
 
 const EMAIL = process.env.E2E_ADMIN_EMAIL ?? "admin@diecast.local";
 const PASSWORD =
 	process.env.E2E_ADMIN_PASSWORD ?? process.env.SEED_USER_PASSWORD ?? "";
+const BASE_URL = process.env.E2E_BASE_URL ?? "http://localhost:3000";
 
-async function login(page: Page) {
-	if (!PASSWORD) {
-		throw new Error(
-			"Set E2E_ADMIN_PASSWORD (or SEED_USER_PASSWORD): the password of the seeded admin",
-		);
-	}
-	await page.goto("/login");
-	await page.getByLabel("Email").fill(EMAIL);
-	await page.getByLabel("Password").fill(PASSWORD);
-	await page.getByRole("button", { name: "Sign in" }).click();
-	await page.waitForURL("**/landing");
+type AuthState = Awaited<
+	ReturnType<import("@playwright/test").BrowserContext["storageState"]>
+>;
+
+const test = base.extend<{ storageState: AuthState }, { authState: AuthState }>(
+	{
+		authState: [
+			async ({ browser }, use) => {
+				if (!PASSWORD) {
+					throw new Error(
+						"Set E2E_ADMIN_PASSWORD (or SEED_USER_PASSWORD): the password of the seeded admin",
+					);
+				}
+				const context = await browser.newContext({ baseURL: BASE_URL });
+				const page = await context.newPage();
+				await page.goto("/login");
+				await page.getByLabel("Email").fill(EMAIL);
+				await page.getByLabel("Password").fill(PASSWORD);
+				await page.getByRole("button", { name: "Sign in" }).click();
+				await page.waitForURL("**/landing");
+				const state = await context.storageState();
+				await context.close();
+				await use(state);
+			},
+			{ scope: "worker" },
+		],
+		storageState: async ({ authState }, use) => {
+			await use(authState);
+		},
+	},
+);
+
+/** A page that exists today and is behind login. Foundation-level checks only. */
+async function openPage(page: Page) {
+	await page.goto("/purchase-requisitions");
+	await expect(page).toHaveURL(/\/purchase-requisitions/);
+	await expect(page.getByRole("main")).toBeVisible({ timeout: 15_000 });
+	await page.waitForLoadState("networkidle");
 }
 
-async function openPoList(page: Page) {
-	await page.goto("/purchase-orders");
-	await expect(page.getByRole("heading", { level: 1 })).toBeVisible({
-		timeout: 15_000,
-	});
-}
-
-const MOTION_TOKENS = {
-	"--motion-fast": "120ms",
-	"--motion-base": "180ms",
-	"--motion-slow": "260ms",
-	"--motion-emphasis": "600ms",
-	"--motion-skeleton": "1400ms",
+const MOTION_TOKENS_MS = {
+	"--motion-fast": 120,
+	"--motion-base": 180,
+	"--motion-slow": 260,
+	"--motion-emphasis": 600,
+	"--motion-skeleton": 1400,
 } as const;
 
 const readToken = (page: Page, name: string) =>
@@ -48,24 +73,28 @@ const readToken = (page: Page, name: string) =>
 		name,
 	);
 
-test.describe("BR-DS-10 nothing on the never-list ships", () => {
-	test.beforeEach(async ({ page }) => {
-		await login(page);
-	});
+/** "120ms", ".12s", "0.12s", "0" -> milliseconds. The spec fixes the duration, not its spelling. */
+function toMs(value: string): number {
+	const m = /^(-?\d*\.?\d+)(ms|s)?$/.exec(value.trim());
+	if (!m) throw new Error(`not a duration: "${value}"`);
+	const n = Number.parseFloat(m[1]);
+	return m[2] === "s" ? Math.round(n * 1000) : n;
+}
 
-	test("BR-DS-10 the motion tokens have the spec values", async ({ page }) => {
-		await openPoList(page);
-		for (const [name, value] of Object.entries(MOTION_TOKENS)) {
-			expect(await readToken(page, name)).toBe(value);
+test.describe("BR-DS-10 nothing on the never-list ships", () => {
+	test("BR-DS-10 the motion tokens have the spec durations", async ({
+		page,
+	}) => {
+		await openPage(page);
+		for (const [name, ms] of Object.entries(MOTION_TOKENS_MS)) {
+			expect(toMs(await readToken(page, name))).toBe(ms);
 		}
 	});
 
-	test("BR-DS-10 no element on the PO list loops an animation (skeleton excepted) or uses a delay", async ({
+	test("BR-DS-10 no element loops an animation (skeleton excepted) or uses a delay", async ({
 		page,
 	}) => {
-		await openPoList(page);
-		// Let loading finish so the skeleton is gone.
-		await page.waitForLoadState("networkidle");
+		await openPage(page);
 		const offenders = await page.evaluate(() => {
 			const bad: string[] = [];
 			for (const el of Array.from(document.querySelectorAll("*"))) {
@@ -73,6 +102,7 @@ test.describe("BR-DS-10 nothing on the never-list ships", () => {
 				const describe = `${el.tagName.toLowerCase()}.${String((el as HTMLElement).className).slice(0, 60)}`;
 				if (
 					cs.animationName !== "none" &&
+					!/skeleton/.test(cs.animationName) &&
 					cs.animationIterationCount.includes("infinite")
 				) {
 					bad.push(`loop: ${describe} ${cs.animationName}`);
@@ -88,15 +118,12 @@ test.describe("BR-DS-10 nothing on the never-list ships", () => {
 		expect(offenders).toEqual([]);
 	});
 
-	test("BR-DS-10 navigating PO list to PO detail starts no animation on the content", async ({
+	test("BR-DS-10 a page navigation starts no running animation on the loaded content", async ({
 		page,
 	}) => {
-		await openPoList(page);
-		const firstDoc = page.getByRole("link", { name: /^PO-\S+/ }).first();
-		await expect(firstDoc).toBeVisible({ timeout: 15_000 });
-		await firstDoc.click();
-		await page.waitForURL(/\/purchase-orders\/.+/);
-		await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+		await openPage(page);
+		await page.goto("/landing");
+		await page.waitForLoadState("networkidle");
 		const running = await page.evaluate(() =>
 			document
 				.getAnimations()
@@ -108,40 +135,31 @@ test.describe("BR-DS-10 nothing on the never-list ships", () => {
 						"?",
 				),
 		);
-		// Only skeleton sweeps (while loading) are allowed to run; the page is loaded by now.
+		// Only skeleton sweeps (while loading) may run; the page is loaded by now.
 		expect(running.filter((n) => !/skeleton/.test(String(n)))).toEqual([]);
-	});
-
-	test("BR-DS-10 there is exactly one h1 on the PO list and on the PO detail", async ({
-		page,
-	}) => {
-		await openPoList(page);
-		await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
 	});
 });
 
 test.describe("BR-DS-11 reduced motion", () => {
 	test.beforeEach(async ({ page }) => {
 		await page.emulateMedia({ reducedMotion: "reduce" });
-		await login(page);
 	});
 
-	test("BR-DS-11 all five duration tokens are 0ms", async ({ page }) => {
-		await openPoList(page);
-		for (const name of Object.keys(MOTION_TOKENS)) {
-			expect(await readToken(page, name)).toMatch(/^0(ms|s)$/);
+	test("BR-DS-11 all five duration tokens are 0 ms", async ({ page }) => {
+		await openPage(page);
+		for (const name of Object.keys(MOTION_TOKENS_MS)) {
+			expect(toMs(await readToken(page, name))).toBe(0);
 		}
 	});
 
-	test("BR-DS-11 no element on the PO list has a non-zero transition or animation duration", async ({
+	test("BR-DS-11 no element has a non-zero transition or animation duration", async ({
 		page,
 	}) => {
-		await openPoList(page);
-		await page.waitForLoadState("networkidle");
+		await openPage(page);
 		const offenders = await page.evaluate(() => {
 			const bad: string[] = [];
 			const zero = (v: string) =>
-				v.split(",").every((d) => parseFloat(d) === 0);
+				v.split(",").every((d) => Number.parseFloat(d) === 0);
 			for (const el of Array.from(document.querySelectorAll("*"))) {
 				const cs = getComputedStyle(el);
 				if (!zero(cs.transitionDuration) || !zero(cs.animationDuration)) {
@@ -158,14 +176,11 @@ test.describe("BR-DS-11 reduced motion", () => {
 	test("BR-DS-11 a dialog appears at once (no running animation right after it opens)", async ({
 		page,
 	}) => {
-		await openPoList(page);
+		await openPage(page);
 		const trigger = page
 			.getByRole("button", { name: /^(new|create|add)\b/i })
 			.first();
-		test.skip(
-			(await trigger.count()) === 0,
-			"no dialog trigger on the PO list",
-		);
+		test.skip((await trigger.count()) === 0, "no dialog trigger on this page");
 		await trigger.click();
 		const dialog = page.getByRole("dialog");
 		test.skip((await dialog.count()) === 0, "trigger did not open a dialog");
@@ -185,81 +200,54 @@ test.describe("BR-DS-11 reduced motion", () => {
 });
 
 test.describe("BR-DS-15 light and dark", () => {
-	test("BR-DS-15 dark mode changes the page and badge colours; none keeps its light value", async ({
+	test("BR-DS-15 dark mode changes the page background and text colour; none keeps its light value", async ({
 		page,
 	}) => {
 		await page.emulateMedia({ colorScheme: "light" });
-		await login(page);
-		await openPoList(page);
-		await page.waitForLoadState("networkidle");
+		await openPage(page);
 
 		const sample = () =>
-			page.evaluate(() => {
-				const badges = Array.from(
-					document.querySelectorAll<HTMLElement>("span, div"),
-				).filter(
-					(el) =>
-						el.querySelector("svg[aria-hidden='true']") &&
-						el.children.length <= 2 &&
-						/^[A-Za-z][A-Za-z -]{2,24}$/.test(el.textContent?.trim() ?? "") &&
-						getComputedStyle(el).borderRadius !== "0px",
-				);
-				return {
-					page: getComputedStyle(document.body).backgroundColor,
-					badges: badges.slice(0, 12).map((b) => ({
-						text: b.textContent?.trim() ?? "",
-						bg: getComputedStyle(b).backgroundColor,
-						fg: getComputedStyle(b).color,
-					})),
-				};
-			});
+			page.evaluate(() => ({
+				bg: getComputedStyle(document.body).backgroundColor,
+				fg: getComputedStyle(document.body).color,
+				main: getComputedStyle(document.querySelector("main") ?? document.body)
+					.backgroundColor,
+			}));
 
 		const light = await sample();
-		await page.screenshot({
-			path: "test-results/design-system-po-list-light.png",
-		});
+		await page.screenshot({ path: "test-results/design-system-light.png" });
 
 		await page.emulateMedia({ colorScheme: "dark" });
 		await page.reload();
-		await expect(page.getByRole("heading", { level: 1 })).toBeVisible({
-			timeout: 15_000,
-		});
+		await expect(page.getByRole("main")).toBeVisible({ timeout: 15_000 });
 		await page.waitForLoadState("networkidle");
 		await expect(page.locator("html")).toHaveClass(/\bdark\b/);
 		const dark = await sample();
-		await page.screenshot({
-			path: "test-results/design-system-po-list-dark.png",
-		});
+		await page.screenshot({ path: "test-results/design-system-dark.png" });
 
-		expect(dark.page).not.toBe(light.page);
-		const lightByText = new Map(light.badges.map((b) => [b.text, b]));
-		for (const d of dark.badges) {
-			const l = lightByText.get(d.text);
-			if (!l) continue;
-			// A closed (outline) badge has a transparent fill in both themes; compare text colour then.
-			const same = d.bg === l.bg && d.fg === l.fg;
-			expect({ text: d.text, same }).toEqual({ text: d.text, same: false });
-		}
+		expect(dark.bg).not.toBe(light.bg);
+		expect(dark.fg).not.toBe(light.fg);
 	});
 });
 
 test.describe("BR-DS-20 keyboard focus ring", () => {
-	test("BR-DS-20 every focused element on the PO list shows a solid 2px ring, 2px offset, in --ring", async ({
+	test("BR-DS-20 every keyboard-focused element shows a solid 2px ring, 2px offset, in --ring (--sidebar-ring in the sidebar)", async ({
 		page,
 	}) => {
-		await login(page);
-		await openPoList(page);
-		await page.waitForLoadState("networkidle");
+		await openPage(page);
 
-		const ringColour = await page.evaluate(() => {
-			const probe = document.createElement("span");
-			probe.style.color = "var(--ring)";
-			document.body.appendChild(probe);
-			const c = getComputedStyle(probe).color;
-			probe.remove();
-			return c;
+		const colours = await page.evaluate(() => {
+			const resolve = (v: string) => {
+				const probe = document.createElement("span");
+				probe.style.color = `var(${v})`;
+				document.body.appendChild(probe);
+				const c = getComputedStyle(probe).color;
+				probe.remove();
+				return c;
+			};
+			return { ring: resolve("--ring"), sidebar: resolve("--sidebar-ring") };
 		});
-		expect(ringColour).not.toBe("");
+		expect(colours.ring).not.toBe("");
 
 		const seen = new Set<string>();
 		const bad: string[] = [];
@@ -270,9 +258,9 @@ test.describe("BR-DS-20 keyboard focus ring", () => {
 				const el = document.activeElement as HTMLElement | null;
 				if (!el || el === document.body) return null;
 				const cs = getComputedStyle(el);
-				const id = `${el.tagName.toLowerCase()}:${(el.getAttribute("aria-label") ?? el.textContent ?? "").trim().slice(0, 30)}`;
 				return {
-					id,
+					id: `${el.tagName.toLowerCase()}:${(el.getAttribute("aria-label") ?? el.textContent ?? "").trim().slice(0, 30)}`,
+					inSidebar: el.closest('[data-sidebar="sidebar"]') !== null,
 					style: cs.outlineStyle,
 					width: cs.outlineWidth,
 					offset: cs.outlineOffset,
@@ -282,17 +270,16 @@ test.describe("BR-DS-20 keyboard focus ring", () => {
 			});
 			if (!info) continue;
 			seen.add(info.id);
+			const want = info.inSidebar ? colours.sidebar : colours.ring;
 			if (info.style !== "solid")
 				bad.push(`${info.id}: outline-style ${info.style}`);
 			if (info.width !== "2px")
 				bad.push(`${info.id}: outline-width ${info.width}`);
 			if (info.offset !== "2px")
 				bad.push(`${info.id}: outline-offset ${info.offset}`);
-			if (info.color !== ringColour)
-				bad.push(
-					`${info.id}: outline-color ${info.color} != ring ${ringColour}`,
-				);
-			if (info.shadow.includes(ringColour))
+			if (info.color !== want)
+				bad.push(`${info.id}: outline-color ${info.color} != ${want}`);
+			if (info.shadow.includes(want))
 				bad.push(`${info.id}: ring drawn as box-shadow`);
 		}
 		expect(seen.size).toBeGreaterThanOrEqual(5);
