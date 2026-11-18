@@ -126,7 +126,15 @@ test.describe("BR-DS-21 sidebar icons and active item", () => {
 
 test.describe("BR-DS-16 table density", () => {
 	const rowHeight = async (page: Page) => {
-		const row = page.locator("tbody tr").first();
+		// Wait until loading is over: no skeleton placeholder left in the body.
+		await expect(page.locator("tbody tr").first()).toBeVisible({
+			timeout: 15_000,
+		});
+		await expect(
+			page.locator("tbody [data-slot='skeleton'], tbody .animate-pulse"),
+		).toHaveCount(0, { timeout: 15_000 });
+		// Measure a real data row (the empty-state row spans all columns).
+		const row = page.locator("tbody tr:not(:has(td[colspan]))").first();
 		await expect(row).toBeVisible({ timeout: 15_000 });
 		return (await row.boundingBox())?.height ?? 0;
 	};
