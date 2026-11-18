@@ -257,6 +257,8 @@ test.describe("BR-DS-20 keyboard focus ring", () => {
 			const info = await page.evaluate(() => {
 				const el = document.activeElement as HTMLElement | null;
 				if (!el || el === document.body) return null;
+				// Next.js dev overlay is tooling, not app UI.
+				if (el.closest("nextjs-portal") !== null) return null;
 				const cs = getComputedStyle(el);
 				return {
 					id: `${el.tagName.toLowerCase()}:${(el.getAttribute("aria-label") ?? el.textContent ?? "").trim().slice(0, 30)}`,
