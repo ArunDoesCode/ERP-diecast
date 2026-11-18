@@ -18,6 +18,11 @@ function usableTerm(term: string | undefined, minLength: number) {
   return trimmed && trimmed.length >= minLength ? trimmed : undefined;
 }
 
+/** True when `term` is long enough to filter (BR-STD-38): the one place that decides. */
+export function hasSearchTerm(term: string | undefined): boolean {
+  return usableTerm(term, MIN_SEARCH_LENGTH) !== undefined;
+}
+
 /** The LIKE pattern for `term`: `\`, `%` and `_` are escaped (Postgres default escape). */
 function containsPattern(term: string): string {
   return `%${term.replace(/[\\%_]/g, "\\$&")}%`;

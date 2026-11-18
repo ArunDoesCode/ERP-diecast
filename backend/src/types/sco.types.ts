@@ -7,6 +7,7 @@ import {
 } from "../db/schemas/02_procurement-purchasing";
 import { companySettings } from "../db/schemas/04_company";
 import { MAX_MONEY_PAISE } from "../lib/money";
+import { searchTermSchema } from "../lib/safe-search";
 import { gstPercentSchema } from "./po.types";
 
 export const scoStatusSchema = z.enum(scoStatusEnum.enumValues);
@@ -135,7 +136,7 @@ export const scoListQuerySchema = z.object({
     .pipe(z.array(scoStatusSchema).max(20).optional()),
   vendorId: z.coerce.number().int().positive().optional(),
   // Matches SCO number or vendor name (case-insensitive contains).
-  q: z.string().trim().min(1).max(100).optional(),
+  q: searchTermSchema,
   // Register date filter (S4): SCO createdAt, inclusive, ISO dates.
   createdFrom: z.coerce.date().optional(),
   createdTo: z.coerce.date().optional(),

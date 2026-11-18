@@ -22,7 +22,7 @@ import {
 } from "../db/schemas/02_procurement";
 import { employees } from "../db/schemas/03_hcm";
 import { AppError } from "../lib/errors";
-import { safeSearch } from "../lib/safe-search";
+import { hasSearchTerm, safeSearch } from "../lib/safe-search";
 import type { PartialUpdate } from "../lib/types";
 import type {
   supplierHistoryQuerySchemaType,
@@ -134,7 +134,7 @@ export const supplierRepository = {
         : supplierMaster.name; // BR-SUP-23: sorted by name unless chosen
     const orderFn = params.sortDir === "desc" ? desc : asc;
 
-    const searchClause = params.q
+    const searchClause = hasSearchTerm(params.q)
       ? or(
           safeSearch(
             params.q,
@@ -223,7 +223,7 @@ export const supplierRepository = {
         .orderBy(asc(supplierItems.id))
         .limit(params.pageSize)
         .offset((params.page - 1) * params.pageSize),
-      params.q
+      hasSearchTerm(params.q)
         ? db
             .select({ value: count() })
             .from(supplierItems)
@@ -259,7 +259,7 @@ export const supplierRepository = {
         .orderBy(asc(supplierServices.id))
         .limit(params.pageSize)
         .offset((params.page - 1) * params.pageSize),
-      params.q
+      hasSearchTerm(params.q)
         ? db
             .select({ value: count() })
             .from(supplierServices)

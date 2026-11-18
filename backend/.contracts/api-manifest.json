@@ -2711,7 +2711,7 @@
           "sortDir": "enum:asc,desc.required",
           "status": "array<enum:draft,pending_approval,approved,rejected,require_more_info,material_issued,material_received,closed,cancelled>.optional",
           "vendorId": "integer.positive.optional",
-          "q": "string.nonempty.optional",
+          "q": "string.optional",
           "createdFrom": "unrepresentable.optional",
           "createdTo": "unrepresentable.optional"
         }
