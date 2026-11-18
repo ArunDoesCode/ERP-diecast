@@ -1,6 +1,6 @@
 /**
  * docs/specs/api-standards/spec.md (v1) T-4: Playwright smoke.
- * Log in as the seeded admin, open the purchase requisitions list, see at least one row.
+ * Log in as the seeded admin, open the purchase requisitions list, see at least one list item.
  *
  * Runs against the `bun run try` stack (API :4000 + UI :3000) on the dev database with its demo data.
  * Credentials: E2E_ADMIN_EMAIL (default admin@diecast.local) and E2E_ADMIN_PASSWORD (or SEED_USER_PASSWORD,
@@ -29,8 +29,9 @@ test("T-4 seeded admin logs in and sees at least one purchase requisition row", 
 
 	await page.goto("/purchase-requisitions");
 	await expect(page).toHaveURL(/\/purchase-requisitions/);
-	await expect(page.locator("tbody tr").first()).toBeVisible({
-		timeout: 15_000,
-	});
-	expect(await page.locator("tbody tr").count()).toBeGreaterThan(0);
+	// The list is a card grid (no table): each item is a card whose title button shows the PR number.
+	// Follow-up: a data-testid on the list item would be a sturdier hook than the number pattern.
+	const items = page.getByRole("button", { name: /^PR-\S+/ });
+	await expect(items.first()).toBeVisible({ timeout: 15_000 });
+	expect(await items.count()).toBeGreaterThan(0);
 });
