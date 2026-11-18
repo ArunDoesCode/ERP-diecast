@@ -1,0 +1,196 @@
+"use client";
+
+import { type Icon, IconRefresh } from "@tabler/icons-react";
+import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
+
+export type StatCardProps = {
+	label: string;
+	value: number | string;
+	/** Never "closed" and never the accent colour. */
+	tone?: "neutral" | "warning" | "info" | "success" | "danger";
+	icon?: Icon;
+	hint?: string;
+	href?: string;
+	loading?: boolean;
+	error?: boolean;
+	onRetry?: () => void;
+	countUp?: boolean;
+};
+
+const EDGE: Record<NonNullable<StatCardProps["tone"]>, string> = {
+	neutral: "border-l-neutral",
+	warning: "border-l-warning",
+	info: "border-l-info",
+	success: "border-l-success",
+	danger: "border-l-destructive",
+};
+
+const CHIP: Record<NonNullable<StatCardProps["tone"]>, string> = {
+	neutral: "bg-neutral-subtle text-neutral",
+	warning: "bg-warning-subtle text-warning",
+	info: "bg-info-subtle text-info",
+	success: "bg-success-subtle text-success",
+	danger: "bg-destructive-subtle text-destructive",
+};
+
+const COUNT_UP_MS = 600;
+// --ease-standard: cubic-bezier(0.2, 0, 0, 1)
+function easeStandard(t: number): number {
+	// Solve x(s) = t by bisection, return y(s).
+	const [x1, y1, x2, y2] = [0.2, 0, 0, 1];
+	const bez = (a: number, b: number, s: number) =>
+		3 * a * (1 - s) ** 2 * s + 3 * b * (1 - s) * s ** 2 + s ** 3;
+	let lo = 0;
+	let hi = 1;
+	for (let i = 0; i < 24; i++) {
+		const mid = (lo + hi) / 2;
+		if (bez(x1, x2, mid) < t) lo = mid;
+		else hi = mid;
+	}
+	return bez(y1, y2, (lo + hi) / 2);
+}
+
+/**
+ * Counts 0 -> value once per mount. First render (server and client) is the final value;
+ * later value changes never re-animate; reduced motion keeps the final value.
+ */
+function useCountUp(value: number | string, enabled: boolean) {
+	const [shown, setShown] = useState<number | null>(null);
+	const latest = useRef(value);
+	latest.current = value;
+
+	// Depends on `enabled` only: value changes never restart the run, and the
+	// frame reads the latest value, so the end state is always the current value.
+	useEffect(() => {
+		if (!enabled || typeof latest.current !== "number") return;
+		if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+		let raf = 0;
+		const t0 = performance.now();
+		const step = (now: number) => {
+			const target = latest.current;
+			const t = Math.min((now - t0) / COUNT_UP_MS, 1);
+			if (t >= 1 || typeof target !== "number") {
+				setShown(null);
+				return;
+			}
+			setShown(Math.round(target * easeStandard(t)));
+			raf = requestAnimationFrame(step);
+		};
+		setShown(0);
+		raf = requestAnimationFrame(step);
+		return () => {
+			cancelAnimationFrame(raf);
+			setShown(null);
+		};
+	}, [enabled]);
+
+	return shown;
+}
+
+export function StatCard({
+	label,
+	value,
+	tone = "neutral",
+	icon: CardIcon,
+	hint,
+	href,
+	loading,
+	error,
+	onRetry,
+	countUp,
+}: StatCardProps) {
+	const animated = useCountUp(value, Boolean(countUp) && !loading && !error);
+	const finalText = typeof value === "number" ? String(value) : value;
+	const shownText = animated === null ? finalText : String(animated);
+
+	const className = cn(
+		"flex items-start gap-3 rounded-lg border border-l-[3px] bg-card p-4 text-card-foreground",
+		EDGE[tone],
+		href &&
+			"transition-colors duration-(--motion-fast) hover:bg-muted/50 focus-visible:outline-2 focus-visible:outline-ring",
+	);
+
+	const body = (
+		<>
+			{CardIcon && (
+				<span
+					className={cn(
+						"flex size-8 shrink-0 items-center justify-center rounded-md",
+						CHIP[tone],
+					)}
+				>
+					<CardIcon size={16} stroke={1.75} aria-hidden="true" />
+				</span>
+			)}
+			<span className="flex min-w-0 flex-col gap-0.5">
+				<span className="text-xs leading-4 font-semibold text-muted-foreground">
+					{label}
+				</span>
+				{loading ? (
+					<Skeleton className="h-[34px] w-16" aria-hidden="true" />
+				) : error ? (
+					<>
+						<span className="text-[26px] leading-[34px] font-bold tabular-nums">
+							–
+						</span>
+						{onRetry && (
+							<button
+								type="button"
+								onClick={onRetry}
+								className="inline-flex w-fit items-center gap-1 text-xs font-semibold text-brand-accent underline-offset-4 hover:underline"
+							>
+								<IconRefresh size={12} stroke={2} aria-hidden="true" />
+								Try again
+							</button>
+						)}
+					</>
+				) : (
+					<>
+						<span
+							className="text-[26px] leading-[34px] font-bold tabular-nums"
+							aria-hidden={countUp ? "true" : undefined}
+						>
+							{shownText}
+						</span>
+						{countUp && <span className="sr-only">{finalText}</span>}
+					</>
+				)}
+				{hint && !loading && (
+					<span className="text-xs leading-4 text-muted-foreground">
+						{hint}
+					</span>
+				)}
+			</span>
+		</>
+	);
+
+	const accessibleName =
+		!loading && !error ? `${label}: ${finalText}` : undefined;
+
+	if (href && !error) {
+		return (
+			<Link
+				href={href}
+				className={className}
+				aria-label={accessibleName}
+				aria-busy={loading ? "true" : undefined}
+			>
+				{body}
+			</Link>
+		);
+	}
+	return (
+		// biome-ignore lint/a11y/useSemanticElements: fieldset is for form controls; a section would add a landmark per card
+		<div
+			className={className}
+			role="group"
+			aria-label={accessibleName}
+			aria-busy={loading ? "true" : undefined}
+		>
+			{body}
+		</div>
+	);
+}

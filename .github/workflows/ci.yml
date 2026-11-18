@@ -84,6 +84,10 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bunx tsc --noEmit
       - run: bun run lint
+      - name: Unit tests (design system, BR-DS-*)
+        run: bun run test
+      - name: Contrast check (BR-DS-02)
+        run: bun run contrast:check
       - run: bun run build
       - name: Standards check (blocking for mutation-invalidate and motion, BR-STD-30)
         # raw-palette stays report-only until issue #91.
@@ -97,6 +101,9 @@ jobs:
   e2e:
     # UI end-to-end tests (Playwright, frontend/e2e). Non-blocking for now.
     # Every step after "Find specs" is skipped while frontend/e2e has no *.spec.ts, so the job is green.
+    # Runs only on PRs into main and pushes to main: sub-feature PRs into epic/* run it locally instead
+    # (test-runner step 9, .claude/agents/test-runner.md), which saves a 5-minute CI round trip per push.
+    if: github.event_name == 'push' || github.base_ref == 'main'
     runs-on: ubuntu-latest
     continue-on-error: true
     services:

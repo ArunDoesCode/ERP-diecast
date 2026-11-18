@@ -1,11 +1,17 @@
 import type { Metadata } from "next";
 
 import "./globals.css";
-import { Manrope } from "next/font/google";
+import { Geist_Mono, Manrope } from "next/font/google";
 import Providers from "@/lib/Providers";
+import { DENSITY_INIT_SCRIPT } from "@/lib/shell/density";
 import { cn } from "@/lib/utils";
 
 const manrope = Manrope({ subsets: ["latin"], variable: "--font-sans" });
+const geistMono = Geist_Mono({
+	subsets: ["latin"],
+	variable: "--font-geist-mono",
+	preload: false,
+});
 
 export const metadata: Metadata = {
 	title: "DieCast ERP",
@@ -20,9 +26,12 @@ export default function RootLayout({
 	return (
 		<html
 			lang="en"
-			className={cn("font-sans", manrope.variable)}
+			className={cn("font-sans", manrope.variable, geistMono.variable)}
 			suppressHydrationWarning
 		>
+			<head>
+				<script>{DENSITY_INIT_SCRIPT}</script>
+			</head>
 			<body>
 				<Providers>{children}</Providers>
 			</body>

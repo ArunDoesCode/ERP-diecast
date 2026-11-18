@@ -13,6 +13,7 @@ import { LogPoCommunicationDialog } from "@/components/pages/purchase-orders/Log
 import { MarkPoInvoicedDialog } from "@/components/pages/purchase-orders/MarkPoInvoicedDialog";
 import { PoDetailPanel } from "@/components/pages/purchase-orders/PoDetailPanel";
 import { ShortClosePoAlert } from "@/components/pages/purchase-orders/ShortClosePoAlert";
+import { StatusBadge } from "@/components/shared/StatusBadge";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -41,11 +42,9 @@ import {
 	canClosePurchaseOrder,
 	canMarkPurchaseOrderInvoiced,
 	canShortClosePurchaseOrder,
-	getPOStatusBadgeStyle,
 	PO_IN_TRANSIT_STATUSES,
 	PO_TERMINAL_STATUSES,
 } from "@/lib/po-status-badge";
-import { humanizeStatusLabel } from "@/lib/pr-status-badge";
 import {
 	PO_REASON_MAX,
 	PO_REASON_MIN,
@@ -211,7 +210,6 @@ export function PurchaseOrderTrackingCards({
 		<>
 			<div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
 				{purchaseOrders.map((po) => {
-					const badgeStyle = getPOStatusBadgeStyle(po.status);
 					// BR-PO-19: due date = revised date if set, else expected date.
 					const dueDate =
 						po.dueDate ?? po.revisedDeliveryDate ?? po.expectedDeliveryDate;
@@ -228,12 +226,7 @@ export function PurchaseOrderTrackingCards({
 								<div className="flex items-start justify-between gap-2">
 									<CardTitle className="text-base">{po.poNumber}</CardTitle>
 									<div className="flex flex-wrap items-center justify-end gap-1">
-										<Badge
-											variant={badgeStyle.variant}
-											className={badgeStyle.className}
-										>
-											{humanizeStatusLabel(po.status)}
-										</Badge>
+										<StatusBadge doc="po" status={po.status} />
 										{isOverdue ? (
 											<Badge
 												variant="outline"

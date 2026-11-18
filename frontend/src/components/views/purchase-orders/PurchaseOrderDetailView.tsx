@@ -1,13 +1,13 @@
 "use client";
 
 import {
-	IconArrowLeft,
 	IconCurrencyRupee,
+	IconDots,
 	IconFileInvoice,
 	IconTruckDelivery,
 } from "@tabler/icons-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { SearchableSelect } from "@/components/common/SearchableSelect";
@@ -22,6 +22,12 @@ import { MarkPoInvoicedDialog } from "@/components/pages/purchase-orders/MarkPoI
 import { PoDetailPanel } from "@/components/pages/purchase-orders/PoDetailPanel";
 import { ShortClosePoAlert } from "@/components/pages/purchase-orders/ShortClosePoAlert";
 import { CancelPrLineDialog } from "@/components/pages/purchase-requisitions/CancelPrLineDialog";
+import { DetailHeader } from "@/components/shared/DetailHeader";
+import { DocumentFlow } from "@/components/shared/DocumentFlow";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { ErrorState } from "@/components/shared/ErrorState";
+import { StatusBadge } from "@/components/shared/StatusBadge";
+import { StatusFlashRow } from "@/components/shared/StatusFlashRow";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -45,6 +51,12 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -81,6 +93,7 @@ import {
 	useSupplierItemsQuery,
 	useSuppliersQuery,
 } from "@/lib/api/suppliers/queries";
+import { formatDate, formatMoney } from "@/lib/format";
 import {
 	canCancelPurchaseOrder,
 	canClosePurchaseOrder,
@@ -89,16 +102,14 @@ import {
 	PO_IN_TRANSIT_STATUSES,
 	PO_TERMINAL_STATUSES,
 } from "@/lib/po-status-badge";
-import {
-	getPRStatusBadgeStyle,
-	humanizeStatusLabel,
-} from "@/lib/pr-status-badge";
+import { useBreadcrumbLast } from "@/lib/shell/breadcrumb-last";
 import { useAuthSessionStore } from "@/lib/store/auth-session-store";
 import {
 	GST_PERCENT_VALUES,
 	type LastRateSource,
 	PO_REASON_MAX,
 	PO_REASON_MIN,
+	type POStatus,
 } from "@/types/purchase-orders";
 import type {
 	PRLinkedPo,
@@ -106,20 +117,6 @@ import type {
 	PurchaseRequisitionItem,
 } from "@/types/purchase-requisitions";
 import type { Supplier } from "@/types/suppliers";
-
-function formatMoney(paise?: number | null) {
-	return `₹${((paise ?? 0) / 100).toLocaleString("en-IN", {
-		maximumFractionDigits: 0,
-	})}`;
-}
-
-function formatDate(value?: string | null) {
-	if (!value) return "-";
-	return new Date(value).toLocaleDateString("en-IN", {
-		day: "2-digit",
-		month: "short",
-	});
-}
 
 function pendingLines(lines: PurchaseRequisitionItem[]) {
 	return lines.filter((line) => line.status === "pending");
@@ -152,19 +149,7 @@ function sameDefaultSupplier(lines: PurchaseRequisitionItem[]) {
 	return supplierIds.size === 1 ? [...supplierIds][0] : undefined;
 }
 
-function statusBadgeClass(status: string) {
-	if (status === "pending")
-		return "border-amber-200 bg-amber-100 text-amber-800";
-	if (status === "po_draft") return "border-sky-200 bg-sky-100 text-sky-800";
-	if (status === "ordered")
-		return "border-emerald-200 bg-emerald-100 text-emerald-800";
-	if (status === "cancelled")
-		return "border-zinc-300 bg-zinc-100 text-zinc-700";
-	return "border-slate-300 bg-slate-100 text-slate-800";
-}
-
 export function PurchaseOrderDetailView({ prId }: { prId: number }) {
-	const router = useRouter();
 	const canManagePO = useCan("po.manage");
 	const [selectedLineIds, setSelectedLineIds] = useState<Set<number>>(
 		() => new Set(),
@@ -181,6 +166,7 @@ export function PurchaseOrderDetailView({ prId }: { prId: number }) {
 	const lines = detail?.items ?? [];
 	const selectedLines = lines.filter((line) => selectedLineIds.has(line.id));
 	const pr = detail?.pr;
+	useBreadcrumbLast(pr?.prNumber);
 	// BR-PR-33: a pending line can be cancelled on its own while the PR is
 	// approved or partly ordered, by the requester (super-admin: the API allows it too).
 	const canCancelLines =
@@ -212,29 +198,31 @@ export function PurchaseOrderDetailView({ prId }: { prId: number }) {
 	}
 
 	return (
-		<div className="flex w-full flex-col gap-4 p-6">
-			<Button
-				type="button"
-				variant="ghost"
-				size="sm"
-				className="w-fit"
-				onClick={() => router.push("/purchase-orders")}
-			>
-				<IconArrowLeft className="size-3.5" />
-				Back to queue
-			</Button>
-
+		<div className="flex w-full max-w-[1100px] flex-col gap-4">
 			{detailQuery.isLoading ? (
 				<DetailSkeleton />
+			) : detailQuery.isError && !detail ? (
+				<ErrorState
+					message="Could not load this document."
+					onRetry={() => detailQuery.refetch()}
+					retrying={detailQuery.isFetching}
+				/>
 			) : !detail || !pr ? (
-				<Card>
-					<CardContent className="py-10 text-center text-muted-foreground">
-						Purchase requisition not found.
-					</CardContent>
-				</Card>
+				<EmptyState
+					title="This document does not exist"
+					action={
+						<Link
+							href="/purchase-orders"
+							className="text-[13px] font-medium text-brand-accent hover:underline"
+						>
+							Back to purchase orders
+						</Link>
+					}
+				/>
 			) : (
 				<div className="flex min-w-0 flex-col gap-4">
-					<DetailHeader pr={pr} lines={lines} />
+					<PrDetailHeader pr={pr} lines={lines} />
+					<PrDocumentFlow pr={pr} linkedPos={detail.linkedPos} />
 
 					<Card>
 						<CardHeader className="gap-3">
@@ -324,36 +312,80 @@ export function PurchaseOrderDetailView({ prId }: { prId: number }) {
 	);
 }
 
-function DetailHeader({
+function PrDetailHeader({
 	pr,
 	lines,
 }: {
 	pr: PurchaseRequisition;
 	lines: PurchaseRequisitionItem[];
 }) {
-	const badgeStyle = getPRStatusBadgeStyle(pr.status);
 	const pendingCount = pendingLines(lines).length;
-
 	return (
-		<div className="flex flex-col gap-3 border-b pb-4 lg:flex-row lg:items-end lg:justify-between">
-			<div>
-				<div className="flex flex-wrap items-center gap-2">
-					<h2 className="font-heading text-xl font-medium">{pr.prNumber}</h2>
-					<Badge variant={badgeStyle.variant} className={badgeStyle.className}>
-						{humanizeStatusLabel(pr.status)}
-					</Badge>
-				</div>
-				<p className="text-xs text-muted-foreground">
-					{pendingCount} pending line{pendingCount === 1 ? "" : "s"} · Est{" "}
-					{formatMoney(pr.estimatedAmountPaise)}
-				</p>
-			</div>
-			<div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground sm:grid-cols-3">
-				<span>Created {formatDate(pr.createdAt)}</span>
-				<span>{lines.length} lines</span>
-				<span>Requester {pr.requestedByName ?? `#${pr.requestedBy}`}</span>
-			</div>
-		</div>
+		<DetailHeader
+			docNo={pr.prNumber}
+			title={`${pendingCount} pending line${pendingCount === 1 ? "" : "s"}`}
+			status={<StatusBadge doc="pr" status={pr.status} />}
+			backHref="/purchase-orders"
+			backLabel="purchase orders"
+			meta={[
+				{
+					label: "Raised by",
+					value: pr.requestedByName ?? `#${pr.requestedBy}`,
+				},
+				{ label: "Date", value: formatDate(pr.createdAt) },
+				{ label: "Est. value", value: formatMoney(pr.estimatedAmountPaise) },
+				{ label: "Lines", value: String(lines.length) },
+			]}
+		/>
+	);
+}
+
+// PR -> PO -> GRN chain from data already on the page (no extra request).
+const RECEIVED_PO_STATUSES = new Set([
+	"partial_received",
+	"fully_received",
+	"invoiced",
+	"closed",
+]);
+
+function PrDocumentFlow({
+	pr,
+	linkedPos,
+}: {
+	pr: PurchaseRequisition;
+	linkedPos: PRLinkedPo[];
+}) {
+	const livePos = linkedPos.filter((po) => po.status !== "cancelled");
+	const firstPo = livePos[0];
+	const received = livePos.some((po) => RECEIVED_PO_STATUSES.has(po.status));
+	return (
+		<DocumentFlow
+			steps={[
+				{
+					label: "Requisition",
+					docNo: pr.prNumber,
+					status: <StatusBadge doc="pr" status={pr.status} />,
+					state: "done",
+				},
+				{
+					label: "Purchase order",
+					docNo: firstPo
+						? livePos.length > 1
+							? `${firstPo.poNumber} +${livePos.length - 1}`
+							: firstPo.poNumber
+						: undefined,
+					status: firstPo ? (
+						<StatusBadge doc="po" status={firstPo.status} />
+					) : undefined,
+					state: "current",
+				},
+				{
+					label: "Goods receipt",
+					status: received ? <span>Received</span> : undefined,
+					state: received ? "done" : "todo",
+				},
+			]}
+		/>
 	);
 }
 
@@ -376,9 +408,9 @@ function LinesTable({
 				<TableRow>
 					<TableHead className="w-10" />
 					<TableHead>Item</TableHead>
-					<TableHead>Qty</TableHead>
+					<TableHead className="text-right">Qty</TableHead>
 					<TableHead>Default supplier</TableHead>
-					<TableHead>Est rate</TableHead>
+					<TableHead className="text-right">Est rate</TableHead>
 					<TableHead>Status</TableHead>
 					<TableHead>PO</TableHead>
 					{onCancelLine ? <TableHead className="w-24" /> : null}
@@ -407,18 +439,15 @@ function LinesTable({
 									</span>
 								</div>
 							</TableCell>
-							<TableCell>
+							<TableCell className="text-right tabular-nums">
 								{line.requestedQty} {line.uom ?? ""}
 							</TableCell>
 							<TableCell>{line.defaultSupplierName ?? "No history"}</TableCell>
-							<TableCell>{formatMoney(line.estRatePaise)}</TableCell>
+							<TableCell className="text-right tabular-nums">
+								{formatMoney(line.estRatePaise)}
+							</TableCell>
 							<TableCell>
-								<Badge
-									variant="outline"
-									className={statusBadgeClass(line.status ?? "pending")}
-								>
-									{humanizeStatusLabel(line.status)}
-								</Badge>
+								<StatusBadge doc="prLine" status={line.status ?? "pending"} />
 							</TableCell>
 							<TableCell>{line.linkedPoNumber ?? "-"}</TableCell>
 							{onCancelLine ? (
@@ -447,7 +476,8 @@ type LinkedPoDialogState =
 	| { type: "send" | "reminder" | "escalate"; poId: number; poNumber: string }
 	| { type: "delay"; poId: number; poNumber: string }
 	| { type: "confirm"; poId: number; poNumber: string }
-	| { type: "invoice"; poId: number; poNumber: string };
+	| { type: "invoice"; poId: number; poNumber: string }
+	| { type: "cancel" | "close" | "shortClose"; poId: number; poNumber: string };
 
 function LinkedPOs({
 	linkedPos,
@@ -465,6 +495,7 @@ function LinkedPOs({
 	const [dialogState, setDialogState] = useState<LinkedPoDialogState | null>(
 		null,
 	);
+	const flashKeys = useOwnActionStatuses(linkedPos);
 
 	return (
 		<Card>
@@ -480,16 +511,20 @@ function LinkedPOs({
 					<div className="space-y-2">
 						{linkedPos.map((po) => (
 							<div key={po.id} className="space-y-2">
-								<div className="flex flex-col gap-2 rounded-md border p-3 text-xs sm:flex-row sm:items-center sm:justify-between">
+								<StatusFlashRow
+									as="div"
+									flashKey={flashKeys[po.id]}
+									className="flex flex-col gap-2 rounded-md border p-3 text-xs sm:flex-row sm:items-center sm:justify-between"
+								>
 									<div className="flex flex-wrap items-center gap-2">
-										<span className="font-medium">{po.poNumber}</span>
+										<span className="font-mono font-medium">{po.poNumber}</span>
 										<span className="text-muted-foreground">
 											Supplier #{po.supplierId}
 										</span>
-										<Badge variant="outline">
-											{humanizeStatusLabel(po.status)}
-										</Badge>
-										<span>{formatMoney(po.totalAmountPaise)}</span>
+										<StatusBadge doc="po" status={po.status} />
+										<span className="tabular-nums">
+											{formatMoney(po.totalAmountPaise)}
+										</span>
 									</div>
 
 									<div className="flex flex-wrap gap-2">
@@ -504,11 +539,6 @@ function LinkedPOs({
 												>
 													Edit
 												</Button>
-												<CancelPOAlert
-													poId={po.id}
-													prId={prId}
-													poNumber={po.poNumber}
-												/>
 											</>
 										) : !PO_TERMINAL_STATUSES.has(po.status) ? (
 											<>
@@ -603,23 +633,20 @@ function LinkedPOs({
 														Mark Invoiced
 													</Button>
 												) : null}
-												{canClosePurchaseOrder(po.status) ? (
-													<ClosePoAlert poId={po.id} poNumber={po.poNumber} />
-												) : null}
-												{canShortClosePurchaseOrder(po.status) ? (
-													<ShortClosePoAlert
-														poId={po.id}
-														poNumber={po.poNumber}
-													/>
-												) : null}
-												{canCancelPurchaseOrder(po.status) ? (
-													<CancelPOAlert
-														poId={po.id}
-														prId={prId}
-														poNumber={po.poNumber}
-													/>
-												) : null}
 											</>
+										) : null}
+										{canManagePO ? (
+											<PoMoreMenu
+												poNumber={po.poNumber}
+												status={po.status}
+												onSelect={(type) =>
+													setDialogState({
+														type,
+														poId: po.id,
+														poNumber: po.poNumber,
+													})
+												}
+											/>
 										) : null}
 										{/* Independent of canManagePO: grn.edit_draft holders are authorized by
 									the backend to create/manage GRN drafts (creategrn, bypass) even
@@ -637,7 +664,7 @@ function LinkedPOs({
 											</Button>
 										) : null}
 									</div>
-								</div>
+								</StatusFlashRow>
 								<PoApprovalHistory poId={po.id} />
 								<PoDetails poId={po.id} />
 							</div>
@@ -710,6 +737,40 @@ function LinkedPOs({
 				/>
 			) : null}
 
+			{dialogState?.type === "cancel" ? (
+				<CancelPOAlert
+					poId={dialogState.poId}
+					prId={prId}
+					poNumber={dialogState.poNumber}
+					open
+					onOpenChange={(open) => {
+						if (!open) setDialogState(null);
+					}}
+				/>
+			) : null}
+
+			{dialogState?.type === "close" ? (
+				<ClosePoAlert
+					poId={dialogState.poId}
+					poNumber={dialogState.poNumber}
+					open
+					onOpenChange={(open) => {
+						if (!open) setDialogState(null);
+					}}
+				/>
+			) : null}
+
+			{dialogState?.type === "shortClose" ? (
+				<ShortClosePoAlert
+					poId={dialogState.poId}
+					poNumber={dialogState.poNumber}
+					open
+					onOpenChange={(open) => {
+						if (!open) setDialogState(null);
+					}}
+				/>
+			) : null}
+
 			{dialogState?.type === "invoice" ? (
 				<MarkPoInvoicedDialog
 					poId={dialogState.poId}
@@ -723,6 +784,102 @@ function LinkedPOs({
 			) : null}
 		</Card>
 	);
+}
+
+type MoreAction = "cancel" | "close" | "shortClose";
+
+/** Destructive actions live in one "More" menu; each opens a confirm dialog naming the PO (BR-DS-08). */
+function PoMoreMenu({
+	poNumber,
+	status,
+	onSelect,
+}: {
+	poNumber: string;
+	status: POStatus;
+	onSelect: (action: MoreAction) => void;
+}) {
+	const items: { action: MoreAction; label: string }[] = [];
+	if (canClosePurchaseOrder(status))
+		items.push({ action: "close", label: "Close PO" });
+	if (canShortClosePurchaseOrder(status))
+		items.push({ action: "shortClose", label: "Short-close" });
+	if (canCancelPurchaseOrder(status))
+		items.push({ action: "cancel", label: "Cancel PO" });
+	if (items.length === 0) return null;
+
+	return (
+		<DropdownMenu>
+			<DropdownMenuTrigger asChild>
+				<Button
+					type="button"
+					size="sm"
+					variant="outline"
+					aria-label={`More actions for ${poNumber}`}
+				>
+					<IconDots className="size-3.5" />
+					More
+				</Button>
+			</DropdownMenuTrigger>
+			<DropdownMenuContent align="end">
+				{items.map((item) => (
+					<DropdownMenuItem
+						key={item.action}
+						variant={item.action === "cancel" ? "destructive" : undefined}
+						onSelect={() => onSelect(item.action)}
+					>
+						{item.label}
+					</DropdownMenuItem>
+				))}
+			</DropdownMenuContent>
+		</DropdownMenu>
+	);
+}
+
+/**
+ * Status per PO that only moves after an action by this user on this page, so the row
+ * flashes for the user's own change and never for a refetch or someone else's (BR-DS-12).
+ */
+function useOwnActionStatuses(linkedPos: PRLinkedPo[]) {
+	const queryClient = useQueryClient();
+	// poId -> time the arm expires (only mutations that name the document arm a row)
+	const armed = useRef<Map<number, number>>(new Map());
+	const [own, setOwn] = useState<Record<number, string>>({});
+
+	useEffect(() => {
+		const unsubscribe = queryClient.getMutationCache().subscribe((event) => {
+			if (
+				event.type === "updated" &&
+				event.mutation.state.status === "success"
+			) {
+				const variables = event.mutation.state.variables as
+					| { poId?: unknown }
+					| undefined;
+				if (typeof variables?.poId === "number") {
+					armed.current.set(variables.poId, Date.now() + 10_000);
+				}
+			}
+		});
+		return unsubscribe;
+	}, [queryClient]);
+
+	useEffect(() => {
+		const now = Date.now();
+		const isArmed = (id: number) => (armed.current.get(id) ?? 0) > now;
+		setOwn((current) => {
+			let next = current;
+			for (const po of linkedPos) {
+				if (current[po.id] === undefined || isArmed(po.id)) {
+					if (current[po.id] !== po.status) {
+						if (next === current) next = { ...current };
+						next[po.id] = po.status;
+					}
+				}
+			}
+			return next;
+		});
+	}, [linkedPos]);
+
+	return own;
 }
 
 function PoDetails({ poId }: { poId: number }) {
@@ -800,10 +957,14 @@ function CancelPOAlert({
 	poId,
 	prId,
 	poNumber,
+	open,
+	onOpenChange,
 }: {
 	poId: number;
 	prId: number;
 	poNumber: string;
+	open?: boolean;
+	onOpenChange?: (open: boolean) => void;
 }) {
 	const [reason, setReason] = useState("");
 	const mutation = useCancelPurchaseOrderMutation();
@@ -811,15 +972,19 @@ function CancelPOAlert({
 
 	return (
 		<AlertDialog
-			onOpenChange={(open) => {
-				if (!open) setReason("");
+			open={open}
+			onOpenChange={(next) => {
+				onOpenChange?.(next);
+				if (!next) setReason("");
 			}}
 		>
-			<AlertDialogTrigger asChild>
-				<Button type="button" size="sm" variant="outline">
-					Cancel
-				</Button>
-			</AlertDialogTrigger>
+			{open === undefined ? (
+				<AlertDialogTrigger asChild>
+					<Button type="button" size="sm" variant="outline">
+						Cancel
+					</Button>
+				</AlertDialogTrigger>
+			) : null}
 			<AlertDialogContent>
 				<AlertDialogHeader>
 					<AlertDialogTitle>Cancel {poNumber}?</AlertDialogTitle>
@@ -1130,7 +1295,9 @@ function CreatePOModal({
 						onClick={onSubmit}
 					>
 						<IconTruckDelivery className="size-3.5" />
-						Create draft PO · {formatMoney(totalPaise)} incl. GST
+						{createMutation.isPending
+							? "Saving…"
+							: `Create draft PO · ${formatMoney(totalPaise)} incl. GST`}
 					</Button>
 				</DialogFooter>
 			</DialogContent>
@@ -1251,7 +1418,7 @@ function CreatePOLine({
 						step={1}
 						value={value}
 						onChange={(event) => onChange(event.target.value)}
-						className="pl-7"
+						className="pl-7 text-right tabular-nums"
 					/>
 				</div>
 			</div>
@@ -1280,7 +1447,7 @@ function CreatePOLine({
 				</Select>
 			</div>
 
-			<div className="text-right font-medium">
+			<div className="text-right font-medium tabular-nums">
 				<p className="text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase">
 					Total
 				</p>

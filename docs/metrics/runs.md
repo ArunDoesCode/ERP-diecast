@@ -20,3 +20,4 @@ Source: `docs/plans/agentic-workflow-v2.md` → Phase 6 and Baseline.
 ## Runs
 | Date | Run | Mode | Min | Agent calls | Tokens | Fix rounds | Findings | Parked | Confirm | Commits | chore+docs | test | fix | PR |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2026-11-18 | epic-design-system | epic | 126 | 11 (epic) + ~60 (sub-features) | 0 | 1 | 0 | 0 | 0 | 41 | 0+2 | 14 | 7 | epic PR |

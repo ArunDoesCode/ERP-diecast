@@ -21,25 +21,34 @@ export function ClosePoAlert({
 	poId,
 	poNumber,
 	onClosed,
+	open,
+	onOpenChange,
 }: {
 	poId: number;
 	poNumber: string;
 	onClosed?: () => void;
+	/** Controlled mode (opened from a menu): no trigger button is rendered. */
+	open?: boolean;
+	onOpenChange?: (open: boolean) => void;
 }) {
 	const [note, setNote] = useState("");
 	const mutation = useClosePoMutation();
 
 	return (
 		<AlertDialog
-			onOpenChange={(open) => {
-				if (!open) setNote("");
+			open={open}
+			onOpenChange={(next) => {
+				onOpenChange?.(next);
+				if (!next) setNote("");
 			}}
 		>
-			<AlertDialogTrigger asChild>
-				<Button type="button" size="sm" variant="outline">
-					Close PO
-				</Button>
-			</AlertDialogTrigger>
+			{open === undefined ? (
+				<AlertDialogTrigger asChild>
+					<Button type="button" size="sm" variant="outline">
+						Close PO
+					</Button>
+				</AlertDialogTrigger>
+			) : null}
 			<AlertDialogContent>
 				<AlertDialogHeader>
 					<AlertDialogTitle>Close {poNumber}?</AlertDialogTitle>

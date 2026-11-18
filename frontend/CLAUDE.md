@@ -119,5 +119,6 @@ Reference docs the agents read: [`.claude/reference/nextjs-build-conventions.md`
 (before building) and [`.claude/reference/nextjs-review-checklist.md`](.claude/reference/nextjs-review-checklist.md)
 (when reviewing).
 
-Skills live in [`.claude/skills/`](.claude/skills/): `structure-guard`, `client-data-state`,
-`ui-form-standards`, `data-table`, `shadcn`, `pwa-runtime-ux` (shelved — no PWA infra yet).
+Skills live in [`.claude/skills/`](.claude/skills/): `design-system` (load for **any** screen or UI
+change: tokens, status badges, shared components, screen patterns, motion), `structure-guard`,
+`client-data-state`, `ui-form-standards`, `data-table`, `shadcn`, `pwa-runtime-ux` (shelved — no PWA infra yet).
