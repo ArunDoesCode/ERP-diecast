@@ -1,6 +1,6 @@
 ---
 module: <kebab-name>
-status: draft            # draft | frozen | changed-after-freeze
+status: draft            # draft | frozen (set only by /freeze; change requests keep it frozen)
 version: 0
 frozen_on:
 owner: Arun

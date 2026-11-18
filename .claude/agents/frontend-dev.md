@@ -22,7 +22,7 @@ In your report, add a **Map updates** section (new routes, views, components, qu
 - Load the relevant skills: `structure-guard`, `client-data-state`, `data-table`, `ui-form-standards`.
 - Show only actions the spec allows for the current status + role (spec §4/§8).
 - Every form field has a linked `<Label htmlFor>` (a11y lint rule).
-- If the `design-system` skill exists, load it and use only its tokens, components and motion allow-list.
+- If `frontend/.claude/skills/design-system/SKILL.md` exists, load it and use only its tokens, components and motion allow-list.
 - Before returning: `bunx tsc --noEmit && bun run lint` clean for files you touched (report pre-existing
   errors separately, don't fix them unless the brief says so). No backend test runs — test-runner does that.
 - Contract missing something, or the spec silent on a screen → BLOCKED with the question + your

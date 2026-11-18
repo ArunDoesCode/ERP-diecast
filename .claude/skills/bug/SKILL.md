@@ -23,7 +23,7 @@ Never-wait policy and hard stops: `.claude/pipeline/PROTOCOL.md`. Ask the owner 
    - No rule → **spec gap**. Do not wait:
      [spec-gap-mid-build](../../../docs/runbooks/spec-gap-mid-build.md) — spawn **researcher** for the
      benchmark, add the rule to the spec changelog, log the assumption (`confirm` if it touches money,
-     stock, permissions or what a factory user sees). Invariant conflict → hard stop.
+     stock, tax, permissions or what a factory user sees). Invariant conflict → hard stop.
 5. **Red** — **test-writer** (`subagent_type: test-writer`, never a fork), zero-context brief template
    from PROTOCOL, mode `regression`: spec path, BR id, the issue number. Do **not** pass what you found
    in step 3 — no suspected cause, file names or fix ideas. Test named `BR-<MOD>-NN regression: <short>`

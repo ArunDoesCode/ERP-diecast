@@ -33,14 +33,17 @@ gates, findings counts, `lastGreen`, `parked`, `failures` in `state.json` the mo
    `git worktree add .claude/worktrees/<id> -b feature/<id> origin/<base>` and EnterWorktree. Session already
    sits in its own fresh worktree → stay there, `git switch -c feature/<id> origin/<base>`. `--resume`:
    re-enter the existing one — [resume-after-crash](../../../docs/runbooks/resume-after-crash.md). Never `main`.
-4. State: `.claude/pipeline/state.sh init <id> <module> <feature|sub> feature/<id> <base>`, then fill `spec`
-   (+ `epic`, `envFile`). On `--resume` read it and continue from `phase` — never re-plan or re-explore.
+4. State: `.claude/pipeline/state.sh init <id> <module> <feature|sub> feature/<id> <base>`, then fill `spec`,
+   `assumptions.file` (+ `epic`). No `backend/.env` in the worktree → `envFile` = `<main checkout>/backend/.env`;
+   never read or copy it, run `bun --env-file=<envFile> run …` / `test`. No env file there either → hard
+   stop (missing secret). On `--resume` read the state and continue from `phase` — never re-plan or re-explore.
 5. Infra: `cd backend && docker compose up -d && bun run db:test:prepare`. Trouble →
    [docker-or-port-problem](../../../docs/runbooks/docker-or-port-problem.md),
    [test-db-reset](../../../docs/runbooks/test-db-reset.md). Code index:
    `[ -d .codegraph ] && codegraph sync || codegraph init -i`; sync again after each slice commit.
-6. Design gate: no `frontend/e2e/` or no `.claude/skills/design-system/` → set gates `design` and
-   `screenshots` to `skipped`, note "design-reviewer not active yet".
+6. Design gate (the one rule: PROTOCOL → Efficiency): no `frontend/e2e/` or no
+   `frontend/.claude/skills/design-system/SKILL.md` → set gates `design` and `screenshots` to `skipped`,
+   note "design-reviewer not active yet".
 7. Baseline: **test-runner** `mode: baseline` → `reports/00-test-runner-baseline.md`. Red on the base is
    not this run's work: note it for the hand-over ("red before this run").
 
@@ -52,9 +55,9 @@ Load yourself (no exploring): `docs/STATUS.md`, the spec (new layout: `spec.md` 
 2. Write `plan.md`: slices in order (2–6 BRs each, demo-able, independent enough to park one), per slice
    backend/frontend work, files, tests. Copy the slices into `state.json.slices`.
 3. Anything the spec leaves open → [spec-gap-mid-build](../../../docs/runbooks/spec-gap-mid-build.md):
-   spawn **researcher** (brief: the question, the module, "how do ERPNext / Odoo / SAP B1 handle it";
-   it writes `docs/research/<id>-gaps.md`), follow the benchmark, append the row to the assumptions file,
-   add the rule to the spec changelog, go on. No question to the owner.
+   spawn **researcher** in gap mode (the question verbatim + the spec path; it appends to the module's
+   research file → Follow-ups), follow the benchmark, append the row to the assumptions file, add the
+   rule to the spec changelog, go on. No question to the owner.
 
 ## Phase 2 — Build (`phase: build`, per slice in plan order)
 Test independence (PROTOCOL) holds: you write neither tests nor production code.
@@ -103,18 +106,21 @@ E. Round 3 not green, or one finding id open after 2 fixes → do NOT ask:
    - `docs/modules/<module>.md`: dev agents' "Map updates", gotchas from the fix loop, History row,
      `last_verified_commit`.
    - the spec: Implementation status (BR → done / parked #n + test file), changelog lines for assumptions.
-   - assumptions file, `docs/decisions.md`, `docs/research/<id>-gaps.md` if written.
+   - assumptions file, `docs/decisions.md`, the research file if it got a follow-up.
    - a cross-cutting convention that would have prevented a finding → one line in the package
      `CLAUDE.md` or matching skill (budgets: `docs/KNOWLEDGE.md`).
    - `docs/STATUS.md` (module row, Active pipelines) — the only STATUS edit of the run.
-   - `.pipeline/<id>/summary.md` from `.claude/pipeline/templates/RUN_RECORD.md`.
+   - `.pipeline/<id>/summary.md` from `.claude/pipeline/templates/RUN_RECORD.md`, and this run's row in
+     `docs/metrics/runs.md` (`.claude/pipeline/state.sh line`) — the worktree and its state are removed
+     after the merge, so the row is written now.
 3. Issues, once: one per backlog finding (`gh issue create`, labels `P1–P3` + type + `mod:<module>`);
    set the numbers in `findings.md`.
 4. `.pipeline/<id>/HANDOVER.md` from `.claude/pipeline/templates/HANDOVER.md` (≤ 40 lines).
 5. `git push -u origin feature/<id>`, then
    `gh pr create --base <base> --head feature/<id> --label agent-pipeline --title "<id>: <summary>"`
    with the body from `.claude/pipeline/templates/PR_BODY.md`. No question first. Save `pr` in `state.json`.
-6. CI: `gh pr checks <n> --watch`. Red → [ci-red](../../../docs/runbooks/ci-red.md) (findings `TEST-`,
+6. CI: `gh pr checks <n> --watch` (give up after 20 min: gate `ci` stays `pending`, say so in the
+   hand-over, go on). Red → [ci-red](../../../docs/runbooks/ci-red.md) (findings `TEST-`,
    Phase 3 loop, push). Green → gate `ci` green. Same job red after 2 fix pushes → park, per the runbook.
 7. Merge: base `main` → `pr.merge = "owner"`. Base `epic/*` → `/epic` §2 merges it.
 8. Final reply: 3 lines (what is ready, PR link, how many `confirm` questions and parked slices) + the
@@ -128,7 +134,7 @@ A run where every slice is parked still ends here, with a PR that carries the do
    Ignore anything starting with `🤖`.
 2. Classify each item: bug (behaviour ≠ spec) · spec change (behaviour = spec, owner wants different) ·
    answer to a `confirm` question · question · nit.
-   - `confirm` answered **yes** → mark the assumption confirmed. **No** → a normal change request for
+   - `confirm` answered **yes** → write `yes` in the row's Owner answer column. **No** → write `no`, then a normal change request for
      that rule only (`/freeze` change-request path, spec version bump); never a re-run of the feature.
    - spec change not needed for this milestone → issue, reply saying so.
 3. Record as `PR-` findings. Bug: regression test first by **test-writer** (zero-context brief: spec

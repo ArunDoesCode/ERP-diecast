@@ -39,32 +39,36 @@ Principle: **the owner reads decisions and pictures; agents read everything else
 8. **`OWNER.md` last, generated from the agent layer** — exact shape and 60-line limit in
    `docs/specs/_template/OWNER.md`. The worked example uses the same numbers as the spec's Summary.
    Each card is self-contained: no links, no rule ids; an effect on another module is restated in one
-   line inside the card. Counts in "Decided for you" come from edge-cases.md and assumptions.md.
+   line inside the card. "Decided for you — please confirm" lists every spec-phase assumption tagged
+   `confirm`, one plain line each; the counts under it come from edge-cases.md and assumptions.md.
 9. **Report** ≤ 5 lines: rules, edge cases, cards, assumptions (confirm / info), next step.
 
 ## What reaches the owner, what does not
 | Kind of question | Who decides |
 |---|---|
-| Changes money, stock, tax, or who is allowed to do something | owner card |
+| Changes money, stock, tax, or who is allowed to do something — and the benchmark ERPs disagree, or die-casting differs | owner card |
+| Changes money, stock, tax, or who is allowed to do something — and ERPNext, Odoo and SAP all agree | benchmark decides: assumption tagged `confirm` **and** one line, by name, in `OWNER.md` → "Decided for you — please confirm" |
 | Changes what a factory user sees or must do | owner card |
 | Mature ERPs disagree with each other, or die-casting differs from the benchmark | owner card |
 | Everything else (validation limits, pagination, error codes, naming, indexes, endpoint shape) | agent, by benchmark + standards, logged in `assumptions.md` |
 
 - Agent decisions follow what ERPNext / Odoo / SAP do (stricter one if they differ). Record the choice
   and the source; never give the owner a survey of options.
-- A side case of a main choice (not the main choice itself) where all products agree is not a card,
-  even if it touches stock: it is an edge case with source `benchmark` + an assumption tagged `confirm`.
+- Nothing that changes money, stock, tax or permissions is decided silently: it is a card, or a named
+  line the owner can say "no" to. A "no" turns the line into a card.
 - **More than 7 cards = the feature is too big.** Split it into two modules (two spec folders) along
   the Flow, and say so in the report. Never drop or merge cards to fit.
 
 ## Flat specs (existing `docs/specs/<module>.md`)
 Not migrated. Edit the file in place with its own section names; owner questions stay in its
 "Questions for you" table (max 7); agent choices go to `docs/specs/<module>.assumptions.md`
-(same table as `docs/specs/_template/assumptions.md`). No OWNER.md, no design folder.
+(same table as `docs/specs/_template/assumptions.md`). No OWNER.md, no design folder: a `confirm` row
+is asked in "Questions for you" as a yes / no line.
 
 ## Rules for you
-- Never mark a spec `frozen` — only `/freeze` does. Never edit `design/data.md`, `api.md`, `screens.md`;
-  send the designer a question through the coordinator instead.
+- Never mark a spec `frozen` — only `/freeze` does. Never edit `design/data.md`, `api.md`, `screens.md`
+  (one exception: emptying their "Choices made" tables after you moved the rows in step 7); send the
+  designer a question through the coordinator instead.
 - Don't invent scope: what the brief does not ask for goes under "Not now".
 - If a sentence doesn't decide behaviour, cut it. Code gaps and history go in the module map.
 - Code lookup: one `codegraph_explore` per question. See PROTOCOL → Code lookup.

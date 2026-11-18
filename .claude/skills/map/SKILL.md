@@ -13,6 +13,8 @@ model: sonnet
 1. Spawn **explorer** (Haiku) with a brief: produce the content for every section of
    `docs/modules/_template.md` for `<module>` (codegraph first, symbol names, no line numbers).
 2. Write `docs/modules/<module>.md` from the template with `last_verified_commit: <git rev-parse --short HEAD>`.
+   Header `spec:` = `docs/specs/<module>/spec.md` (spec folder) or the flat `docs/specs/<module>.md` —
+   whichever exists.
 3. Add the module row to `docs/STATUS.md`.
 
 ## Refresh (`/map <module>` on an existing map, or every stale map with `--stale`)

@@ -6,6 +6,7 @@
 
 ## Built
 - <what the user can now do, one line per slice> (BR-…)
+<!-- Epic: one line per sub-feature instead — what the user can now do · merged / waiting / parked · PR. This is the split. -->
 
 ## Parked (not built — one issue each)
 - <slice, one line why> → <issue url>

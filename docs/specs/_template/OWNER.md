@@ -43,8 +43,13 @@ Max 7 cards. More than 7 = the feature is too big and gets split.
 - **Cost:** …
 - **Your answer:**
 
-## 5. Decided for you
-<N> edge cases decided by ERP benchmark, <M> technical choices logged. Nothing here needs your reading.
+## 5. Decided for you — please confirm
+Cases that change money, stock, tax or who may do what, where ERPNext, Odoo and SAP all do the same.
+One plain line each. Say "no" to a line and it becomes a card.
+- Receiving more than was ordered is refused.
+- <one line per such case>
+
+Everything else: <N> edge cases decided by ERP benchmark, <M> technical choices logged. No reading needed.
 
 ## 6. Not included
 - … (max 5 lines)

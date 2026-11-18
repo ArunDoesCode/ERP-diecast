@@ -23,7 +23,7 @@ You (main session) run the steps; subagents cannot spawn each other. Briefs to a
 ## Folder path
 | Step | Who | Writes | Needs |
 |---|---|---|---|
-| 1 | — | — | `docs/briefs/<feature>.md` with `status: agreed`. Missing → stop, suggest `/brief <feature>` |
+| 1 | — | — | The brief whose header says `module: <module>` (`grep -l '^module: <module>' docs/briefs/*.md`; its file name is `<feature>`), with `status: agreed`. Missing → stop, suggest `/brief <module>` |
 | 2 | researcher | `docs/research/<feature>.md` | Missing → run it as in `/research`. Present → reuse |
 | 3 | spec-analyst, pass 1 | `spec.md` (draft) | interview: max 3 questions at a time, letter answers |
 | 4 | solution-designer ∥ ui-ux-designer (one message, two Agent calls) | `design/data.md`, `design/api.md` ∥ `design/screens.md` + pictures | `spec.md` |

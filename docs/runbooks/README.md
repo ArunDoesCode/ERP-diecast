@@ -19,9 +19,8 @@ For pipeline agents in an unattended run (first) and the owner (second). One pag
 
 ## Rules that hold in every runbook
 - **Never wait for the owner** unless it is a hard stop.
-- **Hard stops (the only ones):** a destructive or irreversible action · a guardrail hook or deny rule
-  blocks the run · a domain invariant would break (money in paise, stock only through the ledger,
-  audit trail) · a needed secret or access is missing.
+- **Hard stops:** only the four listed in `.claude/pipeline/PROTOCOL.md` → Never-wait build policy. On one:
+  write `HANDOVER.md`, phase `handover`, print a line starting `HARD STOP:`, stop.
 - **Second failure of the same kind = park** the slice ([park-a-slice.md](park-a-slice.md)) and go on.
 - **Only the coordinator** parks, opens issues, edits `state.json` and talks to GitHub. A subagent that
   hits one of these cases returns `FAILED` or `BLOCKED` with the runbook name in `NEXT:`.
@@ -33,7 +32,7 @@ For pipeline agents in an unattended run (first) and the owner (second). One pag
 |---|---|
 | `<id>` | run id = folder name `.pipeline/<id>/` (local to the worktree, not in git; only `summary.md` is committed) |
 | `state.json` | the run's state; fields in `.claude/pipeline/state.schema.json` (`phase`, `currentSlice`, `fixRounds`, `lastGreen`, `parked`, `failures`, `gates`, `pr`). Update with `.claude/pipeline/state.sh` |
-| Assumptions file | `docs/specs/<module>/assumptions.md`, or `docs/specs/<module>.assumptions.md` for a flat spec |
+| Assumptions file | `docs/specs/<module>/assumptions.md`, or `docs/specs/<module>.assumptions.md` for a flat spec. Columns: `docs/specs/_template/assumptions.md` |
 | Hand-over | `.pipeline/<id>/HANDOVER.md` from `.claude/pipeline/templates/HANDOVER.md`; also the top of the PR body |
 | Last green | `state.json` → `lastGreen`: newest commit where typecheck, lint, tests and contract check all passed |
 | Park | revert one slice to last green, open an issue with the evidence, continue with the rest |

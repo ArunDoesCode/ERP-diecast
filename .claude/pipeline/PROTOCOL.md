@@ -8,6 +8,7 @@ How the coordinator and subagents work together. Every pipeline agent reads this
 - **Subagents**: explorer, test-runner (haiku) · backend-dev, frontend-dev, test-writer, researcher,
   code-reviewer, security-auditor, performance-auditor, spec-reviewer, design-reviewer (sonnet). They cannot
   spawn agents and never talk to each other: everything goes through the coordinator and the run folder.
+  Spec-time agents (spec-analyst, solution-designer, ui-ux-designer) are run by `/spec` and `/freeze`, not by a build.
 - Backend ↔ frontend share one artefact: the **API contract** (descriptors in
   `backend/src/routes/end-points.ts` + generated `backend/.contracts/api-manifest.json` + the run's
   `contract.md`). Frontend never reads backend source to guess shapes.
@@ -15,6 +16,8 @@ How the coordinator and subagents work together. Every pipeline agent reads this
 ## Git model
 One branch + one worktree per run: `feature/<id>` in `.claude/worktrees/<id>`, cut from the base (`main`, or
 `epic/<name>` for a sub-feature). One small PR into the base, label `agent-pipeline`.
+- Worktrees always sit under the **main checkout** (first line of `git worktree list`), never inside
+  another worktree — also for sub-features of an epic.
 - Push to `feature/*` / `epic/*` and `gh pr create` are automatic. Never commit or push to `main`.
 - Sub-feature PR → epic branch: merged by the pipeline when every gate is green (`/epic` §2).
   Feature / epic PR → `main`: the owner merges.
@@ -24,7 +27,9 @@ One branch + one worktree per run: `feature/<id>` in `.claude/worktrees/<id>`, c
 New: `docs/specs/<module>/spec.md` (+ `OWNER.md`, `design/{data,api,screens,edge-cases}.md`,
 `assumptions.md`). Old, still valid: `docs/specs/<module>.md` (assumptions in
 `docs/specs/<module>.assumptions.md`). "The spec" = whichever exists. Frozen = `status: frozen`.
-Assumption row: `| A-NN | date | BR or area | question | what we chose | source | confirm / info |`.
+Assumptions file = `assumptions.md` in the spec folder, or `docs/specs/<module>.assumptions.md` for a flat
+spec (create it from the template on first use). Columns and tag rules: only in
+`docs/specs/_template/assumptions.md` — copy its header, never invent another shape.
 
 ## Run folder: `.pipeline/<id>/` (local to the worktree, gitignored)
 Only `summary.md` is committed (once, in the run's `docs(<id>)` commit). `NN` = `state.json.nextSeq`.
@@ -73,7 +78,8 @@ After `/freeze` the run goes to the end without the owner.
 
 **Hard stops (the only ones):** a destructive or irreversible action · a guardrail hook or deny rule
 blocks the run · a domain invariant would break (money in paise, stock only through the ledger, audit
-trail) · a needed secret or access is missing. On a hard stop: write `HANDOVER.md`, phase `handover`, stop.
+trail) · a needed secret or access is missing. On a hard stop: write `HANDOVER.md`, phase `handover`, print
+one line starting `HARD STOP:` with the reason (the `/goal` judge ends the run on it), then the gate table, stop.
 Everything the run decided alone is shown once, at the end, in the hand-over (`templates/HANDOVER.md`).
 
 ## Brief format (coordinator → agent)
@@ -96,7 +102,8 @@ Write your report to: .pipeline/<id>/reports/NN-<agent>.md
 ```
 Used for every subagent call. No filled Scope block → do not send. **Pointers, not pasted text:** a brief
 names files, sections and ids; it never copies spec text, code, reports or findings. Work outside scope is
-reported under QUESTIONS, never done.
+reported under QUESTIONS, never done. Exception: **researcher** (gap mode) gets a three-line prompt — mode
+`gap`, the question verbatim, the spec path — writes no report file and returns its own short block.
 
 ## Return format (agent → coordinator)
 Write the full report file, then return **only** this block:
@@ -167,14 +174,15 @@ Tests are the spec turned into code. They must not be shaped by the implementati
 - **Developers run only their slice**: `bun test <the test files named in the brief>` plus their package's
   typecheck and lint. Never the whole suite.
 - **Reviewers do not run tests.** code-reviewer reads only the review checklist of the package the diff
-  touches. design-reviewer runs only when `frontend/e2e/` and the `design-system` skill exist; otherwise
-  gates `design` and `screenshots` = `skipped` with that note.
+  touches. **design-reviewer is active only when** `frontend/e2e/` exists **and** `frontend/.claude/skills/design-system/SKILL.md` exists;
+  otherwise gates `design` and `screenshots` = `skipped`, note "design-reviewer not active yet". This is the
+  one activation rule — agents and skills point here.
 - **Fix rounds re-review the fix diff only** (spec-reviewer: full diff), again with test-runner in parallel.
 - **Docs once per run:** map, spec status + changelog, assumptions, decisions, `docs/STATUS.md`,
   `summary.md` go in one `docs(<id>)` commit at hand-over (earlier only when a park needs a clean tree).
   Issues are opened once, at hand-over — except the issue a park needs.
 
-**Loop limit:** max **3** fix rounds. Same finding id open after 2 fixes, or round 3 not green → park.
+**Loop limit:** max **3** fix rounds (`state.sh phase fix` refuses a 4th). Same finding id open after 2 fixes, or round 3 not green → park.
 Never a 4th round, never a silent loop, never a wait for the owner.
 
 ## Code lookup (CodeGraph)

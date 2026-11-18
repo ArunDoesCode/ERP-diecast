@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Pipeline run state helper. Schema: .claude/pipeline/state.schema.json. Rules: PROTOCOL.md -> Run state.
 #   state.sh now                                        UTC timestamp
-#   state.sh init <id> <module> <mode> <branch> <base>  create .pipeline/<id>/state.json (phase preflight)
+#   state.sh init <id> <module> <mode> <branch> <base>  create .pipeline/<id>/state.json (phase preflight);
+#                                                       mode = feature | sub | bug | epic (spec-gate.sh reads module + mode)
 #   state.sh phase <name>                               close the open phase, open <name>
 #   state.sh call <agent> <slice|-> <DONE|BLOCKED|FAILED> <startISO> [tokens]   append one agent call
 #   state.sh gates                                      gate table (end of every /feature and /epic turn)
@@ -54,6 +55,8 @@ case "$cmd" in
 
   init)
     [ $# -eq 5 ] || { echo "usage: state.sh init <id> <module> <mode> <branch> <base>" >&2; exit 1; }
+    case "$3" in feature | sub | bug | epic) ;; *) echo "state.sh: mode must be feature|sub|bug|epic, got $3" >&2; exit 1 ;; esac
+    case "$4" in feature/* | epic/*) ;; *) echo "state.sh: branch must be feature/* or epic/*, got $4" >&2; exit 1 ;; esac
     f="$root/.pipeline/$1/state.json"
     [ -e "$f" ] && { echo "state.sh: $f exists - resume, do not init" >&2; exit 1; }
     mkdir -p "$(dirname "$f")"
@@ -72,6 +75,10 @@ case "$cmd" in
     [ $# -eq 1 ] || { echo "usage: state.sh phase <preflight|plan|build|review|fix|handover|done>" >&2; exit 1; }
     case "$1" in preflight | plan | build | review | fix | handover | done) ;; *) echo "state.sh: unknown phase $1" >&2; exit 1 ;; esac
     f=$(find_state)
+    if [ "$1" = "fix" ] && [ "$(jq -r 'if .phase != "fix" and (.fixRounds // 0) >= 3 then "stop" else "ok" end' "$f")" = "stop" ]; then
+      echo "state.sh: fix round 3 is used up - no 4th round. Park the slice (docs/runbooks/park-a-slice.md), set fixRounds to 0." >&2
+      exit 1
+    fi
     update "$f" --arg p "$1" --arg now "$(now)" '
       (if .phase != $p and .phases[.phase] != null then .phases[.phase].end = $now else . end)
       | .phases[$p] = { start: (.phases[$p].start // $now), end: null,

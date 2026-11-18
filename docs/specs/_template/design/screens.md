@@ -1,7 +1,8 @@
 # <Module> — screens
 
 > Written by ui-ux-designer from `../spec.md` and `api.md`. Checked by design-reviewer before freeze.
-> Patterns, components and tokens come from the `design-system` skill — never invented here. Max 200 lines.
+> Patterns, components and tokens come from the `design-system` skill
+> (`frontend/.claude/skills/design-system/SKILL.md`) — never invented here. Max 200 lines.
 
 ## Screen list
 | Screen | Route | Pattern | Picture |

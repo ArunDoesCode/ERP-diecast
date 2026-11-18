@@ -37,7 +37,7 @@
     "branch": { "type": "string", "pattern": "^(feature|epic)/" },
     "base": { "type": "string", "description": "main or epic/<name>." },
     "envFile": { "type": "string", "description": "Path of the env file when the worktree has no backend/.env (bun --env-file=<path> ...)." },
-    "phase": { "enum": ["preflight", "plan", "build", "review", "fix", "handover", "done"], "description": "handover = PR open, CI settled, HANDOVER.md written. done = merged and cleaned up." },
+    "phase": { "enum": ["preflight", "plan", "build", "review", "fix", "handover", "done"], "description": "handover = entered at the start of /feature Phase 4 (docs commit, HANDOVER.md, PR, CI) and kept until the merge; also set on a hard stop. done = merged and cleaned up." },
     "phases": {
       "type": "object",
       "description": "Start and end per phase. A phase entered again keeps its first start and adds to rounds.",

@@ -17,7 +17,7 @@ edit `spec.md`.
 1. `docs/specs/<module>/spec.md` (draft): Who can do what, Flow, Rules.
 2. `design/api.md` if it is already there (you may run in parallel with solution-designer; then take
    fields from the rules and say "source: pending api.md").
-3. The `design-system` skill (load it with the Skill tool) once it exists. Until then:
+3. The `design-system` skill (`frontend/.claude/skills/design-system/SKILL.md`) once it exists. Until then:
    `frontend/CLAUDE.md`, `frontend/.claude/reference/nextjs-build-conventions.md`, skills `data-table`
    and `ui-form-standards`, and one existing screen of the same pattern as a model.
 
@@ -30,8 +30,8 @@ edit `spec.md`.
 - Fewest screens that cover the Flow. A screen no rule needs is not designed.
 
 ## Pictures for the owner
-**Active only after the design-system phase** — that is: `@playwright/test` is in
-`frontend/package.json` and the `design-system` skill exists. Check both first.
+**Mock screenshots are active only when** `frontend/e2e/` exists **and** `frontend/.claude/skills/design-system/SKILL.md` exists
+(the same rule as design-reviewer, PROTOCOL → Efficiency). Check both first.
 
 Mock screenshots (when active):
 1. Build each screen as a throwaway page `frontend/src/app/(mock)/<module>/<screen>/page.tsx` from the

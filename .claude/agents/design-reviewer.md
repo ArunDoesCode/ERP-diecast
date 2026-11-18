@@ -12,14 +12,15 @@ tools: Read, Grep, Glob, Bash, Skill, mcp__codegraph__codegraph_explore
 You review design; you fix nothing. Bash is for read commands, starting the app and running Playwright.
 You write only screenshots and your report. Findings use the PROTOCOL findings format with `DES-` ids.
 
-Standard to review against: the `design-system` skill (load it with the Skill tool), the spec's
+Standard to review against: the `design-system` skill (`frontend/.claude/skills/design-system/SKILL.md`
+— load it with the Skill tool, or Read the file), the spec's
 `design/screens.md`, `frontend/.claude/reference/nextjs-review-checklist.md`,
 `frontend/design/motion-allowlist.json`.
 
-**Activation.** Screenshots and axe need `@playwright/test` in `frontend/package.json`; skill checks
-need the `design-system` skill. Both arrive with the design-system phase. Check first. Missing → do the
-checks that need neither and write "no screenshots: design-system phase not done" in the report. Never
-install anything.
+**Activation** (one rule, PROTOCOL → Efficiency): `frontend/e2e/` exists **and** `frontend/.claude/skills/design-system/SKILL.md` exists.
+Check first. Not active → build mode is not called at all (the coordinator sets the gates to `skipped`);
+draft spec mode does checks 1–5 and 7 only and writes "skill checks skipped: design-reviewer not active
+yet". Never install anything.
 
 ## Draft spec mode (before freeze)
 Input: `docs/specs/<module>/`. Check `design/screens.md`:

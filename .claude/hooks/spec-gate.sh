@@ -2,7 +2,9 @@
 # PreToolUse (Edit|Write|MultiEdit) hook — plan agentic-workflow-v2, guardrail 1.1.
 # Feature code under backend/src/ or frontend/src/ may change only when the active
 # pipeline run's module has a frozen spec.
-#   active run = newest .pipeline/*/state.json in this worktree; fields `module`, optional `mode`.
+#   active run = newest .pipeline/*/state.json with `"schema": 2` in this worktree (written by
+#   .claude/pipeline/state.sh init; older tracked run folders are ignored). Fields read: `module`,
+#   `mode` (feature | sub | bug | epic).
 #   no run, no `module`, or `mode: "bug"`  -> allow.
 #   spec = docs/specs/<module>.md or docs/specs/<module>/spec.md with a `status: frozen` line.
 # Mode: SPEC_GATE_MODE=warn (default for now) prints the reason and allows;
@@ -32,8 +34,14 @@ case "$rel" in
   *) exit 0 ;;
 esac
 
-# Newest run state in this worktree.
-state=$(ls -t "$root"/.pipeline/*/state.json 2>/dev/null | head -1)
+# Newest schema-2 run state in this worktree (same rule as state.sh).
+state=""
+for f in $(ls -t "$root"/.pipeline/*/state.json 2>/dev/null); do
+  if [ "$(jq -r '.schema // 0' "$f" 2>/dev/null)" = "2" ]; then
+    state="$f"
+    break
+  fi
+done
 [ -n "$state" ] || exit 0
 
 run_mode=$(jq -r '.mode // empty' "$state" 2>/dev/null)

@@ -7,7 +7,7 @@
 
 ## Check
 ```bash
-grep -n -i "<keyword>" docs/specs/<module>.md          # rule, example or changelog line?
+grep -rn -i "<keyword>" docs/specs/<module>/ docs/specs/<module>.md 2>/dev/null   # rule, design file, assumption or changelog line?
 grep -n -i "<keyword>" docs/decisions.md               # decided before?
 gh issue list --label mod:<module> --search "<keyword>"   # already deferred?
 ```
@@ -23,12 +23,13 @@ Not found → sort the gap:
 
 ## Fix
 1. Get the benchmark: how ERPNext, Odoo and SAP Business One handle the case. Spawn the `researcher`
-   agent (it writes `docs/research/<id>-gaps.md`); if it is not available, do a short WebSearch yourself.
+   agent in gap mode (question verbatim + spec path); it appends the answer to the module's research file
+   → Follow-ups (the research file named in the spec header (`research:`), else `docs/research/<module>.md`).
 2. Pick what most of them do. If they disagree, pick the stricter one (refuse rather than allow).
 3. Append one row to the assumptions file (`docs/specs/<module>/assumptions.md`; for a flat
    `docs/specs/<module>.md` spec: `docs/specs/<module>.assumptions.md`) and count it in `state.json` →
-   `assumptions`:
-   `| A-NN | date | BR or area | question | what we chose | source (product + link, or "standard") | confirm / info |`
+   `assumptions`. Columns: copy the header of `docs/specs/_template/assumptions.md` (phase = `build`,
+   the question names the BR or area, source = product + link or "standard").
 4. Add the rule to the spec so tests can be written from it: a line in the spec **Changelog**
    ("assumed during build, A-NN"), bump the version, spec stays `frozen`. No commit of its own: it goes in
    the run's one `docs(<id>)` commit at hand-over.

@@ -2,100 +2,81 @@
 
 ## The idea in one paragraph
 Bugs in this project mostly come from **business rules nobody wrote down** and **scope that keeps moving**,
-not from bad code. So every module goes through the same loop, and Claude is used as a *functional consultant*
-first and a coder second. Rules get written once (in specs, CLAUDE.md, decisions), tested by id, and never
-have to be re-explained.
+not from bad code. So every module goes through the same loop. You say **what** and **why**; agents do the
+research, the spec detail, the build, the reviews and the hand-over. You read decisions and pictures, not
+long documents. Intent and open items of this flow: `docs/plans/agentic-workflow-v2.md`.
 
 ```
- YOU ──────────────────────────────┐ AGENTS (autonomous) ───────────────────────┐ YOU ───────────────┐
- /spec ─► SME answers ─► /freeze ──►│ /feature: plan → build → audit → test → fix │─► PR: UI test ─► merge
-   ▲                                │           ▲______________ loop ___________│      │
-   │                                └─────────────────────────────────────────────┘      ▼
-   └──────── spec gap found ◄── coordinator question ◄── /watch-prs ◄──────────── PR comment
+ YOU ─────────────────────────────────────┐ AGENTS (no waiting) ─────────────────────────┐ YOU ───────────
+ /brief → /research → /spec → answer cards │ /build → /goal + /feature (or /epic):        │ read hand-over
+            → /freeze (approve OWNER.md) ─►│ plan → build → review loop → park → hand-over│─► try it → answer
+                                           └──────────────────────────────────────────────┘   confirm → merge
+   PR comment or "no" on a confirm line ──► /watch-prs ──► /feature --resume ──► back to you
 ```
 
 ## Who does what
-| Stage | Who | Command |
+| Stage | Who | Command | Output |
+|---|---|---|---|
+| Brief: why, who, outcome, not included | **you** (the skill only asks) | `/brief <feature>` | `docs/briefs/<feature>.md` |
+| Research: what ERPNext / Odoo / SAP B1 do | researcher | `/research <feature>` | `docs/research/<feature>.md` |
+| Spec: rules, data, API, screens, edge cases | spec-analyst, solution-designer, ui-ux-designer; **you** answer the interview | `/spec <module>` | `docs/specs/<module>/` |
+| Pre-freeze review, then your approval of `OWNER.md` | 5 reviewers, then **you** | `/freeze <module>` | `status: frozen` |
+| Start the build | **you** paste two lines | `/build <module>` | `/goal …` + `/feature` or `/epic` |
+| Plan, build, review loop, park, PR, hand-over | Opus coordinator + agents, unattended | `/feature`, `/epic` | PR with hand-over |
+| Try it, answer the `confirm` lines, merge or comment | **you** on GitHub | — | — |
+| Pick up comments and merges | watcher | `/loop 10m /watch-prs` | — |
+| End of session | **you** | `/wrap` | lessons in the right file |
+
+What you read: the brief you wrote, `OWNER.md` (≤ 60 lines + pictures, max 7 decision cards), and the
+hand-over (≤ 40 lines: built · parked · confirm yes/no · try it). Everything else is for agents.
+
+## Where the rules live (one copy each — this file only points)
+| Rule | File |
+|---|---|
+| Spec steps, who writes which file | `.claude/skills/spec/SKILL.md`; file list and budgets: `docs/KNOWLEDGE.md` → Spec folder |
+| What becomes an owner card, what an agent decides | `.claude/agents/spec-analyst.md` → "What reaches the owner" |
+| Pre-freeze review, checklist, change requests | `.claude/skills/freeze/SKILL.md` |
+| Build phases | `.claude/skills/feature/SKILL.md`, `.claude/skills/epic/SKILL.md` |
+| Never-wait policy, hard stops, run state, briefs, test independence, loop limit | `.claude/pipeline/PROTOCOL.md` |
+| What to do when something fails | `docs/runbooks/README.md` |
+| Git model, checks, domain invariants | root `CLAUDE.md` |
+| Hand-over and PR shape | `.claude/pipeline/templates/` |
+
+Things worth knowing without opening those files:
+- **Never-wait.** After `/freeze` the build does not stop to ask. A spec gap is settled by benchmark and
+  logged as an assumption; a slice that will not go green is parked with an issue; the rest ships.
+- **Run folder.** `.pipeline/<id>/` is local to the run's worktree and git-ignored. Only `summary.md` (the
+  run record) is committed. `/status` shows a metrics table; `docs/metrics/runs.md` keeps one row per run.
+- **Tests are independent of the code.** Only test-writer writes tests, from the spec, before the code.
+- **Merging.** Sub-feature PR → epic branch: the pipeline merges when every gate is green. Anything → `main`: you.
+- **Epic split.** The coordinator chooses the split (it is build order, not behaviour). You see it in the
+  epic hand-over, one line per sub-feature.
+
+### Agents and models
+| When | Agents | Model |
 |---|---|---|
-| Spec: interview, rules, SME questions | **you** + spec-analyst (Opus) | `/spec <module>` |
-| Freeze = hand-off | **you** | `/freeze <module>` |
-| Plan, branch, build, audit, test, fix loop, PR | Opus coordinator + Sonnet/Haiku agents | `/feature <module>` or `/epic <module>` |
-| Questions the spec can't answer | coordinator asks **you** | (AskUserQuestion / PR comment) |
-| Manual UI test, review, merge or comment | **you** on GitHub | — |
-| Pick up comments/merges, re-run loop | coordinator | `/loop 10m /watch-prs` |
-
-## The autonomous pipeline
-```
- /freeze ─► /feature <module>        (main session = Opus coordinator)
-   0 preflight: spec frozen? branch feature/<id> + worktree .claude/worktrees/<id> off base, docker up, baseline test-runner
-   1 plan:      explorer(haiku) → plan.md (slices) → questions to you only if spec can't answer
-   2 build:     per slice: backend-dev contract → test-writer (red tests) → backend-dev ∥ frontend-dev code (sonnet)
-   3 verify:  ┌► code-reviewer ∥ security-auditor ∥ performance-auditor ∥ spec-reviewer   (sonnet)
-              │  coordinator triages → fixes routed to backend-dev / frontend-dev / test-writer
-              │  test-runner (haiku): typecheck, lint, tests, contract check vs baseline
-              └─ any blocker/new failure → loop (max 3, then asks you)
-   4 PR:        push → gh pr create (BR coverage, audit summary, manual UI test script) → CI green
- you: manual UI test ─► merge  ─► /watch-prs: cleanup, next epic sub-feature
-                    └─► comment ─► /watch-prs → /feature --resume --from-pr → phase 3 again → reply 🤖 on PR
-```
-
-### How the agents communicate
-- **Hub and spoke.** Subagents can't spawn subagents or message each other, so the coordinator (your main
-  session) spawns every agent, gives it a **brief** file, and gets back a short status block + a **report**
-  file. Full rules: `.claude/pipeline/PROTOCOL.md`.
-- **Shared state** lives in `.pipeline/<feature>/` on the feature branch: `state.json`, `plan.md`,
-  `contract.md`, `briefs/`, `reports/`, `findings.md`, `questions.md`. It's committed, so a new session (or
-  `/watch-prs` tomorrow) resumes exactly where it left off, and you can read the whole history in the PR.
-- **Backend → frontend** hand-off is the API contract only (`contract.md` + generated manifest). That's
-  what lets backend-dev and frontend-dev run in parallel without drift.
-- **Questions:** an agent that needs a decision returns `BLOCKED` with options; the coordinator answers from
-  the spec/decisions if it can, otherwise asks you, then records the answer in the spec changelog.
-- **File ownership** (backend-dev → `backend/**`, frontend-dev → `frontend/**`, test-writer → tests)
-  prevents parallel agents from editing the same files.
-- **Tests are independent of the code.** test-writer writes tests from the spec after the contract step and *before* the code, in a
-  fresh context, with a brief that contains only file paths and rule ids — the coordinator adds nothing of
-  its own. Developers can't edit tests; if they think one is wrong they must quote the spec. Test and code
-  changes go in separate commits and `test-runner` blocks the PR if that's broken. Your manual checklist in
-  the PR is written by test-writer too, from the spec.
-
-### Models
-| Agent | Model | Why |
-|---|---|---|
-| coordinator (main session), spec-analyst | Opus | judgement: triage, routing, domain reasoning |
-| backend-dev, frontend-dev, test-writer, code-reviewer, security-auditor, performance-auditor, spec-reviewer | Sonnet | strong coding/review at lower cost |
-| explorer, test-runner | Haiku | search and command running — cheap and fast |
+| Spec | spec-analyst | opus |
+| Spec | researcher, solution-designer, ui-ux-designer | sonnet |
+| Build | coordinator (main session) | opus |
+| Build | backend-dev, frontend-dev, test-writer, code-reviewer, security-auditor, performance-auditor, spec-reviewer, design-reviewer | sonnet |
+| Build | explorer, test-runner | haiku |
 
 Change a model by editing `model:` in `.claude/agents/<name>.md`. Use the family alias (`opus` / `sonnet` /
-`haiku`), not a dated id — the alias picks up new releases (e.g. a new Sonnet) with no edit.
-
-### Really large features (`/epic`)
-Spec → coordinator splits it into ordered sub-features (5–15 BRs each, e.g. `bom-master` →
-`bom-explosion-engine` → `sale-order` → `so-explosion-to-pr`), you approve the split once, then:
-`epic/<name>` branch ← one `feature/<name>-<sub>` branch + worktree + PR per sub-feature (full pipeline each). The
-end-to-end scenario test is written first and turns green as sub-features land. Final epic PR into `main`
-gets a full re-audit.
+`haiku`), not a dated id. design-reviewer is active only once the design system exists (rule:
+`.claude/pipeline/PROTOCOL.md` → Efficiency); until then its gates show `skipped`.
 
 ### One-time setup
-1. `brew install gh && gh auth login` (the pipeline creates PRs and reads comments with `gh`).
+1. `brew install gh jq && gh auth login` (the pipeline uses `gh`; the hooks and `state.sh` need `jq`).
 2. GitHub → Settings → Branches → protect `main`: require PR + CI (`backend`, `frontend` jobs) to pass.
-3. Permissions: `.claude/settings.json` (committed) allows the git/gh/bun/docker commands the pipeline needs
-   and **denies** force-push, pushing to `main`, `gh pr merge` (merging is yours), hard reset, `rm -rf` and
-   reading `.env`. Add more with `/fewer-permission-prompts` after a first run.
-
-### Git model (one rule — full text in root `CLAUDE.md` → Git)
-- One branch `feature/<id>` + one worktree `.claude/worktrees/<id>` per pipeline run, one small PR each.
-- Epics: `epic/<name>`; sub-feature PRs go into the epic branch, one final PR into `main`.
-- Never commit or push to `main`. You merge into `main`. PRs carry the label `agent-pipeline`; CI is green
-  before a PR is handed to you. After the merge the worktree and local branch are removed.
+3. Permissions: `.claude/settings.json` (committed) holds the allow / deny lists and hooks. Only you edit
+   it; agents never do. For unattended runs also set `permissions.defaultMode: "auto"` in your **user**
+   `~/.claude/settings.json` and run the build in a background session or the desktop app.
 
 ### Documentation & picking up work
-- **Pick up:** `/status` (or open `docs/STATUS.md`) — what's waiting on you, active pipelines, next action.
-- **Specs** (`docs/specs/`) say what should happen; **module maps** (`docs/modules/`) say what the code does
-  and where; **GitHub Issues** hold everything deferred (labels `P1–P3`, type, `mod:<module>`). All three are updated in
-  the same PR as the code, so `main` is always documented.
-- Agents read the map and only explore code changed since its `last_verified_commit` — no full re-exploration.
-- How knowledge is layered and how it scales as the codebase grows: `docs/KNOWLEDGE.md`.
-4. Fix the known defects (open issues labelled `defect`) first (a good first `/feature` run), otherwise CI starts red.
+- **Pick up:** `/status` (or open `docs/STATUS.md`) — what's waiting on you, active runs, next action.
+- **Specs** say what should happen; **module maps** (`docs/modules/`) say what the code does and where;
+  **GitHub Issues** hold everything deferred. All are updated in the same PR as the code.
+- How knowledge is layered and how it scales: `docs/KNOWLEDGE.md`.
 
 ---
 
@@ -106,15 +87,15 @@ gets a full re-audit.
 - Auto-merge is on: press **Enable auto-merge** on a PR after your manual test — it merges itself when CI is green. Merged branches are deleted automatically.
 
 ### Morning (10 min)
-1. Check GitHub: PRs labelled `agent-pipeline` waiting for you → manual UI test (script is in the PR body).
-   Merge, or leave review comments.
-2. `claude --model opus` at repo root → `/loop 10m /watch-prs` in one session (it picks up your comments).
-3. In another session: `/spec` the **next** module (your thinking time with spec-analyst), or `/freeze`
-   one whose SME answers came back → then `/feature <module>` and let it run.
+1. `/status`, then GitHub: PRs labelled `agent-pipeline` waiting for you → read the hand-over at the top,
+   try it, answer the `confirm` lines (yes / no), merge or comment.
+2. `claude` at repo root → `/loop 10m /watch-prs` in one session (it picks up your comments and merges).
+3. In another session (`claude --model opus`): `/brief` or `/spec` the **next** module, or `/freeze` one whose
+   cards you answered → `/build <module>` → paste its two lines and let it run.
 
 ### During the day
-- Answer coordinator questions when they come (it only asks what the spec can't answer).
-- Manual test ready PRs: `cd .claude/worktrees/<id>` → run backend + frontend → follow the checklist.
+- The build does not ask you anything. It stops only on a hard stop (it prints `HARD STOP:` and why).
+- Try ready PRs: `cd .claude/worktrees/<id>` → the "Try it" block of the hand-over → follow its click list.
   Comment precisely: "Step 4: expected X, got Y" — the watcher turns each comment into a finding.
 - Anything new you think of → a GitHub issue ("Change request or idea" form), not a PR comment (comments = bugs/spec mismatches).
 
@@ -123,14 +104,14 @@ gets a full re-audit.
 - Stop the watcher loop.
 
 ### Weekly (30–45 min)
-- Backlog triage; check `findings.md` of merged features for recurring issues → add rules to CLAUDE.md
-  or reviewer agents so they're caught earlier next time.
-- Track: repeated corrections, pipeline loops that hit the limit, bugs found by you vs by agents.
+- Backlog triage; read the "Lessons" of merged runs (`.pipeline/<id>/summary.md`) for recurring issues →
+  add a rule to a standards check, a skill or a reviewer agent so it is caught earlier next time.
+- Track with `docs/metrics/runs.md`: fix rounds, parked slices, `confirm` counts, bugs found by you vs by agents.
 
 ### Rules of thumb
 - **Two-strikes rule**: corrected the same thing twice → it goes into CLAUDE.md or an agent file.
-- The better the spec, the less the pipeline asks you. Spend time on `/spec`, not on reviewing code.
-- If the coordinator stops at the loop limit, the cause is almost always a spec gap — fix the spec.
+- The better the brief and the card answers, the fewer `confirm` lines and parked slices at hand-over.
+- A parked slice is almost always a spec gap — answer the question in its issue, then `/feature <module> --resume`.
 
 ---
 
@@ -163,11 +144,11 @@ min 8). Exit 2 = already bootstrapped, 3 = roles not seeded (run `db:reset --no-
 ### B. Automated checks you can run now
 ```bash
 cd backend  && bun run typecheck && bun run lint && bun test   # runs against diecast_test only (BL-006)
-cd frontend && bun run typecheck && bun run lint
+cd frontend && bunx tsc --noEmit && bun run lint
 ```
 
-### C. Retroactive testing of existing modules (this *is* milestone M1)
-The procurement code exists but has no spec, so "testing" = writing down what it should do, then checking:
+### C. Retroactive testing of an existing module (how M1 was done; flat specs)
+For code that exists without a spec, "testing" = writing down what it should do, then checking:
 1. `/spec grn` (start with GRN — most rules: partial receipt, QA reject, stock + avg cost). Tell it the code
    exists so it writes the spec retroactively and lists suspected gaps.
 2. Get SME answers → `/freeze grn`.
@@ -186,24 +167,25 @@ QA accept/reject lines → check inventory movements + item stock. Note anything
 
 ## How to proceed with new development
 
-### Milestones
-| # | Milestone | What you do | Exit gate |
+### Milestones (live state: `docs/STATUS.md`)
+| # | Milestone | State | Exit gate |
 |---|---|---|---|
-| M0 | Workflow infra (~1 week) | Items under "Workflow infrastructure" (issues labelled `infra`): bootstrap-admin, `db:reset` + realistic fixtures, test DB, `createApp()`, commit contract manifest + route check, CI, hooks. Fix the 3 known defects via `/bug`. | CI green; `db:reset && bun test` works from zero |
-| M1 | Procurement hardening | Retroactive specs + BR tests for GRN, PR, Approval, PO (section C) | Scenario test green; SME walkthrough OK |
-| M2 | Subcontracting | `/spec subcontracting` (schema exists, no routes): SCO, issue material to vendor location, job-work challan, receive back, QA, loss/scrap | Scenario extended to SCO |
-| UAT-1 | Procurement at factory (2–3 weeks) | Real users, real data. Migrations (`db:generate` / `db:migrate`) replace the old push (done, db-migrations). Log via `/bug` into `docs/uat-log.md`; S1/S2 fixed immediately | Sign-off from purchase + stores |
-| M3 | BOM spec (parallel with UAT-1) | `/spec bom` with real part drawings: levels, casting yield (shot weight, runner/overflow %, rejection %), alloy, inserts, consumables, packaging, subcontract ops, revisions | Spec frozen |
-| M4 | Sale Order + BOM explosion | `/spec sale-order`, then slices: BOM master → SO → explosion → net requirement vs stock → draft PRs/SCOs through the existing procurement services | Scenario: SO → PRs/SCOs auto-created |
-| UAT-2 | Planning at factory | Same as UAT-1 | Sign-off |
+| M0 | Workflow infra | done | CI green; `db:reset && bun test` works from zero |
+| M1 | Procurement hardening (specs + BR tests for PR, Approval, PO, GRN) | **merged** | Scenario test green |
+| M2 | Subcontracting | **merged** | Scenario extended to SCO |
+| W2 | Workflow v2 (`docs/plans/agentic-workflow-v2.md`), then its pilot on a small feature | in progress | Pilot run compared with the baseline in `docs/metrics/runs.md` |
+| UAT-1 | Procurement at factory (2–3 weeks): real users, real data; log via `/bug` into `docs/uat-log.md`; S1/S2 fixed at once | not started | Sign-off from purchase + stores |
+| M3 | BOM: `/brief bom-explosion` → `/research` → `/spec bom` (levels, casting yield, alloy, inserts, subcontract ops, revisions) | not started | Spec frozen |
+| M4 | Sale Order + BOM explosion (SO → explosion → net requirement vs stock → draft PRs/SCOs) | not started | Scenario: SO → PRs/SCOs auto-created |
+| UAT-2 | Planning at factory | not started | Sign-off |
 
 ### Starting any new module (checklist)
-1. `/spec <module>` — include dependencies (`depends_on`) and what existing APIs it reuses.
-2. SME questions answered → `/freeze <module>`.
-3. ≤15 BRs → `/feature <module>`; bigger → `/epic <module>` (approve the split once).
-4. Keep `/loop 10m /watch-prs` running; answer questions; manual-test each PR; merge or comment.
+1. `/brief <feature>` → `/research <feature>` → `/spec <module>` (new modules get a spec folder).
+2. Answer the cards in `OWNER.md` → `/freeze <module>`.
+3. `/build <module>` — it picks `/feature` (≤ 15 rules) or `/epic` (more) and prints the two lines to run.
+4. Keep `/loop 10m /watch-prs` running; try each PR; answer its `confirm` lines; merge or comment.
 5. Epic: the scenario test for the full flow must be green before the epic PR into `main`.
-6. SME walkthrough → fix via PR comments → spec "Implementation status" all done → module DONE.
+6. SME walkthrough → fix via PR comments → all rules built, nothing parked → module DONE.
 Prefer `/slice` (manual, you in the loop) only for small experiments or when you want to learn the code.
 
 ### Scope discipline
