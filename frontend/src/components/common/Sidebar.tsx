@@ -1,13 +1,12 @@
 "use client";
 
-import { IconLogout } from "@tabler/icons-react";
+import { IconBuildingFactory2 } from "@tabler/icons-react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 
 import {
 	Sidebar,
 	SidebarContent,
-	SidebarFooter,
 	SidebarGroup,
 	SidebarGroupContent,
 	SidebarGroupLabel,
@@ -17,19 +16,15 @@ import {
 	SidebarMenuItem,
 	SidebarRail,
 } from "@/components/ui/sidebar";
-import { useLogoutMutation, useMeQuery } from "@/lib/api/auth/queries";
+import { useMeQuery } from "@/lib/api/auth/queries";
 import { normalizeAllowedPath } from "@/lib/path-utils";
+import { getNavIcon } from "@/lib/shell/nav-icons";
 import { useAuthSessionStore } from "@/lib/store/auth-session-store";
-import { Button } from "../ui/button";
-import { ModeToggle } from "../ui/mode-toggle";
 
 export function NavSidebar() {
 	const pathname = usePathname();
-	const router = useRouter();
-	const logoutMutation = useLogoutMutation();
 
 	const token = useAuthSessionStore((state) => state.token);
-	const role = useAuthSessionStore((state) => state.role);
 	const screens = useAuthSessionStore((state) => state.screens);
 	const hasHydrated = useAuthSessionStore((state) => state.hasHydrated);
 
@@ -57,11 +52,15 @@ export function NavSidebar() {
 	}, []);
 
 	return (
-		<Sidebar variant="inset" className="w-60">
+		<Sidebar variant="inset" collapsible="icon">
 			<SidebarHeader>
-				<div className="px-2 py-1.5 text-sm font-semibold">
-					{" "}
-					{role ? `Role: ${role}` : "Role: -"}
+				<div className="flex items-center gap-2 px-1 py-1.5">
+					<span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
+						<IconBuildingFactory2 className="size-4" />
+					</span>
+					<span className="truncate text-sm font-semibold group-data-[collapsible=icon]:hidden">
+						DiecastOS
+					</span>
 				</div>
 			</SidebarHeader>
 
@@ -79,7 +78,9 @@ export function NavSidebar() {
 					sidebarGroups.map((group) => (
 						<SidebarGroup key={group.name}>
 							{group.name !== "" && (
-								<SidebarGroupLabel>{group.name}</SidebarGroupLabel>
+								<SidebarGroupLabel className="text-sidebar-muted">
+									{group.name}
+								</SidebarGroupLabel>
 							)}
 							<SidebarGroupContent>
 								<SidebarMenu>
@@ -88,14 +89,20 @@ export function NavSidebar() {
 											pathname === page.path ||
 											pathname.startsWith(`${page.path}/`);
 
+										const NavIcon = getNavIcon(page.path);
 										return (
 											<SidebarMenuItem key={page.path}>
 												<SidebarMenuButton
 													asChild
 													isActive={isActive}
 													tooltip={page.title}
+													className="relative data-active:font-bold data-active:before:absolute data-active:before:inset-y-1 data-active:before:left-0 data-active:before:w-[3px] data-active:before:rounded-r data-active:before:bg-sidebar-primary data-active:before:content-['']"
 												>
-													<Link href={page.path}>
+													<Link
+														href={page.path}
+														aria-current={isActive ? "page" : undefined}
+													>
+														<NavIcon />
 														<span>{page.title}</span>
 													</Link>
 												</SidebarMenuButton>
@@ -118,31 +125,6 @@ export function NavSidebar() {
 				)}
 			</SidebarContent>
 
-			<SidebarFooter>
-				<div className="px-2 pb-1 text-xs text-muted-foreground"></div>
-				<SidebarMenu>
-					<SidebarMenuItem className="flex justify-between items-center">
-						<Button
-							onClick={() => {
-								logoutMutation.mutate(undefined, {
-									onSettled: () => {
-										router.replace("/login");
-									},
-								});
-							}}
-							disabled={logoutMutation.isPending}
-						>
-							<IconLogout />
-							<span>
-								{logoutMutation.isPending ? "Logging out..." : "Logout"}
-							</span>
-						</Button>
-						<div>
-							<ModeToggle />
-						</div>
-					</SidebarMenuItem>
-				</SidebarMenu>
-			</SidebarFooter>
 			<SidebarRail />
 		</Sidebar>
 	);

@@ -226,7 +226,7 @@ html[data-density="compact"] {
 }
 
 /* BR-DS-20: one solid 2px ring with 2px offset on keyboard focus. Unlayered so it beats utility classes. */
-:focus-visible {
+:is(a, button, input, select, textarea, [role], [tabindex]):focus-visible {
 	outline: 2px solid var(--ring);
 	outline-offset: 2px;
 }
