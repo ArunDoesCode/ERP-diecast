@@ -5,9 +5,7 @@ import {
   desc,
   eq,
   getTableColumns,
-  ilike,
   inArray,
-  or,
   sql,
 } from "drizzle-orm";
 
@@ -31,6 +29,7 @@ import { employees } from "../db/schemas/03_hcm";
 import { allocateDocumentSequence } from "../lib/document-number";
 import { AppError, BadRequestError, ConflictError } from "../lib/errors";
 import { assertMoneyInRange } from "../lib/money";
+import { safeSearch } from "../lib/safe-search";
 import type {
   poListQuerySchemaType,
   poStatusSchemaType,
@@ -171,16 +170,8 @@ export const poRepository = {
         : purchaseOrders.id;
     const orderFn = params.sortDir === "desc" ? desc : asc;
 
-    const q = params.q?.trim();
-    const pattern = q ? `%${q}%` : undefined;
-
     const filters = [
-      pattern
-        ? or(
-            ilike(purchaseOrders.poNumber, pattern),
-            ilike(purchaseOrders.notes, pattern),
-          )
-        : undefined,
+      safeSearch(params.q, purchaseOrders.poNumber, purchaseOrders.notes),
       params.status && params.status.length > 0
         ? inArray(purchaseOrders.status, params.status)
         : undefined,

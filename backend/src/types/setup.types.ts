@@ -36,7 +36,7 @@ const employeeWriteBaseSchema = createInsertSchema(employees, {
 
 export const employeeInputSchema = employeeWriteBaseSchema
   .extend({
-    phone: z.string().optional(),
+    phone: z.string().max(30).optional(),
     dailyRatePaise: z
       .number()
       .int()
@@ -45,7 +45,7 @@ export const employeeInputSchema = employeeWriteBaseSchema
       .optional(),
     loginMethod: loginMethodSchema,
     email: z.string().email().optional(),
-    password: z.string().min(8).optional(),
+    password: z.string().min(8).max(128).optional(),
   })
   .refine(
     (data) =>
@@ -61,7 +61,7 @@ export type employeeInputSchemaType = z.infer<typeof employeeInputSchema>;
 // email/password when the login method is staying "password" — the service
 // layer enforces email+password only when flipping qr -> password.
 export const employeeUpdateSchema = employeeWriteBaseSchema.extend({
-  phone: z.string().optional(),
+  phone: z.string().max(30).optional(),
   dailyRatePaise: z
     .number()
     .int()
@@ -70,7 +70,7 @@ export const employeeUpdateSchema = employeeWriteBaseSchema.extend({
     .optional(),
   loginMethod: loginMethodSchema,
   email: z.string().email().optional(),
-  password: z.string().min(8).optional(),
+  password: z.string().min(8).max(128).optional(),
 });
 export type employeeUpdateSchemaType = z.infer<typeof employeeUpdateSchema>;
 
@@ -88,7 +88,7 @@ export type employeeListQuerySchemaType = z.infer<
 
 // Debounced name-search + infinite-scroll UI.
 export const employeeSearchQuerySchema = z.object({
-  q: z.string().min(1),
+  q: z.string().trim().min(1).max(100),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(10),
   sortBy: z.enum(["name", "roleId", "dailyRatePaise", "isActive"]).optional(),
@@ -106,7 +106,7 @@ export const roleSchema = z.object({
 export type roleSchemaType = z.infer<typeof roleSchema>;
 
 export const roleInputSchema = z.object({
-  name: z.string().min(1),
+  name: z.string().min(1).max(200),
 });
 export type roleInputSchemaType = z.infer<typeof roleInputSchema>;
 
@@ -135,7 +135,9 @@ export const roleListItemSchema = roleSchema.extend({
 export type roleListItemSchemaType = z.infer<typeof roleListItemSchema>;
 
 /** POST /roles/:id/copy body (BR-AUTH-25). */
-export const roleCopyInputSchema = z.object({ name: z.string().trim().min(1) });
+export const roleCopyInputSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+});
 export type roleCopyInputSchemaType = z.infer<typeof roleCopyInputSchema>;
 
 export const roleGrantItemSchema = z.object({
@@ -163,8 +165,8 @@ export type roleGrantsSchemaType = z.infer<typeof roleGrantsSchema>;
 /** POST /roles/:id/grants body: the diff the UI confirmed (keys, not page ids). */
 export const roleGrantsDiffSchema = z
   .object({
-    added: z.array(z.string()).default([]),
-    removed: z.array(z.string()).default([]),
+    added: z.array(z.string().max(100)).max(1000).default([]),
+    removed: z.array(z.string().max(100)).max(1000).default([]),
   })
   .superRefine((data, ctx) => {
     if (data.added.length === 0 && data.removed.length === 0) {
@@ -194,10 +196,10 @@ export type screenSchemaType = z.infer<typeof screenSchema>;
 /** PATCH /screens/:key body: key/path/permissionKey are code-owned (BR-AUTH-06). */
 export const screenUpdateSchema = z
   .object({
-    label: z.string().trim().min(1).optional(),
+    label: z.string().trim().min(1).max(200).optional(),
     sortOrder: z.number().int().optional(),
     // "" clears the group (stored as "")
-    menuGroup: z.string().trim().optional(),
+    menuGroup: z.string().trim().max(200).optional(),
   })
   .strict()
   .superRefine((data, ctx) => {
@@ -217,8 +219,8 @@ export type screenUpdateSchemaType = z.infer<typeof screenUpdateSchema>;
 /** POST /screens/:key/roles body: tick = grant the screen's key to the role. */
 export const screenRolesDiffSchema = z
   .object({
-    added: z.array(z.number().int()).default([]),
-    removed: z.array(z.number().int()).default([]),
+    added: z.array(z.number().int()).max(1000).default([]),
+    removed: z.array(z.number().int()).max(1000).default([]),
   })
   .superRefine((data, ctx) => {
     if (data.added.length === 0 && data.removed.length === 0) {

@@ -9,6 +9,7 @@ import {
   purchaseOrders,
 } from "../db/schemas/02_procurement-purchasing";
 import { MAX_MONEY_PAISE } from "../lib/money";
+import { searchTermSchema } from "../lib/safe-search";
 
 export const poStatusSchema = z.enum(poStatusEnum.enumValues);
 export type poStatusSchemaType = z.infer<typeof poStatusSchema>;
@@ -106,7 +107,8 @@ export const createPoSchema = z.object({
         gstPercent: gstPercentSchema.optional(),
       }),
     )
-    .min(1),
+    .min(1)
+    .max(500),
 });
 export type createPoSchemaType = z.infer<typeof createPoSchema>;
 
@@ -146,14 +148,17 @@ export const updatePoSchema = z
     poId: z.number().int().positive(),
     inserts: z
       .array(updatePoInsertItemSchema)
+      .max(500)
       .nullish()
       .transform((v) => v ?? []),
     updates: z
       .array(updatePoUpdateItemSchema)
+      .max(500)
       .nullish()
       .transform((v) => v ?? []),
     deletes: z
       .array(updatePoDeleteItemSchema)
+      .max(500)
       .nullish()
       .transform((v) => v ?? []),
   })
@@ -186,6 +191,7 @@ export const poListQuerySchema = z
     // Comma-separated list of statuses, e.g. "draft,approved".
     status: z
       .string()
+      .max(200)
       .optional()
       .transform((value) =>
         value
@@ -195,9 +201,9 @@ export const poListQuerySchema = z
               .filter(Boolean)
           : undefined,
       )
-      .pipe(z.array(poStatusSchema).optional()),
+      .pipe(z.array(poStatusSchema).max(20).optional()),
     supplierId: z.coerce.number().int().positive().optional(),
-    q: z.string().trim().min(1).optional(),
+    q: searchTermSchema,
     // Dispatched/partial_received POs whose expectedDeliveryDate has passed
     // and still have remaining (not-yet-received) qty on at least one line.
     overdue: z

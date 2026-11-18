@@ -47,7 +47,7 @@ export type scoDetailsSchemaType = z.infer<typeof scoDetailsSchema>;
 
 // --- Requests ---
 
-const wholeQtySchema = z.number().int().min(1); // BR-SCO-02
+const wholeQtySchema = z.number().int().min(1).max(1_000_000_000); // BR-SCO-02
 
 export const scoLineInputSchema = z.object({
   rawItemId: z.number().int().positive(),
@@ -74,7 +74,7 @@ export const createScoSchema = z.object({
   expectedReturnDate: z.coerce.date(),
   projectRef: z.string().trim().min(1).max(200).optional(),
   notes: z.string().max(2000).optional(),
-  lines: z.array(scoLineInputSchema).min(1),
+  lines: z.array(scoLineInputSchema).min(1).max(500),
 });
 export type createScoSchemaType = z.infer<typeof createScoSchema>;
 
@@ -86,7 +86,7 @@ export const updateScoSchema = z
     expectedReturnDate: z.coerce.date().optional(),
     projectRef: z.string().trim().min(1).max(200).nullish(),
     notes: z.string().max(2000).nullish(),
-    lines: z.array(scoLineInputSchema).min(1).optional(),
+    lines: z.array(scoLineInputSchema).min(1).max(500).optional(),
   })
   .strict()
   .refine(
@@ -122,6 +122,7 @@ export const scoListQuerySchema = z.object({
   // Comma-separated statuses, e.g. "draft,approved".
   status: z
     .string()
+    .max(200)
     .optional()
     .transform((value) =>
       value
@@ -131,7 +132,7 @@ export const scoListQuerySchema = z.object({
             .filter(Boolean)
         : undefined,
     )
-    .pipe(z.array(scoStatusSchema).optional()),
+    .pipe(z.array(scoStatusSchema).max(20).optional()),
   vendorId: z.coerce.number().int().positive().optional(),
   // Matches SCO number or vendor name (case-insensitive contains).
   q: z.string().trim().min(1).max(100).optional(),

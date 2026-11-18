@@ -6,6 +6,7 @@ import {
   ForbiddenError,
   NotFoundError,
 } from "../lib/errors";
+import { istDayStart } from "../lib/ist-day";
 import { approvalRepository } from "../repository/approvalRepository";
 import { prRepository } from "../repository/prRepository";
 import type {
@@ -30,9 +31,8 @@ function assertCanLinkMachine(
 // BR-PR-08: a required-by date cannot be before today when saved.
 function assertNotPastDate(date: Date | null | undefined) {
   if (!date) return;
-  const startOfToday = new Date();
-  startOfToday.setUTCHours(0, 0, 0, 0);
-  if (date.getTime() < startOfToday.getTime()) {
+  // BR-STD-25: "today" is the India day.
+  if (istDayStart(date).getTime() < istDayStart().getTime()) {
     throw new BadRequestError(
       "Required-by date cannot be in the past",
       "PR_DATE_IN_PAST",

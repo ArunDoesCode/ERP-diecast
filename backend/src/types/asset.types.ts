@@ -12,6 +12,7 @@ import {
   serviceMaster,
 } from "../db/schemas/02_procurement-catalog";
 import { MAX_MONEY_PAISE } from "../lib/money";
+import { searchTermSchema } from "../lib/safe-search";
 
 // Fixed lists (BR-INV-02), kept in code.
 export const ITEM_CATEGORIES = [
@@ -72,7 +73,7 @@ export type assetMachineSchemaType = z.infer<typeof assetMachineSchema>;
 export const assetItemListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(10),
-  q: z.string().optional(),
+  q: searchTermSchema,
   isActive: isActiveQuery,
   category: itemCategorySchema.optional(),
   sortBy: z
@@ -88,9 +89,9 @@ export type assetItemListQuerySchemaType = z.infer<
 // BR-INV-03): strict makes sending them a 400 instead of silently dropping them.
 export const assetItemCreateSchema = z
   .object({
-    sku: z.string().trim().min(1),
-    name: z.string().trim().min(1),
-    description: z.string().nullable().optional(),
+    sku: z.string().trim().min(1).max(50),
+    name: z.string().trim().min(1).max(200),
+    description: z.string().max(1000).nullable().optional(),
     category: itemCategorySchema,
     uom: itemUnitSchema,
     reorderLevel: reorderLevelSchema.optional(),
@@ -126,9 +127,9 @@ export type assetLastRateSchemaType = z.infer<typeof assetLastRateSchema>;
 
 export const assetItemUpdateSchema = z
   .object({
-    sku: z.string().trim().min(1).optional(),
-    name: z.string().trim().min(1).optional(),
-    description: z.string().nullable().optional(),
+    sku: z.string().trim().min(1).max(50).optional(),
+    name: z.string().trim().min(1).max(200).optional(),
+    description: z.string().max(1000).nullable().optional(),
     category: itemCategorySchema.optional(),
     uom: itemUnitSchema.optional(),
     reorderLevel: reorderLevelSchema.optional(),
@@ -147,7 +148,7 @@ export type assetItemUpdateSchemaType = z.infer<typeof assetItemUpdateSchema>;
 export const assetServiceListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(10),
-  q: z.string().optional(),
+  q: searchTermSchema,
   isActive: isActiveQuery,
   sortBy: z.enum(["code", "name", "createdAt"]).optional(),
   sortDir: z.enum(["asc", "desc"]).default("asc"),
@@ -166,9 +167,9 @@ export const assetServiceCreateSchema = createInsertSchema(serviceMaster)
     isActive: true,
   })
   .extend({
-    code: z.string().trim().min(1),
-    name: z.string().trim().min(1),
-    defaultUom: z.string().trim().min(1),
+    code: z.string().trim().min(1).max(50),
+    name: z.string().trim().min(1).max(200),
+    defaultUom: z.string().trim().min(1).max(20),
     sacCode: sacCodeSchema.nullable().optional(),
   });
 export type assetServiceCreateSchemaType = z.infer<
@@ -184,9 +185,9 @@ export const assetServiceUpdateSchema = createUpdateSchema(serviceMaster)
     lastUpdatedAt: true,
   })
   .extend({
-    code: z.string().trim().min(1).optional(),
-    name: z.string().trim().min(1).optional(),
-    defaultUom: z.string().trim().min(1).optional(),
+    code: z.string().trim().min(1).max(50).optional(),
+    name: z.string().trim().min(1).max(200).optional(),
+    defaultUom: z.string().trim().min(1).max(20).optional(),
     sacCode: sacCodeSchema.nullable().optional(),
   })
   .superRefine((data, ctx) => {
@@ -279,7 +280,7 @@ export type assetInventoryMovementListQuerySchemaType = z.infer<
 export const assetLocationListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(10),
-  q: z.string().optional(),
+  q: searchTermSchema,
   isActive: isActiveQuery,
   sortBy: z.enum(["name", "type", "createdAt"]).optional(),
   sortDir: z.enum(["asc", "desc"]).default("asc"),
@@ -301,7 +302,7 @@ export const assetLocationCreateSchema = createInsertSchema(locations)
     isActive: true,
   })
   .extend({
-    name: z.string().trim().min(1),
+    name: z.string().trim().min(1).max(200),
     linkedVendorId: z.number().int().positive().nullable().optional(),
   });
 export type assetLocationCreateSchemaType = z.infer<
@@ -317,7 +318,7 @@ export const assetLocationUpdateSchema = createUpdateSchema(locations)
     lastUpdatedAt: true,
   })
   .extend({
-    name: z.string().trim().min(1).optional(),
+    name: z.string().trim().min(1).max(200).optional(),
     isActive: z.boolean().optional(),
     linkedVendorId: z.number().int().positive().nullable().optional(),
   })
@@ -405,7 +406,7 @@ export const assetManualMovementCreateSchema = z.discriminatedUnion(
       itemId: z.number().int().positive(),
       locationId: z.number().int().positive(),
       referenceType: documentMovementReferenceTypeSchema,
-      reason: z.string().optional(),
+      reason: z.string().max(500).optional(),
     }),
   ],
 );
@@ -450,7 +451,7 @@ export type assetStockRowSchemaType = z.infer<typeof assetStockRowSchema>;
 export const assetStockListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(10),
-  q: z.string().optional(),
+  q: searchTermSchema,
   category: itemCategorySchema.optional(),
   locationId: z.coerce.number().int().positive().optional(),
   belowReorder: z
@@ -528,7 +529,7 @@ export const machineStatusSchema = z.enum([
 export const assetMachineListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(10),
-  q: z.string().optional(),
+  q: searchTermSchema,
   status: machineStatusSchema.optional(),
   isActive: isActiveQuery,
   sortBy: z.enum(["name", "code", "type", "status", "createdAt"]).optional(),
@@ -548,8 +549,8 @@ export const assetMachineCreateSchema = createInsertSchema(machines)
     isActive: true,
   })
   .extend({
-    name: z.string().trim().min(1),
-    code: z.string().trim().min(1),
+    name: z.string().trim().min(1).max(200),
+    code: z.string().trim().min(1).max(50),
     status: machineStatusSchema.optional(),
     lastMaintenanceAt: maintenanceDateSchema.nullable().optional(),
   });
@@ -566,8 +567,8 @@ export const assetMachineUpdateSchema = createUpdateSchema(machines)
     lastUpdatedAt: true,
   })
   .extend({
-    name: z.string().trim().min(1).optional(),
-    code: z.string().trim().min(1).optional(),
+    name: z.string().trim().min(1).max(200).optional(),
+    code: z.string().trim().min(1).max(50).optional(),
     status: machineStatusSchema.optional(),
     isActive: z.boolean().optional(),
     lastMaintenanceAt: maintenanceDateSchema.nullable().optional(),

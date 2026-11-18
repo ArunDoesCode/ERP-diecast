@@ -6,7 +6,6 @@ import {
   eq,
   exists,
   getTableColumns,
-  ilike,
   inArray,
   or,
   sql,
@@ -23,6 +22,7 @@ import {
 } from "../db/schemas/02_procurement";
 import { employees } from "../db/schemas/03_hcm";
 import { AppError } from "../lib/errors";
+import { safeSearch } from "../lib/safe-search";
 import type { PartialUpdate } from "../lib/types";
 import type {
   supplierHistoryQuerySchemaType,
@@ -45,10 +45,6 @@ export type SupplierHistoryInsert = {
   newValue: string | null;
   changedBy: number;
 };
-
-function escapeLike(value: string) {
-  return value.replace(/[\\%_]/g, (ch) => `\\${ch}`);
-}
 
 const supplierColumns = getTableColumns(supplierMaster);
 
@@ -138,16 +134,16 @@ export const supplierRepository = {
         : supplierMaster.name; // BR-SUP-23: sorted by name unless chosen
     const orderFn = params.sortDir === "desc" ? desc : asc;
 
-    const q = params.q?.trim();
-    const pattern = q ? `%${escapeLike(q)}%` : undefined;
-
-    const searchClause = pattern
+    const searchClause = params.q
       ? or(
-          ilike(supplierMaster.name, pattern),
-          ilike(supplierMaster.contactPerson, pattern),
-          ilike(supplierMaster.email, pattern),
-          ilike(supplierMaster.phone, pattern),
-          ilike(supplierMaster.gstNumber, pattern),
+          safeSearch(
+            params.q,
+            supplierMaster.name,
+            supplierMaster.contactPerson,
+            supplierMaster.email,
+            supplierMaster.phone,
+            supplierMaster.gstNumber,
+          ),
           exists(
             db
               .select({ id: supplierItems.id })
@@ -156,7 +152,7 @@ export const supplierRepository = {
               .where(
                 and(
                   eq(supplierItems.supplierId, supplierMaster.id),
-                  ilike(itemMaster.sku, pattern),
+                  safeSearch(params.q, itemMaster.sku),
                 ),
               ),
           ),
@@ -208,18 +204,14 @@ export const supplierRepository = {
     supplierId: number,
     params: supplierItemListQuerySchemaType,
   ) {
-    const q = params.q?.trim();
-    const pattern = q ? `%${escapeLike(q)}%` : undefined;
-
     const whereClause = and(
       eq(supplierItems.supplierId, supplierId),
-      pattern
-        ? or(
-            ilike(itemMaster.name, pattern),
-            ilike(itemMaster.sku, pattern),
-            ilike(supplierItems.supplierSku, pattern),
-          )
-        : undefined,
+      safeSearch(
+        params.q,
+        itemMaster.name,
+        itemMaster.sku,
+        supplierItems.supplierSku,
+      ),
     );
 
     const [rows, [totalRow]] = await Promise.all([
@@ -231,7 +223,7 @@ export const supplierRepository = {
         .orderBy(asc(supplierItems.id))
         .limit(params.pageSize)
         .offset((params.page - 1) * params.pageSize),
-      pattern
+      params.q
         ? db
             .select({ value: count() })
             .from(supplierItems)
@@ -250,17 +242,9 @@ export const supplierRepository = {
     supplierId: number,
     params: supplierServiceListQuerySchemaType,
   ) {
-    const q = params.q?.trim();
-    const pattern = q ? `%${escapeLike(q)}%` : undefined;
-
     const whereClause = and(
       eq(supplierServices.supplierId, supplierId),
-      pattern
-        ? or(
-            ilike(serviceMaster.name, pattern),
-            ilike(serviceMaster.code, pattern),
-          )
-        : undefined,
+      safeSearch(params.q, serviceMaster.name, serviceMaster.code),
     );
 
     const [rows, [totalRow]] = await Promise.all([
@@ -275,7 +259,7 @@ export const supplierRepository = {
         .orderBy(asc(supplierServices.id))
         .limit(params.pageSize)
         .offset((params.page - 1) * params.pageSize),
-      pattern
+      params.q
         ? db
             .select({ value: count() })
             .from(supplierServices)

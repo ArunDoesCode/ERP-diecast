@@ -5,7 +5,6 @@ import {
   desc,
   eq,
   gt,
-  ilike,
   inArray,
   isNull,
   lte,
@@ -17,7 +16,6 @@ import {
 import { db } from "../db/client";
 import { roles } from "../db/schemas/01_auth";
 import {
-  type ApprovalChainStep,
   approvalPolicies,
   approvalRequests,
   approvalTrails,
@@ -33,6 +31,7 @@ import {
 import { supplierMaster } from "../db/schemas/02_procurement-suppliers";
 import { employees } from "../db/schemas/03_hcm";
 import { fallbackPolicyName } from "../lib/approval-fallback";
+import { safeSearch } from "../lib/safe-search";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -254,7 +253,7 @@ export const approvalRepository = {
       params.isActive !== undefined
         ? eq(approvalPolicies.isActive, params.isActive)
         : undefined,
-      params.q ? ilike(approvalPolicies.name, `%${params.q}%`) : undefined,
+      safeSearch(params.q, approvalPolicies.name),
     ].filter((filter) => filter !== undefined);
 
     const whereClause = filters.length > 0 ? and(...filters) : undefined;

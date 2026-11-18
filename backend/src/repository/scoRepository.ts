@@ -6,10 +6,8 @@ import {
   eq,
   getTableColumns,
   gte,
-  ilike,
   inArray,
   lt,
-  or,
   sql,
 } from "drizzle-orm";
 
@@ -32,15 +30,11 @@ import { employees } from "../db/schemas/03_hcm";
 import { allocateDocumentSequence } from "../lib/document-number";
 import { istMonthKey } from "../lib/ist-day";
 import { assertMoneyInRange } from "../lib/money";
+import { safeSearch } from "../lib/safe-search";
 import type {
   scoListQuerySchemaType,
   scoResponseSchemaType,
 } from "../types/sco.types";
-
-// Escape LIKE wildcards so a search term is matched literally (SEC-2).
-function escapeLike(value: string) {
-  return value.replace(/[\\%_]/g, (ch) => `\\${ch}`);
-}
 
 export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type ScoInsert = typeof subcontractingOrders.$inferInsert;
@@ -122,12 +116,7 @@ export const scoRepository = {
       params.vendorId !== undefined
         ? eq(subcontractingOrders.vendorId, params.vendorId)
         : undefined,
-      params.q
-        ? or(
-            ilike(subcontractingOrders.scoNumber, `%${escapeLike(params.q)}%`),
-            ilike(supplierMaster.name, `%${escapeLike(params.q)}%`),
-          )
-        : undefined,
+      safeSearch(params.q, subcontractingOrders.scoNumber, supplierMaster.name),
       params.createdFrom
         ? gte(subcontractingOrders.createdAt, params.createdFrom)
         : undefined,

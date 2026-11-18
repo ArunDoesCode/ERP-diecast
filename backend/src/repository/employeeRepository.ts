@@ -1,7 +1,7 @@
-import { and, asc, count, desc, eq, ilike } from "drizzle-orm";
-
+import { and, asc, count, desc, eq } from "drizzle-orm";
 import { db } from "../db/client";
 import { employees } from "../db/schemas/03_hcm";
+import { safeSearchMin } from "../lib/safe-search";
 import type { employeeSchemaType } from "../types/setup.types";
 import type { DbExecutor } from "./executor";
 
@@ -80,7 +80,7 @@ export const employeeRepository = {
         : employees.id;
     const orderFn = params.sortDir === "desc" ? desc : asc;
 
-    const whereClause = ilike(employees.name, `%${params.q}%`);
+    const whereClause = safeSearchMin(1, params.q, employees.name);
 
     const [rows, [totalRow]] = await Promise.all([
       db
