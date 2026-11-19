@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 
+import { accessLogController } from "../controller/accessLogController";
 import { employeeController } from "../controller/employeeController";
 import { moduleController } from "../controller/moduleController";
 import { pageController } from "../controller/pageController";
@@ -16,6 +17,7 @@ import {
 import { register } from "../lib/route-registry";
 import type { AppEnv } from "../lib/types";
 import {
+  accessLogDetailSchema,
   accessLogListQuerySchema,
   accessLogSchema,
   assignableRoleSchema,
@@ -381,7 +383,7 @@ register({
 setupRouter.get(
   SETUP_ROUTES.accessLog.list,
   requirePermission("setup.roles.manage"),
-  asyncHandler(employeeController.accessLog),
+  asyncHandler(accessLogController.list),
 );
 register({
   method: "GET",
@@ -397,7 +399,23 @@ register({
   },
   notes: [
     "No write endpoints exist. Send sortBy=at&sortDir=desc for newest first.",
+    "Each row carries a one-line summary of the change, not the before/after records (BR-AUTH-31).",
   ],
+});
+
+setupRouter.get(
+  SETUP_ROUTES.accessLog.detail,
+  requirePermission("setup.roles.manage"),
+  asyncHandler(accessLogController.detail),
+);
+register({
+  method: "GET",
+  path: `${SETUP_BASE_PATH}${SETUP_ROUTES.accessLog.detail}`,
+  tags: ["setup", "access-log"],
+  summary: "One access-log row with full before/after (BR-AUTH-31).",
+  auth: { type: "permission", key: "setup.roles.manage" },
+  responses: { "200": successResponse(accessLogDetailSchema) },
+  notes: ["400 non-integer id; 404 unknown id. Read-only."],
 });
 
 export { setupRouter as setupRoutes };

@@ -31,8 +31,11 @@ export const scoItemResponseSchema = createSelectSchema(
 ).extend({
   rawItemSku: z.string(),
   rawItemName: z.string(),
+  // BR-SCO-26
+  rawItemUom: z.string(),
   finishedItemSku: z.string(),
   finishedItemName: z.string(),
+  finishedItemUom: z.string(),
   // service price x return qty, no GST.
   lineValuePaise: z.number().int(),
   lineTaxPaise: z.number().int(),
@@ -170,4 +173,28 @@ export const companySettingsUpsertSchema = z
   .strict();
 export type companySettingsUpsertSchemaType = z.infer<
   typeof companySettingsUpsertSchema
+>;
+
+// --- Company settings history (BR-SCO-29) ---
+
+export const companySettingsHistoryQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(10),
+});
+export type companySettingsHistoryQuerySchemaType = z.infer<
+  typeof companySettingsHistoryQuerySchema
+>;
+
+// One changed field of one save, newest first.
+export const companySettingsHistoryRowSchema = z.object({
+  id: z.number().int(),
+  field: z.enum(["name", "address", "gstin", "stateCode"]),
+  oldValue: z.string().nullable(),
+  newValue: z.string(),
+  changedBy: z.number().int(),
+  changedByName: z.string().nullable(),
+  changedAt: z.date(),
+});
+export type companySettingsHistoryRowSchemaType = z.infer<
+  typeof companySettingsHistoryRowSchema
 >;

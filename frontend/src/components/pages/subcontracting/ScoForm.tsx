@@ -3,10 +3,9 @@
 import { IconPlus, IconTrash } from "@tabler/icons-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-
 import { SearchableSelect } from "@/components/common/SearchableSelect";
-import { formatPaise } from "@/components/pages/inventory/inventory-format";
 import { ScoItemPicker } from "@/components/pages/subcontracting/ScoItemPicker";
+import { PageHeader } from "@/components/shared/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FloatingLabelInput } from "@/components/ui/floating-label";
@@ -28,6 +27,7 @@ import {
 	useSupplierServicesQuery,
 	useSuppliersQuery,
 } from "@/lib/api/suppliers/queries";
+import { formatMoney } from "@/lib/format";
 import { istTodayIso } from "@/lib/ist-date";
 import type { ScoDetailPayload, ScoLineInput } from "@/types/subcontracting";
 import { GST_SLABS, type Supplier } from "@/types/suppliers";
@@ -36,8 +36,10 @@ type LineState = {
 	key: number;
 	rawItemId?: number;
 	rawItemLabel?: string;
+	rawItemUom?: string;
 	finishedItemId?: number;
 	finishedItemLabel?: string;
+	finishedItemUom?: string;
 	serviceId?: number;
 	serviceLabel?: string;
 	sendQty: string;
@@ -68,8 +70,10 @@ function linesFromDetail(detail: ScoDetailPayload): LineState[] {
 			key: lineKeySeed,
 			rawItemId: line.rawItemId,
 			rawItemLabel: `${line.rawItemSku} · ${line.rawItemName}`,
+			rawItemUom: line.rawItemUom,
 			finishedItemId: line.finishedItemId,
 			finishedItemLabel: `${line.finishedItemSku} · ${line.finishedItemName}`,
+			finishedItemUom: line.finishedItemUom,
 			serviceId: line.serviceId,
 			serviceLabel: line.serviceDescription,
 			sendQty: String(line.rawQtyToIssue),
@@ -271,18 +275,15 @@ export function ScoForm({ existing }: ScoFormProps) {
 	}
 
 	return (
-		<div className="flex w-full flex-col gap-6 p-6">
-			<div>
-				<h1 className="font-heading text-lg font-medium">
-					{existing
+		<div className="flex w-full flex-col gap-4">
+			<PageHeader
+				title={
+					existing
 						? `Edit ${existing.sco.scoNumber}`
-						: "New subcontracting order"}
-				</h1>
-				<p className="text-xs text-muted-foreground">
-					Price and GST come from the vendor's service list and can be changed
-					while the order is a draft.
-				</p>
-			</div>
+						: "New subcontracting order"
+				}
+				description="Price and GST come from the vendor's service list and can be changed while the order is a draft."
+			/>
 
 			<Card>
 				<CardHeader>
@@ -304,7 +305,7 @@ export function ScoForm({ existing }: ScoFormProps) {
 								onSearchChange={setVendorSearch}
 								placeholder="Select vendor"
 								searchPlaceholder="Search vendors"
-								emptyText="No active service providers found."
+								emptyText="No match. Only active suppliers of type Service provider or Both can get a subcontracting order; change the type on the supplier page."
 								isLoading={suppliersQuery.isLoading}
 							/>
 						)}
@@ -395,10 +396,11 @@ export function ScoForm({ existing }: ScoFormProps) {
 											value={line.rawItemId}
 											valueLabel={line.rawItemLabel}
 											placeholder="Select raw item"
-											onChange={(id, label) =>
+											onChange={(id, label, uom) =>
 												updateLine(line.key, {
 													rawItemId: id,
 													rawItemLabel: label,
+													rawItemUom: uom,
 												})
 											}
 										/>
@@ -411,10 +413,11 @@ export function ScoForm({ existing }: ScoFormProps) {
 											value={line.finishedItemId}
 											valueLabel={line.finishedItemLabel}
 											placeholder="Select finished item"
-											onChange={(id, label) =>
+											onChange={(id, label, uom) =>
 												updateLine(line.key, {
 													finishedItemId: id,
 													finishedItemLabel: label,
+													finishedItemUom: uom,
 												})
 											}
 										/>
@@ -458,7 +461,7 @@ export function ScoForm({ existing }: ScoFormProps) {
 								<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
 									<FloatingLabelInput
 										id={`sco-send-${line.key}`}
-										label="Send qty (pcs)"
+										label={`Send qty${line.rawItemUom ? ` (${line.rawItemUom})` : ""}`}
 										type="number"
 										min="1"
 										step="1"
@@ -469,7 +472,7 @@ export function ScoForm({ existing }: ScoFormProps) {
 									/>
 									<FloatingLabelInput
 										id={`sco-return-${line.key}`}
-										label="Return qty (pcs)"
+										label={`Return qty${line.finishedItemUom ? ` (${line.finishedItemUom})` : ""}`}
 										type="number"
 										min="1"
 										step="1"
@@ -536,10 +539,10 @@ export function ScoForm({ existing }: ScoFormProps) {
 			</Card>
 
 			<div className="flex flex-col items-end gap-1 text-sm">
-				<span>Value: {formatPaise(totals.value)}</span>
-				<span>GST: {formatPaise(totals.tax)}</span>
+				<span>Value: {formatMoney(totals.value)}</span>
+				<span>GST: {formatMoney(totals.tax)}</span>
 				<span className="font-medium">
-					Total: {formatPaise(totals.value + totals.tax)}
+					Total: {formatMoney(totals.value + totals.tax)}
 				</span>
 			</div>
 

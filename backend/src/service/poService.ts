@@ -1,10 +1,21 @@
 import { db } from "../db/client";
 import { isUniqueViolation } from "../lib/db-errors";
-import { BadRequestError, ConflictError, NotFoundError } from "../lib/errors";
+import { allocateDocumentSequence } from "../lib/document-number";
+import {
+  AppError,
+  BadRequestError,
+  ConflictError,
+  NotFoundError,
+} from "../lib/errors";
+import { assertMoneyInRange } from "../lib/money";
 import { approvalRepository } from "../repository/approvalRepository";
-import { assetRepository } from "../repository/assetRepository";
-import type { Tx } from "../repository/poRepository";
+import type {
+  CreatePoLineData,
+  PreparedPoLine,
+  Tx,
+} from "../repository/poRepository";
 import { poRepository } from "../repository/poRepository";
+import { prRepository } from "../repository/prRepository";
 import type {
   closePoSchemaType,
   confirmPoSchemaType,
@@ -95,9 +106,102 @@ async function assertLinesAreDraftable(prItemIds: number[]) {
         `PR item ${id}'s parent PR must be approved or partial_ordered (current: ${row.prStatus})`,
       );
     }
+
+    assertItemActive(row);
   }
 
   return rowById;
+}
+
+// BR-INV-05: an inactive item can't go on a new PO line, even from a PR line
+// approved before the item was deactivated.
+function assertItemActive(row: { id: number; itemIsActive: boolean }) {
+  if (!row.itemIsActive) {
+    throw new BadRequestError(
+      `The item of PR item ${row.id} is inactive and can't go on a new PO`,
+      "ITEM_INACTIVE",
+    );
+  }
+}
+
+// BR-PO-04: line value = round(qty x rate); line tax = round(value x GST% / 100).
+// GST % is turned into whole basis points first so the tax maths is integer only.
+export function computeLinePaise(
+  qty: number,
+  unitPricePaise: number,
+  gstPercent: number,
+) {
+  const lineValuePaise = Math.round(qty * unitPricePaise);
+  const lineTaxPaise = Math.round(
+    (lineValuePaise * Math.round(gstPercent * 100)) / 10000,
+  );
+  assertMoneyInRange(lineValuePaise);
+  assertMoneyInRange(lineTaxPaise);
+  return { lineValuePaise, lineTaxPaise };
+}
+
+// BR-PO-04: totals are always the sum of the stored line amounts.
+function computeTotalsPaise(
+  lines: { lineValuePaise: number; lineTaxPaise: number }[],
+) {
+  const subtotalPaise = lines.reduce((sum, l) => sum + l.lineValuePaise, 0);
+  const taxAmountPaise = lines.reduce((sum, l) => sum + l.lineTaxPaise, 0);
+  const totalAmountPaise = subtotalPaise + taxAmountPaise;
+  assertMoneyInRange(subtotalPaise);
+  assertMoneyInRange(taxAmountPaise);
+  assertMoneyInRange(totalAmountPaise);
+  return { subtotalPaise, taxAmountPaise, totalAmountPaise };
+}
+
+/**
+ * Locks the PR lines behind these PO lines (headers first, CRP-2) and turns
+ * each resolved line into a PO line ready to save. Re-checks under the lock
+ * what the unlocked pre-check saw: the PR line is still pending (a concurrent
+ * PO may have drafted it) and its item is still active (BR-INV-05).
+ */
+function prepareLines(
+  lines: CreatePoLineData[],
+  prItemMap: Map<
+    number,
+    Awaited<
+      ReturnType<typeof poRepository.findPurchaseRequestItemsByIdsForUpdate>
+    >[number]
+  >,
+): PreparedPoLine[] {
+  return lines.map((line) => {
+    const prItem = prItemMap.get(line.prItemId);
+    if (!prItem) {
+      throw new BadRequestError(
+        `Invalid prItemId: ${line.prItemId}`,
+        "PO_INVALID_PR_ITEM",
+      );
+    }
+    if (prItem.status !== "pending") {
+      throw new ConflictError(
+        `PR item ${line.prItemId} is no longer pending (already ${prItem.status})`,
+        "PO_LINE_ALREADY_DRAFTED",
+      );
+    }
+    assertItemActive(prItem);
+
+    const qty = prItem.requestedQty - (prItem.issuedQty ?? 0);
+    return {
+      prItemId: line.prItemId,
+      itemId: prItem.itemId,
+      qty,
+      uom: prItem.uom,
+      unitPricePaise: line.unitPricePaise,
+      gstPercent: line.gstPercent,
+      ...computeLinePaise(qty, line.unitPricePaise, line.gstPercent),
+    };
+  });
+}
+
+// BR-PR-36: recompute each touched PR header, in id order.
+async function recomputePrHeaders(prIds: Iterable<number>, tx: Tx) {
+  for (const prId of [...new Set(prIds)].sort((a, b) => a - b)) {
+    await prRepository.recomputeHeaderStatusFromItems(prId, tx);
+  }
 }
 
 function startOfUtcDay(date: Date) {
@@ -154,20 +258,22 @@ async function resolveLines(
       }),
     ),
   ];
-  const priceRows = await poRepository.findActivePriceRows(supplierId, itemIds);
+  const needRate = lines.some((line) => line.unitPricePaise === undefined);
+  const [priceRows, lastRates] = await Promise.all([
+    poRepository.findActivePriceRows(supplierId, itemIds),
+    // #53: one batch lookup instead of getLastRate per line.
+    needRate
+      ? poRepository.findLastRates(supplierId, itemIds)
+      : new Map<number, number>(),
+  ]);
   const gstByItem = new Map(priceRows.map((r) => [r.itemId, r.taxPercentage]));
 
-  const resolved: {
-    prItemId: number;
-    unitPricePaise: number;
-    gstPercent: number;
-  }[] = [];
+  const resolved: CreatePoLineData[] = [];
   for (const line of lines) {
     const itemId = prRows.get(line.prItemId)?.itemId;
     let unitPricePaise = line.unitPricePaise;
     if (unitPricePaise === undefined && itemId !== undefined) {
-      const suggestion = await assetRepository.getLastRate(itemId, supplierId);
-      unitPricePaise = suggestion?.ratePaise;
+      unitPricePaise = lastRates.get(itemId);
     }
     if (unitPricePaise === undefined || unitPricePaise < 1) {
       throw new BadRequestError(
@@ -254,10 +360,13 @@ export const poService = {
   },
 
   async list(params: poListQuerySchemaType) {
-    const { rows, total } = await poRepository.list(params);
+    const { rows, total, statusCounts } = await poRepository.list(params);
     return {
       data: rows,
-      meta: toPaginatedMeta(params.page, params.pageSize, total),
+      meta: {
+        ...toPaginatedMeta(params.page, params.pageSize, total),
+        statusCounts,
+      },
     };
   },
 
@@ -276,60 +385,199 @@ export const poService = {
     const prRows = await assertLinesAreDraftable(prItemIds);
     const lines = await resolveLines(input.supplierId, input.lines, prRows);
 
-    return poRepository.createWithItems(
-      {
-        supplierId: input.supplierId,
-        // BR-PO-23: no terms typed -> the supplier's default terms.
-        paymentTermsDays:
-          input.paymentTermsDays ?? supplier.defaultPaymentTermsDays,
-        deliveryTerms: input.deliveryTerms ?? null,
-        expectedDeliveryDate: input.expectedDeliveryDate ?? null,
-        notes: input.notes ?? null,
-        createdBy: actorId,
-      },
-      lines,
-    );
+    return db.transaction(async (tx) => {
+      const prItemRows =
+        await poRepository.findPurchaseRequestItemsByIdsForUpdate(
+          prItemIds,
+          tx,
+        );
+      const prepared = prepareLines(
+        lines,
+        new Map(prItemRows.map((row) => [row.id, row])),
+      );
+
+      const { periodKey, seq } = await allocateDocumentSequence(
+        tx,
+        "po",
+        actorId,
+      );
+      const created = await poRepository.insertPo(
+        {
+          poNumber: `PO-${periodKey}-${seq}`,
+          supplierId: input.supplierId,
+          ...computeTotalsPaise(prepared),
+          // BR-PO-23: no terms typed -> the supplier's default terms.
+          paymentTermsDays:
+            input.paymentTermsDays ?? supplier.defaultPaymentTermsDays,
+          deliveryTerms: input.deliveryTerms ?? null,
+          expectedDeliveryDate: input.expectedDeliveryDate ?? null,
+          notes: input.notes ?? null,
+          createdBy: actorId,
+        },
+        tx,
+      );
+      if (!created) {
+        throw new AppError(
+          "Failed to create purchase order",
+          500,
+          "PO_CREATE_FAILED",
+        );
+      }
+
+      const items = await poRepository.insertPoLines(created.id, prepared, tx);
+      if (!items) {
+        throw new AppError(
+          "PO item/line mismatch during link creation",
+          500,
+          "PO_LINK_MISMATCH",
+        );
+      }
+      await recomputePrHeaders(
+        prItemRows.map((row) => row.prId),
+        tx,
+      );
+
+      return { po: await reloadPo(created.id, tx), items };
+    });
   },
 
+  // BR-PO-05: draft only, checked once under the row lock (BR-PO-22). A PO
+  // can't be left with no lines.
   async update(input: updatePoSchemaType) {
-    const existingPo = await poRepository.findPoById(input.poId);
-    if (!existingPo) {
-      throw new NotFoundError("Purchase order not found");
-    }
+    const { poId } = input;
+    return db.transaction(async (tx) => {
+      const locked = await poRepository.lockPoById(poId, tx);
+      if (!locked) {
+        throw new NotFoundError("Purchase order not found");
+      }
+      assertEditable(locked.status);
+      assertNotBeforePoDate(input.expectedDeliveryDate, locked.createdAt);
 
-    assertEditable(existingPo.status);
-    assertNotBeforePoDate(input.expectedDeliveryDate, existingPo.createdAt);
+      const insertPrItemIds = input.inserts.map((line) => line.prItemId);
+      const inserts =
+        insertPrItemIds.length > 0
+          ? await resolveLines(
+              locked.supplierId,
+              input.inserts,
+              await assertLinesAreDraftable(insertPrItemIds),
+            )
+          : [];
 
-    const insertPrItemIds = input.inserts.map((line) => line.prItemId);
-    const inserts =
-      insertPrItemIds.length > 0
-        ? await resolveLines(
-            existingPo.supplierId,
-            input.inserts,
-            await assertLinesAreDraftable(insertPrItemIds),
-          )
-        : [];
+      const existingItems = await poRepository.findPoItemsByPoId(poId, tx);
+      const existingById = new Map(existingItems.map((row) => [row.id, row]));
+      const deleteIds = [...new Set(input.deletes.map((del) => del.id))];
+      for (const id of [...deleteIds, ...input.updates.map((u) => u.id)]) {
+        if (!existingById.has(id)) {
+          throw new NotFoundError(`PO item not found for id ${id}`);
+        }
+      }
+      if (existingItems.length - deleteIds.length + inserts.length === 0) {
+        throw new BadRequestError(
+          "A purchase order needs at least one line",
+          "PO_NEEDS_A_LINE",
+        );
+      }
 
-    const headerData = {
-      ...(input.paymentTermsDays !== undefined
-        ? { paymentTermsDays: input.paymentTermsDays }
-        : {}),
-      ...(input.deliveryTerms !== undefined
-        ? { deliveryTerms: input.deliveryTerms }
-        : {}),
-      ...(input.notes !== undefined ? { notes: input.notes } : {}),
-      ...(input.expectedDeliveryDate !== undefined
-        ? { expectedDeliveryDate: input.expectedDeliveryDate }
-        : {}),
-    };
+      const headerData = {
+        ...(input.paymentTermsDays !== undefined
+          ? { paymentTermsDays: input.paymentTermsDays }
+          : {}),
+        ...(input.deliveryTerms !== undefined
+          ? { deliveryTerms: input.deliveryTerms }
+          : {}),
+        ...(input.notes !== undefined ? { notes: input.notes } : {}),
+        ...(input.expectedDeliveryDate !== undefined
+          ? { expectedDeliveryDate: input.expectedDeliveryDate }
+          : {}),
+      };
+      if (Object.keys(headerData).length > 0) {
+        await poRepository.updatePoById(poId, headerData, tx);
+      }
 
-    return poRepository.updateWithItems(
-      input.poId,
-      headerData,
-      inserts,
-      input.updates,
-      input.deletes,
-    );
+      // CRP-2: take every PR lock this edit needs up front, headers first and
+      // lines in id order, before any line is changed.
+      const links = await poRepository.findLinksByPoItemIds(
+        poId,
+        deleteIds,
+        tx,
+      );
+      const prItemRows =
+        await poRepository.findPurchaseRequestItemsByIdsForUpdate(
+          [
+            ...links
+              .map((link) => link.prItemId)
+              .filter((id): id is number => id != null),
+            ...insertPrItemIds,
+          ],
+          tx,
+        );
+
+      await poRepository.removePoLines(poId, deleteIds, links, tx);
+
+      const updatedItems = await poRepository.updatePoLinePrices(
+        poId,
+        input.updates.map((update) => {
+          const existing = existingById.get(update.id) as NonNullable<
+            ReturnType<typeof existingById.get>
+          >;
+          const unitPricePaise =
+            update.unitPricePaise ?? existing.unitPricePaise;
+          const gstPercent = update.gstPercent ?? existing.gstPercent;
+          return {
+            id: update.id,
+            unitPricePaise,
+            gstPercent,
+            ...computeLinePaise(existing.qty, unitPricePaise, gstPercent),
+          };
+        }),
+        tx,
+      );
+      const updatedById = new Map(updatedItems.map((row) => [row.id, row]));
+
+      const prepared = prepareLines(
+        inserts,
+        new Map(prItemRows.map((row) => [row.id, row])),
+      );
+      const createdItems = await poRepository.insertPoLines(poId, prepared, tx);
+      if (!createdItems) {
+        throw new AppError(
+          "Failed to create PO item",
+          500,
+          "PO_ITEM_CREATE_FAILED",
+        );
+      }
+
+      await recomputePrHeaders(
+        [
+          ...links.map((link) => link.prId),
+          ...prItemRows
+            .filter((row) => insertPrItemIds.includes(row.id))
+            .map((row) => row.prId),
+        ],
+        tx,
+      );
+
+      const lines = await poRepository.findPoItemsByPoId(poId, tx);
+      const po = await poRepository.updatePoById(
+        poId,
+        computeTotalsPaise(lines),
+        tx,
+      );
+      if (!po) {
+        throw new NotFoundError("Purchase order not found");
+      }
+
+      return {
+        po,
+        items: [
+          ...input.updates.flatMap((update) => {
+            const row = updatedById.get(update.id);
+            return row ? [row] : [];
+          }),
+          ...createdItems,
+        ],
+      };
+    });
   },
 
   // BR-PO-11: draft / pending_approval / approved / dispatched with no GRN,

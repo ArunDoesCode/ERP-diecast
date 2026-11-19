@@ -2,19 +2,25 @@
 
 import { IconDotsVertical } from "@tabler/icons-react";
 import {
-	type ColumnDef,
-	getCoreRowModel,
 	type PaginationState,
 	type SortingState,
-	useReactTable,
+	useTable,
 } from "@tanstack/react-table";
 import { useMemo, useState } from "react";
-
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
 import { DataTable } from "@/components/common/DataTable";
 import { DataTableColumnHeader } from "@/components/common/DataTableColumnHeader";
+import {
+	type DataTableColumnDef,
+	dataTableFeatures,
+} from "@/components/common/data-table-features";
+import {
+	listEmptyState,
+	listErrorState,
+} from "@/components/pages/inventory/list-states";
 import { RoleCopyDialog } from "@/components/pages/setup/roles/RoleCopyDialog";
 import { RoleGrantsEditor } from "@/components/pages/setup/roles/RoleGrantsEditor";
+import { Pagination } from "@/components/shared/Pagination";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -53,7 +59,7 @@ export function RoleTable({ onEditRole }: RoleTableProps) {
 	const roles = rolesQuery.data?.data ?? [];
 	const meta = rolesQuery.data?.meta;
 
-	const columns = useMemo<ColumnDef<Role>[]>(() => {
+	const columns = useMemo<DataTableColumnDef<Role>[]>(() => {
 		return [
 			{
 				accessorKey: "name",
@@ -131,10 +137,10 @@ export function RoleTable({ onEditRole }: RoleTableProps) {
 		];
 	}, [onEditRole]);
 
-	const table = useReactTable({
+	const table = useTable({
+		features: dataTableFeatures,
 		data: roles,
 		columns,
-		getCoreRowModel: getCoreRowModel(),
 		manualSorting: true,
 		manualPagination: true,
 		pageCount: meta?.totalPages ?? 1,
@@ -148,7 +154,24 @@ export function RoleTable({ onEditRole }: RoleTableProps) {
 
 	return (
 		<>
-			<DataTable table={table} isLoading={rolesQuery.isLoading} />
+			<DataTable
+				hidePagination
+				table={table}
+				isLoading={rolesQuery.isLoading}
+				emptyState={listEmptyState("No roles yet")}
+				errorState={listErrorState(rolesQuery, "The list could not be loaded.")}
+			/>
+			<Pagination
+				page={pagination.pageIndex + 1}
+				pageSize={pagination.pageSize}
+				total={rolesQuery.data?.meta.total ?? 0}
+				onPageChange={(next) =>
+					setPagination((prev) => ({ ...prev, pageIndex: next - 1 }))
+				}
+				onPageSizeChange={(size) =>
+					setPagination({ pageIndex: 0, pageSize: size })
+				}
+			/>
 
 			<RoleGrantsEditor
 				roleId={grantsRoleId}

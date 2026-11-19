@@ -185,7 +185,7 @@ export function LogPoCommunicationDialog({
 					{missingExpectedDate ? (
 						<p
 							role="alert"
-							className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+							className="rounded-md border border-warning/30 bg-warning-subtle px-3 py-2 text-xs text-warning"
 						>
 							This PO has no expected delivery date, so it cannot be sent.
 						</p>

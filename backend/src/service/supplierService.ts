@@ -131,26 +131,87 @@ function diffFields(
 
 type RowResult<T> = { ok: true; data: T } | { ok: false; error: string };
 
-const ITEM_FIELDS = [
-  "supplierSku",
-  "supplierUnitPricePaise",
-  "taxPercentage",
-  "leadTimeDays",
-  "qty",
-  "uom",
-  "isActive",
-] as const;
-const SERVICE_FIELDS = [
-  "serviceUnitPricePaise",
-  "taxPercentage",
-  "leadTimeDays",
-  "isActive",
-] as const;
+type Tx = Parameters<Parameters<typeof supplierRepository.transaction>[0]>[0];
 
-function pickDefined<K extends string>(
-  source: Record<string, unknown>,
-  keys: readonly K[],
-) {
+type PriceListRow = Record<string, unknown> & { id: number };
+
+/**
+ * #22: what differs between an item and a service price-list row. Everything
+ * else (selectors, field diff, history, batch all-or-nothing) is shared.
+ */
+type PriceListKind<E> = {
+  entity: "item" | "service";
+  fields: readonly string[];
+  notOnSupplier: string;
+  /** Row id or item/service id of one edit. */
+  target(edit: E): { rowId: number | undefined; refId: number | undefined };
+  /** The item/service id a stored row points at. */
+  refOf(row: PriceListRow): number;
+  lockRows(
+    supplierId: number,
+    targets: { rowIds: number[]; refIds: number[] },
+    tx: Tx,
+  ): Promise<PriceListRow[]>;
+  /** Extra per-row checks and clean-up; returns an error text or undefined. */
+  prepare?(
+    edit: E,
+    current: PriceListRow,
+    fields: Record<string, unknown>,
+  ): string | undefined;
+  updateRow(
+    rowId: number,
+    data: Record<string, unknown>,
+    tx: Tx,
+  ): Promise<PriceListRow | undefined>;
+};
+
+const ITEM_KIND: PriceListKind<supplierItemEditSchemaType> = {
+  entity: "item",
+  fields: [
+    "supplierSku",
+    "supplierUnitPricePaise",
+    "taxPercentage",
+    "leadTimeDays",
+    "qty",
+    "uom",
+    "isActive",
+  ],
+  notOnSupplier: MSG.itemNotOnSupplier,
+  target: (edit) => ({ rowId: edit.supplierItemsId, refId: edit.itemId }),
+  refOf: (row) => row.itemId as number,
+  lockRows: (supplierId, targets, tx) =>
+    supplierRepository.lockItemRows(supplierId, targets, tx),
+  prepare(edit, current, fields) {
+    if ("supplierSku" in fields) {
+      fields.supplierSku = blankToNull(fields.supplierSku as string | null);
+    }
+    if (edit.uom !== undefined && edit.uom !== current.itemUom) {
+      return MSG.unitMismatch;
+    }
+    return undefined;
+  },
+  updateRow: (rowId, data, tx) =>
+    supplierRepository.updateItemRow(rowId, data, tx),
+};
+
+const SERVICE_KIND: PriceListKind<supplierServiceEditSchemaType> = {
+  entity: "service",
+  fields: [
+    "serviceUnitPricePaise",
+    "taxPercentage",
+    "leadTimeDays",
+    "isActive",
+  ],
+  notOnSupplier: MSG.serviceNotOnSupplier,
+  target: (edit) => ({ rowId: edit.supplierServiceId, refId: edit.serviceId }),
+  refOf: (row) => row.serviceId as number,
+  lockRows: (supplierId, targets, tx) =>
+    supplierRepository.lockServiceRows(supplierId, targets, tx),
+  updateRow: (rowId, data, tx) =>
+    supplierRepository.updateServiceRow(rowId, data, tx),
+};
+
+function pickDefined(source: Record<string, unknown>, keys: readonly string[]) {
   const out: Record<string, unknown> = {};
   for (const key of keys) {
     if (source[key] !== undefined) out[key] = source[key];
@@ -158,110 +219,84 @@ function pickDefined<K extends string>(
   return out;
 }
 
-type Tx = Parameters<Parameters<typeof supplierRepository.transaction>[0]>[0];
-
-async function applyItemEdit(
+/**
+ * Locks every row the edits target in one query, then applies each edit in
+ * order: one UPDATE per changed row, and all history rows in one INSERT at
+ * the end (#42). Returns one result per edit.
+ */
+async function applyEdits<E extends Record<string, unknown>>(
+  kind: PriceListKind<E>,
   tx: Tx,
   supplierId: number,
-  edit: supplierItemEditSchemaType,
+  edits: E[],
   actorId: number,
-): Promise<RowResult<Record<string, unknown>>> {
-  const hasRowId = edit.supplierItemsId !== undefined;
-  const hasItemId = edit.itemId !== undefined;
-  if (hasRowId === hasItemId) {
-    return { ok: false, error: MSG.giveOneTarget };
-  }
-  const fields = pickDefined(edit, ITEM_FIELDS);
-  if (Object.keys(fields).length === 0) {
-    return { ok: false, error: MSG.giveOneField };
-  }
-  if ("supplierSku" in fields) {
-    fields.supplierSku = blankToNull(fields.supplierSku as string | null);
-  }
-
-  const current = await supplierRepository.findItemRow(
+): Promise<RowResult<PriceListRow>[]> {
+  const targets = edits.map((edit) => kind.target(edit));
+  const locked = await kind.lockRows(
     supplierId,
-    { supplierItemsId: edit.supplierItemsId, itemId: edit.itemId },
+    {
+      rowIds: targets.flatMap((t) => (t.rowId !== undefined ? [t.rowId] : [])),
+      refIds: targets.flatMap((t) => (t.refId !== undefined ? [t.refId] : [])),
+    },
     tx,
   );
-  if (!current) {
-    return { ok: false, error: MSG.itemNotOnSupplier };
-  }
-  if (edit.uom !== undefined && edit.uom !== current.itemUom) {
-    return { ok: false, error: MSG.unitMismatch };
-  }
+  const byId = new Map(locked.map((row) => [row.id, row]));
+  const byRef = new Map(locked.map((row) => [kind.refOf(row), row]));
 
-  const changes = diffFields(current, fields);
-  if (changes.length === 0) {
-    return { ok: true, data: current };
-  }
-  const updated = await supplierRepository.updateItemRow(
-    current.id,
-    { ...fields, lastUpdatedBy: actorId, lastUpdatedAt: new Date() },
-    tx,
-  );
-  await supplierRepository.insertHistory(
-    changes.map(
-      (c): SupplierHistoryInsert => ({
+  const history: SupplierHistoryInsert[] = [];
+  const results: RowResult<PriceListRow>[] = [];
+  for (const [index, edit] of edits.entries()) {
+    const { rowId, refId } = targets[index] as (typeof targets)[number];
+    if ((rowId !== undefined) === (refId !== undefined)) {
+      results.push({ ok: false, error: MSG.giveOneTarget });
+      continue;
+    }
+    const fields = pickDefined(edit, kind.fields);
+    if (Object.keys(fields).length === 0) {
+      results.push({ ok: false, error: MSG.giveOneField });
+      continue;
+    }
+    const current =
+      rowId !== undefined ? byId.get(rowId) : byRef.get(refId as number);
+    if (!current) {
+      results.push({ ok: false, error: kind.notOnSupplier });
+      continue;
+    }
+    const problem = kind.prepare?.(edit, current, fields);
+    if (problem) {
+      results.push({ ok: false, error: problem });
+      continue;
+    }
+
+    const changes = diffFields(current, fields);
+    if (changes.length === 0) {
+      results.push({ ok: true, data: current });
+      continue;
+    }
+    const updated = await kind.updateRow(
+      current.id,
+      { ...fields, lastUpdatedBy: actorId, lastUpdatedAt: new Date() },
+      tx,
+    );
+    // A later edit of the same row in this batch sees the new values.
+    const next = updated ? { ...current, ...updated } : current;
+    byId.set(next.id, next);
+    byRef.set(kind.refOf(next), next);
+    for (const change of changes) {
+      history.push({
         supplierId,
-        entity: "item",
+        entity: kind.entity,
         entityId: current.id,
         changedBy: actorId,
-        ...c,
-      }),
-    ),
-    tx,
-  );
-  return { ok: true, data: updated ?? current };
-}
-
-async function applyServiceEdit(
-  tx: Tx,
-  supplierId: number,
-  edit: supplierServiceEditSchemaType,
-  actorId: number,
-): Promise<RowResult<Record<string, unknown>>> {
-  const hasRowId = edit.supplierServiceId !== undefined;
-  const hasServiceId = edit.serviceId !== undefined;
-  if (hasRowId === hasServiceId) {
-    return { ok: false, error: MSG.giveOneTarget };
+        ...change,
+      });
+    }
+    results.push({ ok: true, data: updated ?? current });
   }
-  const fields = pickDefined(edit, SERVICE_FIELDS);
-  if (Object.keys(fields).length === 0) {
-    return { ok: false, error: MSG.giveOneField };
+  if (results.every((result) => result.ok)) {
+    await supplierRepository.insertHistory(history, tx);
   }
-
-  const current = await supplierRepository.findServiceRow(
-    supplierId,
-    { supplierServiceId: edit.supplierServiceId, serviceId: edit.serviceId },
-    tx,
-  );
-  if (!current) {
-    return { ok: false, error: MSG.serviceNotOnSupplier };
-  }
-
-  const changes = diffFields(current, fields);
-  if (changes.length === 0) {
-    return { ok: true, data: current };
-  }
-  const updated = await supplierRepository.updateServiceRow(
-    current.id,
-    { ...fields, lastUpdatedBy: actorId, lastUpdatedAt: new Date() },
-    tx,
-  );
-  await supplierRepository.insertHistory(
-    changes.map(
-      (c): SupplierHistoryInsert => ({
-        supplierId,
-        entity: "service",
-        entityId: current.id,
-        changedBy: actorId,
-        ...c,
-      }),
-    ),
-    tx,
-  );
-  return { ok: true, data: updated ?? current };
+  return results;
 }
 
 class BatchRollback extends Error {}
@@ -272,6 +307,70 @@ function buildBatchSummary(results: { success: boolean }[]) {
     success: results.filter((result) => result.success).length,
     failed: results.filter((result) => !result.success).length,
   };
+}
+
+/**
+ * BR-SUP-19..21: one transaction, all rows or none; per-row reasons come back
+ * either way. BR-SUP-27: a single (non-array) edit of a row that is not on the
+ * supplier is a 404.
+ */
+async function runBatchEdit<E extends Record<string, unknown>>(
+  kind: PriceListKind<E>,
+  supplierId: number,
+  input: E | E[],
+  actorId: number,
+) {
+  await requireSupplier(supplierId);
+  const edits = normalizeToArray(input);
+
+  type Row = {
+    index: number;
+    selector: Record<string, number | undefined>;
+    success: boolean;
+    data?: unknown;
+    error?: string;
+  };
+  let results: Row[] = [];
+  try {
+    await supplierRepository.transaction(async (tx) => {
+      const outcomes = await applyEdits(kind, tx, supplierId, edits, actorId);
+      results = outcomes.map((outcome, index) => {
+        const { rowId, refId } = kind.target(edits[index] as E);
+        const selector =
+          kind.entity === "item"
+            ? { supplierItemsId: rowId, itemId: refId }
+            : { supplierServiceId: rowId, serviceId: refId };
+        return outcome.ok
+          ? { index, selector, success: true, data: outcome.data }
+          : { index, selector, success: false, error: outcome.error };
+      });
+      if (results.some((r) => !r.success)) {
+        throw new BatchRollback();
+      }
+    });
+  } catch (error) {
+    if (!(error instanceof BatchRollback)) throw error;
+    for (const r of results) delete r.data;
+    if (!Array.isArray(input) && results[0]?.error === kind.notOnSupplier) {
+      throw new NotFoundError(kind.notOnSupplier);
+    }
+  }
+
+  return { data: results, summary: buildBatchSummary(results) };
+}
+
+// #22: shared save of one new price-list row (item or service); a repeat
+// row is 409 (BR-SUP-11).
+async function saveOneRow<T>(create: () => Promise<T[]>) {
+  try {
+    const [created] = await create();
+    if (!created) {
+      throw new BadRequestError("Could not save the price list row");
+    }
+    return created;
+  } catch (error) {
+    throw getConflictError(error) ?? error;
+  }
 }
 
 async function requireSupplier(supplierId: number) {
@@ -366,8 +465,8 @@ export const supplierService = {
       throw new BadRequestError(MSG.unitMismatch);
     }
 
-    try {
-      const [created] = await supplierRepository.createSupplierItems(
+    return saveOneRow(() =>
+      supplierRepository.createSupplierItems(
         supplierId,
         [
           {
@@ -376,20 +475,8 @@ export const supplierService = {
           },
         ],
         actorId,
-      );
-
-      if (!created) {
-        throw new BadRequestError("Could not save the price list row");
-      }
-
-      return created;
-    } catch (error) {
-      const conflictError = getConflictError(error);
-      if (conflictError) {
-        throw conflictError;
-      }
-      throw error;
-    }
+      ),
+    );
   },
 
   async createSupplierService(
@@ -406,25 +493,9 @@ export const supplierService = {
       throw new BadRequestError(`Unknown service: ${input.serviceId}`);
     }
 
-    try {
-      const [created] = await supplierRepository.createSupplierServices(
-        supplierId,
-        [input],
-        actorId,
-      );
-
-      if (!created) {
-        throw new BadRequestError("Could not save the price list row");
-      }
-
-      return created;
-    } catch (error) {
-      const conflictError = getConflictError(error);
-      if (conflictError) {
-        throw conflictError;
-      }
-      throw error;
-    }
+    return saveOneRow(() =>
+      supplierRepository.createSupplierServices(supplierId, [input], actorId),
+    );
   },
 
   // Returns the supplier row (contract.md), not {supplier, supplierItems}.
@@ -522,10 +593,17 @@ export const supplierService = {
             data.gstNumber !== undefined
               ? (data.gstNumber as string | null)
               : current.gstNumber;
+          // BR-SUP-04: a changed GSTIN fills PAN again from the new GSTIN
+          // unless the edit also sends a PAN.
+          const gstChanged =
+            data.gstNumber !== undefined &&
+            data.gstNumber !== current.gstNumber;
           let pan =
             data.panNumber !== undefined
               ? (data.panNumber as string | null)
-              : current.panNumber;
+              : gstChanged
+                ? null
+                : current.panNumber;
           if (gst) {
             if (pan && pan !== panFromGstin(gst)) {
               throw new BadRequestError(MSG.panMismatch);
@@ -567,9 +645,12 @@ export const supplierService = {
     // mode "item": one price-list row, same rules as the batch
     const { mode: _, ...edit } = input;
     await requireSupplier(id);
-    const outcome = await supplierRepository.transaction(async (tx) =>
-      applyItemEdit(tx, id, edit, actorId),
+    const [outcome] = await supplierRepository.transaction(async (tx) =>
+      applyEdits(ITEM_KIND, tx, id, [edit], actorId),
     );
+    if (!outcome) {
+      throw new BadRequestError(MSG.giveOneTarget);
+    }
     if (!outcome.ok) {
       if (outcome.error === MSG.itemNotOnSupplier) {
         throw new NotFoundError(outcome.error);
@@ -579,51 +660,13 @@ export const supplierService = {
     return outcome.data;
   },
 
-  // BR-SUP-19..21: one transaction, all rows or none; per-row reasons come back either way.
+  // BR-SUP-19..21, 27: see runBatchEdit.
   async editSupplierItems(
     supplierId: number,
     input: supplierItemBatchEditSchemaType,
     actorId: number,
   ) {
-    await requireSupplier(supplierId);
-    const edits = normalizeToArray(input);
-
-    type Row = {
-      index: number;
-      selector: {
-        supplierItemsId: number | undefined;
-        itemId: number | undefined;
-      };
-      success: boolean;
-      data?: unknown;
-      error?: string;
-    };
-    const results: Row[] = [];
-    try {
-      await supplierRepository.transaction(async (tx) => {
-        await supplierRepository.lockItemRowsOrdered(supplierId, tx);
-        for (const [index, edit] of edits.entries()) {
-          const selector = {
-            supplierItemsId: edit.supplierItemsId,
-            itemId: edit.itemId,
-          };
-          const outcome = await applyItemEdit(tx, supplierId, edit, actorId);
-          results.push(
-            outcome.ok
-              ? { index, selector, success: true, data: outcome.data }
-              : { index, selector, success: false, error: outcome.error },
-          );
-        }
-        if (results.some((r) => !r.success)) {
-          throw new BatchRollback();
-        }
-      });
-    } catch (error) {
-      if (!(error instanceof BatchRollback)) throw error;
-      for (const r of results) delete r.data;
-    }
-
-    return { data: results, summary: buildBatchSummary(results) };
+    return runBatchEdit(ITEM_KIND, supplierId, input, actorId);
   },
 
   async editSupplierServices(
@@ -631,45 +674,7 @@ export const supplierService = {
     input: supplierServiceBatchEditSchemaType,
     actorId: number,
   ) {
-    await requireSupplier(supplierId);
-    const edits = normalizeToArray(input);
-
-    type Row = {
-      index: number;
-      selector: {
-        supplierServiceId: number | undefined;
-        serviceId: number | undefined;
-      };
-      success: boolean;
-      data?: unknown;
-      error?: string;
-    };
-    const results: Row[] = [];
-    try {
-      await supplierRepository.transaction(async (tx) => {
-        await supplierRepository.lockServiceRowsOrdered(supplierId, tx);
-        for (const [index, edit] of edits.entries()) {
-          const selector = {
-            supplierServiceId: edit.supplierServiceId,
-            serviceId: edit.serviceId,
-          };
-          const outcome = await applyServiceEdit(tx, supplierId, edit, actorId);
-          results.push(
-            outcome.ok
-              ? { index, selector, success: true, data: outcome.data }
-              : { index, selector, success: false, error: outcome.error },
-          );
-        }
-        if (results.some((r) => !r.success)) {
-          throw new BatchRollback();
-        }
-      });
-    } catch (error) {
-      if (!(error instanceof BatchRollback)) throw error;
-      for (const r of results) delete r.data;
-    }
-
-    return { data: results, summary: buildBatchSummary(results) };
+    return runBatchEdit(SERVICE_KIND, supplierId, input, actorId);
   },
 };
 

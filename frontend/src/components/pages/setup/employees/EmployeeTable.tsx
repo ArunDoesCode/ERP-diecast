@@ -2,18 +2,25 @@
 
 import { IconDotsVertical } from "@tabler/icons-react";
 import {
-	type ColumnDef,
-	getCoreRowModel,
 	type PaginationState,
 	type SortingState,
-	useReactTable,
+	useTable,
 } from "@tanstack/react-table";
 import { useMemo, useState } from "react";
-
 import { ConfirmDeleteDialog } from "@/components/common/ConfirmDeleteDialog";
 import { DataTable } from "@/components/common/DataTable";
 import { DataTableColumnHeader } from "@/components/common/DataTableColumnHeader";
+import {
+	type DataTableColumnDef,
+	dataTableFeatures,
+} from "@/components/common/data-table-features";
+import {
+	listEmptyState,
+	listErrorState,
+} from "@/components/pages/inventory/list-states";
 import { EmployeeRoleDialog } from "@/components/pages/setup/employees/EmployeeRoleDialog";
+import { Pagination } from "@/components/shared/Pagination";
+import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,6 +34,7 @@ import {
 	useEmployeesQuery,
 	useRolesQuery,
 } from "@/lib/api/setup/queries";
+import { formatMoney } from "@/lib/format";
 import type { Employee, EmployeeSortField } from "@/types/setup";
 
 type EmployeeTableProps = {
@@ -60,7 +68,7 @@ export function EmployeeTable({ onEditEmployee }: EmployeeTableProps) {
 	const meta = employeesQuery.data?.meta;
 	const roles = rolesQuery.data?.data ?? [];
 
-	const columns = useMemo<ColumnDef<Employee>[]>(() => {
+	const columns = useMemo<DataTableColumnDef<Employee>[]>(() => {
 		function resolveRoleName(roleId: number) {
 			return roles.find((role) => role.id === roleId)?.name ?? "—";
 		}
@@ -89,11 +97,7 @@ export function EmployeeTable({ onEditEmployee }: EmployeeTableProps) {
 				header: ({ column }) => (
 					<DataTableColumnHeader column={column} title="Daily Rate" />
 				),
-				cell: ({ getValue }) =>
-					(getValue<number>() / 100).toLocaleString(undefined, {
-						style: "currency",
-						currency: "INR",
-					}),
+				cell: ({ getValue }) => formatMoney(getValue<number>()),
 			},
 			{
 				accessorKey: "isActive",
@@ -101,9 +105,10 @@ export function EmployeeTable({ onEditEmployee }: EmployeeTableProps) {
 					<DataTableColumnHeader column={column} title="Status" />
 				),
 				cell: ({ getValue }) => (
-					<Badge variant={getValue<boolean>() ? "default" : "outline"}>
-						{getValue<boolean>() ? "Active" : "Inactive"}
-					</Badge>
+					<StatusBadge
+						doc="employee"
+						status={getValue<boolean>() ? "active" : "inactive"}
+					/>
 				),
 			},
 			{
@@ -141,10 +146,10 @@ export function EmployeeTable({ onEditEmployee }: EmployeeTableProps) {
 		];
 	}, [roles, onEditEmployee]);
 
-	const table = useReactTable({
+	const table = useTable({
+		features: dataTableFeatures,
 		data: employees,
 		columns,
-		getCoreRowModel: getCoreRowModel(),
 		manualSorting: true,
 		manualPagination: true,
 		pageCount: meta?.totalPages ?? 1,
@@ -159,7 +164,27 @@ export function EmployeeTable({ onEditEmployee }: EmployeeTableProps) {
 
 	return (
 		<>
-			<DataTable table={table} isLoading={employeesQuery.isLoading} />
+			<DataTable
+				hidePagination
+				table={table}
+				isLoading={employeesQuery.isLoading}
+				emptyState={listEmptyState("No employees yet")}
+				errorState={listErrorState(
+					employeesQuery,
+					"The list could not be loaded.",
+				)}
+			/>
+			<Pagination
+				page={pagination.pageIndex + 1}
+				pageSize={pagination.pageSize}
+				total={employeesQuery.data?.meta.total ?? 0}
+				onPageChange={(next) =>
+					setPagination((prev) => ({ ...prev, pageIndex: next - 1 }))
+				}
+				onPageSizeChange={(size) =>
+					setPagination({ pageIndex: 0, pageSize: size })
+				}
+			/>
 
 			<EmployeeRoleDialog
 				employee={employeeForRole}

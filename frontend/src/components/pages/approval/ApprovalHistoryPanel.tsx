@@ -1,8 +1,9 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useApprovalHistoryQuery } from "@/lib/api/approval/queries";
+import { formatDateTime } from "@/lib/format";
 import type { ApprovalDocType } from "@/types/approval";
 
 const ACTION_LABEL: Record<string, string> = {
@@ -15,24 +16,6 @@ const ACTION_LABEL: Record<string, string> = {
 	cancelled: "Cancelled",
 	withdrawn: "Withdrawn",
 };
-
-const STATUS_LABEL: Record<string, string> = {
-	pending_approval: "Waiting for approval",
-	approved: "Approved",
-	rejected: "Rejected",
-	require_more_info: "Sent back",
-	auto_approved: "Auto-approved",
-	cancelled: "Cancelled",
-	partial_ordered: "Partly ordered",
-	fully_ordered: "Fully ordered",
-};
-
-function formatDate(value: string) {
-	return new Intl.DateTimeFormat(undefined, {
-		dateStyle: "medium",
-		timeStyle: "short",
-	}).format(new Date(value));
-}
 
 /** BR-APR-54: every approval request of a document, newest first, with its trail. */
 export function ApprovalHistoryPanel({
@@ -65,11 +48,9 @@ export function ApprovalHistoryPanel({
 					{history.map((request, index) => (
 						<li key={request.id} className="rounded-md border p-3 text-xs">
 							<div className="flex flex-wrap items-center gap-2">
-								<Badge variant="outline">
-									{STATUS_LABEL[request.status] ?? request.status}
-								</Badge>
+								<StatusBadge doc="approval" status={request.status} />
 								<span className="text-muted-foreground">
-									Requested {formatDate(request.requestedAt)}
+									Requested {formatDateTime(request.requestedAt)}
 								</span>
 								{index === 0 && request.status === "pending_approval" ? (
 									<span>
@@ -88,7 +69,7 @@ export function ApprovalHistoryPanel({
 										<span className="font-medium">
 											{ACTION_LABEL[entry.action] ?? entry.action}
 										</span>{" "}
-										by {entry.actorName} · {formatDate(entry.actionAt)}
+										by {entry.actorName} · {formatDateTime(entry.actionAt)}
 										{entry.notes ? (
 											<p className="text-muted-foreground">“{entry.notes}”</p>
 										) : null}

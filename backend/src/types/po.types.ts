@@ -37,6 +37,8 @@ export type gstPercentSchemaType = z.infer<typeof gstPercentSchema>;
 // when, BR-PO-11, 13, 21) plus the canceller's name and the due date (BR-PO-19).
 export const poResponseSchema = poSchema.extend({
   cancelledByName: z.string().nullable(),
+  // BR-PO-24
+  supplierName: z.string(),
   // BR-PO-19: revisedDeliveryDate if set, else expectedDeliveryDate.
   dueDate: z.date().nullable(),
 });

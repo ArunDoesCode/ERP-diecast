@@ -1,11 +1,16 @@
 "use client";
 
-import { IconArrowLeft } from "@tabler/icons-react";
+import { IconDots } from "@tabler/icons-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { EditGrnModal } from "@/components/pages/grn/EditGrnModal";
 import { GrnLinesTable } from "@/components/pages/grn/GrnLinesTable";
+import { DetailHeader } from "@/components/shared/DetailHeader";
+import { DocumentFlow } from "@/components/shared/DocumentFlow";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { StatusBadge } from "@/components/shared/StatusBadge";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -15,29 +20,23 @@ import {
 	AlertDialogFooter,
 	AlertDialogHeader,
 	AlertDialogTitle,
-	AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCan } from "@/hooks/use-can";
 import { useDeleteGrnMutation, useGrnDetailQuery } from "@/lib/api/grn/queries";
-import { getGrnStatusBadgeStyle } from "@/lib/grn-status-badge";
-import { humanizeStatusLabel } from "@/lib/pr-status-badge";
-import type { Grn } from "@/types/grn";
-
-function formatDate(value?: string | null) {
-	if (!value) return "-";
-	return new Date(value).toLocaleDateString("en-IN", {
-		day: "2-digit",
-		month: "short",
-		year: "numeric",
-	});
-}
+import { formatDate, formatDocNo } from "@/lib/format";
+import { useBreadcrumbLast } from "@/lib/shell/breadcrumb-last";
+import type { Grn, GrnLinkedPo, GrnLinkedPr } from "@/types/grn";
 
 export function GrnDetailView({ grnId }: { grnId: number }) {
-	const router = useRouter();
 	const canEditDraft = useCan("grn.edit_draft");
 	const [editOpen, setEditOpen] = useState(false);
 
@@ -45,54 +44,82 @@ export function GrnDetailView({ grnId }: { grnId: number }) {
 	const detail = detailQuery.data?.success ? detailQuery.data.data : undefined;
 	const grn = detail?.grn;
 	const items = detail?.items ?? [];
+	useBreadcrumbLast(grn?.grnNumber);
 
 	const canManage = canEditDraft && grn?.status === "draft";
 
+	if (detailQuery.isLoading) {
+		return (
+			<div className="flex w-full flex-col gap-4">
+				<DetailHeader
+					docNo=""
+					status={null}
+					backHref="/grn"
+					backLabel="goods receipts"
+					loading
+				/>
+				<Skeleton className="h-96 w-full" />
+			</div>
+		);
+	}
+
+	if (!detail || !grn) {
+		return (
+			<EmptyState
+				title="GRN not found"
+				description="It may have been deleted, or the link is wrong."
+				action={
+					<Button type="button" variant="outline" size="sm" asChild>
+						<Link href="/grn">Back to goods receipts</Link>
+					</Button>
+				}
+			/>
+		);
+	}
+
 	return (
-		<div className="flex w-full flex-col gap-4 p-6">
-			<Button
-				type="button"
-				variant="ghost"
-				size="sm"
-				className="w-fit"
-				onClick={() => router.push("/grn")}
-			>
-				<IconArrowLeft className="size-3.5" />
-				Back to GRN tracking
-			</Button>
+		<div className="flex w-full min-w-0 flex-col gap-4">
+			<DetailHeader
+				docNo={formatDocNo(grn.grnNumber)}
+				status={<StatusBadge doc="grn" status={grn.status} />}
+				backHref="/grn"
+				backLabel="goods receipts"
+				meta={[
+					{
+						label: "PO",
+						value: detail.po ? (
+							<span className="font-mono">
+								{formatDocNo(detail.po.poNumber)}
+							</span>
+						) : (
+							"No linked PO"
+						),
+					},
+					{ label: "Received", value: formatDate(grn.receivedDate) },
+					{ label: "Challan", value: grn.challanNo ?? "–" },
+					{ label: "Vehicle", value: grn.vehicleNo ?? "–" },
+				]}
+				actions={
+					canManage ? (
+						<GrnDraftActions grn={grn} onEdit={() => setEditOpen(true)} />
+					) : undefined
+				}
+			/>
 
-			{detailQuery.isLoading ? (
-				<DetailSkeleton />
-			) : !detail || !grn ? (
-				<Card>
-					<CardContent className="py-10 text-center text-muted-foreground">
-						GRN not found.
-					</CardContent>
-				</Card>
-			) : (
-				<div className="flex min-w-0 flex-col gap-4">
-					<DetailHeader
-						grn={grn}
-						canManage={canManage}
-						onEdit={() => setEditOpen(true)}
-					/>
+			<GrnDocumentFlow grn={grn} po={detail.po} prs={detail.prs} />
 
-					<Card>
-						<CardHeader>
-							<CardTitle>Lines</CardTitle>
-						</CardHeader>
-						<CardContent>
-							<GrnLinesTable
-								grnId={grn.id}
-								poId={grn.poId ?? 0}
-								items={items}
-							/>
-						</CardContent>
-					</Card>
-				</div>
-			)}
+			<GrnDeliveryDetails grn={grn} />
 
-			{editOpen && grn ? (
+			<Card>
+				<CardHeader>
+					<CardTitle>Lines</CardTitle>
+				</CardHeader>
+				<CardContent>
+					<GrnLinesTable grnId={grn.id} poId={grn.poId ?? 0} items={items} />
+				</CardContent>
+			</Card>
+
+			{editOpen ? (
 				<EditGrnModal
 					grnId={grn.id}
 					open={editOpen}
@@ -104,88 +131,129 @@ export function GrnDetailView({ grnId }: { grnId: number }) {
 	);
 }
 
-function DetailHeader({
+/** Requisition → purchase order → goods receipt, this GRN current (BR-GRN-45). */
+function GrnDocumentFlow({
 	grn,
-	canManage,
-	onEdit,
+	po,
+	prs,
 }: {
 	grn: Grn;
-	canManage: boolean;
-	onEdit: () => void;
+	po: GrnLinkedPo | null;
+	prs: GrnLinkedPr[];
 }) {
-	const badgeStyle = getGrnStatusBadgeStyle(grn.status);
-	const deleteMutation = useDeleteGrnMutation();
-	const router = useRouter();
-
+	const firstPr = prs[0];
 	return (
-		<div className="flex flex-col gap-3 border-b pb-4 lg:flex-row lg:items-end lg:justify-between">
-			<div>
-				<div className="flex flex-wrap items-center gap-2">
-					<h2 className="font-heading text-xl font-medium">{grn.grnNumber}</h2>
-					<Badge variant={badgeStyle.variant} className={badgeStyle.className}>
-						{humanizeStatusLabel(grn.status)}
-					</Badge>
-				</div>
-				<p className="text-xs text-muted-foreground">
-					{grn.poId != null ? `PO #${grn.poId}` : "No linked PO"} · Received{" "}
-					{formatDate(grn.receivedDate)}
-				</p>
-			</div>
-
-			<div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground sm:grid-cols-3">
-				<span>Challan {grn.challanNo ?? "-"}</span>
-				<span>Vehicle {grn.vehicleNo ?? "-"}</span>
-				<span>Driver {grn.driverName ?? "-"}</span>
-				{grn.driverPhone ? <span>Phone {grn.driverPhone}</span> : null}
-				{grn.remarks ? <span>Remarks {grn.remarks}</span> : null}
-			</div>
-
-			{canManage ? (
-				<div className="flex flex-wrap gap-2">
-					<Button type="button" size="sm" variant="outline" onClick={onEdit}>
-						Edit
-					</Button>
-					<AlertDialog>
-						<AlertDialogTrigger asChild>
-							<Button type="button" size="sm" variant="outline">
-								Delete
-							</Button>
-						</AlertDialogTrigger>
-						<AlertDialogContent>
-							<AlertDialogHeader>
-								<AlertDialogTitle>Delete {grn.grnNumber}?</AlertDialogTitle>
-								<AlertDialogDescription>
-									Only legal while draft. Cannot be undone.
-								</AlertDialogDescription>
-							</AlertDialogHeader>
-							<AlertDialogFooter>
-								<AlertDialogCancel>Cancel</AlertDialogCancel>
-								<AlertDialogAction
-									disabled={deleteMutation.isPending}
-									onClick={() =>
-										deleteMutation.mutate(grn.id, {
-											onSuccess: (result) => {
-												if (result.success) router.push("/grn");
-											},
-										})
-									}
-								>
-									Delete
-								</AlertDialogAction>
-							</AlertDialogFooter>
-						</AlertDialogContent>
-					</AlertDialog>
-				</div>
-			) : null}
-		</div>
+		<DocumentFlow
+			steps={[
+				{
+					label: "Requisition",
+					docNo: firstPr
+						? prs.length > 1
+							? `${firstPr.prNumber} +${prs.length - 1}`
+							: firstPr.prNumber
+						: undefined,
+					href: firstPr ? `/purchase-orders/${firstPr.id}` : undefined,
+					status: firstPr ? (
+						<StatusBadge doc="pr" status={firstPr.status} />
+					) : undefined,
+					state: firstPr ? "done" : "todo",
+				},
+				{
+					label: "Purchase order",
+					docNo: po?.poNumber,
+					status: po ? <StatusBadge doc="po" status={po.status} /> : undefined,
+					state: po ? "done" : "todo",
+				},
+				{
+					label: "Goods receipt",
+					docNo: grn.grnNumber,
+					status: <StatusBadge doc="grn" status={grn.status} />,
+					state: "current",
+				},
+			]}
+		/>
 	);
 }
 
-function DetailSkeleton() {
+/** Driver, phone and remarks: the fields DetailHeader's four meta pairs leave out. */
+function GrnDeliveryDetails({ grn }: { grn: Grn }) {
+	const rows = [
+		{ label: "Driver", value: grn.driverName },
+		{ label: "Phone", value: grn.driverPhone },
+		{ label: "Remarks", value: grn.remarks },
+	].filter((row) => row.value);
+	if (rows.length === 0) return null;
 	return (
-		<div className="space-y-4">
-			<Skeleton className="h-16 w-full" />
-			<Skeleton className="h-96 w-full" />
-		</div>
+		<dl className="flex flex-wrap gap-x-6 gap-y-1 text-[13px]">
+			{rows.map((row) => (
+				<div key={row.label} className="flex gap-1.5">
+					<dt className="text-xs font-semibold text-muted-foreground">
+						{row.label}
+					</dt>
+					<dd>{row.value}</dd>
+				</div>
+			))}
+		</dl>
+	);
+}
+
+/** Edit stays a button; Delete lives in the "More" menu behind a confirm dialog naming the GRN (BR-DS-08). */
+function GrnDraftActions({ grn, onEdit }: { grn: Grn; onEdit: () => void }) {
+	const deleteMutation = useDeleteGrnMutation();
+	const router = useRouter();
+	const [confirmOpen, setConfirmOpen] = useState(false);
+
+	return (
+		<>
+			<Button type="button" size="sm" variant="outline" onClick={onEdit}>
+				Edit
+			</Button>
+			<DropdownMenu>
+				<DropdownMenuTrigger asChild>
+					<Button
+						type="button"
+						size="sm"
+						variant="outline"
+						aria-label={`More actions for ${grn.grnNumber}`}
+					>
+						<IconDots className="size-3.5" />
+						More
+					</Button>
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align="end">
+					<DropdownMenuItem
+						variant="destructive"
+						onSelect={() => setConfirmOpen(true)}
+					>
+						Delete GRN
+					</DropdownMenuItem>
+				</DropdownMenuContent>
+			</DropdownMenu>
+			<AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Delete {grn.grnNumber}?</AlertDialogTitle>
+						<AlertDialogDescription>
+							Only legal while draft. Cannot be undone.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction
+							disabled={deleteMutation.isPending}
+							onClick={() =>
+								deleteMutation.mutate(grn.id, {
+									onSuccess: (result) => {
+										if (result.success) router.push("/grn");
+									},
+								})
+							}
+						>
+							Delete
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+		</>
 	);
 }

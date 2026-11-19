@@ -12,7 +12,7 @@ export function ScoFormView({ scoId }: { scoId?: number }) {
 
 	if (!canManage) {
 		return (
-			<p className="p-6 text-sm text-muted-foreground">
+			<p className="text-sm text-muted-foreground">
 				You do not have permission to create or edit orders.
 			</p>
 		);
@@ -27,7 +27,7 @@ export function ScoFormView({ scoId }: { scoId?: number }) {
 	const result = detailQuery.data;
 	if (!result?.success) {
 		return (
-			<p className="p-6 text-sm text-muted-foreground">
+			<p className="text-sm text-muted-foreground">
 				{result?.message ?? "Order not found."}
 			</p>
 		);
@@ -35,7 +35,7 @@ export function ScoFormView({ scoId }: { scoId?: number }) {
 
 	if (result.data.sco.status !== "draft") {
 		return (
-			<p className="p-6 text-sm text-muted-foreground">
+			<p className="text-sm text-muted-foreground">
 				Only a draft order can be edited.
 			</p>
 		);

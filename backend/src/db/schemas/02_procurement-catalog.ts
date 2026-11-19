@@ -53,6 +53,15 @@ export const itemMaster = pgTable(
     skuNormUq: uniqueIndex("uq_item_master_sku_norm").on(
       sql`lower(btrim(${t.sku}))`,
     ),
+    // Item / stock list search (ilike %q%, #38): pg_trgm GIN
+    skuTrgm: index("idx_item_master_sku_trgm").using(
+      "gin",
+      t.sku.op("gin_trgm_ops"),
+    ),
+    nameTrgm: index("idx_item_master_name_trgm").using(
+      "gin",
+      t.name.op("gin_trgm_ops"),
+    ),
   }),
 );
 

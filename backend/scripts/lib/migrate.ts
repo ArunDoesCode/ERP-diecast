@@ -145,7 +145,7 @@ export type Target = {
   dbName: string;
   user: string;
   password: string;
-  /** host:port/db, never the password */
+  /** host:port/db, never the password (IPv6 host in brackets) */
   label: string;
   /** host is this machine (localhost, 127.0.0.1, ::1) */
   local: boolean;
@@ -153,7 +153,7 @@ export type Target = {
   usual: boolean;
 };
 
-const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 
 /** Reads the DB the driver will really connect to (URL first, then PG* variables). */
 export function parseTarget(
@@ -179,7 +179,11 @@ export function parseTarget(
       "DATABASE_URL has a query string (connection overrides such as ?database=); refused. Put the settings in the URL path and host instead.",
     );
   }
-  const host = (u.hostname || env.PGHOST || "").toLowerCase();
+  // An IPv6 literal comes back from URL as "[::1]"; the driver connects to "::1", so judge that
+  // (#85: the bracketed form passed the local check but never matched the driver).
+  const host = (u.hostname || env.PGHOST || "")
+    .toLowerCase()
+    .replace(/^\[(.*)\]$/, "$1");
   const port = u.port || env.PGPORT || "5432";
   // Not decoded: the driver sends the path as written, so the guard must judge that same name.
   const dbName = u.pathname.replace(/^\//, "") || env.PGDATABASE || "";
@@ -195,7 +199,7 @@ export function parseTarget(
     dbName,
     user: decodeURIComponent(u.username) || env.PGUSER || "",
     password: decodeURIComponent(u.password) || env.PGPASSWORD || "",
-    label: `${host}:${port}/${dbName}`,
+    label: `${host.includes(":") ? `[${host}]` : host}:${port}/${dbName}`,
     local,
     usual,
   };

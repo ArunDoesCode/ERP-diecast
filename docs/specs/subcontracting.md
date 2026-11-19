@@ -31,10 +31,11 @@ Seed: ow owner, bo back_office.
 
 | Action | Key | Seed roles |
 |---|---|---|
-| view SCOs, challans, receipts, vendor stock | `sco.view` | ow, bo, fs, qa |
+| view SCOs, challans, receipts, vendor stock, company settings and their history | `sco.view` | ow, bo, fs, qa |
 | create / edit draft, submit, cancel | `sco.manage` | ow, bo |
 | issue material (challan), enter receipt | `sco.issue_receive` | ow, bo, fs |
 | QA accept / reject a receipt line | `sco.qa_decide` | ow, bo, qa |
+| edit company settings | `company.manage` | ow |
 | close SCO with nothing left at the vendor | `sco.close` | ow, bo |
 | close SCO with any loss (write-off) | `sco.close` + `sco.loss_override` | ow |
 | approve | the approval chain (`approval.md`) | |
@@ -82,11 +83,15 @@ the server or the browser runs in.
 | BR-SCO-18 | The SCO becomes `material_received` when every line is fully issued and nothing is left at the vendor. | 1000 issued, 980 accepted + 20 rejected → material_received |
 | BR-SCO-19 | Close needs `sco.close`. If anything is left at the vendor, close also needs `sco.loss_override` and a reason (3–500 chars); that qty is written off as process loss from the vendor location at issue cost (ledger reference `sco_loss`, BR-GRN-43). No loss is allowed without the owner. Un-issued qty is dropped. | 1000 issued, 1000 back, bo closes → closed; 990 back, bo closes → 403; ow closes, no reason → 400; ow, reason "chips lost in machining" → 10 written off, closed |
 | BR-SCO-20 | Cancel only while nothing is issued, from draft, pending_approval or approved; reason always needed, 3–500 chars, draft included; an open approval request is cancelled too (BR-APR-48). After a challan → 409. | approved, no challan, reason "vendor down" → cancelled |
-| BR-SCO-21 | SCOs, challans and receipts are never deleted; a mistake after posting is fixed by a receipt, a close or (later) a correction, never by edit. | delete a posted challan → 400 |
+| BR-SCO-21 | SCOs, challans and receipts are never deleted; a mistake after posting is fixed by a receipt, a close or (later) a correction, never by edit. No delete route exists for any of them. | DELETE an SCO, a challan or a receipt → 404, nothing changes |
 | BR-SCO-22 | The SCO shows job-work charge due = Σ accepted × service price, plus GST at the line %, for checking the vendor's bill. No bill is posted in v1. | 980 accepted → ₹24,500 + ₹4,410 GST |
 | BR-SCO-23 | Every action needs its key from "Who can do what"; otherwise 403 and nothing changes. | fs closes SCO → 403; qa makes a challan → 403 |
 | BR-SCO-24 | Challan, receipt, QA decision and close each save everything in one go (ledger rows, SCO lines, status, challan settlement) and lock the SCO first; the loser of a race gets 409, nothing half-written. | two challans for the last 400 at once → one 200, one 409 |
 | BR-SCO-25 | Every posting stores who, when, reason (if any) and the heat number, so a finished part traces back to its challan and casting batch. | HSG-MC receipt row → challan JWC/26-27/4, heat H-231 |
+| BR-SCO-26 | Read-only: each SCO line in SCO details carries the raw and finished items' units (`rawItemUom`, `finishedItemUom`), and screens label quantities with them. | Raw item H13 in kg → line shows `rawItemUom` "kg" |
+| BR-SCO-27 | A receipt's received date is optional and defaults to today; it can't be after today (400 `SCO_RECEIPT_DATE_FUTURE`, nothing saved); back-dating stays open (as challans, BR-SCO-09). Its number is `SCO-GRN-<period>-<seq>`, period = year-month of the IST day the receipt is saved, never reused (dates note above; same as BR-SCO-01). | at 02:00 IST on 1 Oct 2026: received date 2 Oct → 400; 1 Oct or 28 Sep → saved; saved at 00:30 IST on 1 Nov 2026 → SCO-GRN-2026-11-… (not 2026-10) |
+| BR-SCO-28 | On a QA decision the raw issue cost is the average issue cost of the challan pieces that receipt line settled. If that line settled no raw piece (ratio < 1 and the rounding of BR-SCO-14 gave 0 pieces), the issue cost is the weighted average issue cost of all challans of that SCO line, never 0. | 1 raw → 3 finished, challans 10 pcs @ 12,000; 1 piece back maps to 0 raw → finished cost = 4,000 (12,000 ÷ 3) + service price, not the service price alone |
+| BR-SCO-29 | Every save of company settings (name, address, GSTIN, state) adds a history row per changed field: old value, new value, who, when. Rows are never edited or deleted. Whoever can read company settings (`sco.view`) can read the history, newest first. | owner changes GSTIN 27AAA… → 27BBB… → row "Arun, 19-11 10:00, GSTIN 27AAA… → 27BBB…"; fs (holds `sco.view`) reads it; save with no change → no row |
 
 ### Acceptance — IST day (v4, BL-079)
 
@@ -138,3 +143,7 @@ None open.
 - 2026-09-29 — v3 (Arun, BL-072): challan date can't be in the future → 400 (BR-SCO-09); back-dating stays open. No other rule changed.
 - 2026-10-01 — v4 change request (BL-079, #63): every SCO "today" / days-left = plant calendar day in IST (Asia/Kolkata), same on server and date picker (BR-SCO-03, 09, 11; dates note above Rules; FY and number period follow it). Fixes 00:00–05:30 IST mismatch. No other rule changed. Awaiting re-freeze.
 - 2026-10-01 — v4 frozen (Arun): IST-day rules as above; no open questions.
+- 2026-11-19 — change after freeze, approved by Arun in chat: BR-SCO-26 (item units on SCO lines; screens always said "pcs"). Read-only; the whole-number rule (BR-SCO-02) is unchanged.
+- 2026-11-19 — change after freeze, approved by Arun in chat: BR-SCO-21 example — no delete route, so DELETE → 404 (#59).
+- 2026-11-19 — change after freeze, approved by Arun in chat: BR-SCO-27 receipt date can't be in the future (#83) and receipt number period on the IST day (#82; the v4 dates note already covered it, BR-SCO-27 names it). BR-SCO-28 QA issue cost falls back to all challans of the line when ratio < 1 maps to 0 raw pieces (#60). Why: `subcontracting.assumptions.md`.
+- 2026-11-19 — change after freeze, approved by Arun in chat: BR-SCO-29 company settings change history (#58).

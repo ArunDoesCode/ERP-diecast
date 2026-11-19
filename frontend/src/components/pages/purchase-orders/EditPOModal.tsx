@@ -24,11 +24,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import {
 	usePurchaseOrderDetailQuery,
+	useSupplierPriceRowsQuery,
 	useUpdatePurchaseOrderMutation,
 } from "@/lib/api/purchase-orders/queries";
-import { useSupplierItemsQuery } from "@/lib/api/suppliers/queries";
 import { formatMoney } from "@/lib/format";
-import { GST_PERCENT_VALUES } from "@/types/purchase-orders";
+import {
+	GST_PERCENT_VALUES,
+	suggestedRateInput,
+} from "@/types/purchase-orders";
 import type { PurchaseRequisitionItem } from "@/types/purchase-requisitions";
 
 function GstSelect({
@@ -89,19 +92,21 @@ export function EditPOModal({
 	);
 	const [addedRates, setAddedRates] = useState<Record<number, string>>({});
 	const updateMutation = useUpdatePurchaseOrderMutation();
-	// GST % for newly added lines comes from the supplier's active price list.
-	const supplierItemsQuery = useSupplierItemsQuery(
+	// GST % for newly added lines comes from the supplier's active price list,
+	// read for exactly the lines that can be added (#107: no 100-row cap).
+	const priceRowsQuery = useSupplierPriceRowsQuery(
 		po?.supplierId ?? 0,
-		{ page: 1, pageSize: 100 },
+		pendingLines.map((line) => line.itemId),
 		open && Boolean(po),
 	);
 	const catalogGstByItemId = useMemo(() => {
 		const map = new Map<number, number>();
-		for (const item of supplierItemsQuery.data?.data ?? []) {
-			if (item.taxPercentage != null) map.set(item.itemId, item.taxPercentage);
+		for (const item of priceRowsQuery.data ?? []) {
+			if (item.isActive === false || item.taxPercentage == null) continue;
+			map.set(item.itemId, item.taxPercentage);
 		}
 		return map;
-	}, [supplierItemsQuery.data?.data]);
+	}, [priceRowsQuery.data]);
 
 	// Seed form state from the fetched PO exactly once per time the modal opens —
 	// not on every `po`/`items` reference change, or a background refetch (e.g.
@@ -178,7 +183,8 @@ export function EditPOModal({
 		setAddedLineIds((current) => new Set(current).add(lineId));
 		setAddedRates((current) => ({
 			...current,
-			[lineId]: current[lineId] ?? String((estRatePaise ?? 0) / 100),
+			// BR-PO-25: a 0 suggestion is not prefilled.
+			[lineId]: current[lineId] ?? suggestedRateInput(estRatePaise),
 		}));
 		setAddedGsts((current) => ({
 			...current,
@@ -263,7 +269,7 @@ export function EditPOModal({
 										Supplier
 									</span>
 									<div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
-										Supplier #{po.supplierId}
+										{po.supplierName}
 									</div>
 								</div>
 								<div>

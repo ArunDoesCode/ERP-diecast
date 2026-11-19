@@ -110,6 +110,24 @@ describe("BR-DS-03 one label, tone and icon per status", () => {
 	});
 });
 
+describe("BR-DS-03 master-data docs: active is success, inactive is closed (2026-11-19)", () => {
+	const DOCS: StatusDoc[] = [
+		"supplier",
+		"item",
+		"machine",
+		"employee",
+		"policy",
+	];
+	for (const doc of DOCS) {
+		test(`BR-DS-03 ${doc}/active -> success`, () => {
+			expect(getStatusTone(doc, "active").tone).toBe("success");
+		});
+		test(`BR-DS-03 ${doc}/inactive -> closed`, () => {
+			expect(getStatusTone(doc, "inactive").tone).toBe("closed");
+		});
+	}
+});
+
 describe("BR-DS-04 unknown or missing status never throws", () => {
 	const UNKNOWN: Array<[string, string | null | undefined]> = [
 		["not in the map", "on_hold"],

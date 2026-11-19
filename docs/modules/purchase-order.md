@@ -79,7 +79,7 @@ Submit / decide go through `POST /approval/submitRequest` and `actOnRequest` (`d
 - `dispatched` may jump straight to `fully_received` (single GRN pass).
 - `po_communications.status` is always `logged`; nothing is sent.
 - `PurchaseOrderDetailView` route param `prId` is a PR id. Do not rename it.
-- Last-rate `source` values from `getLastRate`: `po_history`, `supplier_catalog`, `pr_estimate` (= item average), `standard_rate`.
+- Last-rate `source` values from `getLastRate`: `po_history`, `supplier_catalog`, `item_average`, `standard_rate` (BR-INV-30; labels per BR-PO-25).
 
 ## Tests
 | File | Covers |
@@ -94,7 +94,6 @@ No frontend tests.
 ## Known gaps / debt
 - Fixed by the code (verified at `eea4fb1`): BL-019 (PR lines get `ordered` / `closed` / `cancelled`), BL-028 (approval reject cancels the PO through `cancelLockedPo` and cancels PR lines), BL-029 (header recompute is status-guarded); tax is no longer hardcoded 0; cancel is one transaction with audit columns; short-close and communications endpoint exist; delay fields required; invoice duplicate check exists.
 - BL-046 open: no active-item check when a PO line is drafted (`assertLinesAreDraftable` / `resolveLines`).
-- BL-047 open: `pr_estimate` name still means item average; the detail view label map has no `standard_rate` entry and `LastRateSource` in `frontend/src/types/purchase-orders.ts` lacks it.
 - BL-053 partly: the supplier picker fetches the first 20 suppliers and hides inactive ones client-side (`supplier.isActive`); it does not ask the server for active only.
 - PO log has no `lastUpdatedBy/At` on `purchase_orders`.
 - CRP-5 (repo layering): `poRepository` writes PR line rows and calls `prRepository`; PERF-03 / 05 / 09 minor batching and search items are in `.pipeline/m1/findings.md`, not fixed.

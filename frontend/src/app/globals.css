@@ -192,10 +192,10 @@ html[data-density="compact"] {
 
 @keyframes skeleton-sweep {
 	from {
-		background-position: 200% 0;
+		transform: translateX(-100%);
 	}
 	to {
-		background-position: -200% 0;
+		transform: translateX(100%);
 	}
 }
 
@@ -216,7 +216,8 @@ html[data-density="compact"] {
 		--motion-emphasis: 0ms;
 		--motion-skeleton: 0ms;
 	}
-	.animate-skeleton {
+	.animate-skeleton,
+	.after\:animate-skeleton::after {
 		animation: none;
 		background-image: none;
 	}

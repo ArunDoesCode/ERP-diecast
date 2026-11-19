@@ -248,6 +248,7 @@ export const assignableRoleSchema = z.object({
 export type assignableRoleSchemaType = z.infer<typeof assignableRoleSchema>;
 
 /** GET /access-log row (BR-AUTH-20). before/after are free JSON snapshots. */
+/** One access-log list row: who, when, what and a one-line summary (BR-AUTH-31). */
 export const accessLogSchema = z.object({
   id: z.number(),
   at: z.string(),
@@ -255,10 +256,16 @@ export const accessLogSchema = z.object({
   actorName: z.string().nullable(),
   action: z.string(),
   target: z.string(),
+  summary: z.string(),
+});
+export type accessLogSchemaType = z.infer<typeof accessLogSchema>;
+
+/** One access-log row with the full before/after records (BR-AUTH-31). */
+export const accessLogDetailSchema = accessLogSchema.extend({
   before: z.unknown().nullable(),
   after: z.unknown().nullable(),
 });
-export type accessLogSchemaType = z.infer<typeof accessLogSchema>;
+export type accessLogDetailSchemaType = z.infer<typeof accessLogDetailSchema>;
 
 export const accessLogListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),

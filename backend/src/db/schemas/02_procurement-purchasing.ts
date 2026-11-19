@@ -69,6 +69,15 @@ export const purchaseRequests = pgTable(
   },
   (table) => ({
     statusIdx: index("idx_purchase_requests_status").on(table.status),
+    // List `q` search (ilike %q%, #54): pg_trgm GIN indexes
+    prNumberTrgm: index("idx_purchase_requests_pr_number_trgm").using(
+      "gin",
+      table.prNumber.op("gin_trgm_ops"),
+    ),
+    notesTrgm: index("idx_purchase_requests_notes_trgm").using(
+      "gin",
+      table.notes.op("gin_trgm_ops"),
+    ),
   }),
 );
 
@@ -189,6 +198,15 @@ export const purchaseOrders = pgTable(
   (table) => ({
     statusIdx: index("idx_purchase_orders_status").on(table.status),
     supplierIdx: index("idx_purchase_orders_supplier_id").on(table.supplierId),
+    // List `q` search (ilike %q%, #54): pg_trgm GIN indexes
+    poNumberTrgm: index("idx_purchase_orders_po_number_trgm").using(
+      "gin",
+      table.poNumber.op("gin_trgm_ops"),
+    ),
+    notesTrgm: index("idx_purchase_orders_notes_trgm").using(
+      "gin",
+      table.notes.op("gin_trgm_ops"),
+    ),
   }),
 );
 
@@ -352,6 +370,11 @@ export const subcontractingOrders = pgTable(
   (t) => ({
     vendorStatusIdx: index("idx_sco_vendor_status").on(t.vendorId, t.status),
     createdAtIdx: index("idx_sco_created_at").on(t.createdAt.desc()),
+    // SCO list `q` search (ilike %q%, #62)
+    scoNumberTrgm: index("idx_sco_sco_number_trgm").using(
+      "gin",
+      t.scoNumber.op("gin_trgm_ops"),
+    ),
   }),
 );
 
@@ -517,6 +540,11 @@ export const grns = pgTable(
       table.challanNo,
     ),
     poIdIdx: index("idx_grns_po_id").on(table.poId),
+    // GRN list `q` search (ilike %q%, #54)
+    grnNumberTrgm: index("idx_grns_grn_number_trgm").using(
+      "gin",
+      table.grnNumber.op("gin_trgm_ops"),
+    ),
   }),
 );
 

@@ -32,6 +32,7 @@ import {
 	getPurchaseOrderById,
 	getPurchaseOrderCommunications,
 	getPurchaseOrders,
+	getSupplierPriceRows,
 	markPurchaseOrderInvoiced,
 	sendPurchaseOrder,
 	sendPurchaseOrderReminder,
@@ -50,6 +51,8 @@ export const purchaseOrderKeys = {
 		["purchase-orders", "communications", poId] as const,
 	lastRate: (itemId: number, supplierId: number) =>
 		["purchase-orders", "last-rate", itemId, supplierId] as const,
+	priceRows: (supplierId: number, itemIds: number[]) =>
+		["purchase-orders", "price-rows", supplierId, itemIds] as const,
 };
 
 const PO_ERROR_MESSAGES: Record<string, string> = {
@@ -110,6 +113,24 @@ export function useItemLastRateQuery(
 			itemId > 0 &&
 			Number.isFinite(supplierId) &&
 			supplierId > 0,
+	});
+}
+
+/**
+ * The supplier's price-list rows for the PO's own items (#107): used for the
+ * rate and GST % of each line, not capped at 100 rows.
+ */
+export function useSupplierPriceRowsQuery(
+	supplierId: number,
+	itemIds: number[],
+	enabled = true,
+) {
+	const ids = [...new Set(itemIds)].sort((a, b) => a - b);
+	return useQuery({
+		queryKey: purchaseOrderKeys.priceRows(supplierId, ids),
+		queryFn: () => getSupplierPriceRows(supplierId, ids),
+		enabled: enabled && supplierId > 0 && ids.length > 0,
+		placeholderData: keepPreviousData,
 	});
 }
 

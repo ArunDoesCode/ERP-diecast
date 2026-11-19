@@ -19,7 +19,7 @@ import {
 	useReceiptDetailQuery,
 	useScoReceiptsQuery,
 } from "@/lib/api/subcontracting/queries";
-import { formatScoDate } from "@/lib/sco-format";
+import { formatDate } from "@/lib/format";
 import type { ReceiptQaStatus } from "@/types/subcontracting";
 
 const QA_LABEL: Record<ReceiptQaStatus, string> = {
@@ -41,10 +41,12 @@ function ReceiptDetail({
 	scoId,
 	receiptId,
 	canQa,
+	rawUomByLine,
 }: {
 	scoId: number;
 	receiptId: number;
 	canQa: boolean;
+	rawUomByLine: Map<number, string>;
 }) {
 	const query = useReceiptDetailQuery(receiptId);
 	if (query.isLoading) return <Skeleton className="h-16" />;
@@ -118,7 +120,8 @@ function ReceiptDetail({
 					<ul className="space-y-0.5 text-xs">
 						{settlements.map((row) => (
 							<li key={row.id}>
-								{row.challanNumber}: {row.qty} pcs settled
+								{row.challanNumber}: {row.qty}{" "}
+								{rawUomByLine.get(row.scoItemId) ?? ""} settled
 							</li>
 						))}
 					</ul>
@@ -131,9 +134,12 @@ function ReceiptDetail({
 export function ScoReceiptsCard({
 	scoId,
 	canQa,
+	rawUomByLine,
 }: {
 	scoId: number;
 	canQa: boolean;
+	/** SCO line id → raw item unit (BR-SCO-26). */
+	rawUomByLine: Map<number, string>;
 }) {
 	const query = useScoReceiptsQuery(scoId);
 	const receipts = query.data?.success ? query.data.data : [];
@@ -160,7 +166,7 @@ export function ScoReceiptsCard({
 											{receipt.vendorChallanNo}
 										</p>
 										<p className="text-muted-foreground">
-											{formatScoDate(receipt.receivedDate)}
+											{formatDate(receipt.receivedDate)}
 											{receipt.createdByName
 												? ` · ${receipt.createdByName}`
 												: ""}
@@ -186,6 +192,7 @@ export function ScoReceiptsCard({
 											scoId={scoId}
 											receiptId={receipt.id}
 											canQa={canQa}
+											rawUomByLine={rawUomByLine}
 										/>
 									</div>
 								) : null}

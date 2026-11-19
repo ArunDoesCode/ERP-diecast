@@ -26,11 +26,11 @@ afterAll(() => {
 });
 
 describe("sidebar fold", () => {
-	test("BR-DS-21 the sidebar is unfolded by default", () => {
+	test("Shell table (SPEC-S4) the sidebar is unfolded by default", () => {
 		expect(readSidebarFolded()).toBe(false);
 	});
 
-	test("BR-DS-21 the fold state is kept as the strings true / false", () => {
+	test("Shell table (SPEC-S4) the fold state is kept as the strings true / false", () => {
 		writeSidebarFolded(true);
 		expect(store.get(SIDEBAR_FOLD_STORAGE_KEY)).toBe("true");
 		expect(readSidebarFolded()).toBe(true);

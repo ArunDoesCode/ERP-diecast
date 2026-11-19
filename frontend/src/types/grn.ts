@@ -1,6 +1,8 @@
+import type { POStatus } from "@/types/purchase-orders";
 import type {
 	ApiResult,
 	PaginatedResponse,
+	PRStatus,
 } from "@/types/purchase-requisitions";
 
 export const grnStatusValues = [
@@ -38,6 +40,24 @@ export interface Grn {
 	remarks: string | null;
 }
 
+/** GET /grn/getgrns row: header plus its PO's number (BR-GRN-45). */
+export interface GrnListRow extends Grn {
+	poNumber: string | null;
+}
+
+/** The GRN's PO and the requisitions behind it (BR-GRN-45). */
+export interface GrnLinkedPo {
+	id: number;
+	poNumber: string;
+	status: POStatus;
+}
+
+export interface GrnLinkedPr {
+	id: number;
+	prNumber: string;
+	status: PRStatus;
+}
+
 export interface GrnItem {
 	id: number;
 	grnId: number | null;
@@ -61,13 +81,19 @@ export interface GrnItemDetail extends GrnItem {
 	itemId: number;
 	itemSku: string;
 	itemName: string;
+	/** Item unit (BR-GRN-46). */
+	uom: string;
 	orderedQty: number;
+	/** PO line qty accepted so far across all GRNs (BR-GRN-47). */
+	poReceivedQty: number;
 	correctedQty: number;
 	netAcceptedQty: number;
 }
 
 export interface GrnDetailPayload {
 	grn: Grn;
+	po: GrnLinkedPo | null;
+	prs: GrnLinkedPr[];
 	items: GrnItemDetail[];
 }
 
@@ -82,7 +108,7 @@ export type GrnListParams = {
 	q?: string;
 };
 
-export type GrnListResult = PaginatedResponse<Grn>;
+export type GrnListResult = PaginatedResponse<GrnListRow>;
 export type GrnDetailResult = ApiResult<GrnDetailPayload>;
 
 export type GrnCreatePayload = {

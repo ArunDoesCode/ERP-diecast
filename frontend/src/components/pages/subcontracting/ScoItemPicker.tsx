@@ -14,7 +14,7 @@ type ScoItemPickerProps = {
 	/** Label to show for `value` before/without a search result (edit mode, prior pick). */
 	valueLabel?: string;
 	placeholder: string;
-	onChange: (itemId: number, label: string) => void;
+	onChange: (itemId: number, label: string, uom?: string) => void;
 };
 
 export function ScoItemPicker({
@@ -50,7 +50,11 @@ export function ScoItemPicker({
 			options={options}
 			onValueChange={(next) => {
 				const option = options.find((entry) => entry.value === next);
-				onChange(Number(next), option?.label ?? `Item #${next}`);
+				onChange(
+					Number(next),
+					option?.label ?? `Item #${next}`,
+					option?.secondaryLabel,
+				);
 			}}
 			searchValue={search}
 			onSearchChange={setSearch}

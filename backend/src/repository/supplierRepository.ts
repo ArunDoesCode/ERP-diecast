@@ -204,8 +204,13 @@ export const supplierRepository = {
     supplierId: number,
     params: supplierItemListQuerySchemaType,
   ) {
+    const byItems =
+      params.itemIds && params.itemIds.length > 0
+        ? inArray(supplierItems.itemId, params.itemIds)
+        : undefined;
     const whereClause = and(
       eq(supplierItems.supplierId, supplierId),
+      byItems,
       safeSearch(
         params.q,
         itemMaster.name,
@@ -232,7 +237,7 @@ export const supplierRepository = {
         : db
             .select({ value: count() })
             .from(supplierItems)
-            .where(eq(supplierItems.supplierId, supplierId)),
+            .where(and(eq(supplierItems.supplierId, supplierId), byItems)),
     ]);
 
     return { rows, total: totalRow?.value ?? 0 };
@@ -431,54 +436,63 @@ export const supplierRepository = {
     await ex.insert(supplierHistory).values(rows);
   },
 
-  // Price-list row of this supplier by row id or item id, with the item's own unit (BR-SUP-14).
-  async findItemRow(
+  /**
+   * The supplier's price-list rows an edit targets (by row id or item id),
+   * with the item's own unit (BR-SUP-14), locked in id order so two batches
+   * cannot deadlock (PERF-40). One query for the whole batch (#42).
+   */
+  async lockItemRows(
     supplierId: number,
-    selector: {
-      supplierItemsId?: number | undefined;
-      itemId?: number | undefined;
-    },
+    targets: { rowIds: number[]; refIds: number[] },
     ex: Executor = db,
   ) {
-    const [row] = await ex
+    if (targets.rowIds.length === 0 && targets.refIds.length === 0) return [];
+    return ex
       .select({ ...supplierItemColumns, itemUom: itemMaster.uom })
       .from(supplierItems)
       .innerJoin(itemMaster, eq(itemMaster.id, supplierItems.itemId))
       .where(
         and(
           eq(supplierItems.supplierId, supplierId),
-          selector.supplierItemsId !== undefined
-            ? eq(supplierItems.id, selector.supplierItemsId)
-            : eq(supplierItems.itemId, selector.itemId ?? -1),
+          or(
+            targets.rowIds.length > 0
+              ? inArray(supplierItems.id, targets.rowIds)
+              : undefined,
+            targets.refIds.length > 0
+              ? inArray(supplierItems.itemId, targets.refIds)
+              : undefined,
+          ),
         ),
       )
-      .for("update", { of: supplierItems })
-      .limit(1);
-    return row;
+      .orderBy(asc(supplierItems.id))
+      .for("update", { of: supplierItems });
   },
 
-  async findServiceRow(
+  // Same as lockItemRows, for service rows.
+  async lockServiceRows(
     supplierId: number,
-    selector: {
-      supplierServiceId?: number | undefined;
-      serviceId?: number | undefined;
-    },
+    targets: { rowIds: number[]; refIds: number[] },
     ex: Executor = db,
   ) {
-    const [row] = await ex
+    if (targets.rowIds.length === 0 && targets.refIds.length === 0) return [];
+    return ex
       .select(supplierServiceColumns)
       .from(supplierServices)
       .where(
         and(
           eq(supplierServices.supplierId, supplierId),
-          selector.supplierServiceId !== undefined
-            ? eq(supplierServices.id, selector.supplierServiceId)
-            : eq(supplierServices.serviceId, selector.serviceId ?? -1),
+          or(
+            targets.rowIds.length > 0
+              ? inArray(supplierServices.id, targets.rowIds)
+              : undefined,
+            targets.refIds.length > 0
+              ? inArray(supplierServices.serviceId, targets.refIds)
+              : undefined,
+          ),
         ),
       )
-      .for("update")
-      .limit(1);
-    return row;
+      .orderBy(asc(supplierServices.id))
+      .for("update");
   },
 
   async updateItemRow(
@@ -505,25 +519,6 @@ export const supplierRepository = {
       .where(eq(supplierServices.id, rowId))
       .returning(supplierServiceColumns);
     return row;
-  },
-
-  // Lock every target row up front, ordered by id, so two batches cannot deadlock (PERF-40).
-  async lockItemRowsOrdered(supplierId: number, ex: Executor = db) {
-    await ex
-      .select({ id: supplierItems.id })
-      .from(supplierItems)
-      .where(eq(supplierItems.supplierId, supplierId))
-      .orderBy(asc(supplierItems.id))
-      .for("update");
-  },
-
-  async lockServiceRowsOrdered(supplierId: number, ex: Executor = db) {
-    await ex
-      .select({ id: supplierServices.id })
-      .from(supplierServices)
-      .where(eq(supplierServices.supplierId, supplierId))
-      .orderBy(asc(supplierServices.id))
-      .for("update");
   },
 
   async findItemUoms(itemIds: number[]) {

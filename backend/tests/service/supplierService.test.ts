@@ -994,3 +994,183 @@ describe("BR-SUP-25 roles", () => {
     expect(res.status).toBe(401);
   });
 });
+
+// ---- changes of 2026-11-19 (suppliers.md changelog) ----
+describe("BR-SUP-04 PAN follows the GSTIN (2026-11-19)", () => {
+  test("BR-SUP-04 GSTIN changed to another state code: PAN stays the same", async () => {
+    const pan = newPan();
+    const s = await mkSupplier({ gstNumber: `27${pan}1Z5` });
+    expect(s.panNumber).toBe(pan);
+    const r = await bo("PATCH", `/updateSupplier/${s.id}`, {
+      mode: "master",
+      gstNumber: `29${pan}1Z5`,
+    });
+    expect(r.status).toBe(200);
+    expect(sup(r.json.data).panNumber).toBe(pan);
+  });
+  test("BR-SUP-04 GSTIN changed so characters 3-12 differ: PAN is filled again from the new GSTIN", async () => {
+    const pan = newPan();
+    const s = await mkSupplier({ gstNumber: `27${pan}1Z5` });
+    const pan2 = newPan() === pan ? "ZZZZZ9999Z" : newPan();
+    const r = await bo("PATCH", `/updateSupplier/${s.id}`, {
+      mode: "master",
+      gstNumber: `27${pan2}1Z5`,
+    });
+    expect(r.status).toBe(200);
+    expect(sup(r.json.data).panNumber).toBe(pan2);
+    const d = await bo("GET", `/${s.id}/detail`);
+    expect((d.json.data.supplier ?? d.json.data).panNumber).toBe(pan2);
+  });
+});
+
+describe("BR-SUP-10 history also tracks SKU, qty, unit, lead time (2026-11-19)", () => {
+  for (const [field, patch, before, after] of [
+    ["supplierSku", { supplierSku: "SKU-NEW" }, "SKU-OLD", "SKU-NEW"],
+    ["qty", { qty: 500 }, "100", "500"],
+    ["leadTimeDays", { leadTimeDays: 9 }, "3", "9"],
+  ] as const) {
+    test(`BR-SUP-10 price-list change of ${field} adds a history row with old and new`, async () => {
+      const s = await mkSupplier();
+      const item = await mkItem();
+      const row = (
+        await addItem(s.id, item.id, {
+          supplierSku: "SKU-OLD",
+          qty: 100,
+          leadTimeDays: 3,
+          taxPercentage: 18,
+        })
+      ).json.data;
+      const r = await bo("PATCH", `/${s.id}/editItem`, {
+        supplierItemsId: row.id,
+        ...patch,
+      });
+      expect(r.status).toBe(200);
+      const h = (await history(s.id)).find(
+        (x) => x.entity === "item" && x.field === field,
+      );
+      expect(h).toBeDefined();
+      expect(h?.oldValue).toBe(before);
+      expect(h?.newValue).toBe(after);
+      expect(h?.changedBy).toBe(await userFor("back_office"));
+    });
+  }
+});
+
+describe("BR-SUP-24 picker shows only active suppliers (2026-11-19, #41)", () => {
+  test("BR-SUP-24 status=active never returns an inactive supplier", async () => {
+    const tag = uid();
+    const on = await mkSupplier({ name: `${tag}_on` });
+    const off = await mkSupplier({ name: `${tag}_off`, isActive: false });
+    const r = await bo(
+      "GET",
+      `/listSuppliers?status=active&q=${tag}&pageSize=100`,
+    );
+    expect(r.status).toBe(200);
+    const ids = r.json.data.map((x: any) => x.id);
+    expect(ids).toContain(on.id);
+    expect(ids).not.toContain(off.id);
+    expect(r.json.data.every((x: any) => x.isActive === true)).toBe(true);
+  });
+});
+
+describe("BR-SUP-26 field caps (2026-11-19)", () => {
+  const count = async (name: string) =>
+    (
+      await db
+        .select({ id: supplierMaster.id })
+        .from(supplierMaster)
+        .where(eq(supplierMaster.name, name))
+    ).length;
+  test("BR-SUP-26 name of 200 characters saves, 201 -> 400 and nothing saved", async () => {
+    const base = uid();
+    const ok = `${base}${"n".repeat(200 - base.length)}`;
+    expect((await bo("POST", "/createSupplier", { name: ok })).status).toBe(
+      201,
+    );
+    const bad = `${base}${"m".repeat(201 - base.length)}`;
+    expect((await bo("POST", "/createSupplier", { name: bad })).status).toBe(
+      400,
+    );
+    expect(await count(bad)).toBe(0);
+  });
+  for (const [field, max] of [
+    ["contactPerson", 200],
+    ["phone", 30],
+    ["address", 500],
+  ] as const) {
+    test(`BR-SUP-26 ${field} of ${max} characters saves, ${max + 1} -> 400`, async () => {
+      expect(
+        (
+          await bo("POST", "/createSupplier", {
+            name: uid(),
+            [field]: "x".repeat(max),
+          })
+        ).status,
+      ).toBe(201);
+      const name = uid();
+      const r = await bo("POST", "/createSupplier", {
+        name,
+        [field]: "x".repeat(max + 1),
+      });
+      expect(r.status).toBe(400);
+      expect(await count(name)).toBe(0);
+    });
+  }
+  test("BR-SUP-26 email of 255 characters -> 400", async () => {
+    const email = `${"a".repeat(64)}@${"b".repeat(63)}.${"c".repeat(63)}.${"d".repeat(62)}`;
+    expect(email.length).toBe(255);
+    const name = uid();
+    expect((await bo("POST", "/createSupplier", { name, email })).status).toBe(
+      400,
+    );
+    expect(await count(name)).toBe(0);
+  });
+  test("BR-SUP-26 supplier SKU of 100 characters saves, 101 -> 400", async () => {
+    const s = await mkSupplier();
+    const i1 = await mkItem();
+    const i2 = await mkItem();
+    expect(
+      (await addItem(s.id, i1.id, { supplierSku: "k".repeat(100) })).status,
+    ).toBe(201);
+    expect(
+      (await addItem(s.id, i2.id, { supplierSku: "k".repeat(101) })).status,
+    ).toBe(400);
+  });
+  test("BR-SUP-26 price-list qty 1,000,000,000 saves, 1,000,000,001 -> 400", async () => {
+    const s = await mkSupplier();
+    const i1 = await mkItem();
+    const i2 = await mkItem();
+    expect((await addItem(s.id, i1.id, { qty: 1000000000 })).status).toBe(201);
+    expect((await addItem(s.id, i2.id, { qty: 1000000001 })).status).toBe(400);
+  });
+});
+
+describe("BR-SUP-27 editing a price-list row that is not on the supplier (2026-11-19)", () => {
+  test("BR-SUP-27 row id that does not exist -> 404, nothing saved", async () => {
+    const s = await mkSupplier();
+    const r = await bo("PATCH", `/${s.id}/editItem`, {
+      supplierItemsId: 999999999,
+      supplierUnitPricePaise: 25000,
+    });
+    expect(r.status).toBe(404);
+    expect(
+      (await history(s.id)).filter((h) => h.field === "supplierUnitPricePaise"),
+    ).toHaveLength(0);
+  });
+  test("BR-SUP-27 row id of another supplier -> 404 and that row is unchanged", async () => {
+    const a = await mkSupplier();
+    const b = await mkSupplier();
+    const item = await mkItem();
+    const row = (await addItem(b.id, item.id)).json.data;
+    const r = await bo("PATCH", `/${a.id}/editItem`, {
+      supplierItemsId: row.id,
+      supplierUnitPricePaise: 99999,
+    });
+    expect(r.status).toBe(404);
+    const [after] = await db
+      .select()
+      .from(supplierItems)
+      .where(eq(supplierItems.id, row.id));
+    expect(after?.supplierUnitPricePaise).toBe(24500);
+  });
+});

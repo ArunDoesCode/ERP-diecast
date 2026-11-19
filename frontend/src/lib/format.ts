@@ -55,7 +55,9 @@ export function formatMoney(
 	}
 	const whole = opts?.whole === true;
 	// Round first so the sign follows the displayed amount (no `-₹0.00`).
-	const units = whole ? Math.round(paise / 100) : Math.round(paise);
+	// Halves round away from zero, so -₹2.50 shows -₹3 like ₹2.50 shows ₹3.
+	const roundHalfAway = (n: number) => Math.sign(n) * Math.round(Math.abs(n));
+	const units = roundHalfAway(whole ? paise / 100 : paise);
 	const negative = units < 0;
 	const abs = Math.abs(units);
 	const rupees = whole ? abs : Math.floor(abs / 100);

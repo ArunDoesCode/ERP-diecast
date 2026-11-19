@@ -11,7 +11,7 @@ export default function SetupError({
 
 	return (
 		<div className="space-y-3 p-6">
-			<p className="text-sm text-red-600">
+			<p className="text-sm text-destructive">
 				Something went wrong while loading this page.
 			</p>
 			<button

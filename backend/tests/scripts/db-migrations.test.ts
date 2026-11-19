@@ -645,8 +645,19 @@ describe("db:migrate behaviour (BR-MIG-04, 13, 14, 15, 22)", () => {
       );
       // undo what the later migrations added, so they can run again on this DB
       const later = folders().slice(2).map(sqlOf).join("\n");
+      // indexes, foreign keys (on tables that outlive the replay), then tables (CASCADE)
       for (const m of later.matchAll(/CREATE (?:UNIQUE )?INDEX "([^"]+)"/g)) {
         await s.unsafe(`DROP INDEX IF EXISTS public."${m[1]}"`);
+      }
+      for (const m of later.matchAll(
+        /ALTER TABLE "([^"]+)" ADD CONSTRAINT "([^"]+)" FOREIGN KEY/g,
+      )) {
+        await s.unsafe(
+          `ALTER TABLE IF EXISTS public."${m[1]}" DROP CONSTRAINT IF EXISTS "${m[2]}"`,
+        );
+      }
+      for (const m of later.matchAll(/CREATE TABLE "([^"]+)"/g)) {
+        await s.unsafe(`DROP TABLE IF EXISTS public."${m[1]}" CASCADE`);
       }
     });
     const modulesBefore = await q(SCRATCH, (s) => count(s, "modules"));

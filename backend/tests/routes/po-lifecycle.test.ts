@@ -2535,3 +2535,32 @@ describe("BR-PR-47 PR line cancel and PO cancel at once (no deadlock)", () => {
     });
   }
 });
+
+describe("BR-PO-24 supplier name on PO list and details", () => {
+  test("BR-PO-24 regression: list row and details carry supplierName", async () => {
+    const po = await mkDraftPo({ supplier: "s2" });
+    const list = await call(
+      "buyer",
+      "GET",
+      `/api/po/getpos?supplierId=${sup.s2}&page=1&pageSize=100&sortDir=desc`,
+    );
+    expect(list.status).toBe(200);
+    const row = ((await json(list)).data as Rec[]).find(
+      (r) => r.id === po.poId,
+    );
+    expect(row?.supplierName).toBe("TEST_po_s2");
+    const d = await detail(po.poId);
+    expect(d.status).toBe(200);
+    expect(poOf(await json(d)).supplierName).toBe("TEST_po_s2");
+  });
+
+  test("BR-PO-24 regression: PR details linkedPos carry supplierName", async () => {
+    const po = await mkDraftPo({ supplier: "s2" });
+    const res = await call("buyer", "GET", `/api/pr/getprdetails/${po.prId}`);
+    expect(res.status).toBe(200);
+    const linked = (await json(res)).data as { linkedPos: Rec[] };
+    const row = linked.linkedPos.find((p) => p.id === po.poId);
+    expect(row).toBeDefined();
+    expect(row?.supplierName).toBe("TEST_po_s2");
+  });
+});

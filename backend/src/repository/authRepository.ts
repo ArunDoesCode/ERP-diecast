@@ -1,4 +1,4 @@
-import { and, eq, gt } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
 
 import { db } from "../db/client";
 import {
@@ -28,23 +28,52 @@ export const authRepository = {
     return row;
   },
 
-  async getActiveEmployeeWithRoleById(id: number) {
+  /** BR-AUTH-29: the active QR-method employee whose current QR digest matches. */
+  async getActiveQrEmployeeByTokenHash(qrTokenHash: string) {
     const [row] = await db
       .select({
         id: employees.id,
         name: employees.name,
-        roleId: employees.roleId,
-        roleName: roles.name,
+        email: employees.email,
+        passwordHash: employees.passwordHash,
       })
       .from(employees)
-      .innerJoin(roles, eq(roles.id, employees.roleId))
-      .where(and(eq(employees.id, id), eq(employees.isActive, true)))
+      .where(
+        and(
+          eq(employees.qrToken, qrTokenHash),
+          eq(employees.isActive, true),
+          isNull(employees.passwordHash),
+        ),
+      )
       .limit(1);
     return row;
   },
 
-  /** Employee + role regardless of active flag (BR-AUTH-12 decides in the caller). */
-  async getEmployeeRoleById(id: number) {
+  /**
+   * BR-AUTH-27: locks the employee row for the refresh rotation, so a password
+   * reset, login-method change or deactivation (which lock the same row and
+   * revoke every refresh token) is ordered strictly before or after it.
+   */
+  async lockEmployeeForRefresh(id: number, exec: DbExecutor) {
+    const [row] = await exec
+      .select({
+        id: employees.id,
+        name: employees.name,
+        isActive: employees.isActive,
+        passwordHash: employees.passwordHash,
+      })
+      .from(employees)
+      .where(eq(employees.id, id))
+      .limit(1)
+      .for("update");
+    return row;
+  },
+
+  /**
+   * Employee + role + the role's keys in one query (BR-AUTH-12; #45), regardless
+   * of the active flag (the caller decides).
+   */
+  async getActorRowById(id: number) {
     const [row] = await db
       .select({
         id: employees.id,
@@ -53,55 +82,74 @@ export const authRepository = {
         isActive: employees.isActive,
         roleId: employees.roleId,
         roleName: roles.name,
-        roleIsSystem: roles.isSystem,
+        keys: sql<
+          string[]
+        >`coalesce(array_agg(${rolePermissions.permissionKey}) filter (where ${rolePermissions.permissionKey} is not null), '{}')`,
       })
       .from(employees)
       .innerJoin(roles, eq(roles.id, employees.roleId))
+      .leftJoin(rolePermissions, eq(rolePermissions.roleId, employees.roleId))
       .where(eq(employees.id, id))
+      .groupBy(employees.id, roles.id)
       .limit(1);
     return row;
   },
 
-  async getPermissionKeysByRoleId(roleId: number) {
-    const rows = await db
-      .select({ key: rolePermissions.permissionKey })
-      .from(rolePermissions)
-      .where(eq(rolePermissions.roleId, roleId));
-    return rows.map((r) => r.key);
-  },
-
-  async listScreens() {
-    return db
+  /**
+   * The screens a caller may open (BR-AUTH-13; #50): filtered in SQL, so
+   * `/auth/me` never reads the whole screen table. `keys = null` = every screen
+   * (super-admin).
+   */
+  async listScreensForKeys(keys: string[] | null) {
+    const query = db
       .select({
         key: screens.key,
         path: screens.path,
         label: screens.label,
         menuGroup: screens.menuGroup,
         sortOrder: screens.sortOrder,
-        permissionKey: screens.permissionKey,
       })
-      .from(screens)
-      .orderBy(screens.sortOrder, screens.key);
+      .from(screens);
+    const filtered =
+      keys === null
+        ? query
+        : query.where(
+            keys.length === 0
+              ? isNull(screens.permissionKey)
+              : or(
+                  isNull(screens.permissionKey),
+                  inArray(screens.permissionKey, keys),
+                ),
+          );
+    return filtered.orderBy(screens.sortOrder, screens.key);
   },
 
-  async storeRefreshToken(data: {
-    employeeId: number;
-    tokenHash: string;
-    expiresAt: Date;
-  }) {
-    await db.insert(refreshTokens).values(data);
+  async storeRefreshToken(
+    data: {
+      employeeId: number;
+      tokenHash: string;
+      expiresAt: Date;
+    },
+    exec: DbExecutor = db,
+  ) {
+    await exec.insert(refreshTokens).values(data);
   },
 
   /**
    * Atomic single-use gate for rotation (BR-AUTH-05): returns the row only to
    * the one caller whose DELETE actually removed it.
    */
-  async consumeRefreshToken(tokenHash: string) {
-    const [row] = await db
+  async consumeRefreshToken(
+    tokenHash: string,
+    employeeId: number,
+    exec: DbExecutor = db,
+  ) {
+    const [row] = await exec
       .delete(refreshTokens)
       .where(
         and(
           eq(refreshTokens.tokenHash, tokenHash),
+          eq(refreshTokens.employeeId, employeeId),
           gt(refreshTokens.expiresAt, new Date()),
         ),
       )

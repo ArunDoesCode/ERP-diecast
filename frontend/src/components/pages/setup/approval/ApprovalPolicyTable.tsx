@@ -1,20 +1,25 @@
 "use client";
 
-import { IconPlus } from "@tabler/icons-react";
+import { IconListDetails, IconPlus } from "@tabler/icons-react";
 import {
-	type ColumnDef,
-	getCoreRowModel,
 	type PaginationState,
 	type SortingState,
-	useReactTable,
+	useTable,
 } from "@tanstack/react-table";
 import { useMemo, useState } from "react";
-
 import { DataTable } from "@/components/common/DataTable";
 import { DataTableColumnHeader } from "@/components/common/DataTableColumnHeader";
-import { Badge } from "@/components/ui/badge";
+import {
+	type DataTableColumnDef,
+	dataTableFeatures,
+} from "@/components/common/data-table-features";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { ErrorState } from "@/components/shared/ErrorState";
+import { FilterBar } from "@/components/shared/FilterBar";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { Pagination } from "@/components/shared/Pagination";
+import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
 	Select,
@@ -71,7 +76,7 @@ export function ApprovalPolicyTable({
 	const policies = policiesQuery.data?.data ?? [];
 	const meta = policiesQuery.data?.meta;
 
-	const columns = useMemo<ColumnDef<ApprovalPolicySummary>[]>(
+	const columns = useMemo<DataTableColumnDef<ApprovalPolicySummary>[]>(
 		() => [
 			{
 				accessorKey: "name",
@@ -83,7 +88,7 @@ export function ApprovalPolicyTable({
 						<button
 							type="button"
 							onClick={() => onEdit(row.original.id)}
-							className="text-left font-medium text-primary hover:underline"
+							className="text-left font-medium text-brand-accent hover:underline"
 						>
 							{row.original.name}
 						</button>
@@ -100,6 +105,7 @@ export function ApprovalPolicyTable({
 			},
 			{
 				accessorKey: "priority",
+				meta: { numeric: true },
 				header: ({ column }) => (
 					<DataTableColumnHeader column={column} title="Priority" />
 				),
@@ -129,21 +135,21 @@ export function ApprovalPolicyTable({
 				header: ({ column }) => (
 					<DataTableColumnHeader column={column} title="Status" />
 				),
-				cell: ({ row }) =>
-					row.original.isActive ? (
-						<Badge variant="default">Active</Badge>
-					) : (
-						<Badge variant="secondary">Inactive</Badge>
-					),
+				cell: ({ row }) => (
+					<StatusBadge
+						doc="policy"
+						status={row.original.isActive ? "active" : "inactive"}
+					/>
+				),
 			},
 		],
 		[onEdit, canManage],
 	);
 
-	const table = useReactTable({
+	const table = useTable({
+		features: dataTableFeatures,
 		data: policies,
 		columns,
-		getCoreRowModel: getCoreRowModel(),
 		manualSorting: true,
 		manualPagination: true,
 		pageCount: meta?.totalPages ?? 1,
@@ -155,72 +161,141 @@ export function ApprovalPolicyTable({
 		state: { sorting, pagination },
 	});
 
+	const total = meta?.total ?? 0;
+	const filtersActive =
+		search.trim() !== "" || docType !== "all" || activeFilter !== "all";
+
+	function resetFilters() {
+		setSearch("");
+		setDocType("all");
+		setActiveFilter("all");
+		setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+	}
+
 	return (
-		<Card>
-			<CardHeader className="gap-3">
-				<div className="flex items-center justify-between gap-3">
-					<CardTitle>Approval Policies</CardTitle>
-					{canManage ? (
-						<Button type="button" onClick={onCreate}>
-							<IconPlus className="size-3.5" />
-							Create Policy
+		<div className="flex w-full flex-col gap-4">
+			<PageHeader
+				title="Approval policies"
+				description="Who approves which documents, and in what order."
+				actions={
+					canManage ? (
+						<Button type="button" size="sm" onClick={onCreate}>
+							<IconPlus />
+							Create policy
 						</Button>
-					) : null}
-				</div>
-				<p className="text-xs text-muted-foreground">
-					Server-side search, filter, sorting, and pagination.
-				</p>
-			</CardHeader>
-			<CardContent className="space-y-4">
-				<div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-					<Input
-						id="approval-policy-search"
-						placeholder="Search policy"
-						value={search}
-						onChange={(event) => {
-							setSearch(event.target.value);
-							setPagination((prev) => ({ ...prev, pageIndex: 0 }));
-						}}
-					/>
+					) : undefined
+				}
+			/>
 
-					<Select
-						value={docType}
-						onValueChange={(value) => {
-							setDocType(value as "all" | ApprovalDocType);
-							setPagination((prev) => ({ ...prev, pageIndex: 0 }));
-						}}
-					>
-						<SelectTrigger className="w-full">
-							<SelectValue placeholder="Doc type" />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value="all">All doc types</SelectItem>
-							<SelectItem value="pr">PR</SelectItem>
-							<SelectItem value="po">PO</SelectItem>
-							<SelectItem value="sco">SCO</SelectItem>
-						</SelectContent>
-					</Select>
+			<FilterBar
+				value="all"
+				onChange={() => {}}
+				onReset={resetFilters}
+				filtersActive={filtersActive}
+			>
+				<Input
+					id="approval-policy-search"
+					aria-label="Search policy"
+					placeholder="Search policy"
+					className="w-52"
+					value={search}
+					onChange={(event) => {
+						setSearch(event.target.value);
+						setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+					}}
+				/>
 
-					<Select
-						value={activeFilter}
-						onValueChange={(value) => {
-							setActiveFilter(value as ActiveFilter);
-							setPagination((prev) => ({ ...prev, pageIndex: 0 }));
-						}}
-					>
-						<SelectTrigger className="w-full">
-							<SelectValue placeholder="Status" />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value="all">All statuses</SelectItem>
-							<SelectItem value="active">Active only</SelectItem>
-							<SelectItem value="inactive">Inactive only</SelectItem>
-						</SelectContent>
-					</Select>
-				</div>
+				<Select
+					value={docType}
+					onValueChange={(value) => {
+						setDocType(value as "all" | ApprovalDocType);
+						setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+					}}
+				>
+					<SelectTrigger className="w-40" aria-label="Doc type">
+						<SelectValue placeholder="Doc type" />
+					</SelectTrigger>
+					<SelectContent>
+						<SelectItem value="all">All doc types</SelectItem>
+						<SelectItem value="pr">PR</SelectItem>
+						<SelectItem value="po">PO</SelectItem>
+						<SelectItem value="sco">SCO</SelectItem>
+					</SelectContent>
+				</Select>
 
-				<DataTable table={table} isLoading={policiesQuery.isLoading} />
-			</CardContent>
-		</Card>
+				<Select
+					value={activeFilter}
+					onValueChange={(value) => {
+						setActiveFilter(value as ActiveFilter);
+						setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+					}}
+				>
+					<SelectTrigger className="w-40" aria-label="Status">
+						<SelectValue placeholder="Status" />
+					</SelectTrigger>
+					<SelectContent>
+						<SelectItem value="all">All statuses</SelectItem>
+						<SelectItem value="active">Active only</SelectItem>
+						<SelectItem value="inactive">Inactive only</SelectItem>
+					</SelectContent>
+				</Select>
+			</FilterBar>
+
+			<DataTable
+				table={table}
+				isLoading={policiesQuery.isLoading}
+				hidePagination
+				emptyState={
+					filtersActive ? (
+						<EmptyState
+							icon={IconListDetails}
+							title="Nothing matches these filters"
+							action={
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									onClick={resetFilters}
+								>
+									Reset filters
+								</Button>
+							}
+						/>
+					) : (
+						<EmptyState
+							icon={IconListDetails}
+							title="No approval policies yet"
+						/>
+					)
+				}
+				errorState={
+					policiesQuery.isError ? (
+						<ErrorState
+							message={
+								policiesQuery.error instanceof Error
+									? policiesQuery.error.message
+									: "The policies could not be loaded."
+							}
+							onRetry={() => {
+								void policiesQuery.refetch();
+							}}
+							retrying={policiesQuery.isRefetching}
+						/>
+					) : undefined
+				}
+			/>
+
+			<Pagination
+				page={pagination.pageIndex + 1}
+				pageSize={pagination.pageSize}
+				total={total}
+				onPageChange={(next) =>
+					setPagination((prev) => ({ ...prev, pageIndex: next - 1 }))
+				}
+				onPageSizeChange={(size) =>
+					setPagination({ pageIndex: 0, pageSize: size })
+				}
+			/>
+		</div>
 	);
 }

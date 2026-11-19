@@ -81,6 +81,8 @@ export const prLinkedPoSchema = z.object({
   id: z.number().int(),
   poNumber: z.string(),
   supplierId: z.number().int(),
+  // BR-PO-24
+  supplierName: z.string(),
   status: prLinkedPoStatusSchema,
   totalAmountPaise: z.number().int(),
 });

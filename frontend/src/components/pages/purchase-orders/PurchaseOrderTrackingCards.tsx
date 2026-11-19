@@ -1,6 +1,6 @@
 "use client";
 
-import { IconCalendar, IconCheck } from "@tabler/icons-react";
+import { IconCalendar, IconCheck, IconFileOff } from "@tabler/icons-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
@@ -13,6 +13,7 @@ import { LogPoCommunicationDialog } from "@/components/pages/purchase-orders/Log
 import { MarkPoInvoicedDialog } from "@/components/pages/purchase-orders/MarkPoInvoicedDialog";
 import { PoDetailPanel } from "@/components/pages/purchase-orders/PoDetailPanel";
 import { ShortClosePoAlert } from "@/components/pages/purchase-orders/ShortClosePoAlert";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import {
 	AlertDialog,
@@ -25,7 +26,6 @@ import {
 	AlertDialogTitle,
 	AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -37,6 +37,7 @@ import {
 	purchaseOrderKeys,
 	useCancelPurchaseOrderMutation,
 } from "@/lib/api/purchase-orders/queries";
+import { formatDate, formatMoney } from "@/lib/format";
 import {
 	canCancelPurchaseOrder,
 	canClosePurchaseOrder,
@@ -59,24 +60,11 @@ type PoTrackingDialogState = {
 type PurchaseOrderTrackingCardsProps = {
 	purchaseOrders: PurchaseOrder[];
 	isLoading: boolean;
+	filtersActive?: boolean;
+	onResetFilters?: () => void;
 };
 
 const SKELETON_CARDS = 6;
-
-function formatMoney(paise?: number | null) {
-	return `₹${((paise ?? 0) / 100).toLocaleString("en-IN", {
-		maximumFractionDigits: 0,
-	})}`;
-}
-
-function formatDate(value?: string | null) {
-	if (!value) return "-";
-	return new Date(value).toLocaleDateString("en-IN", {
-		day: "2-digit",
-		month: "short",
-		year: "numeric",
-	});
-}
 
 function SubmitForApprovalButton({ poId }: { poId: number }) {
 	const queryClient = useQueryClient();
@@ -163,6 +151,8 @@ const CONFIRMATION_METHOD_LABEL: Record<string, string> = {
 export function PurchaseOrderTrackingCards({
 	purchaseOrders,
 	isLoading,
+	filtersActive,
+	onResetFilters,
 }: PurchaseOrderTrackingCardsProps) {
 	const canManagePO = useCan("po.manage");
 	const canEditGrnDraft = useCan("grn.edit_draft");
@@ -197,12 +187,25 @@ export function PurchaseOrderTrackingCards({
 	}
 
 	if (purchaseOrders.length === 0) {
-		return (
-			<Card>
-				<CardContent className="py-8 text-center text-muted-foreground">
-					No purchase orders match this filter.
-				</CardContent>
-			</Card>
+		return filtersActive ? (
+			<EmptyState
+				icon={IconFileOff}
+				title="Nothing matches these filters"
+				action={
+					onResetFilters ? (
+						<Button
+							type="button"
+							variant="outline"
+							size="sm"
+							onClick={onResetFilters}
+						>
+							Reset filters
+						</Button>
+					) : undefined
+				}
+			/>
+		) : (
+			<EmptyState icon={IconFileOff} title="No purchase orders yet" />
 		);
 	}
 
@@ -224,21 +227,18 @@ export function PurchaseOrderTrackingCards({
 						<Card key={po.id}>
 							<CardHeader className="space-y-2">
 								<div className="flex items-start justify-between gap-2">
-									<CardTitle className="text-base">{po.poNumber}</CardTitle>
+									<CardTitle className="font-mono text-base">
+										{po.poNumber}
+									</CardTitle>
 									<div className="flex flex-wrap items-center justify-end gap-1">
 										<StatusBadge doc="po" status={po.status} />
 										{isOverdue ? (
-											<Badge
-												variant="outline"
-												className="border-red-200 bg-red-100 text-red-800"
-											>
-												Overdue
-											</Badge>
+											<StatusBadge doc="challanDue" status="overdue" />
 										) : null}
 									</div>
 								</div>
 								<p className="text-xs text-muted-foreground">
-									Supplier #{po.supplierId}
+									{po.supplierName}
 								</p>
 							</CardHeader>
 
@@ -256,13 +256,13 @@ export function PurchaseOrderTrackingCards({
 									<p>Expected delivery {formatDate(po.expectedDeliveryDate)}</p>
 								) : null}
 								{po.revisedDeliveryDate ? (
-									<p className="text-amber-700">
+									<p className="text-warning">
 										Revised delivery {formatDate(po.revisedDeliveryDate)}
 										{po.delayReason ? ` — ${po.delayReason}` : ""}
 									</p>
 								) : null}
 								{po.supplierConfirmed ? (
-									<p className="flex items-center gap-1 text-emerald-700">
+									<p className="flex items-center gap-1 text-success">
 										<IconCheck className="size-3.5" /> Confirmed
 										{po.confirmationMethod
 											? ` (${CONFIRMATION_METHOD_LABEL[po.confirmationMethod] ?? po.confirmationMethod})`

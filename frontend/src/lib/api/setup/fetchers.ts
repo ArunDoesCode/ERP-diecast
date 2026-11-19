@@ -1,6 +1,7 @@
 import { api } from "@/lib/api/client";
 import { API_ROUTES } from "@/lib/api/routes";
 import type {
+	AccessLogDetail,
 	AccessLogEntry,
 	AccessLogListParams,
 	AssignableRole,
@@ -105,6 +106,8 @@ export const getAccessLog = (params?: AccessLogListParams) =>
 	api.get<PaginatedResponse<AccessLogEntry>>(
 		`${API_ROUTES.setup.accessLog.list}${toQueryString(params)}`,
 	);
+export const getAccessLogDetail = (id: number) =>
+	api.get<Ok<AccessLogDetail>>(API_ROUTES.setup.accessLog.detail(id));
 
 export const getAssignableRoles = () =>
 	api.get<Ok<AssignableRole[]>>(API_ROUTES.setup.employees.assignableRoles);

@@ -81,9 +81,25 @@ async function backup(): Promise<string> {
   }
   // Credentials go through the environment, never the command line.
   const oldUmask = process.umask(0o077);
+  // #85: no inherited PG* variable (PGHOSTADDR, PGSERVICE, PGOPTIONS ...) may move pg_dump to
+  // another server or database than the one judged above; only the TLS settings pass through
+  // (the URL cannot carry ?sslmode=, parseTarget refuses query strings).
+  const PG_PASS_THROUGH = new Set([
+    "PGSSLMODE",
+    "PGSSLROOTCERT",
+    "PGSSLCERT",
+    "PGSSLKEY",
+    "PGSSLCRL",
+  ]);
+  const baseEnv: Record<string, string> = {};
+  for (const [k, v] of Object.entries(process.env)) {
+    if (v === undefined) continue;
+    if (k.startsWith("PG") && !PG_PASS_THROUGH.has(k)) continue;
+    baseEnv[k] = v;
+  }
   const proc = Bun.spawn(["pg_dump", "--format=custom", `--file=${file}`], {
     env: {
-      ...process.env,
+      ...baseEnv,
       PGHOST: target.host,
       PGPORT: target.port,
       PGDATABASE: target.dbName,

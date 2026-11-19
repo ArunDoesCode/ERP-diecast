@@ -1246,3 +1246,60 @@ describe("BR-SCO-25 audit and traceability", () => {
     expect(settlements[0]?.challanNumber).toMatch(/^JWC\//);
   });
 });
+
+describe("BR-SCO-21 challans and receipts are never deleted", () => {
+  test("BR-SCO-21 DELETE a challan -> 404 and it is unchanged", async () => {
+    const s = await makeIssued({ send: 100 });
+    const list = await call("bo", "GET", `/sco/${s.scoId}/challans`);
+    expect(list.status).toBe(200);
+    const challanId = list.json.data[0].id as number;
+    for (const path of [
+      `/sco/challans/${challanId}`,
+      `/sco/${s.scoId}/challans/${challanId}`,
+    ]) {
+      for (const actor of ["owner", "bo"]) {
+        const res = await call(actor, "DELETE", path);
+        expect(res.status).toBe(404);
+      }
+    }
+    const rows = await db
+      .select({ id: scoChallans.id })
+      .from(scoChallans)
+      .where(eq(scoChallans.id, challanId));
+    expect(rows).toHaveLength(1);
+  });
+
+  test("BR-SCO-21 DELETE a receipt -> 404 and it is unchanged", async () => {
+    const s = await makeIssued({ send: 100 });
+    const rcpt = await receipt("fs", s.scoId, [
+      { scoItemId: s.itemId, processedQty: 10 },
+    ]);
+    expect(rcpt.status).toBe(201);
+    const receiptId = rcpt.json.data.receipt.id as number;
+    for (const path of [
+      `/sco/receipts/${receiptId}`,
+      `/sco/${s.scoId}/receipts/${receiptId}`,
+    ]) {
+      for (const actor of ["owner", "bo"]) {
+        const res = await call(actor, "DELETE", path);
+        expect(res.status).toBe(404);
+      }
+    }
+    const rows = await db
+      .select({ id: subcontractingGrns.id })
+      .from(subcontractingGrns)
+      .where(eq(subcontractingGrns.id, receiptId));
+    expect(rows).toHaveLength(1);
+  });
+
+  test("BR-SCO-21 DELETE an SCO -> 404 and it is unchanged", async () => {
+    const s = await makeIssued({ send: 100, lots: [] });
+    const res = await call("owner", "DELETE", `/sco/${s.scoId}`);
+    expect(res.status).toBe(404);
+    const rows = await db
+      .select({ id: subcontractingOrders.id })
+      .from(subcontractingOrders)
+      .where(eq(subcontractingOrders.id, s.scoId));
+    expect(rows).toHaveLength(1);
+  });
+});

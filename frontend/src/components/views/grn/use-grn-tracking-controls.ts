@@ -41,6 +41,16 @@ export function useGrnTrackingControls() {
 		setPage(1);
 	}
 
+	function resetFilters() {
+		setQ("");
+		setStatusFilter("all");
+		setQaStatusFilter("all");
+		setPage(1);
+	}
+
+	const filtersActive =
+		q.trim() !== "" || statusFilter !== "all" || qaStatusFilter !== "all";
+
 	function onPageSizeChange(nextPageSize: number) {
 		setPageSize(nextPageSize);
 		setPage(1);
@@ -64,5 +74,7 @@ export function useGrnTrackingControls() {
 		onSortByChange,
 		onSortDirectionChange,
 		onPageSizeChange,
+		resetFilters,
+		filtersActive,
 	};
 }

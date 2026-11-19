@@ -30,6 +30,7 @@ import {
 	decideReceiptQa,
 	getChallanById,
 	getCompanySettings,
+	getCompanySettingsHistory,
 	getLossLog,
 	getOpenChallans,
 	getReceiptById,
@@ -51,6 +52,7 @@ export const scoKeys = {
 			: (["subcontracting", "list"] as const),
 	detail: (scoId: number) => ["subcontracting", "detail", scoId] as const,
 	companySettings: () => ["company", "settings"] as const,
+	companySettingsHistory: () => ["company", "settings", "history"] as const,
 	challans: (scoId: number) => ["subcontracting", "challans", scoId] as const,
 	openChallans: (params?: OpenChallanParams) =>
 		params
@@ -189,6 +191,14 @@ export function useCompanySettingsQuery(enabled = true) {
 	return useQuery({
 		queryKey: scoKeys.companySettings(),
 		queryFn: getCompanySettings,
+		enabled,
+	});
+}
+
+export function useCompanySettingsHistoryQuery(enabled = true) {
+	return useQuery({
+		queryKey: scoKeys.companySettingsHistory(),
+		queryFn: getCompanySettingsHistory,
 		enabled,
 	});
 }

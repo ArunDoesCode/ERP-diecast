@@ -2,23 +2,26 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { IconPlus } from "@tabler/icons-react";
-import {
-	type ColumnDef,
-	getCoreRowModel,
-	type PaginationState,
-	useReactTable,
-} from "@tanstack/react-table";
+import { type PaginationState, useTable } from "@tanstack/react-table";
 import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { DataTable } from "@/components/common/DataTable";
 import { DataTableColumnHeader } from "@/components/common/DataTableColumnHeader";
 import {
+	type DataTableColumnDef,
+	dataTableFeatures,
+} from "@/components/common/data-table-features";
+import {
 	SearchableSelect,
 	type SearchableSelectOption,
 } from "@/components/common/SearchableSelect";
-import { InventoryBackButton } from "@/components/pages/inventory/InventoryBackButton";
-import { formatPaise } from "@/components/pages/inventory/inventory-format";
-import { Badge } from "@/components/ui/badge";
+import {
+	listEmptyState,
+	listErrorState,
+} from "@/components/pages/inventory/list-states";
+import { FilterBar } from "@/components/shared/FilterBar";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -50,6 +53,7 @@ import {
 	useItemsQuery,
 	useUpdateItemMutation,
 } from "@/lib/api/asset/queries";
+import { formatMoney } from "@/lib/format";
 import {
 	type AssetItem,
 	type AssetItemCategory,
@@ -371,7 +375,7 @@ function ItemEditorForm({ mode, item, onDone }: ItemEditorFormProps) {
 								<p className="text-xs font-medium text-muted-foreground">
 									Average cost (read-only)
 								</p>
-								<p>{formatPaise(item.averageCostPaise)}</p>
+								<p>{formatMoney(item.averageCostPaise)}</p>
 							</div>
 						</div>
 					) : null}
@@ -456,7 +460,7 @@ export function InventoryItemsManager() {
 
 	const comboboxOptions = useMemo(() => items.map(toItemOption), [items]);
 
-	const columns = useMemo<ColumnDef<AssetItem>[]>(
+	const columns = useMemo<DataTableColumnDef<AssetItem>[]>(
 		() => [
 			{
 				accessorKey: "name",
@@ -504,26 +508,26 @@ export function InventoryItemsManager() {
 			{
 				accessorKey: "standardRatePaise",
 				header: "Std rate",
-				cell: ({ getValue }) => formatPaise(getValue<number>()),
+				cell: ({ getValue }) => formatMoney(getValue<number>()),
 			},
 			{
 				accessorKey: "isActive",
 				header: "Status",
-				cell: ({ getValue }) =>
-					getValue<boolean>() ? (
-						<Badge variant="secondary">Active</Badge>
-					) : (
-						<Badge variant="outline">Inactive</Badge>
-					),
+				cell: ({ getValue }) => (
+					<StatusBadge
+						doc="item"
+						status={getValue<boolean>() ? "active" : "inactive"}
+					/>
+				),
 			},
 		],
 		[],
 	);
 
-	const table = useReactTable({
+	const table = useTable({
+		features: dataTableFeatures,
 		data: items,
 		columns,
-		getCoreRowModel: getCoreRowModel(),
 		manualPagination: true,
 		pageCount: meta?.totalPages ?? 1,
 		onPaginationChange: setPagination,
@@ -531,9 +535,18 @@ export function InventoryItemsManager() {
 	});
 
 	return (
-		<div className="flex w-full flex-col gap-6 p-6">
-			<InventoryBackButton />
-			<div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+		<div className="flex w-full flex-col gap-4">
+			<PageHeader
+				title="Items"
+				description="Raw materials, components and finished goods."
+				actions={
+					<Button onClick={() => setModal({ open: true, mode: "create" })}>
+						<IconPlus className="size-3.5" />
+						Create item
+					</Button>
+				}
+			/>
+			<FilterBar value="" onChange={() => {}}>
 				<div className="w-full sm:max-w-sm">
 					<SearchableSelect
 						value={
@@ -558,14 +571,14 @@ export function InventoryItemsManager() {
 						isLoading={itemsQuery.isLoading}
 					/>
 				</div>
+			</FilterBar>
 
-				<Button onClick={() => setModal({ open: true, mode: "create" })}>
-					<IconPlus className="size-3.5" />
-					Create item
-				</Button>
-			</div>
-
-			<DataTable table={table} isLoading={itemsQuery.isLoading} />
+			<DataTable
+				table={table}
+				isLoading={itemsQuery.isLoading}
+				emptyState={listEmptyState("No items yet")}
+				errorState={listErrorState(itemsQuery, "The list could not be loaded.")}
+			/>
 
 			<Dialog
 				open={modal.open}

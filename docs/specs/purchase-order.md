@@ -73,6 +73,9 @@ line traces back to its PR line and forward to its GRNs. A PO never moves stock 
 | BR-PO-21 | Every status change and log action stores who and when: approval moves in the approval trail, send/remind/escalate/confirm in the PO log, cancel/short-close/close/invoice on the PO row. | After cancel → cancelledBy, time, reason readable |
 | BR-PO-22 | Every status change re-reads the PO under a row lock and checks status inside the same save; the loser of a race gets 409 and nothing is half-saved. | Cancel and GRN create at once → one wins. Send twice → one sent row |
 | BR-PO-23 | Payment terms are whole days 0–365; a new PO with no terms typed copies the supplier's default terms (BR-SUP-06, suppliers Q6 = A), editable in draft. Later changes to the supplier's terms don't touch existing POs. | S1 terms 30, new PO blank → 30 days. Terms 400 → 400. S1 changed to 45 → PO-1 stays 30 |
+| BR-PO-24 | Read-only: PO list rows, PO details, and each PO listed in a PR's details (`linkedPos`) carry the supplier's name (`supplierName`) next to `supplierId`. | PO-2026-11-1 for Bharat Tool Steels → list row, details and the PR's linked PO show "Bharat Tool Steels" |
+| BR-PO-25 | The PO screen labels the rate suggestion's source (BR-INV-30): "Last PO", "Price list", "Item average", "Standard rate". A suggestion of 0 (legacy item with no standard rate, BR-INV-24) is not prefilled: the rate stays empty for the user to type (BR-PO-03 still needs ≥ 1). | source `standard_rate` 24,000 → rate 24,000, label "Standard rate"; legacy item → empty rate, no 0 |
+| BR-PO-26 | The PO list answer carries, in `meta`, the row count of each quick-filter status group for the same search, so the screen shows the counts from one call. | search "ADC" → `meta` counts per group match the rows each filter shows |
 
 ## Not now
 
@@ -98,3 +101,5 @@ None open.
 - 2026-09-29 — pre-freeze touch-up: checked BR-PO-07, 09, 11 agree with approval Q4=B. BR-PO-03 suggestion falls back to the item standard rate (inventory BR-INV-24).
 - 2026-09-29 — frozen v1 (all questions answered by Arun)
 - 2026-09-29 — v2 clarified during build (review): supplier confirmation method is one of phone, email, whatsapp, in_person (400 otherwise) and becomes the log row's channel (BR-PO-17). Error codes used: `PO_NOT_EDITABLE` (409), `PO_RATE_REQUIRED`, `PO_NEEDS_A_LINE`, `PO_DATE_BEFORE_PO_DATE`, `PO_INVALID_STATUS`, `PO_STATUS_CHANGED`. The cancel dialog tells the user the PR lines are cancelled and a new PR is needed (BR-PO-11).
+- 2026-11-19 — change after freeze, approved by Arun in chat: BR-PO-24 (supplier name on PO list and details; screens showed "Supplier #2"). Read-only.
+- 2026-11-19 — change after freeze, approved by Arun in chat: BR-PO-25 rate source labels and no 0 prefill (#35); BR-PO-26 quick-filter counts in the list `meta` (#107, PERF-01).

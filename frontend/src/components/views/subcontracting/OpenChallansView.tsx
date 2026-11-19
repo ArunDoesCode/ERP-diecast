@@ -1,45 +1,87 @@
 "use client";
 
-import { IconArrowLeft } from "@tabler/icons-react";
+import { IconFileOff } from "@tabler/icons-react";
+import { useTable } from "@tanstack/react-table";
 import Link from "next/link";
-import { useState } from "react";
-
-import { formatPaise } from "@/components/pages/inventory/inventory-format";
-import { PurchaseRequisitionsPagination } from "@/components/pages/purchase-requisitions/PurchaseRequisitionsPagination";
+import { useMemo, useState } from "react";
+import { DataTable } from "@/components/common/DataTable";
+import {
+	type DataTableColumnDef,
+	dataTableFeatures,
+} from "@/components/common/data-table-features";
 import { ChallanDueBadge } from "@/components/pages/subcontracting/ChallanDueBadge";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { ErrorState } from "@/components/shared/ErrorState";
+import { FilterBar } from "@/components/shared/FilterBar";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { Pagination } from "@/components/shared/Pagination";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-	Table,
-	TableBody,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from "@/components/ui/table";
 import { useOpenChallansQuery } from "@/lib/api/subcontracting/queries";
-import { formatScoDate } from "@/lib/sco-format";
-import type { ChallanDueStatus } from "@/types/subcontracting";
+import { formatDate, formatDocNo, formatMoney } from "@/lib/format";
+import type { Challan, ChallanDueStatus } from "@/types/subcontracting";
 
-const DUE_OPTIONS: Array<{ label: string; value: "all" | ChallanDueStatus }> = [
-	{ label: "All open challans", value: "all" },
-	{ label: "Due within 60 days", value: "warning" },
-	{ label: "Overdue", value: "overdue" },
-	{ label: "On track", value: "ok" },
+type DueFilter = "all" | ChallanDueStatus;
+
+const QUICK: Array<{ key: DueFilter; label: string }> = [
+	{ key: "all", label: "All open" },
+	{ key: "warning", label: "Due within 60 days" },
+	{ key: "overdue", label: "Overdue" },
+	{ key: "ok", label: "On track" },
+];
+
+const columns: DataTableColumnDef<Challan>[] = [
+	{
+		accessorKey: "challanNumber",
+		header: "Challan no.",
+		cell: ({ row }) => (
+			<Link
+				href={`/subcontracting/challans/${row.original.id}`}
+				className="font-mono text-brand-accent hover:underline"
+			>
+				{formatDocNo(row.original.challanNumber)}
+			</Link>
+		),
+	},
+	{
+		accessorKey: "scoNumber",
+		header: "SCO no.",
+		cell: ({ row }) => (
+			<Link
+				href={`/subcontracting/${row.original.scoId}`}
+				className="font-mono text-brand-accent hover:underline"
+			>
+				{formatDocNo(row.original.scoNumber)}
+			</Link>
+		),
+	},
+	{ accessorKey: "vendorName", header: "Vendor" },
+	{
+		accessorKey: "challanDate",
+		header: "Date",
+		cell: ({ row }) => formatDate(row.original.challanDate),
+	},
+	{
+		accessorKey: "valuePaise",
+		header: "Value",
+		meta: { numeric: true },
+		cell: ({ row }) => formatMoney(row.original.valuePaise),
+	},
+	{
+		accessorKey: "returnDueDate",
+		header: "Return due",
+		cell: ({ row }) => (
+			<span className="inline-flex flex-wrap items-center gap-2">
+				<span>{formatDate(row.original.returnDueDate)}</span>
+				<ChallanDueBadge challan={row.original} />
+			</span>
+		),
+	},
 ];
 
 export function OpenChallansView() {
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(10);
-	const [dueStatus, setDueStatus] = useState<"all" | ChallanDueStatus>("all");
+	const [dueStatus, setDueStatus] = useState<DueFilter>("all");
 
 	const query = useOpenChallansQuery({
 		page,
@@ -48,106 +90,80 @@ export function OpenChallansView() {
 		sortDir: "asc",
 		dueStatus: dueStatus === "all" ? undefined : dueStatus,
 	});
-	const challans = query.data?.data ?? [];
+	const challans = useMemo(() => query.data?.data ?? [], [query.data]);
+
+	const table = useTable({
+		features: dataTableFeatures,
+		data: challans,
+		columns,
+		manualPagination: true,
+		manualSorting: true,
+	});
+
+	const changeDue = (key: string) => {
+		setDueStatus(key as DueFilter);
+		setPage(1);
+	};
 
 	return (
-		<div className="flex w-full flex-col gap-6 p-6">
-			<Button type="button" variant="ghost" size="sm" className="w-fit" asChild>
-				<Link href="/subcontracting">
-					<IconArrowLeft className="size-3.5" />
-					Back to orders
-				</Link>
-			</Button>
+		<div className="flex w-full flex-col gap-4">
+			<PageHeader
+				title="Open challans"
+				description="Material at vendors that has not come back. Return within 1 year of the challan date, otherwise it counts as a supply."
+			/>
 
-			<div>
-				<h1 className="font-heading text-lg font-medium">Open challans</h1>
-				<p className="text-xs text-muted-foreground">
-					Material at vendors that has not come back. Return within 1 year of
-					the challan date, otherwise it counts as a supply.
-				</p>
-			</div>
-
-			<Select
+			<FilterBar
+				quick={QUICK}
 				value={dueStatus}
-				onValueChange={(value) => {
-					setDueStatus(value as "all" | ChallanDueStatus);
-					setPage(1);
-				}}
-			>
-				<SelectTrigger className="w-full sm:w-64" aria-label="Due status">
-					<SelectValue placeholder="Due status" />
-				</SelectTrigger>
-				<SelectContent>
-					{DUE_OPTIONS.map((option) => (
-						<SelectItem key={option.value} value={option.value}>
-							{option.label}
-						</SelectItem>
-					))}
-				</SelectContent>
-			</Select>
+				onChange={changeDue}
+				onReset={() => changeDue("all")}
+			/>
 
-			<Card>
-				<CardContent>
-					{query.isLoading ? (
-						<Skeleton className="h-32" />
-					) : challans.length === 0 ? (
-						<p className="py-6 text-center text-muted-foreground">
-							No open challans.
-						</p>
+			<DataTable
+				table={table}
+				isLoading={query.isLoading}
+				hidePagination
+				emptyState={
+					dueStatus === "all" ? (
+						<EmptyState icon={IconFileOff} title="No open challans" />
 					) : (
-						<Table>
-							<TableHeader>
-								<TableRow>
-									<TableHead>Challan</TableHead>
-									<TableHead>SCO</TableHead>
-									<TableHead>Vendor</TableHead>
-									<TableHead>Date</TableHead>
-									<TableHead className="text-right">Value</TableHead>
-									<TableHead>Return due</TableHead>
-								</TableRow>
-							</TableHeader>
-							<TableBody>
-								{challans.map((challan) => (
-									<TableRow key={challan.id}>
-										<TableCell>
-											<Link
-												href={`/subcontracting/challans/${challan.id}`}
-												className="font-medium underline-offset-2 hover:underline"
-											>
-												{challan.challanNumber}
-											</Link>
-										</TableCell>
-										<TableCell>
-											<Link
-												href={`/subcontracting/${challan.scoId}`}
-												className="underline-offset-2 hover:underline"
-											>
-												{challan.scoNumber}
-											</Link>
-										</TableCell>
-										<TableCell>{challan.vendorName}</TableCell>
-										<TableCell>{formatScoDate(challan.challanDate)}</TableCell>
-										<TableCell className="text-right">
-											{formatPaise(challan.valuePaise)}
-										</TableCell>
-										<TableCell>
-											<span className="mr-2">
-												{formatScoDate(challan.returnDueDate)}
-											</span>
-											<ChallanDueBadge challan={challan} />
-										</TableCell>
-									</TableRow>
-								))}
-							</TableBody>
-						</Table>
-					)}
-				</CardContent>
-			</Card>
+						<EmptyState
+							icon={IconFileOff}
+							title="Nothing matches these filters"
+							action={
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									onClick={() => changeDue("all")}
+								>
+									Reset filters
+								</Button>
+							}
+						/>
+					)
+				}
+				errorState={
+					query.isError ? (
+						<ErrorState
+							message={
+								query.error instanceof Error
+									? query.error.message
+									: "The list could not be loaded."
+							}
+							onRetry={() => {
+								void query.refetch();
+							}}
+							retrying={query.isRefetching}
+						/>
+					) : undefined
+				}
+			/>
 
-			<PurchaseRequisitionsPagination
+			<Pagination
 				page={page}
 				pageSize={pageSize}
-				meta={query.data?.meta}
+				total={query.data?.meta.total ?? 0}
 				onPageChange={setPage}
 				onPageSizeChange={(next) => {
 					setPageSize(next);

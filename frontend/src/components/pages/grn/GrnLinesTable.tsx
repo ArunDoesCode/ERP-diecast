@@ -5,7 +5,7 @@ import { useState } from "react";
 import { GrnBypassAlert } from "@/components/pages/grn/GrnBypassAlert";
 import { GrnCorrectionAlert } from "@/components/pages/grn/GrnCorrectionAlert";
 import { GrnQaDecisionModal } from "@/components/pages/grn/GrnQaDecisionModal";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/ui/button";
 import {
 	Table,
@@ -16,8 +16,6 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { useCan } from "@/hooks/use-can";
-import { getGrnQaStatusBadgeStyle } from "@/lib/grn-status-badge";
-import { humanizeStatusLabel } from "@/lib/pr-status-badge";
 import type { GrnItemDetail } from "@/types/grn";
 
 export function GrnLinesTable({
@@ -52,7 +50,9 @@ export function GrnLinesTable({
 						<TableHead>Net accepted</TableHead>
 						<TableHead>Rejected</TableHead>
 						<TableHead>QA status</TableHead>
-						<TableHead className="w-48" />
+						<TableHead className="w-48">
+							<span className="sr-only">Actions</span>
+						</TableHead>
 					</TableRow>
 				</TableHeader>
 				<TableBody>
@@ -67,7 +67,6 @@ export function GrnLinesTable({
 						</TableRow>
 					) : (
 						items.map((item) => {
-							const badgeStyle = getGrnQaStatusBadgeStyle(item.qaStatus);
 							const isPendingQa =
 								item.qaStatus === "pending" && !item.isQaBypassed;
 							const canCorrect =
@@ -92,7 +91,7 @@ export function GrnLinesTable({
 												</span>
 											) : null}
 											{item.overReceiptReason ? (
-												<span className="text-xs text-amber-700">
+												<span className="text-xs text-warning">
 													Over-receipt +{item.overReceiptExcessQty ?? 0}:{" "}
 													{item.overReceiptReason}
 												</span>
@@ -112,12 +111,10 @@ export function GrnLinesTable({
 									</TableCell>
 									<TableCell>{item.rejectedQty ?? 0}</TableCell>
 									<TableCell>
-										<Badge
-											variant={badgeStyle.variant}
-											className={badgeStyle.className}
-										>
-											{humanizeStatusLabel(item.qaStatus ?? "pending")}
-										</Badge>
+										<StatusBadge
+											doc="grnQa"
+											status={item.qaStatus ?? "pending"}
+										/>
 									</TableCell>
 									<TableCell>
 										<div className="flex flex-wrap gap-2">

@@ -52,22 +52,22 @@ async function makeRole(name: string, keys: string[]) {
 async function makeUser(
   tag: string,
   rid: number,
-  opts: { login?: boolean; active?: boolean } = {},
+  opts: { login?: boolean; active?: boolean; qr?: boolean } = {},
 ) {
   const email = `${PREFIX}${tag}@diecast.test`;
   const [e] = await db
     .insert(employees)
     .values({
       name: `TEST_empsec_${tag}`,
-      email,
-      passwordHash: await Bun.password.hash(PASSWORD),
+      email: opts.qr ? null : email,
+      passwordHash: opts.qr ? null : await Bun.password.hash(PASSWORD),
       roleId: rid,
       isActive: opts.active ?? true,
     })
     .returning({ id: employees.id });
   if (!e) throw new Error("Fixture setup: employee insert failed");
   emp[tag] = e.id;
-  if (opts.login !== false && (opts.active ?? true)) {
+  if (!opts.qr && opts.login !== false && (opts.active ?? true)) {
     token[tag] = (await authService.login(email, PASSWORD)).accessToken;
   }
 }
@@ -144,6 +144,8 @@ beforeAll(async () => {
   await makeUser("wide", roleId.wide as number, { login: false });
   await makeUser("grncorr", roleId.grncorr as number);
   await makeUser("plainuser", roleId.plain as number);
+  // QR login method (BR-AUTH-28): no email, no password
+  await makeUser("qruser", roleId.plain as number, { qr: true });
   await makeUser("inactive1", roleId.inactiveonly as number, {
     active: false,
   });
@@ -268,7 +270,7 @@ describe("BR-AUTH-16 no escalation on edit / deactivate / QR regenerate", () => 
     const { status, json } = await call(
       "mgr",
       "POST",
-      `/setup/employees/${emp.plainuser}/qr`,
+      `/setup/employees/${emp.qruser}/qr`,
     );
     expect(status).toBe(200);
     expect(typeof json.data.qrToken).toBe("string");
@@ -277,6 +279,19 @@ describe("BR-AUTH-16 no escalation on edit / deactivate / QR regenerate", () => 
 });
 
 // ---------------------------------------------------------------------------
+describe("BR-AUTH-28 QR regenerate only for a QR-method employee", () => {
+  test("BR-AUTH-28 regenerating QR for a password-method employee -> 400 LOGIN_METHOD_NOT_QR, no token stored", async () => {
+    const { status, json } = await call(
+      "sa",
+      "POST",
+      `/setup/employees/${emp.plainuser}/qr`,
+    );
+    expect(status).toBe(400);
+    expect(json.code).toBe("LOGIN_METHOD_NOT_QR");
+    expect((await empRow("plainuser"))?.qrToken ?? null).toBeNull();
+  });
+});
+
 describe("BR-AUTH-20 employee create / edit / QR regenerate are logged without secrets", () => {
   test("BR-AUTH-20 creating an employee adds a log row for the actor, with no password or hash in it", async () => {
     const before = (await logsBy("mgr")).length;
@@ -330,7 +345,7 @@ describe("BR-AUTH-20 employee create / edit / QR regenerate are logged without s
     const { status, json } = await call(
       "sa",
       "POST",
-      `/setup/employees/${emp.plainuser}/qr`,
+      `/setup/employees/${emp.qruser}/qr`,
     );
     expect(status).toBe(200);
     const raw = json.data.qrToken as string;

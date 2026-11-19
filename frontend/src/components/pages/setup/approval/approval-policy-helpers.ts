@@ -1,3 +1,4 @@
+import { formatMoney } from "@/lib/format";
 import type {
 	ApprovalPolicyChainLevelInput,
 	ApprovalPolicyCreateInput,
@@ -21,9 +22,7 @@ export function rupeesInputToPaise(value: string): number | null {
 }
 
 function rupees(paise: number) {
-	return `₹${(paise / 100).toLocaleString("en-IN", {
-		maximumFractionDigits: 2,
-	})}`;
+	return formatMoney(paise);
 }
 
 export function toAmountLabel(min: number | null, max: number | null) {

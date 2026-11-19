@@ -1,16 +1,26 @@
 "use client";
 
-import { IconPlus, IconSearch } from "@tabler/icons-react";
+import { IconBuildingStore, IconPlus, IconSearch } from "@tabler/icons-react";
+import { useTable } from "@tanstack/react-table";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-
+import { DataTable } from "@/components/common/DataTable";
+import {
+	type DataTableColumnDef,
+	dataTableFeatures,
+} from "@/components/common/data-table-features";
 import {
 	SearchableSelect,
 	type SearchableSelectOption,
 } from "@/components/common/SearchableSelect";
 import { CreateSupplierModal } from "@/components/pages/suppliers/CreateSupplierModal";
-import { SuppliersCards } from "@/components/pages/suppliers/SuppliersCards";
-import { SuppliersPagination } from "@/components/pages/suppliers/SuppliersPagination";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { ErrorState } from "@/components/shared/ErrorState";
+import { FilterBar } from "@/components/shared/FilterBar";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { Pagination } from "@/components/shared/Pagination";
+import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -27,9 +37,51 @@ import {
 	useSuppliersQuery,
 } from "@/lib/api/suppliers/queries";
 import type {
+	Supplier,
 	SupplierSortField,
 	SupplierStatusFilter,
 } from "@/types/suppliers";
+
+const columns: DataTableColumnDef<Supplier>[] = [
+	{
+		accessorKey: "name",
+		header: "Supplier",
+		cell: ({ row }) => (
+			<span className="inline-flex items-center gap-2">
+				<Link
+					href={`/suppliers/${row.original.id}`}
+					className="text-brand-accent hover:underline"
+				>
+					{row.original.name}
+				</Link>
+				{row.original.isActive ? null : (
+					<StatusBadge doc="supplier" status="inactive" />
+				)}
+			</span>
+		),
+	},
+	{
+		accessorKey: "contactPerson",
+		header: "Contact",
+		cell: ({ row }) => row.original.contactPerson || "–",
+	},
+	{
+		accessorKey: "phone",
+		header: "Phone",
+		cell: ({ row }) => row.original.phone || "–",
+	},
+	{
+		accessorKey: "email",
+		header: "Email",
+		cell: ({ row }) => row.original.email || "–",
+	},
+];
+
+const STATUS_QUICK: Array<{ key: SupplierStatusFilter; label: string }> = [
+	{ key: "all", label: "All" },
+	{ key: "active", label: "Active" },
+	{ key: "inactive", label: "Inactive" },
+];
 
 const SORT_FIELDS: Array<{ label: string; value: SupplierSortField }> = [
 	{ label: "Name", value: "name" },
@@ -82,129 +134,167 @@ export function SuppliersView() {
 		return Array.from(dedup.values());
 	}, [supplierLookupQuery.data]);
 
-	if (suppliersQuery.isError) {
-		return (
-			<div className="flex w-full flex-col gap-4 p-6">
-				<p className="text-sm text-destructive">Failed to load suppliers.</p>
-				<Button
-					type="button"
-					variant="outline"
-					className="w-fit"
-					onClick={() => suppliersQuery.refetch()}
-				>
-					Retry
-				</Button>
-			</div>
-		);
-	}
+	const table = useTable({
+		features: dataTableFeatures,
+		data: suppliers,
+		columns,
+		manualPagination: true,
+		manualSorting: true,
+	});
+
+	const filtersActive = status !== "all" || search !== "";
+	const resetFilters = () => {
+		setStatus("all");
+		setSearch("");
+		setPage(1);
+	};
 
 	return (
-		<div className="flex w-full flex-col gap-6 p-6">
-			<div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-				<div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
-					<div className="w-full sm:max-w-sm">
-						<SearchableSelect
-							value={undefined}
-							options={supplierLookupOptions}
-							onValueChange={(value) => router.push(`/suppliers/${value}`)}
-							searchValue={comboboxSearch}
-							onSearchChange={setComboboxSearch}
-							placeholder="Jump to supplier"
-							searchPlaceholder="Search supplier"
-							emptyText="Type to search suppliers"
-							isLoading={supplierLookupQuery.isLoading}
-							hasNextPage={supplierLookupQuery.hasNextPage}
-							isFetchingNextPage={supplierLookupQuery.isFetchingNextPage}
-							onReachEnd={() => supplierLookupQuery.fetchNextPage()}
-						/>
-					</div>
-
-					<div className="relative flex-1">
-						<IconSearch className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-						<Input
-							value={search}
-							onChange={(event) => {
-								setSearch(event.target.value);
-								setPage(1);
-							}}
-							placeholder="Search name, contact, email, phone, GSTIN or item SKU"
-							aria-label="Search suppliers"
-							className="pl-7"
-						/>
-					</div>
-
-					<div className="flex items-center gap-2">
-						<Select
-							value={status}
-							onValueChange={(value) => {
-								setStatus(value as SupplierStatusFilter);
-								setPage(1);
-							}}
-						>
-							<SelectTrigger className="w-32" aria-label="Filter by status">
-								<SelectValue placeholder="Status" />
-							</SelectTrigger>
-							<SelectContent>
-								<SelectItem value="all">All</SelectItem>
-								<SelectItem value="active">Active</SelectItem>
-								<SelectItem value="inactive">Inactive</SelectItem>
-							</SelectContent>
-						</Select>
-
-						<Select
-							value={sortBy}
-							onValueChange={(value) => {
-								setSortBy(value as SupplierSortField);
-								setPage(1);
-							}}
-						>
-							<SelectTrigger className="w-40">
-								<SelectValue placeholder="Sort by" />
-							</SelectTrigger>
-							<SelectContent>
-								{SORT_FIELDS.map((field) => (
-									<SelectItem key={field.value} value={field.value}>
-										{field.label}
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
-
-						<Select
-							value={sortDir}
-							onValueChange={(value) => {
-								setSortDir(value as "asc" | "desc");
-								setPage(1);
-							}}
-						>
-							<SelectTrigger className="w-32">
-								<SelectValue placeholder="Order" />
-							</SelectTrigger>
-							<SelectContent>
-								<SelectItem value="asc">Asc</SelectItem>
-								<SelectItem value="desc">Desc</SelectItem>
-							</SelectContent>
-						</Select>
-					</div>
-				</div>
-
-				{canManage ? (
-					<Button onClick={() => setCreateOpen(true)}>
-						<IconPlus className="size-3.5" />
-						Create supplier
-					</Button>
-				) : null}
-			</div>
-
-			<SuppliersCards
-				suppliers={suppliers}
-				isLoading={suppliersQuery.isLoading}
+		<div className="flex w-full flex-col gap-4">
+			<PageHeader
+				title="Suppliers"
+				description="Vendors you buy from or send job work to."
+				actions={
+					canManage ? (
+						<Button onClick={() => setCreateOpen(true)}>
+							<IconPlus />
+							Create supplier
+						</Button>
+					) : undefined
+				}
 			/>
 
-			<SuppliersPagination
+			<FilterBar
+				quick={STATUS_QUICK}
+				value={status}
+				onChange={(key) => {
+					setStatus(key as SupplierStatusFilter);
+					setPage(1);
+				}}
+				onReset={resetFilters}
+				filtersActive={filtersActive}
+			>
+				<div className="w-56">
+					<SearchableSelect
+						value={undefined}
+						options={supplierLookupOptions}
+						onValueChange={(value) => router.push(`/suppliers/${value}`)}
+						searchValue={comboboxSearch}
+						onSearchChange={setComboboxSearch}
+						placeholder="Jump to supplier"
+						searchPlaceholder="Search supplier"
+						emptyText="Type to search suppliers"
+						isLoading={supplierLookupQuery.isLoading}
+						hasNextPage={supplierLookupQuery.hasNextPage}
+						isFetchingNextPage={supplierLookupQuery.isFetchingNextPage}
+						onReachEnd={() => supplierLookupQuery.fetchNextPage()}
+					/>
+				</div>
+
+				<div className="relative w-72">
+					<IconSearch
+						aria-hidden="true"
+						className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground"
+					/>
+					<Input
+						value={search}
+						onChange={(event) => {
+							setSearch(event.target.value);
+							setPage(1);
+						}}
+						placeholder="Search name, contact, GSTIN or item SKU"
+						aria-label="Search suppliers"
+						className="pl-7"
+					/>
+				</div>
+
+				<Select
+					value={sortBy}
+					onValueChange={(value) => {
+						setSortBy(value as SupplierSortField);
+						setPage(1);
+					}}
+				>
+					<SelectTrigger className="w-40" aria-label="Sort by">
+						<SelectValue placeholder="Sort by" />
+					</SelectTrigger>
+					<SelectContent>
+						{SORT_FIELDS.map((field) => (
+							<SelectItem key={field.value} value={field.value}>
+								{field.label}
+							</SelectItem>
+						))}
+					</SelectContent>
+				</Select>
+
+				<Select
+					value={sortDir}
+					onValueChange={(value) => {
+						setSortDir(value as "asc" | "desc");
+						setPage(1);
+					}}
+				>
+					<SelectTrigger className="w-28" aria-label="Order">
+						<SelectValue placeholder="Order" />
+					</SelectTrigger>
+					<SelectContent>
+						<SelectItem value="asc">Asc</SelectItem>
+						<SelectItem value="desc">Desc</SelectItem>
+					</SelectContent>
+				</Select>
+			</FilterBar>
+
+			<DataTable
+				table={table}
+				isLoading={suppliersQuery.isLoading}
+				hidePagination
+				emptyState={
+					filtersActive ? (
+						<EmptyState
+							icon={IconBuildingStore}
+							title="Nothing matches these filters"
+							action={
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									onClick={resetFilters}
+								>
+									Reset filters
+								</Button>
+							}
+						/>
+					) : (
+						<EmptyState
+							icon={IconBuildingStore}
+							title="No suppliers yet"
+							action={
+								canManage ? (
+									<Button size="sm" onClick={() => setCreateOpen(true)}>
+										Create supplier
+									</Button>
+								) : undefined
+							}
+						/>
+					)
+				}
+				errorState={
+					suppliersQuery.isError ? (
+						<ErrorState
+							message="Failed to load suppliers."
+							onRetry={() => {
+								void suppliersQuery.refetch();
+							}}
+							retrying={suppliersQuery.isRefetching}
+						/>
+					) : undefined
+				}
+			/>
+
+			<Pagination
 				page={page}
 				pageSize={pageSize}
-				meta={meta}
+				total={meta?.total ?? 0}
 				onPageChange={setPage}
 				onPageSizeChange={(nextPageSize) => {
 					setPageSize(nextPageSize);

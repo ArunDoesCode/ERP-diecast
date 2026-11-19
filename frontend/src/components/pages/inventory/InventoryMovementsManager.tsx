@@ -2,21 +2,25 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { IconPlus } from "@tabler/icons-react";
-import {
-	type ColumnDef,
-	getCoreRowModel,
-	type PaginationState,
-	useReactTable,
-} from "@tanstack/react-table";
+import { type PaginationState, useTable } from "@tanstack/react-table";
 import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { DataTable } from "@/components/common/DataTable";
 import { DataTableColumnHeader } from "@/components/common/DataTableColumnHeader";
 import {
+	type DataTableColumnDef,
+	dataTableFeatures,
+} from "@/components/common/data-table-features";
+import {
 	SearchableSelect,
 	type SearchableSelectOption,
 } from "@/components/common/SearchableSelect";
-import { InventoryBackButton } from "@/components/pages/inventory/InventoryBackButton";
+import {
+	listEmptyState,
+	listErrorState,
+} from "@/components/pages/inventory/list-states";
+import { FilterBar } from "@/components/shared/FilterBar";
+import { PageHeader } from "@/components/shared/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,6 +53,7 @@ import {
 	useLocationsQuery,
 	useMovementsQuery,
 } from "@/lib/api/asset/queries";
+import { formatDateTime } from "@/lib/format";
 import {
 	type AssetMovement,
 	type AssetMovementCreatePayload,
@@ -453,7 +458,7 @@ export function InventoryMovementsManager() {
 	const movements = movementsQuery.data?.data ?? [];
 	const meta = movementsQuery.data?.meta;
 
-	const columns = useMemo<ColumnDef<AssetMovement>[]>(
+	const columns = useMemo<DataTableColumnDef<AssetMovement>[]>(
 		() => [
 			{
 				accessorKey: "itemName",
@@ -507,26 +512,35 @@ export function InventoryMovementsManager() {
 				),
 				cell: ({ getValue }) => {
 					const value = getValue<string>();
-					return value ? new Date(value).toLocaleString() : "—";
+					return formatDateTime(value);
 				},
 			},
 		],
 		[],
 	);
 
-	const table = useReactTable({
+	const table = useTable({
+		features: dataTableFeatures,
 		data: movements,
 		columns,
-		getCoreRowModel: getCoreRowModel(),
 		manualPagination: true,
 		pageCount: meta?.totalPages ?? 1,
 		onPaginationChange: setPagination,
 		state: { pagination },
 	});
 	return (
-		<div className="flex w-full flex-col gap-6 p-6">
-			<InventoryBackButton />
-			<div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+		<div className="flex w-full flex-col gap-4">
+			<PageHeader
+				title="Movements"
+				description="Every posting in the stock ledger."
+				actions={
+					<Button onClick={() => setCreateOpen(true)}>
+						<IconPlus className="size-3.5" />
+						Stock-take / opening stock
+					</Button>
+				}
+			/>
+			<FilterBar value="" onChange={() => {}}>
 				<div className="flex w-full gap-2 sm:max-w-lg">
 					<div className="flex-1">
 						<ItemPicker
@@ -550,14 +564,17 @@ export function InventoryMovementsManager() {
 						Clear
 					</Button>
 				</div>
+			</FilterBar>
 
-				<Button onClick={() => setCreateOpen(true)}>
-					<IconPlus className="size-3.5" />
-					Stock-take / opening stock
-				</Button>
-			</div>
-
-			<DataTable table={table} isLoading={movementsQuery.isLoading} />
+			<DataTable
+				table={table}
+				isLoading={movementsQuery.isLoading}
+				emptyState={listEmptyState("No movements yet")}
+				errorState={listErrorState(
+					movementsQuery,
+					"The list could not be loaded.",
+				)}
+			/>
 
 			<Dialog open={createOpen} onOpenChange={setCreateOpen}>
 				<DialogContent className="sm:max-w-xl">
@@ -624,7 +641,7 @@ export function InventoryMovementsManager() {
 							</p>
 							<p>
 								<span className="font-medium">Created:</span>{" "}
-								{new Date(detailMovement.createdAt).toLocaleString()}
+								{formatDateTime(detailMovement.createdAt)}
 							</p>
 						</div>
 					) : null}

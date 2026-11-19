@@ -1,15 +1,14 @@
 "use client";
 
 import { IconFileOff, IconListCheck, IconSearch } from "@tabler/icons-react";
-import {
-	type ColumnDef,
-	getCoreRowModel,
-	useReactTable,
-} from "@tanstack/react-table";
+import { useTable } from "@tanstack/react-table";
 import Link from "next/link";
 import { useMemo } from "react";
-
 import { DataTable } from "@/components/common/DataTable";
+import {
+	type DataTableColumnDef,
+	dataTableFeatures,
+} from "@/components/common/data-table-features";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { FilterBar } from "@/components/shared/FilterBar";
@@ -34,6 +33,7 @@ import {
 import { useCan } from "@/hooks/use-can";
 import { usePurchaseRequisitionsQuery } from "@/lib/api/purchase-requisitions/queries";
 import { formatDate, formatDocNo, formatMoney } from "@/lib/format";
+import type { StatusCounts } from "@/types/purchase-orders";
 import {
 	type PRStatus,
 	type PRType,
@@ -43,7 +43,7 @@ import {
 
 const QUEUE_STATUSES: PRStatus[] = ["approved", "partial_ordered"];
 
-const columns: ColumnDef<PurchaseRequisition>[] = [
+const columns: DataTableColumnDef<PurchaseRequisition>[] = [
 	{
 		accessorKey: "prNumber",
 		header: "PR no.",
@@ -107,30 +107,28 @@ export function PurchaseOrdersView() {
 		typeFilter,
 	} = usePOQueueControls();
 
+	// BR-PR-48: the PR number search goes in `q`, the type in its own param.
 	const queueQuery = usePurchaseRequisitionsQuery({
 		page,
 		pageSize,
 		sortBy: "createdAt",
 		sortDir,
 		status: status === "all" ? QUEUE_STATUSES : [status],
-		q,
+		...(searchField === "prNumber"
+			? { q }
+			: typeFilter !== "all"
+				? { type: typeFilter }
+				: {}),
 	});
 
-	// Counts for the quick filters: same list API, one row each, same search.
-	const approvedCount = usePurchaseRequisitionsQuery({
-		page: 1,
-		pageSize: 1,
-		status: ["approved"],
-		q,
-	});
-	const partialCount = usePurchaseRequisitionsQuery({
-		page: 1,
-		pageSize: 1,
-		status: ["partial_ordered"],
-		q,
-	});
-	const approved = approvedCount.data?.meta.total;
-	const partial = partialCount.data?.meta.total;
+	// BR-PO-26: the quick-filter counts come in the same answer's meta.
+	const statusCounts = (
+		queueQuery.data?.meta as
+			| { statusCounts?: StatusCounts<PRStatus> }
+			| undefined
+	)?.statusCounts;
+	const approved = statusCounts?.approved;
+	const partial = statusCounts?.partial_ordered;
 
 	const quick = [
 		{
@@ -151,10 +149,10 @@ export function PurchaseOrdersView() {
 	);
 	const total = queueQuery.data?.meta.total ?? 0;
 
-	const table = useReactTable({
+	const table = useTable({
+		features: dataTableFeatures,
 		data: requisitions,
 		columns,
-		getCoreRowModel: getCoreRowModel(),
 		manualPagination: true,
 		manualSorting: true,
 	});

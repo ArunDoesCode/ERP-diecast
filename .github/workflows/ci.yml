@@ -89,10 +89,9 @@ jobs:
       - name: Contrast check (BR-DS-02)
         run: bun run contrast:check
       - run: bun run build
-      - name: Standards check (blocking for mutation-invalidate and motion, BR-STD-30)
-        # raw-palette stays report-only until issue #91.
+      - name: Standards check (blocking, BR-STD-30, BR-DS-01, BR-DS-09)
         if: ${{ !cancelled() }}
-        run: bun run standards:check -- --strict=mutation-invalidate,motion
+        run: bun run standards:check:strict
       - name: Dependency audit (non-blocking)
         if: ${{ !cancelled() }}
         continue-on-error: true

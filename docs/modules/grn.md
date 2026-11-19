@@ -41,8 +41,8 @@ ledger. All grn + grn-stock BRs are implemented and tested (`grnService.test.ts`
 ## API
 | Method | Path | Key (seed roles holding it) | Purpose |
 |---|---|---|---|
-| GET | `/api/grn/getgrns` | `grn.view` (ow, bo, fs, qa, dd) | List, paginated |
-| GET | `/api/grn/getgrndetails/:id` | `grn.view` | Header + lines + corrected/net qty |
+| GET | `/api/grn/getgrns` | `grn.view` (ow, bo, fs, qa, dd) | List, paginated; rows carry `poNumber` (BR-GRN-45) |
+| GET | `/api/grn/getgrndetails/:id` | `grn.view` | Header + lines + corrected/net qty; `po` and linked `prs` for the document flow (BR-GRN-45) |
 | POST | `/api/grn/creategrn` | `grn.edit_draft` (ow, bo, fs) | Create draft |
 | PATCH | `/api/grn/updategrn` | `grn.edit_draft` | Edit draft (header, arrived qty, batch no.) |
 | DELETE | `/api/grn/deletegrn/:id` | `grn.edit_draft` | Delete draft |

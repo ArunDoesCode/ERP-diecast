@@ -249,6 +249,7 @@ const PUBLIC_ROUTES = [
   "POST /api/auth/login",
   "POST /api/auth/refresh",
   "POST /api/auth/logout",
+  "POST /api/auth/qr-login",
 ];
 const KNOWN_AUTH_TYPES = new Set(["public", "any-authenticated", "permission"]);
 
@@ -307,7 +308,7 @@ describe("T-3 / BR-STD-42 every registered route is guarded by its auth type", (
     expect(unknown).toEqual([]);
   });
 
-  test("BR-STD-42 the public routes are exactly login, refresh and logout", () => {
+  test("BR-STD-42 the public routes are exactly login, qr-login, refresh and logout", () => {
     const pub = getRegistry()
       .filter((d) => d.auth.type === "public")
       .map((d) => `${d.method} ${d.path}`)

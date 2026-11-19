@@ -37,7 +37,7 @@ import {
 	toEditDefaults,
 	toLookupItemOptions,
 } from "@/components/pages/purchase-requisitions/purchase-requisition-modal-shared";
-import { Badge } from "@/components/ui/badge";
+import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -75,10 +75,7 @@ import {
 	useUpdatePurchaseRequisitionMutation,
 } from "@/lib/api/purchase-requisitions/queries";
 import { useAssetItemsLookupQuery } from "@/lib/api/suppliers/queries";
-import {
-	getPRStatusBadgeStyle,
-	humanizeStatusLabel,
-} from "@/lib/pr-status-badge";
+import { formatDateTime, formatMoney } from "@/lib/format";
 import { useAuthSessionStore } from "@/lib/store/auth-session-store";
 import {
 	type PRCreateFormInput,
@@ -493,7 +490,6 @@ export function EditPurchaseRequisitionModal({
 		updateMutation.isPending ||
 		submitApprovalMutation.isPending ||
 		actMutation.isPending;
-	const statusBadgeStyle = getPRStatusBadgeStyle(pr?.status);
 	const cancelBlockedReason = pr
 		? getCancelBlockedReason(pr.status, detail?.items ?? [])
 		: null;
@@ -689,13 +685,7 @@ export function EditPurchaseRequisitionModal({
 									<div className="flex items-center justify-between">
 										<div className="text-sm text-muted-foreground">
 											<p>PR: {pr.prNumber}</p>
-											<p>
-												Estimate: ₹
-												{(pr.estimatedAmountPaise / 100).toLocaleString(
-													"en-IN",
-													{ minimumFractionDigits: 2 },
-												)}
-											</p>
+											<p>Estimate: {formatMoney(pr.estimatedAmountPaise)}</p>
 											{detail.items.some((item) => item.noCostHistory) ? (
 												<p className="text-xs">
 													Estimate uses standard rate for:{" "}
@@ -709,12 +699,7 @@ export function EditPurchaseRequisitionModal({
 												</p>
 											) : null}
 										</div>
-										<Badge
-											variant={statusBadgeStyle.variant}
-											className={statusBadgeStyle.className}
-										>
-											{humanizeStatusLabel(pr.status)}
-										</Badge>
+										<StatusBadge doc="pr" status={pr.status} />
 									</div>
 
 									{pr.status === "cancelled" ? (
@@ -722,7 +707,7 @@ export function EditPurchaseRequisitionModal({
 											<p>
 												Cancelled by {pr.cancelledByName ?? "unknown"}
 												{pr.cancelledAt
-													? ` on ${new Date(pr.cancelledAt).toLocaleString()}`
+													? ` on ${formatDateTime(pr.cancelledAt)}`
 													: ""}
 											</p>
 											<p className="text-muted-foreground">

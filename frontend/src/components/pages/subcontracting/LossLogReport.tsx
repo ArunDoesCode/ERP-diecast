@@ -2,14 +2,12 @@
 
 import Link from "next/link";
 import { useState } from "react";
-
-import { formatPaise } from "@/components/pages/inventory/inventory-format";
-import { PurchaseRequisitionsPagination } from "@/components/pages/purchase-requisitions/PurchaseRequisitionsPagination";
 import {
 	DateRangeFilter,
 	SortableHead,
 	VendorFilter,
 } from "@/components/pages/subcontracting/ReportFilters";
+import { Pagination } from "@/components/shared/Pagination";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -21,7 +19,7 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { useLossLogQuery } from "@/lib/api/subcontracting/queries";
-import { formatScoDate } from "@/lib/sco-format";
+import { formatDate, formatMoney } from "@/lib/format";
 import type { LossLogSortField } from "@/types/subcontracting";
 
 export function LossLogReport() {
@@ -109,7 +107,7 @@ export function LossLogReport() {
 							<TableBody>
 								{rows.map((row) => (
 									<TableRow key={row.ledgerId}>
-										<TableCell>{formatScoDate(row.createdAt)}</TableCell>
+										<TableCell>{formatDate(row.createdAt)}</TableCell>
 										<TableCell>
 											<Link
 												href={`/subcontracting/${row.scoId}`}
@@ -129,7 +127,7 @@ export function LossLogReport() {
 										</TableCell>
 										<TableCell className="text-right">{row.qty}</TableCell>
 										<TableCell className="text-right">
-											{formatPaise(row.costPaise)}
+											{formatMoney(row.costPaise)}
 										</TableCell>
 										<TableCell className="max-w-64 whitespace-normal">
 											{row.reason}
@@ -142,10 +140,10 @@ export function LossLogReport() {
 					)}
 				</CardContent>
 			</Card>
-			<PurchaseRequisitionsPagination
+			<Pagination
 				page={page}
 				pageSize={pageSize}
-				meta={query.data?.meta}
+				total={query.data?.meta.total ?? 0}
 				onPageChange={setPage}
 				onPageSizeChange={(next) => {
 					setPageSize(next);

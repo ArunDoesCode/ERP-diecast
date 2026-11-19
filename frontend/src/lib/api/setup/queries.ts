@@ -14,6 +14,7 @@ import type {
 	EmployeeInput,
 	EmployeeListParams,
 	EmployeeSearchParams,
+	Role,
 	RoleGrantsDiff,
 	RoleInput,
 	RoleListParams,
@@ -31,6 +32,7 @@ import {
 	deleteRole,
 	generateEmployeeQr,
 	getAccessLog,
+	getAccessLogDetail,
 	getAssignableRoles,
 	getEmployees,
 	getModules,
@@ -63,6 +65,8 @@ export const setupKeys = {
 		params
 			? (["setup", "access-log", params] as const)
 			: (["setup", "access-log"] as const),
+	accessLogDetail: (id: number) =>
+		["setup", "access-log", "detail", id] as const,
 	assignableRoles: () => ["setup", "assignable-roles"] as const,
 };
 
@@ -296,7 +300,17 @@ export function useUpdateRoleGrantsMutation() {
 			await queryClient.invalidateQueries({ queryKey: setupKeys.roles() });
 			await queryClient.invalidateQueries({ queryKey: setupKeys.screens() });
 			await queryClient.invalidateQueries({ queryKey: ACCESS_LOG_KEY });
-			await queryClient.invalidateQueries({ queryKey: authKeys.me() });
+			// Own permissions change only when the edited role is the user's own role.
+			const me = queryClient.getQueryData<{ data?: { role?: string } }>(
+				authKeys.me(),
+			);
+			const editedRole = queryClient
+				.getQueriesData<{ data?: Role[] }>({ queryKey: setupKeys.roles() })
+				.flatMap(([, cached]) => cached?.data ?? [])
+				.find((role) => role.id === id);
+			if (!me?.data?.role || !editedRole || editedRole.name === me.data.role) {
+				await queryClient.invalidateQueries({ queryKey: authKeys.me() });
+			}
 			toast.success("Access saved");
 		},
 		onError: (error) => {
@@ -350,6 +364,15 @@ export function useAccessLogQuery(params: AccessLogListParams) {
 		queryKey: setupKeys.accessLog(params),
 		queryFn: () => getAccessLog(params),
 		placeholderData: keepPreviousData,
+	});
+}
+
+/** Full before/after of one access-log row, fetched when the row is opened (BR-AUTH-31). */
+export function useAccessLogDetailQuery(id: number | null) {
+	return useQuery({
+		queryKey: setupKeys.accessLogDetail(id ?? 0),
+		queryFn: () => getAccessLogDetail(id as number),
+		enabled: id !== null,
 	});
 }
 

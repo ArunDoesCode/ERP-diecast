@@ -6,6 +6,7 @@ import type {
 	ChallanDetailResult,
 	ChallanListResult,
 	CompanySettings,
+	CompanySettingsHistoryResult,
 	CompanySettingsPayload,
 	CompanySettingsResult,
 	LossLogParams,
@@ -80,6 +81,12 @@ export function cancelSco(scoId: number, payload: ScoCancelPayload) {
 
 export function getCompanySettings() {
 	return api.get<CompanySettingsResult>(API_ROUTES.company.settings);
+}
+
+export function getCompanySettingsHistory() {
+	return api.get<CompanySettingsHistoryResult>(
+		API_ROUTES.company.settingsHistory,
+	);
 }
 
 export function saveCompanySettings(payload: CompanySettingsPayload) {

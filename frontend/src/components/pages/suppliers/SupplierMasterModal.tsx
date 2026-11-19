@@ -191,9 +191,22 @@ export function SupplierMasterModal({
 															label="GST number (optional)"
 															maxLength={15}
 															onChange={(event) => {
+																const previousGst = field.value ?? "";
 																const gst = event.target.value.toUpperCase();
 																field.onChange(gst);
-																if (isValidGstin(gst)) {
+																if (!isValidGstin(gst)) {
+																	// BR-SUP-04: drop a PAN that came from the old GSTIN.
+																	if (
+																		isValidGstin(previousGst) &&
+																		form.getValues("panNumber") ===
+																			panFromGstin(previousGst)
+																	) {
+																		form.setValue("panNumber", "", {
+																			shouldDirty: true,
+																			shouldValidate: true,
+																		});
+																	}
+																} else {
 																	form.setValue(
 																		"panNumber",
 																		panFromGstin(gst),

@@ -4,6 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { type ReactNode, useEffect, useState } from "react";
 
 import { NavSidebar } from "@/components/common/Sidebar";
+import { SIDEBAR_FOLDED_ATTRIBUTE } from "@/components/shell/sidebar-fold-init";
 import { TopBar } from "@/components/shell/TopBar";
 import type { UserMenuProps } from "@/components/shell/UserMenu";
 import {
@@ -30,6 +31,19 @@ import {
 } from "@/lib/shell/sidebar-fold";
 import { useAuthSessionStore } from "@/lib/store/auth-session-store";
 
+// Screens with no permission key: open to every signed-in user (BR-AUTH-15).
+const ALWAYS_ALLOWED_PATHS = ["/landing", "/approvals"];
+
+function isPathAllowed(pathname: string, allowedPaths: string[]) {
+	const path = normalizeAllowedPath(pathname);
+	return allowedPaths.some((allowedPath) => {
+		const allowed = normalizeAllowedPath(allowedPath);
+		if (!allowed) return false;
+		if (allowed === "/") return path === "/";
+		return path === allowed || path.startsWith(`${allowed}/`);
+	});
+}
+
 /** Protected-area frame: sidebar + 44 px top bar + content. Holds the fold and density preferences. */
 export function AppShell({ children }: { children: ReactNode }) {
 	const pathname = usePathname();
@@ -38,19 +52,38 @@ export function AppShell({ children }: { children: ReactNode }) {
 	const userName = useAuthSessionStore((state) => state.userName);
 	const role = useAuthSessionStore((state) => state.role);
 	const screens = useAuthSessionStore((state) => state.screens);
+	const sessionReady = useAuthSessionStore(
+		(state) => state.hasHydrated && state.userId !== null,
+	);
 
 	const [folded, setFolded] = useState(false);
-	const [density, setDensity] = useState<Density>(DEFAULT_DENSITY);
+	// The menu's density switch is not in the server markup (closed menu), so it can start from
+	// the saved value; the page density itself is set before paint by the root layout script.
+	const [density, setDensity] = useState<Density>(() =>
+		typeof window === "undefined" ? DEFAULT_DENSITY : readDensity(),
+	);
 
-	// Saved preferences live in localStorage; read after mount so server and client markup match.
+	// The server markup is always unfolded; the root layout script marks <html> before paint so
+	// CSS shows the saved fold until this state catches up (#107).
 	useEffect(() => {
 		setFolded(readSidebarFolded());
-		setDensity(readDensity());
 	}, []);
+
+	// BR-AUTH-30: the page guard only checks the refresh cookie; screen access is checked here,
+	// once the session is restored. The API still decides every request (BR-AUTH-14).
+	useEffect(() => {
+		if (!sessionReady) return;
+		const allowed = [
+			...ALWAYS_ALLOWED_PATHS,
+			...screens.map((screen) => screen.path),
+		];
+		if (!isPathAllowed(pathname, allowed)) router.replace("/landing");
+	}, [sessionReady, screens, pathname, router]);
 
 	const changeFolded = (next: boolean) => {
 		setFolded(next);
 		writeSidebarFolded(next);
+		document.documentElement.toggleAttribute(SIDEBAR_FOLDED_ATTRIBUTE, next);
 	};
 	const changeDensity = (next: Density) => {
 		setDensity(next);
@@ -79,7 +112,10 @@ export function AppShell({ children }: { children: ReactNode }) {
 						role: role ?? "-",
 						density,
 						onDensityChange: changeDensity,
+						loggingOut: logoutMutation.isPending,
 						onLogout: () => {
+							// #107: one call only, even on a double click.
+							if (logoutMutation.isPending) return;
 							logoutMutation.mutate(undefined, {
 								onSettled: () => {
 									router.replace("/login");
@@ -117,7 +153,7 @@ function ShellFrame({
 	return (
 		<>
 			<NavSidebar />
-			<SidebarInset>
+			<SidebarInset className="min-w-0">
 				<TopBar
 					crumbs={crumbs}
 					sidebarFolded={folded}

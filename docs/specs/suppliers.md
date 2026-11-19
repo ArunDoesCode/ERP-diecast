@@ -40,13 +40,13 @@ PO screen offers Hindalco and suggests ₹245.
 | BR-SUP-01 | Name is required (trimmed, not blank). Creating or renaming a supplier to a name that matches another supplier, ignoring case and spaces, is rejected with 409 "Supplier name already exists, use a different name"; the user changes the name and saves again. | "Hindalco " exists, create "hindalco" → 409; change to "Hindalco Taloja" → saved; rename S2 to "HINDALCO" → 409 |
 | BR-SUP-02 | GSTIN is optional (unregistered sellers are allowed); if given it is saved in capitals and must be a valid 15-character GSTIN, else 400. | "27aaacr5055k1z5" → saved "27AAACR5055K1Z5"; "27ABC" → 400; blank → saved |
 | BR-SUP-03 | No two suppliers may have the same GSTIN: 409 "Supplier GST number already exists", ignoring case. | S1 has 27AAACR5055K1Z5, S2 saves it in small letters → 409 |
-| BR-SUP-04 | PAN is optional, saved in capitals, must be 10 characters (5 letters, 4 digits, 1 letter); if GSTIN is given, PAN must equal GSTIN characters 3–12, and is filled from the GSTIN when left blank. | GSTIN 27AAACR5055K1Z5, PAN blank → PAN AAACR5055K; PAN AAACX1111K → 400 |
+| BR-SUP-04 | PAN is optional, saved in capitals, must be 10 characters (5 letters, 4 digits, 1 letter); if GSTIN is given, PAN must equal GSTIN characters 3–12, and is filled from the GSTIN when left blank. When the GSTIN is changed, PAN is filled again from the new GSTIN (screen and API). | GSTIN 27AAACR5055K1Z5, PAN blank → PAN AAACR5055K; PAN AAACX1111K → 400; GSTIN changed to 29AAACR5055K1Z5 → PAN stays AAACR5055K, changed to 27BBBCR5055K1Z5 → PAN BBBCR5055K |
 | BR-SUP-05 | Type is one of raw material, consumables, service provider, trader, both; default raw material. | no type → raw material |
 | BR-SUP-06 | Default payment terms are whole days 0–365 (default 0); a new PO with no terms typed copies them. Email, if given, must be a valid address. | terms 400 → 400; "abc@" → 400; S1 terms 30, new PO blank → 30 days |
 | BR-SUP-07 | Suppliers are never deleted, only deactivated. An inactive supplier cannot be chosen on a new PO or SCO (400) but its old POs, GRNs and price list stay readable, and open POs carry on. | deactivate S1 with an open PO → PO still receivable; new PO for S1 → rejected |
 | BR-SUP-08 | An inactive supplier can be reactivated; its price-list rows keep their own active flag. | reactivate S1 → PO allowed again, old prices back |
 | BR-SUP-09 | An edit must change at least one field; optional fields (GSTIN, PAN, contact, email, phone, address) can be cleared, name cannot. | edit with no fields → 400; clear email → saved |
-| BR-SUP-10 | Every supplier change and every price-list price, GST % or active change adds a history row: who, when, old and new values. | price 24 500 → 25 000 paise → history row "Asha, 29-09, 24 500 → 25 000" |
+| BR-SUP-10 | Every supplier change and every price-list change (price, GST %, active, SKU, qty, unit, lead time) adds a history row: who, when, old and new values. | price 24 500 → 25 000 paise → history row "Asha, 29-09, 24 500 → 25 000" |
 | BR-SUP-11 | A supplier has at most one price-list row per item and one per service: a second one → 409; an unknown item or service → 400. | ADC12 already on Hindalco, add ADC12 again → 409 |
 | BR-SUP-12 | Price is in whole paise and must be more than 0. | ₹245.50 → 24 550 paise; price 0 → 400 |
 | BR-SUP-13 | GST % must be one of 0, 0.1, 0.25, 1.5, 3, 5, 12, 18, 28, 40; default 0. | 18 → ok; 17 → 400 |
@@ -62,6 +62,8 @@ PO screen offers Hindalco and suggests ₹245.
 | BR-SUP-23 | Search matches, ignoring case and on any part: supplier name, contact person, email, phone, GSTIN, or the SKU of an item they supply; pages of 1–100 (default 10), sorted by name unless chosen. | "hind" → Hindalco; "ADC12" → every supplier with ADC12 on their list |
 | BR-SUP-24 | The supplier list shows active and inactive with their status and can filter by it; the PO supplier picker shows only active ones. | filter "inactive" → only S1; PO picker → no S1 |
 | BR-SUP-25 | Without the needed key every supplier action returns 403 `PERMISSION_DENIED` naming the key (BR-AUTH-09). | qa opens supplier list → 403 `supplier.view`; fs edits a supplier → 403 `supplier.manage` |
+| BR-SUP-26 | Field caps (BR-STD-13): name 200, contact person 200, phone 30, email 254, address 500, supplier SKU 100 characters; price-list qty ≤ 1,000,000,000 (BR-STD-17). One more → 400, nothing saved. | name of 201 characters → 400; qty 1000000001 → 400 |
+| BR-SUP-27 | Editing one price-list row by id that does not exist on that supplier → 404, nothing saved (a batch row gets its own reason, BR-SUP-21). | PATCH row 99999 → 404 |
 
 ## Not now
 
@@ -85,3 +87,4 @@ None open.
 - 2026-09-29 — coordinator decisions 2026-09-29: duplicate-name check also on rename (BR-SUP-01); recommended defaults accepted, "(assumed)" dropped from BR-SUP-04, 12, 13, 14.
 - 2026-09-29 — pre-freeze touch-up: BR-SUP-16 last fallback = item standard rate (inventory BR-INV-24); BR-SUP-07 also blocks new SCOs (subcontracting BR-SCO-01).
 - 2026-09-29 — frozen v1 (all questions answered by Arun)
+- 2026-11-19 — change after freeze, approved by Arun in chat: touch-ups BR-SUP-04 (PAN refilled on GSTIN change), BR-SUP-10 (history also tracks SKU, qty, unit, lead time); new BR-SUP-26 (field caps), BR-SUP-27 (unknown row → 404) (#43).

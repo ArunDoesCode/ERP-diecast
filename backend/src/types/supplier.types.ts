@@ -302,6 +302,22 @@ export const supplierItemListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(10),
   q: searchTermSchema,
+  // Comma list of item ids (at most 100, one page): the PO screen asks for the
+  // price-list rows of its own lines only (#107, PERF-03).
+  itemIds: z
+    .string()
+    .max(1200)
+    .optional()
+    .transform((value) =>
+      value
+        ? value
+            .split(",")
+            .map((entry) => entry.trim())
+            .filter(Boolean)
+            .map(Number)
+        : undefined,
+    )
+    .pipe(z.array(z.number().int().positive()).max(100).optional()),
 });
 export type supplierItemListQuerySchemaType = z.infer<
   typeof supplierItemListQuerySchema

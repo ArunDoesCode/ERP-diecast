@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { ApprovalHistoryPanel } from "@/components/pages/approval/ApprovalHistoryPanel";
-import { formatPaise } from "@/components/pages/inventory/inventory-format";
 import { CancelScoAlert } from "@/components/pages/subcontracting/CancelScoAlert";
 import { CloseScoDialog } from "@/components/pages/subcontracting/CloseScoDialog";
 import { EnterReceiptDialog } from "@/components/pages/subcontracting/EnterReceiptDialog";
@@ -13,7 +12,8 @@ import { IssueMaterialDialog } from "@/components/pages/subcontracting/IssueMate
 import { ScoChallansCard } from "@/components/pages/subcontracting/ScoChallansCard";
 import { ScoReceiptsCard } from "@/components/pages/subcontracting/ScoReceiptsCard";
 import { ScoSettlementCard } from "@/components/pages/subcontracting/ScoSettlementCard";
-import { Badge } from "@/components/ui/badge";
+import { DetailHeader } from "@/components/shared/DetailHeader";
+import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -30,11 +30,9 @@ import {
 	useScoDetailQuery,
 	useSubmitScoMutation,
 } from "@/lib/api/subcontracting/queries";
-import {
-	formatScoDate,
-	getScoStatusBadgeStyle,
-	SCO_STATUS_LABEL,
-} from "@/lib/sco-format";
+import { formatDate, formatDocNo, formatMoney } from "@/lib/format";
+import { useBreadcrumbLast } from "@/lib/shell/breadcrumb-last";
+import { getStatusTone } from "@/lib/status-tone";
 import { useAuthSessionStore } from "@/lib/store/auth-session-store";
 import type { ScoStatus } from "@/types/subcontracting";
 
@@ -66,6 +64,9 @@ export function ScoDetailView({ scoId }: { scoId: number }) {
 	const query = useScoDetailQuery(scoId);
 	const submitMutation = useSubmitScoMutation();
 	const [showHistory, setShowHistory] = useState(false);
+	useBreadcrumbLast(
+		query.data?.success ? query.data.data.sco.scoNumber : undefined,
+	);
 
 	const back = (
 		<Button type="button" variant="ghost" size="sm" className="w-fit" asChild>
@@ -78,7 +79,7 @@ export function ScoDetailView({ scoId }: { scoId: number }) {
 
 	if (query.isLoading) {
 		return (
-			<div className="flex flex-col gap-4 p-6">
+			<div className="flex flex-col gap-4">
 				{back}
 				<Skeleton className="h-40" />
 				<Skeleton className="h-48" />
@@ -89,7 +90,7 @@ export function ScoDetailView({ scoId }: { scoId: number }) {
 	const result = query.data;
 	if (!result?.success) {
 		return (
-			<div className="flex flex-col gap-4 p-6">
+			<div className="flex flex-col gap-4">
 				{back}
 				<p className="text-sm text-muted-foreground">
 					{result?.message ?? "Order not found."}
@@ -99,78 +100,68 @@ export function ScoDetailView({ scoId }: { scoId: number }) {
 	}
 
 	const { sco, items, chargeDue, challanSettlements } = result.data;
-	const badgeStyle = getScoStatusBadgeStyle(sco.status);
 	const isDraft = sco.status === "draft";
 	// Only the creator submits (BR-SCO-06); the server enforces it too.
 	const isCreator = userId !== null && String(sco.createdBy) === userId;
 
 	return (
-		<div className="flex w-full flex-col gap-6 p-6">
-			{back}
-
-			<div className="flex flex-wrap items-start justify-between gap-3">
-				<div className="space-y-1">
-					<div className="flex items-center gap-2">
-						<h1 className="font-heading text-lg font-medium">
-							{sco.scoNumber}
-						</h1>
-						<Badge
-							variant={badgeStyle.variant}
-							className={badgeStyle.className}
-						>
-							{SCO_STATUS_LABEL[sco.status]}
-						</Badge>
-					</div>
-					<p className="text-xs text-muted-foreground">{sco.vendorName}</p>
-				</div>
-				{canManage || canIssue || canClose ? (
-					<div className="flex flex-wrap gap-2">
-						{canIssue && CAN_ISSUE_STATUS.has(sco.status) ? (
-							<IssueMaterialDialog
-								scoId={sco.id}
-								scoNumber={sco.scoNumber}
-								items={items}
-							/>
-						) : null}
-						{canIssue && sco.status === "material_issued" ? (
-							<EnterReceiptDialog
-								scoId={sco.id}
-								scoNumber={sco.scoNumber}
-								items={items}
-							/>
-						) : null}
-						{canManage && isDraft ? (
-							<>
-								<Button type="button" size="sm" variant="outline" asChild>
-									<Link href={`/subcontracting/${sco.id}/edit`}>Edit</Link>
-								</Button>
-								{isCreator ? (
-									<Button
-										type="button"
-										size="sm"
-										disabled={submitMutation.isPending}
-										onClick={() => submitMutation.mutate(sco.id)}
-									>
-										{submitMutation.isPending
-											? "Submitting..."
-											: "Submit for approval"}
+		<div className="flex w-full flex-col gap-4">
+			<DetailHeader
+				docNo={formatDocNo(sco.scoNumber)}
+				title={sco.vendorName}
+				status={<StatusBadge doc="sco" status={sco.status} />}
+				backHref="/subcontracting"
+				backLabel="orders"
+				actions={
+					canManage || canIssue || canClose ? (
+						<div className="flex flex-wrap gap-2">
+							{canIssue && CAN_ISSUE_STATUS.has(sco.status) ? (
+								<IssueMaterialDialog
+									scoId={sco.id}
+									scoNumber={sco.scoNumber}
+									items={items}
+								/>
+							) : null}
+							{canIssue && sco.status === "material_issued" ? (
+								<EnterReceiptDialog
+									scoId={sco.id}
+									scoNumber={sco.scoNumber}
+									items={items}
+								/>
+							) : null}
+							{canManage && isDraft ? (
+								<>
+									<Button type="button" size="sm" variant="outline" asChild>
+										<Link href={`/subcontracting/${sco.id}/edit`}>Edit</Link>
 									</Button>
-								) : null}
-							</>
-						) : null}
-						{canClose && CLOSABLE.has(sco.status) ? (
-							<CloseScoDialog
-								scoId={sco.id}
-								scoNumber={sco.scoNumber}
-								items={items}
-							/>
-						) : null}
-						{canManage && CANCELLABLE.has(sco.status) ? (
-							<CancelScoAlert scoId={sco.id} scoNumber={sco.scoNumber} />
-						) : null}
-					</div>
-				) : null}
-			</div>
+									{isCreator ? (
+										<Button
+											type="button"
+											size="sm"
+											disabled={submitMutation.isPending}
+											onClick={() => submitMutation.mutate(sco.id)}
+										>
+											{submitMutation.isPending
+												? "Submitting..."
+												: "Submit for approval"}
+										</Button>
+									) : null}
+								</>
+							) : null}
+							{canClose && CLOSABLE.has(sco.status) ? (
+								<CloseScoDialog
+									scoId={sco.id}
+									scoNumber={sco.scoNumber}
+									items={items}
+								/>
+							) : null}
+							{canManage && CANCELLABLE.has(sco.status) ? (
+								<CancelScoAlert scoId={sco.id} scoNumber={sco.scoNumber} />
+							) : null}
+						</div>
+					) : undefined
+				}
+			/>
 
 			<Card>
 				<CardHeader>
@@ -179,26 +170,26 @@ export function ScoDetailView({ scoId }: { scoId: number }) {
 				<CardContent className="grid gap-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
 					<Field
 						label="Expected return"
-						value={formatScoDate(sco.expectedReturnDate)}
+						value={formatDate(sco.expectedReturnDate)}
 					/>
 					<Field label="Project ref" value={sco.projectRef ?? "-"} />
-					<Field label="Created" value={formatScoDate(sco.createdAt)} />
+					<Field label="Created" value={formatDate(sco.createdAt)} />
 					<Field
 						label="Approval"
 						value={
 							sco.status === "pending_approval"
 								? `Level ${sco.currentApprovalLevel} of ${sco.totalApprovalLevels}`
-								: SCO_STATUS_LABEL[sco.status]
+								: getStatusTone("sco", sco.status).label
 						}
 					/>
 					<Field
 						label="Value (ex GST)"
-						value={formatPaise(sco.subtotalPaise)}
+						value={formatMoney(sco.subtotalPaise)}
 					/>
-					<Field label="GST" value={formatPaise(sco.taxAmountPaise)} />
+					<Field label="GST" value={formatMoney(sco.taxAmountPaise)} />
 					<Field
 						label="Total incl. GST"
-						value={formatPaise(sco.totalAmountPaise)}
+						value={formatMoney(sco.totalAmountPaise)}
 					/>
 					<Field label="Notes" value={sco.notes ?? "-"} />
 					{sco.status === "cancelled" ? (
@@ -209,7 +200,7 @@ export function ScoDetailView({ scoId }: { scoId: number }) {
 					) : null}
 					{sco.status === "closed" ? (
 						<>
-							<Field label="Closed" value={formatScoDate(sco.closedAt)} />
+							<Field label="Closed" value={formatDate(sco.closedAt)} />
 							<Field label="Close reason" value={sco.closeReason ?? "-"} />
 						</>
 					) : null}
@@ -258,14 +249,14 @@ export function ScoDetailView({ scoId }: { scoId: number }) {
 										{line.expectedReturnQty}
 									</TableCell>
 									<TableCell className="text-right">
-										{formatPaise(line.serviceUnitPricePaise)}
+										{formatMoney(line.serviceUnitPricePaise)}
 									</TableCell>
 									<TableCell className="text-right">
 										{line.serviceTaxPercentage}% (
-										{formatPaise(line.lineTaxPaise)})
+										{formatMoney(line.lineTaxPaise)})
 									</TableCell>
 									<TableCell className="text-right">
-										{formatPaise(line.lineValuePaise)}
+										{formatMoney(line.lineValuePaise)}
 									</TableCell>
 								</TableRow>
 							))}
@@ -280,7 +271,13 @@ export function ScoDetailView({ scoId }: { scoId: number }) {
 			sco.status === "material_received" ||
 			sco.status === "closed" ? (
 				<>
-					<ScoReceiptsCard scoId={sco.id} canQa={canQa} />
+					<ScoReceiptsCard
+						scoId={sco.id}
+						canQa={canQa}
+						rawUomByLine={
+							new Map(items.map((line) => [line.id, line.rawItemUom]))
+						}
+					/>
 					<ScoSettlementCard
 						items={items}
 						chargeDue={chargeDue}

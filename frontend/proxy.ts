@@ -1,9 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 const PUBLIC_PATHS = ["/", "/login"];
-// Screens with no permission key: open to every signed-in user (BR-AUTH-15).
-const ALWAYS_ALLOWED_PATHS = ["/landing", "/approvals"];
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+// Set by the API as an httpOnly cookie (BR-AUTH-30); scripts cannot read it, the server can.
+const REFRESH_COOKIE = "refresh_token";
 
 function normalizePath(path: string) {
 	if (path === "/") {
@@ -16,67 +15,19 @@ function normalizePath(path: string) {
 		: withLeadingSlash;
 }
 
-function isPathAllowed(pathname: string, allowedPages: string[]) {
-	const normalizedPathname = normalizePath(pathname);
-
-	return allowedPages.some((allowedPage) => {
-		const normalizedAllowed = normalizePath(allowedPage);
-		if (normalizedAllowed === "/") {
-			return normalizedPathname === "/";
-		}
-
-		return (
-			normalizedPathname === normalizedAllowed ||
-			normalizedPathname.startsWith(`${normalizedAllowed}/`)
-		);
-	});
-}
-
-async function fetchScreenPaths(accessToken: string) {
-	if (!apiBaseUrl) {
-		return null;
-	}
-
-	const response = await fetch(`${apiBaseUrl}/auth/me`, {
-		method: "GET",
-		headers: {
-			Authorization: `Bearer ${accessToken}`,
-		},
-		cache: "no-store",
-	});
-
-	if (!response.ok) {
-		return null;
-	}
-
-	const payload = (await response.json()) as {
-		success: true;
-		data: { screens: { path: string }[] };
-	};
-
-	return Array.isArray(payload.data.screens)
-		? payload.data.screens.map((screen) => screen.path)
-		: null;
-}
-
-export async function proxy(request: NextRequest) {
+/**
+ * Page guard (BR-AUTH-30, #25): only checks that the refresh cookie is present, with no API call
+ * per navigation. Screen access is checked in the app once the session is restored (AppShell),
+ * and the API decides every request (BR-AUTH-14).
+ */
+export function proxy(request: NextRequest) {
 	const pathname = request.nextUrl.pathname;
 	if (PUBLIC_PATHS.includes(normalizePath(pathname))) {
 		return NextResponse.next();
 	}
 
-	const accessToken = request.cookies.get("access_token")?.value;
-	if (!accessToken) {
+	if (!request.cookies.get(REFRESH_COOKIE)?.value) {
 		return NextResponse.redirect(new URL("/login", request.url));
-	}
-
-	const screenPaths = await fetchScreenPaths(accessToken);
-	if (!screenPaths) {
-		return NextResponse.redirect(new URL("/login", request.url));
-	}
-
-	if (!isPathAllowed(pathname, [...ALWAYS_ALLOWED_PATHS, ...screenPaths])) {
-		return NextResponse.redirect(new URL("/", request.url));
 	}
 
 	return NextResponse.next();

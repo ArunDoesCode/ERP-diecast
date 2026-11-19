@@ -144,6 +144,19 @@ export const scoReceiptRepository = {
       .orderBy(asc(scoReceiptSettlements.id));
   },
 
+  // BR-SCO-28: qty and value of all challan lines of one SCO line, for the
+  // weighted average issue cost when a receipt line settled no raw piece.
+  async sumChallanCostForScoLine(scoItemId: number, tx: Tx) {
+    const [row] = await tx
+      .select({
+        qty: sql<string>`coalesce(sum(${scoChallanLines.qty}), 0)`,
+        value: sql<string>`coalesce(sum(${scoChallanLines.qty} * ${scoChallanLines.unitIssueCostPaise}), 0)`,
+      })
+      .from(scoChallanLines)
+      .where(eq(scoChallanLines.scoItemId, scoItemId));
+    return { qty: Number(row?.qty ?? 0), value: Number(row?.value ?? 0) };
+  },
+
   // Every challan line of an SCO with its settled qty (getscodetails read-out).
   async listChallanLinesForSco(scoId: number) {
     return db

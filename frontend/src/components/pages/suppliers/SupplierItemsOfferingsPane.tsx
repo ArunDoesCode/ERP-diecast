@@ -1,22 +1,18 @@
 "use client";
 
-import type { ColumnDef, PaginationState } from "@tanstack/react-table";
-import { getCoreRowModel, useReactTable } from "@tanstack/react-table";
+import { type PaginationState, useTable } from "@tanstack/react-table";
 import { useMemo } from "react";
-
 import { DataTable } from "@/components/common/DataTable";
 import { DataTableColumnHeader } from "@/components/common/DataTableColumnHeader";
+import {
+	type DataTableColumnDef,
+	dataTableFeatures,
+} from "@/components/common/data-table-features";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useSupplierItemsQuery } from "@/lib/api/suppliers/queries";
+import { formatMoney } from "@/lib/format";
 import type { SupplierItem } from "@/types/suppliers";
-
-function toCurrencyFromPaise(value: number) {
-	return (value / 100).toLocaleString(undefined, {
-		style: "currency",
-		currency: "INR",
-	});
-}
 
 export function SupplierItemsOfferingsPane({
 	supplierId,
@@ -50,7 +46,7 @@ export function SupplierItemsOfferingsPane({
 	const itemRows = itemQuery.data?.data ?? [];
 	const itemMeta = itemQuery.data?.meta;
 
-	const columns = useMemo<ColumnDef<SupplierItem>[]>(
+	const columns = useMemo<DataTableColumnDef<SupplierItem>[]>(
 		() => [
 			{
 				accessorKey: "itemName",
@@ -82,8 +78,7 @@ export function SupplierItemsOfferingsPane({
 				header: ({ column }) => (
 					<DataTableColumnHeader column={column} title="Unit price" />
 				),
-				cell: ({ row }) =>
-					toCurrencyFromPaise(row.original.supplierUnitPricePaise),
+				cell: ({ row }) => formatMoney(row.original.supplierUnitPricePaise),
 			},
 			{
 				accessorKey: "taxPercentage",
@@ -125,10 +120,10 @@ export function SupplierItemsOfferingsPane({
 		[itemMeta?.page, itemMeta?.pageSize, page, pageSize],
 	);
 
-	const table = useReactTable({
+	const table = useTable({
+		features: dataTableFeatures,
 		data: itemRows,
 		columns,
-		getCoreRowModel: getCoreRowModel(),
 		manualPagination: true,
 		pageCount: itemMeta?.totalPages ?? 1,
 		onPaginationChange: (updater) => {

@@ -1,8 +1,6 @@
 "use client";
 
 import Link from "next/link";
-
-import { formatPaise } from "@/components/pages/inventory/inventory-format";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -13,6 +11,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { formatMoney } from "@/lib/format";
 import type {
 	ChallanSettlementRow,
 	ScoChargeDue,
@@ -67,7 +66,7 @@ export function ScoSettlementCard({
 										{line.acceptedQty}
 									</TableCell>
 									<TableCell className="text-right">
-										{formatPaise(line.chargeDuePaise ?? 0)}
+										{formatMoney(line.chargeDuePaise ?? 0)}
 									</TableCell>
 								</TableRow>
 							))}
@@ -77,19 +76,19 @@ export function ScoSettlementCard({
 						<div>
 							<p className="text-muted-foreground">Charge (ex GST)</p>
 							<p className="font-medium">
-								{formatPaise(chargeDue?.subtotalPaise ?? 0)}
+								{formatMoney(chargeDue?.subtotalPaise ?? 0)}
 							</p>
 						</div>
 						<div>
 							<p className="text-muted-foreground">GST</p>
 							<p className="font-medium">
-								{formatPaise(chargeDue?.gstPaise ?? 0)}
+								{formatMoney(chargeDue?.gstPaise ?? 0)}
 							</p>
 						</div>
 						<div>
 							<p className="text-muted-foreground">Total due</p>
 							<p className="font-medium">
-								{formatPaise(chargeDue?.totalPaise ?? 0)}
+								{formatMoney(chargeDue?.totalPaise ?? 0)}
 							</p>
 						</div>
 					</div>

@@ -2,6 +2,10 @@ import type { Metadata } from "next";
 
 import "./globals.css";
 import { Geist_Mono, Manrope } from "next/font/google";
+import {
+	SIDEBAR_FOLD_INIT_SCRIPT,
+	SIDEBAR_FOLD_INIT_STYLE,
+} from "@/components/shell/sidebar-fold-init";
 import Providers from "@/lib/Providers";
 import { DENSITY_INIT_SCRIPT } from "@/lib/shell/density";
 import { cn } from "@/lib/utils";
@@ -30,7 +34,9 @@ export default function RootLayout({
 			suppressHydrationWarning
 		>
 			<head>
-				<script>{DENSITY_INIT_SCRIPT}</script>
+				{/* Saved density and sidebar fold, applied before first paint (#107). */}
+				<script>{`${DENSITY_INIT_SCRIPT};${SIDEBAR_FOLD_INIT_SCRIPT}`}</script>
+				<style>{SIDEBAR_FOLD_INIT_STYLE}</style>
 			</head>
 			<body>
 				<Providers>{children}</Providers>

@@ -83,6 +83,7 @@ import {
 	useCancelPurchaseOrderMutation,
 	useCreatePurchaseOrderMutation,
 	useItemLastRateQuery,
+	useSupplierPriceRowsQuery,
 } from "@/lib/api/purchase-orders/queries";
 import {
 	purchaseRequisitionKeys,
@@ -90,7 +91,6 @@ import {
 } from "@/lib/api/purchase-requisitions/queries";
 import {
 	useSupplierDetailQuery,
-	useSupplierItemsQuery,
 	useSuppliersQuery,
 } from "@/lib/api/suppliers/queries";
 import { formatDate, formatMoney } from "@/lib/format";
@@ -106,10 +106,11 @@ import { useBreadcrumbLast } from "@/lib/shell/breadcrumb-last";
 import { useAuthSessionStore } from "@/lib/store/auth-session-store";
 import {
 	GST_PERCENT_VALUES,
-	type LastRateSource,
+	LAST_RATE_SOURCE_LABEL,
 	PO_REASON_MAX,
 	PO_REASON_MIN,
 	type POStatus,
+	suggestedRateInput,
 } from "@/types/purchase-orders";
 import type {
 	PRLinkedPo,
@@ -406,14 +407,20 @@ function LinesTable({
 		<Table>
 			<TableHeader>
 				<TableRow>
-					<TableHead className="w-10" />
+					<TableHead className="w-10">
+						<span className="sr-only">Select</span>
+					</TableHead>
 					<TableHead>Item</TableHead>
 					<TableHead className="text-right">Qty</TableHead>
 					<TableHead>Default supplier</TableHead>
 					<TableHead className="text-right">Est rate</TableHead>
 					<TableHead>Status</TableHead>
 					<TableHead>PO</TableHead>
-					{onCancelLine ? <TableHead className="w-24" /> : null}
+					{onCancelLine ? (
+						<TableHead className="w-24">
+							<span className="sr-only">Actions</span>
+						</TableHead>
+					) : null}
 				</TableRow>
 			</TableHeader>
 			<TableBody>
@@ -519,7 +526,7 @@ function LinkedPOs({
 									<div className="flex flex-wrap items-center gap-2">
 										<span className="font-mono font-medium">{po.poNumber}</span>
 										<span className="text-muted-foreground">
-											Supplier #{po.supplierId}
+											{po.supplierName}
 										</span>
 										<StatusBadge doc="po" status={po.status} />
 										<span className="tabular-nums">
@@ -910,6 +917,7 @@ function PoApprovalHistory({ poId }: { poId: number }) {
 				type="button"
 				size="sm"
 				variant="ghost"
+				aria-expanded={open}
 				onClick={() => setOpen((value) => !value)}
 			>
 				{open ? "Hide approval history" : "Approval history"}
@@ -1041,7 +1049,7 @@ function CreatePOModal({
 	const [notes, setNotes] = useState("");
 	const [rates, setRates] = useState<Record<number, string>>(() =>
 		Object.fromEntries(
-			lines.map((line) => [line.id, String((line.estRatePaise ?? 0) / 100)]),
+			lines.map((line) => [line.id, suggestedRateInput(line.estRatePaise)]),
 		),
 	);
 	const suppliersQuery = useSuppliersQuery({
@@ -1049,11 +1057,12 @@ function CreatePOModal({
 		pageSize: 20,
 		sortBy: "name",
 		sortDir: "asc",
+		status: "active",
 		q: supplierSearch || undefined,
 	});
-	const supplierItemsQuery = useSupplierItemsQuery(
+	const supplierItemsQuery = useSupplierPriceRowsQuery(
 		supplierId ?? 0,
-		{ page: 1, pageSize: 100 },
+		lines.map((line) => line.itemId),
 		Boolean(supplierId),
 	);
 	const supplierDetailQuery = useSupplierDetailQuery(supplierId ?? 0);
@@ -1065,21 +1074,21 @@ function CreatePOModal({
 		(supplierDefaultTerms != null ? String(supplierDefaultTerms) : "");
 	const catalogRateByItemId = useMemo(() => {
 		const map = new Map<number, number>();
-		for (const item of supplierItemsQuery.data?.data ?? []) {
+		for (const item of supplierItemsQuery.data ?? []) {
 			// Only active price-list rows suggest a rate / GST (BR-PO-03/04).
 			if (item.isActive === false) continue;
 			map.set(item.itemId, item.supplierUnitPricePaise);
 		}
 		return map;
-	}, [supplierItemsQuery.data?.data]);
+	}, [supplierItemsQuery.data]);
 	const catalogGstByItemId = useMemo(() => {
 		const map = new Map<number, number>();
-		for (const item of supplierItemsQuery.data?.data ?? []) {
+		for (const item of supplierItemsQuery.data ?? []) {
 			if (item.isActive === false || item.taxPercentage == null) continue;
 			map.set(item.itemId, item.taxPercentage);
 		}
 		return map;
-	}, [supplierItemsQuery.data?.data]);
+	}, [supplierItemsQuery.data]);
 	function gstFor(line: PurchaseRequisitionItem) {
 		return gsts[line.id] ?? String(catalogGstByItemId.get(line.itemId) ?? 0);
 	}
@@ -1214,14 +1223,14 @@ function CreatePOModal({
 					</div>
 
 					{!supplierId && defaultSupplierCount > 1 ? (
-						<p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+						<p className="rounded-md border border-border bg-warning-subtle px-3 py-2 text-xs text-warning">
 							Selected lines have {defaultSupplierCount} default suppliers. Pick
 							one supplier for this PO, or create separate POs.
 						</p>
 					) : null}
 
 					{defaultSupplierMismatchCount > 0 ? (
-						<p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+						<p className="rounded-md border border-border bg-warning-subtle px-3 py-2 text-xs text-warning">
 							{defaultSupplierMismatchCount} selected line
 							{defaultSupplierMismatchCount === 1 ? "" : "s"} default to another
 							supplier.
@@ -1305,12 +1314,6 @@ function CreatePOModal({
 	);
 }
 
-const LAST_RATE_SOURCE_LABEL: Record<LastRateSource, string> = {
-	po_history: "last PO",
-	supplier_catalog: "catalog",
-	pr_estimate: "PR estimate",
-};
-
 function CreatePOLine({
 	line,
 	supplierId,
@@ -1340,7 +1343,10 @@ function CreatePOLine({
 		: undefined;
 	const referenceRate =
 		catalogRatePaise != null
-			? { ratePaise: catalogRatePaise, label: "catalog" }
+			? {
+					ratePaise: catalogRatePaise,
+					label: LAST_RATE_SOURCE_LABEL.supplier_catalog,
+				}
 			: lastRate
 				? {
 						ratePaise: lastRate.ratePaise,
@@ -1356,7 +1362,7 @@ function CreatePOLine({
 
 	useEffect(() => {
 		if (referenceRatePaise == null) return;
-		onChangeRef.current(String(referenceRatePaise / 100));
+		onChangeRef.current(suggestedRateInput(referenceRatePaise));
 	}, [referenceRatePaise]);
 
 	return (
@@ -1369,7 +1375,7 @@ function CreatePOLine({
 					line.defaultSupplierId !== supplierId ? (
 						<Badge
 							variant="outline"
-							className="border-amber-200 bg-amber-100 text-amber-800"
+							className="border-border bg-warning-subtle text-warning"
 						>
 							default: {line.defaultSupplierName}
 						</Badge>

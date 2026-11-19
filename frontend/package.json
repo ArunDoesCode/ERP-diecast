@@ -15,10 +15,10 @@
 		"test": "bun test tests"
 	},
 	"dependencies": {
-		"@hookform/resolvers": "^5.9.1",
+		"@hookform/resolvers": "^7.0.7",
 		"@tabler/icons-react": "^3.52.0",
 		"@tanstack/react-query": "^5.108.0",
-		"@tanstack/react-table": "^8.21.3",
+		"@tanstack/react-table": "^9.3.1",
 		"class-variance-authority": "^0.7.1",
 		"clsx": "^2.1.1",
 		"next": "16.2.9",
@@ -44,7 +44,7 @@
 		"@types/react": "^19",
 		"@types/react-dom": "^19",
 		"tailwindcss": "^4",
-		"typescript": "^5"
+		"typescript": "^6.0.3"
 	},
 	"ignoreScripts": [
 		"sharp",

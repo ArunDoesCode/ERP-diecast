@@ -52,8 +52,8 @@ export function useLoginMutation() {
 				return;
 			}
 
+			// Memory only (BR-AUTH-30); the refresh token is the httpOnly cookie.
 			setAccessToken(result.data.accessToken);
-			useAuthSessionStore.getState().setToken(result.data.accessToken);
 			useAuthSessionStore.getState().setProfile({
 				userId: String(result.data.user.id),
 				userName: result.data.user.name,

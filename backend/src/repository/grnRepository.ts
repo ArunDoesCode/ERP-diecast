@@ -10,8 +10,11 @@ import {
   grnCorrections,
   grnItems,
   grns,
+  prPoItemLinks,
   purchaseOrderItems,
   purchaseOrders,
+  purchaseRequestItems,
+  purchaseRequests,
   qaTests,
 } from "../db/schemas/02_procurement-purchasing";
 import { allocateDocumentSequence } from "../lib/document-number";
@@ -57,7 +60,11 @@ const grnItemDetailColumns = {
   itemId: purchaseOrderItems.itemId,
   itemSku: itemMaster.sku,
   itemName: itemMaster.name,
+  // BR-GRN-46
+  uom: itemMaster.uom,
   orderedQty: purchaseOrderItems.qty,
+  // BR-GRN-47: accepted so far on the PO line (all GRNs), for the screen warning
+  poReceivedQty: purchaseOrderItems.receivedQty,
 };
 
 const grnSortColumns = {
@@ -166,8 +173,8 @@ export const grnRepository = {
   },
 
   // Unit of each line of a GRN (from its PO line), keyed by GRN line id.
-  async findLineUoms(grnId: number) {
-    const rows = await db
+  async findLineUoms(grnId: number, executor: Tx | typeof db = db) {
+    const rows = await executor
       .select({ id: grnItems.id, uom: purchaseOrderItems.uom })
       .from(grnItems)
       .innerJoin(
@@ -183,8 +190,9 @@ export const grnRepository = {
     supplierId: number,
     challanNo: string,
     excludeGrnId?: number,
+    executor: Tx | typeof db = db,
   ) {
-    const [row] = await db
+    const [row] = await executor
       .select({ id: grns.id })
       .from(grns)
       .where(
@@ -459,6 +467,43 @@ export const grnRepository = {
       return undefined;
     }
 
+    // BR-GRN-45: the PO and the requisitions behind it, for the document flow.
+    const [poRows, prs] =
+      grn.poId === null
+        ? [[], []]
+        : await Promise.all([
+            db
+              .select({
+                id: purchaseOrders.id,
+                poNumber: purchaseOrders.poNumber,
+                status: purchaseOrders.status,
+              })
+              .from(purchaseOrders)
+              .where(eq(purchaseOrders.id, grn.poId))
+              .limit(1),
+            db
+              .selectDistinct({
+                id: purchaseRequests.id,
+                prNumber: purchaseRequests.prNumber,
+                status: purchaseRequests.status,
+              })
+              .from(purchaseOrderItems)
+              .innerJoin(
+                prPoItemLinks,
+                eq(prPoItemLinks.poItemId, purchaseOrderItems.id),
+              )
+              .innerJoin(
+                purchaseRequestItems,
+                eq(purchaseRequestItems.id, prPoItemLinks.prItemId),
+              )
+              .innerJoin(
+                purchaseRequests,
+                eq(purchaseRequests.id, purchaseRequestItems.prId),
+              )
+              .where(eq(purchaseOrderItems.poId, grn.poId))
+              .orderBy(asc(purchaseRequests.id)),
+          ]);
+
     const corrected = await db
       .select({
         grnItemId: grnCorrections.grnItemId,
@@ -478,10 +523,13 @@ export const grnRepository = {
 
     return {
       grn,
+      po: poRows[0] ?? null,
+      prs,
       items: items.map((item) => {
         const correctedQty = correctedById.get(item.id) ?? 0;
         return {
           ...item,
+          poReceivedQty: item.poReceivedQty ?? 0,
           correctedQty,
           // thousandths keep the subtraction exact (BR-GRN-35)
           netAcceptedQty:
@@ -548,8 +596,9 @@ export const grnRepository = {
 
     const [rows, [totalRow]] = await Promise.all([
       db
-        .select(grnColumns)
+        .select({ ...grnColumns, poNumber: purchaseOrders.poNumber })
         .from(grns)
+        .leftJoin(purchaseOrders, eq(purchaseOrders.id, grns.poId))
         .where(whereClause)
         .orderBy(orderFn(sortColumn), asc(grns.id))
         .limit(params.pageSize)

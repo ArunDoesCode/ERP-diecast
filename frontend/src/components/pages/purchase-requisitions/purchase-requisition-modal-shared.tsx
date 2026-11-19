@@ -227,7 +227,8 @@ export function ItemRowsTable({
 				</p>
 			)}
 
-			{rows.length > 1 ? (
+			{/* Explains why the only row can't be removed. */}
+			{!readOnly && rows.length === 1 ? (
 				<p className="text-xs text-muted-foreground">Minimum 1 row required.</p>
 			) : null}
 		</div>

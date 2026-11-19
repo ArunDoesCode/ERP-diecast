@@ -227,24 +227,24 @@ export const scoService = {
     input: createScoSchemaType,
     actorId: number,
   ): Promise<scoDetailsSchemaType> {
-    const vendor = await scoRepository.findVendor(input.vendorId);
-    if (!vendor) {
-      throw new NotFoundError("Vendor not found");
-    }
-    if (!vendor.isActive) {
-      throw new BadRequestError("Vendor is inactive", "SUPPLIER_INACTIVE");
-    }
-    if (vendor.type !== "service_provider" && vendor.type !== "both") {
-      throw new BadRequestError(
-        "Vendor must be a service provider",
-        "SCO_VENDOR_TYPE_INVALID",
-      );
-    }
-    assertReturnDateInWindow(input.expectedReturnDate);
-
-    const lines = await prepareLines(input.vendorId, input.lines);
-
+    // Vendor check and line prep run inside the tx after the vendor lock,
+    // as update does after the SCO lock (#57).
     return db.transaction(async (tx) => {
+      const vendor = await scoRepository.findVendor(input.vendorId, tx);
+      if (!vendor) {
+        throw new NotFoundError("Vendor not found");
+      }
+      if (!vendor.isActive) {
+        throw new BadRequestError("Vendor is inactive", "SUPPLIER_INACTIVE");
+      }
+      if (vendor.type !== "service_provider" && vendor.type !== "both") {
+        throw new BadRequestError(
+          "Vendor must be a service provider",
+          "SCO_VENDOR_TYPE_INVALID",
+        );
+      }
+      assertReturnDateInWindow(input.expectedReturnDate);
+      const lines = await prepareLines(input.vendorId, input.lines, tx);
       const id = await scoRepository.insertOrder(
         {
           vendorId: input.vendorId,

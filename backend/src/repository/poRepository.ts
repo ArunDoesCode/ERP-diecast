@@ -1,4 +1,5 @@
 import {
+  type AnyColumn,
   and,
   asc,
   count,
@@ -14,6 +15,7 @@ import { itemMaster } from "../db/schemas/02_procurement-catalog";
 import {
   grns,
   poCommunications,
+  poStatusEnum,
   prPoItemLinks,
   purchaseOrderItems,
   purchaseOrders,
@@ -26,9 +28,6 @@ import {
   supplierMaster,
 } from "../db/schemas/02_procurement-suppliers";
 import { employees } from "../db/schemas/03_hcm";
-import { allocateDocumentSequence } from "../lib/document-number";
-import { AppError, BadRequestError, ConflictError } from "../lib/errors";
-import { assertMoneyInRange } from "../lib/money";
 import { safeSearch } from "../lib/safe-search";
 import type {
   poListQuerySchemaType,
@@ -45,6 +44,11 @@ const purchaseOrderColumns = {
   >`(select ${employees.name} from ${employees} where ${employees.id} = ${purchaseOrders.cancelledBy})`.as(
     "cancelled_by_name",
   ),
+  // BR-PO-24: supplier name next to supplierId.
+  supplierName:
+    sql<string>`(select ${supplierMaster.name} from ${supplierMaster} where ${supplierMaster.id} = ${purchaseOrders.supplierId})`.as(
+      "supplier_name",
+    ),
   dueDate:
     sql<Date | null>`coalesce(${purchaseOrders.revisedDeliveryDate}, ${purchaseOrders.expectedDeliveryDate})`
       .mapWith(purchaseOrders.expectedDeliveryDate)
@@ -64,16 +68,6 @@ const purchaseOrderItemDetailColumns = {
 
 type PurchaseOrderInsert = typeof purchaseOrders.$inferInsert;
 export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
-
-export type CreatePoData = Pick<
-  PurchaseOrderInsert,
-  | "supplierId"
-  | "paymentTermsDays"
-  | "deliveryTerms"
-  | "expectedDeliveryDate"
-  | "notes"
-  | "createdBy"
->;
 
 export type CreatePoLineData = {
   prItemId: number;
@@ -105,14 +99,50 @@ export type UpdatePoData = Partial<
     | "invoicedBy"
     | "invoicedAt"
     | "status"
+    | "subtotalPaise"
+    | "taxAmountPaise"
+    | "totalAmountPaise"
   >
 >;
 
-export type PoLineInsertData = CreatePoLineData;
 export type PoLineUpdateData = {
   id: number;
   unitPricePaise?: number | undefined;
   gstPercent?: number | undefined;
+};
+
+export type InsertPoData = Pick<
+  PurchaseOrderInsert,
+  | "poNumber"
+  | "supplierId"
+  | "subtotalPaise"
+  | "taxAmountPaise"
+  | "totalAmountPaise"
+  | "paymentTermsDays"
+  | "deliveryTerms"
+  | "notes"
+  | "expectedDeliveryDate"
+  | "createdBy"
+>;
+
+// A PO line ready to save: qty from the PR line, amounts worked out (BR-PO-04).
+export type PreparedPoLine = {
+  prItemId: number;
+  itemId: number;
+  qty: number;
+  uom: string;
+  unitPricePaise: number;
+  gstPercent: number;
+  lineValuePaise: number;
+  lineTaxPaise: number;
+};
+
+export type PoLinePriceData = {
+  id: number;
+  unitPricePaise: number;
+  gstPercent: number;
+  lineValuePaise: number;
+  lineTaxPaise: number;
 };
 
 type PrItemForUpdateRow = {
@@ -125,6 +155,7 @@ type PrItemForUpdateRow = {
   status: (typeof purchaseRequestItems.$inferSelect)["status"];
   prStatus: (typeof purchaseRequests.$inferSelect)["status"];
   prNumber: string;
+  itemIsActive: boolean;
 };
 
 const poSortColumns = {
@@ -134,34 +165,6 @@ const poSortColumns = {
   createdAt: purchaseOrders.createdAt,
 } as const;
 
-// BR-PO-04: line value = round(qty x rate); line tax = round(value x GST% / 100).
-// GST % is turned into whole basis points first so the tax maths is integer only.
-export function computeLinePaise(
-  qty: number,
-  unitPricePaise: number,
-  gstPercent: number,
-) {
-  const lineValuePaise = Math.round(qty * unitPricePaise);
-  const lineTaxPaise = Math.round(
-    (lineValuePaise * Math.round(gstPercent * 100)) / 10000,
-  );
-  assertMoneyInRange(lineValuePaise);
-  assertMoneyInRange(lineTaxPaise);
-  return { lineValuePaise, lineTaxPaise };
-}
-
-function computeTotalsPaise(
-  lines: { lineValuePaise: number; lineTaxPaise: number }[],
-) {
-  const subtotalPaise = lines.reduce((sum, l) => sum + l.lineValuePaise, 0);
-  const taxAmountPaise = lines.reduce((sum, l) => sum + l.lineTaxPaise, 0);
-  const totalAmountPaise = subtotalPaise + taxAmountPaise;
-  assertMoneyInRange(subtotalPaise);
-  assertMoneyInRange(taxAmountPaise);
-  assertMoneyInRange(totalAmountPaise);
-  return { subtotalPaise, taxAmountPaise, totalAmountPaise };
-}
-
 export const poRepository = {
   async list(params: poListQuerySchemaType) {
     const sortColumn =
@@ -170,13 +173,16 @@ export const poRepository = {
         : purchaseOrders.id;
     const orderFn = params.sortDir === "desc" ? desc : asc;
 
-    const filters = [
+    const searchFilters = [
       safeSearch(params.q, purchaseOrders.poNumber, purchaseOrders.notes),
-      params.status && params.status.length > 0
-        ? inArray(purchaseOrders.status, params.status)
-        : undefined,
       params.supplierId
         ? eq(purchaseOrders.supplierId, params.supplierId)
+        : undefined,
+    ];
+    const filters = [
+      ...searchFilters,
+      params.status && params.status.length > 0
+        ? inArray(purchaseOrders.status, params.status)
         : undefined,
       params.overdue
         ? and(
@@ -193,30 +199,36 @@ export const poRepository = {
     ].filter((filter) => filter !== undefined);
 
     const whereClause = filters.length > 0 ? and(...filters) : undefined;
-    const [rows, [totalRow]] = whereClause
-      ? await Promise.all([
-          db
-            .select(purchaseOrderColumns)
-            .from(purchaseOrders)
-            .where(whereClause)
-            .orderBy(orderFn(sortColumn), asc(purchaseOrders.id))
-            .limit(params.pageSize)
-            .offset((params.page - 1) * params.pageSize),
-          db.select({ value: count() }).from(purchaseOrders).where(whereClause),
-        ])
-      : await Promise.all([
-          db
-            .select(purchaseOrderColumns)
-            .from(purchaseOrders)
-            .orderBy(orderFn(sortColumn), asc(purchaseOrders.id))
-            .limit(params.pageSize)
-            .offset((params.page - 1) * params.pageSize),
-          db.select({ value: count() }).from(purchaseOrders),
-        ]);
+    const countWhere = and(
+      ...searchFilters.filter((filter) => filter !== undefined),
+    );
+    const [rows, [totalRow], countRows] = await Promise.all([
+      db
+        .select(purchaseOrderColumns)
+        .from(purchaseOrders)
+        .where(whereClause)
+        .orderBy(orderFn(sortColumn), asc(purchaseOrders.id))
+        .limit(params.pageSize)
+        .offset((params.page - 1) * params.pageSize),
+      db.select({ value: count() }).from(purchaseOrders).where(whereClause),
+      // BR-PO-26: rows per status for the same search, whatever status
+      // filter is chosen, so the quick filters need no extra call.
+      db
+        .select({ status: purchaseOrders.status, value: count() })
+        .from(purchaseOrders)
+        .where(countWhere)
+        .groupBy(purchaseOrders.status),
+    ]);
+
+    const statusCounts = Object.fromEntries(
+      poStatusEnum.enumValues.map((status) => [status, 0]),
+    ) as Record<poStatusSchemaType, number>;
+    for (const row of countRows) statusCounts[row.status] = row.value;
 
     return {
       rows,
       total: totalRow?.value ?? 0,
+      statusCounts,
     };
   },
 
@@ -279,12 +291,15 @@ export const poRepository = {
         status: purchaseRequestItems.status,
         prStatus: purchaseRequests.status,
         prNumber: purchaseRequests.prNumber,
+        // BR-INV-05: an inactive item can't go on a new PO line.
+        itemIsActive: itemMaster.isActive,
       })
       .from(purchaseRequestItems)
       .innerJoin(
         purchaseRequests,
         eq(purchaseRequests.id, purchaseRequestItems.prId),
       )
+      .innerJoin(itemMaster, eq(itemMaster.id, purchaseRequestItems.itemId))
       .where(inArray(purchaseRequestItems.id, sortedIds))
       .orderBy(asc(purchaseRequestItems.id))
       .for("update", { of: purchaseRequestItems });
@@ -311,12 +326,15 @@ export const poRepository = {
         status: purchaseRequestItems.status,
         prStatus: purchaseRequests.status,
         prNumber: purchaseRequests.prNumber,
+        // BR-INV-05: an inactive item can't go on a new PO line.
+        itemIsActive: itemMaster.isActive,
       })
       .from(purchaseRequestItems)
       .innerJoin(
         purchaseRequests,
         eq(purchaseRequests.id, purchaseRequestItems.prId),
       )
+      .innerJoin(itemMaster, eq(itemMaster.id, purchaseRequestItems.itemId))
       .where(inArray(purchaseRequestItems.id, ids));
   },
 
@@ -350,150 +368,287 @@ export const poRepository = {
       );
   },
 
-  async createWithItems(data: CreatePoData, lines: CreatePoLineData[]) {
-    return db.transaction(async (tx) => {
-      const prItemIds = lines.map((line) => line.prItemId);
-      const prItemRows = await this.findPurchaseRequestItemsByIdsForUpdate(
-        prItemIds,
-        tx,
-      );
-      const prItemMap = new Map(prItemRows.map((row) => [row.id, row]));
+  // #52, #53: the PO create / edit writes. The service owns the transaction
+  // and every check; these only read and write, a whole batch per statement.
 
-      const { periodKey, seq } = await allocateDocumentSequence(
-        tx,
-        "po",
-        data.createdBy,
-      );
-      const poNumber = `PO-${periodKey}-${seq}`;
+  async insertPo(data: InsertPoData, tx: Tx) {
+    const [row] = await tx
+      .insert(purchaseOrders)
+      .values({
+        ...data,
+        status: "draft",
+        currentApprovalLevel: 0,
+        totalApprovalLevels: 0,
+      })
+      .returning({ id: purchaseOrders.id });
+    return row;
+  },
 
-      const preparedLines = lines.map((line) => {
-        const prItem = prItemMap.get(line.prItemId);
-        if (!prItem) {
-          throw new AppError(
-            `Invalid prItemId: ${line.prItemId}`,
-            400,
-            "PO_INVALID_PR_ITEM",
-          );
-        }
-
-        // Re-assert under the FOR UPDATE lock — a concurrent PO create/update
-        // may have flipped this PR item to po_draft/ordered between the
-        // service-level pre-check and this locked read.
-        if (prItem.status !== "pending") {
-          throw new ConflictError(
-            `PR item ${line.prItemId} is no longer pending (already ${prItem.status})`,
-            "PO_LINE_ALREADY_DRAFTED",
-          );
-        }
-
-        const qty = prItem.requestedQty - (prItem.issuedQty ?? 0);
-        return {
-          prItemId: line.prItemId,
-          itemId: prItem.itemId,
-          qty,
-          uom: prItem.uom,
+  /**
+   * Adds lines to a PO: the PO lines, their PR links, and the PR lines move to
+   * po_draft with issuedQty raised by the line qty. Three statements in all.
+   */
+  async insertPoLines(poId: number, lines: PreparedPoLine[], tx: Tx) {
+    if (lines.length === 0) return [];
+    const createdItems = await tx
+      .insert(purchaseOrderItems)
+      .values(
+        lines.map((line) => ({
+          poId,
+          itemId: line.itemId,
+          qty: line.qty,
           unitPricePaise: line.unitPricePaise,
+          uom: line.uom,
           gstPercent: line.gstPercent,
-          ...computeLinePaise(qty, line.unitPricePaise, line.gstPercent),
-        };
-      });
+          lineValuePaise: line.lineValuePaise,
+          lineTaxPaise: line.lineTaxPaise,
+        })),
+      )
+      .returning(purchaseOrderItemWriteColumns);
+    if (createdItems.length !== lines.length) return undefined;
 
-      const totals = computeTotalsPaise(preparedLines);
+    await tx.insert(prPoItemLinks).values(
+      createdItems.map((createdItem, index) => ({
+        prItemId: (lines[index] as PreparedPoLine).prItemId,
+        poItemId: createdItem.id,
+        linkedQty: (lines[index] as PreparedPoLine).qty,
+      })),
+    );
 
-      const [createdPo] = await tx
-        .insert(purchaseOrders)
-        .values({
-          poNumber,
-          supplierId: data.supplierId,
-          status: "draft",
-          subtotalPaise: totals.subtotalPaise,
-          taxAmountPaise: totals.taxAmountPaise,
-          totalAmountPaise: totals.totalAmountPaise,
-          paymentTermsDays: data.paymentTermsDays ?? 0,
-          deliveryTerms: data.deliveryTerms ?? null,
-          notes: data.notes ?? null,
-          expectedDeliveryDate: data.expectedDeliveryDate ?? null,
-          currentApprovalLevel: 0,
-          totalApprovalLevels: 0,
-          createdBy: data.createdBy,
-        })
-        .returning({ id: purchaseOrders.id });
-
-      if (!createdPo) {
-        throw new AppError(
-          "Failed to create purchase order",
-          500,
-          "PO_CREATE_FAILED",
-        );
-      }
-
-      const createdItems = await tx
-        .insert(purchaseOrderItems)
-        .values(
-          preparedLines.map((line) => ({
-            poId: createdPo.id,
-            itemId: line.itemId,
-            qty: line.qty,
-            unitPricePaise: line.unitPricePaise,
-            uom: line.uom,
-            gstPercent: line.gstPercent,
-            lineValuePaise: line.lineValuePaise,
-            lineTaxPaise: line.lineTaxPaise,
-          })),
-        )
-        .returning(purchaseOrderItemWriteColumns);
-
-      await tx.insert(prPoItemLinks).values(
-        createdItems.map((createdItem, index) => {
-          const line = preparedLines[index];
-          if (!line) {
-            throw new AppError(
-              "PO item/line mismatch during link creation",
-              500,
-              "PO_LINK_MISMATCH",
-            );
-          }
-          return {
-            prItemId: line.prItemId,
-            poItemId: createdItem.id,
-            linkedQty: line.qty,
-          };
-        }),
+    const addBack = sql.join(
+      lines.map(
+        (line) => sql`when ${line.prItemId} then ${line.qty}::double precision`,
+      ),
+      sql` `,
+    );
+    await tx
+      .update(purchaseRequestItems)
+      .set({
+        issuedQty: sql`coalesce(${purchaseRequestItems.issuedQty}, 0) + (case ${purchaseRequestItems.id} ${addBack} else 0 end)`,
+        status: "po_draft",
+      })
+      .where(
+        inArray(
+          purchaseRequestItems.id,
+          lines.map((line) => line.prItemId),
+        ),
       );
 
-      const affectedPrIds = new Set<number>();
-      for (const line of preparedLines) {
-        const prItem = prItemMap.get(line.prItemId);
-        if (!prItem) {
-          continue;
-        }
+    return createdItems;
+  },
 
-        await tx
-          .update(purchaseRequestItems)
-          .set({
-            issuedQty: sql`${purchaseRequestItems.issuedQty} + ${line.qty}`,
-            status: "po_draft",
-          })
-          .where(eq(purchaseRequestItems.id, line.prItemId));
+  // PR links of these lines of one PO, with the PR each PR line belongs to.
+  async findLinksByPoItemIds(poId: number, poItemIds: number[], tx: Tx) {
+    if (poItemIds.length === 0) return [];
+    return tx
+      .select({
+        poItemId: prPoItemLinks.poItemId,
+        prItemId: prPoItemLinks.prItemId,
+        linkedQty: prPoItemLinks.linkedQty,
+        prId: purchaseRequestItems.prId,
+      })
+      .from(prPoItemLinks)
+      .innerJoin(
+        purchaseOrderItems,
+        eq(purchaseOrderItems.id, prPoItemLinks.poItemId),
+      )
+      .innerJoin(
+        purchaseRequestItems,
+        eq(purchaseRequestItems.id, prPoItemLinks.prItemId),
+      )
+      .where(
+        and(
+          inArray(prPoItemLinks.poItemId, poItemIds),
+          eq(purchaseOrderItems.poId, poId),
+        ),
+      );
+  },
 
-        affectedPrIds.add(prItem.prId);
-      }
-
-      for (const prId of affectedPrIds) {
-        await prRepository.recomputeHeaderStatusFromItems(prId, tx);
-      }
-
-      const po = await this.findPoById(createdPo.id, tx);
-      if (!po) {
-        throw new AppError(
-          "Failed to create purchase order",
-          500,
-          "PO_CREATE_FAILED",
+  /**
+   * BR-PR-31: lines removed from a draft PO. Their PR lines go back to pending
+   * (issuedQty lowered by the linked qty), the links and the PO lines are
+   * deleted. Returns the ids of the PO lines that were deleted.
+   */
+  async removePoLines(
+    poId: number,
+    poItemIds: number[],
+    links: {
+      poItemId: number | null;
+      prItemId: number | null;
+      linkedQty: number;
+    }[],
+    tx: Tx,
+  ) {
+    if (poItemIds.length === 0) return [];
+    const prLinks = links.filter(
+      (
+        link,
+      ): link is { poItemId: number; prItemId: number; linkedQty: number } =>
+        link.prItemId != null && link.poItemId != null,
+    );
+    if (prLinks.length > 0) {
+      const giveBack = sql.join(
+        prLinks.map(
+          (link) =>
+            sql`when ${link.prItemId} then ${link.linkedQty}::double precision`,
+        ),
+        sql` `,
+      );
+      await tx
+        .update(purchaseRequestItems)
+        .set({
+          issuedQty: sql`greatest(${purchaseRequestItems.issuedQty} - (case ${purchaseRequestItems.id} ${giveBack} else 0 end), 0)`,
+          status: "pending",
+        })
+        .where(
+          inArray(
+            purchaseRequestItems.id,
+            prLinks.map((link) => link.prItemId),
+          ),
         );
-      }
+      await tx.delete(prPoItemLinks).where(
+        inArray(
+          prPoItemLinks.poItemId,
+          prLinks.map((link) => link.poItemId),
+        ),
+      );
+    }
+    const deleted = await tx
+      .delete(purchaseOrderItems)
+      .where(
+        and(
+          eq(purchaseOrderItems.poId, poId),
+          inArray(purchaseOrderItems.id, poItemIds),
+        ),
+      )
+      .returning({ id: purchaseOrderItems.id });
+    return deleted.map((row) => row.id);
+  },
 
-      return { po, items: createdItems };
-    });
+  // New rate, GST % and line amounts for several lines of one PO, one UPDATE.
+  async updatePoLinePrices(poId: number, rows: PoLinePriceData[], tx: Tx) {
+    if (rows.length === 0) return [];
+    const caseOf = (
+      pick: (row: PoLinePriceData) => number,
+      column: AnyColumn,
+      cast: string,
+    ) =>
+      sql`case ${purchaseOrderItems.id} ${sql.join(
+        rows.map(
+          (row) => sql`when ${row.id} then ${pick(row)}::${sql.raw(cast)}`,
+        ),
+        sql` `,
+      )} else ${column} end`;
+    return tx
+      .update(purchaseOrderItems)
+      .set({
+        unitPricePaise: caseOf(
+          (row) => row.unitPricePaise,
+          purchaseOrderItems.unitPricePaise,
+          "bigint",
+        ),
+        gstPercent: caseOf(
+          (row) => row.gstPercent,
+          purchaseOrderItems.gstPercent,
+          "double precision",
+        ),
+        lineValuePaise: caseOf(
+          (row) => row.lineValuePaise,
+          purchaseOrderItems.lineValuePaise,
+          "bigint",
+        ),
+        lineTaxPaise: caseOf(
+          (row) => row.lineTaxPaise,
+          purchaseOrderItems.lineTaxPaise,
+          "bigint",
+        ),
+      })
+      .where(
+        and(
+          eq(purchaseOrderItems.poId, poId),
+          inArray(
+            purchaseOrderItems.id,
+            rows.map((row) => row.id),
+          ),
+        ),
+      )
+      .returning(purchaseOrderItemWriteColumns);
+  },
+
+  /**
+   * #53, BR-INV-24 for many items at once: the default rate per item for this
+   * supplier, same chain as assetRepository.getLastRate (newest approved-or-
+   * later PO line, else active catalog price, else average cost > 0, else
+   * standard rate). Two queries in all. Unknown items are left out.
+   */
+  async findLastRates(supplierId: number, itemIds: number[]) {
+    const rates = new Map<number, number>();
+    if (itemIds.length === 0) return rates;
+
+    const [poRows, itemRows] = await Promise.all([
+      db
+        .selectDistinctOn([purchaseOrderItems.itemId], {
+          itemId: purchaseOrderItems.itemId,
+          ratePaise: purchaseOrderItems.unitPricePaise,
+        })
+        .from(purchaseOrderItems)
+        .innerJoin(
+          purchaseOrders,
+          eq(purchaseOrders.id, purchaseOrderItems.poId),
+        )
+        .where(
+          and(
+            eq(purchaseOrders.supplierId, supplierId),
+            inArray(purchaseOrderItems.itemId, itemIds),
+            sql`${purchaseOrderItems.unitPricePaise} > 0`,
+            inArray(purchaseOrders.status, [
+              "approved",
+              "dispatched",
+              "partial_received",
+              "fully_received",
+              "invoiced",
+              "closed",
+            ]),
+          ),
+        )
+        .orderBy(
+          purchaseOrderItems.itemId,
+          desc(purchaseOrders.createdAt),
+          desc(purchaseOrderItems.id),
+        ),
+      db
+        .select({
+          itemId: itemMaster.id,
+          averageCostPaise: itemMaster.averageCostPaise,
+          standardRatePaise: itemMaster.standardRatePaise,
+          catalogPaise: supplierItems.supplierUnitPricePaise,
+        })
+        .from(itemMaster)
+        .leftJoin(
+          supplierItems,
+          and(
+            eq(supplierItems.itemId, itemMaster.id),
+            eq(supplierItems.supplierId, supplierId),
+            eq(supplierItems.isActive, true), // BR-SUP-15
+          ),
+        )
+        .where(inArray(itemMaster.id, itemIds)),
+    ]);
+
+    const poRate = new Map(poRows.map((row) => [row.itemId, row.ratePaise]));
+    for (const row of itemRows) {
+      const fromPo = poRate.get(row.itemId);
+      const rate =
+        fromPo && fromPo > 0
+          ? fromPo
+          : row.catalogPaise && row.catalogPaise > 0
+            ? row.catalogPaise
+            : row.averageCostPaise > 0
+              ? row.averageCostPaise
+              : row.standardRatePaise;
+      rates.set(row.itemId, rate);
+    }
+    return rates;
   },
 
   async findPoItemsByPoId(poId: number, tx?: Tx) {
@@ -505,67 +660,6 @@ export const poRepository = {
       .orderBy(asc(purchaseOrderItems.id));
   },
 
-  // Scoped by poId (joined) so a link belonging to a different PO's item
-  // can never be read/mutated by a request targeting this PO.
-  async findLinkByPoItemId(poId: number, poItemId: number, tx?: Tx) {
-    const executor = tx ?? db;
-    const [row] = await executor
-      .select({
-        id: prPoItemLinks.id,
-        prItemId: prPoItemLinks.prItemId,
-        linkedQty: prPoItemLinks.linkedQty,
-      })
-      .from(prPoItemLinks)
-      .innerJoin(
-        purchaseOrderItems,
-        eq(purchaseOrderItems.id, prPoItemLinks.poItemId),
-      )
-      .where(
-        and(
-          eq(prPoItemLinks.poItemId, poItemId),
-          eq(purchaseOrderItems.poId, poId),
-        ),
-      )
-      .limit(1);
-
-    return row;
-  },
-
-  async deletePoItemsByIds(poId: number, itemIds: number[], tx?: Tx) {
-    if (itemIds.length === 0) {
-      return [];
-    }
-
-    const executor = tx ?? db;
-    return executor
-      .delete(purchaseOrderItems)
-      .where(
-        and(
-          eq(purchaseOrderItems.poId, poId),
-          inArray(purchaseOrderItems.id, itemIds),
-        ),
-      )
-      .returning({ id: purchaseOrderItems.id });
-  },
-
-  async deleteLinkByPoItemId(poItemId: number, tx: Tx) {
-    return tx
-      .delete(prPoItemLinks)
-      .where(eq(prPoItemLinks.poItemId, poItemId))
-      .returning({ id: prPoItemLinks.id });
-  },
-
-  // BR-PR-31: a line removed from a draft PO goes back to pending.
-  async revertPrItemToPending(prItemId: number, linkedQty: number, tx: Tx) {
-    await tx
-      .update(purchaseRequestItems)
-      .set({
-        issuedQty: sql`greatest(${purchaseRequestItems.issuedQty} - ${linkedQty}, 0)`,
-        status: "pending",
-      })
-      .where(eq(purchaseRequestItems.id, prItemId));
-  },
-
   async updatePoById(poId: number, data: UpdatePoData, tx?: Tx) {
     const executor = tx ?? db;
     const [row] = await executor
@@ -575,233 +669,6 @@ export const poRepository = {
       .returning(purchaseOrderColumns);
 
     return row;
-  },
-
-  // BR-PO-04: totals are always the sum of the stored line columns.
-  async recalculateTotalsByPoId(poId: number, tx: Tx) {
-    const lines = await tx
-      .select({
-        lineValuePaise: purchaseOrderItems.lineValuePaise,
-        lineTaxPaise: purchaseOrderItems.lineTaxPaise,
-      })
-      .from(purchaseOrderItems)
-      .where(eq(purchaseOrderItems.poId, poId));
-
-    const [row] = await tx
-      .update(purchaseOrders)
-      .set(computeTotalsPaise(lines))
-      .where(eq(purchaseOrders.id, poId))
-      .returning(purchaseOrderColumns);
-
-    return row;
-  },
-
-  // BR-PO-05: draft only, checked again under the row lock. A PO can't be left with no lines.
-  async updateWithItems(
-    poId: number,
-    headerData: UpdatePoData,
-    inserts: PoLineInsertData[],
-    updates: PoLineUpdateData[],
-    deletes: { id: number }[],
-  ) {
-    return db.transaction(async (tx) => {
-      const locked = await this.lockPoById(poId, tx);
-      if (!locked) {
-        throw new AppError("Purchase order not found", 404, "NOT_FOUND");
-      }
-      if (locked.status === "pending_approval") {
-        throw new ConflictError(
-          "Purchase order is locked while it is in approval",
-          "DOC_LOCKED_IN_APPROVAL",
-        );
-      }
-      if (locked.status !== "draft") {
-        throw new ConflictError(
-          `Purchase order can only be edited in draft (now ${locked.status})`,
-          "PO_NOT_EDITABLE",
-        );
-      }
-
-      if (Object.keys(headerData).length > 0) {
-        await this.updatePoById(poId, headerData, tx);
-      }
-
-      // CRP-2: take every PR lock this edit needs up front, headers first and
-      // lines in id order, before any line is changed.
-      const removedLinks =
-        deletes.length > 0
-          ? await tx
-              .select({ prItemId: prPoItemLinks.prItemId })
-              .from(prPoItemLinks)
-              .where(
-                inArray(
-                  prPoItemLinks.poItemId,
-                  deletes.map((del) => del.id),
-                ),
-              )
-          : [];
-      await this.findPurchaseRequestItemsByIdsForUpdate(
-        [
-          ...removedLinks
-            .map((link) => link.prItemId)
-            .filter((id): id is number => id != null),
-          ...inserts.map((line) => line.prItemId),
-        ],
-        tx,
-      );
-
-      const changedItems: Awaited<ReturnType<typeof this.findPoItemsByPoId>> =
-        [];
-      const affectedPrIds = new Set<number>();
-
-      for (const del of deletes) {
-        const link = await this.findLinkByPoItemId(poId, del.id, tx);
-        if (link?.prItemId != null) {
-          await this.revertPrItemToPending(link.prItemId, link.linkedQty, tx);
-          const [prItemRow] = await tx
-            .select({ prId: purchaseRequestItems.prId })
-            .from(purchaseRequestItems)
-            .where(eq(purchaseRequestItems.id, link.prItemId))
-            .limit(1);
-          if (prItemRow) {
-            affectedPrIds.add(prItemRow.prId);
-          }
-          await this.deleteLinkByPoItemId(del.id, tx);
-        }
-        const deletedRows = await this.deletePoItemsByIds(poId, [del.id], tx);
-        if (deletedRows.length === 0) {
-          throw new AppError(
-            `PO item not found for id ${del.id}`,
-            404,
-            "NOT_FOUND",
-          );
-        }
-      }
-
-      for (const update of updates) {
-        const [existing] = await tx
-          .select(purchaseOrderItemWriteColumns)
-          .from(purchaseOrderItems)
-          .where(
-            and(
-              eq(purchaseOrderItems.id, update.id),
-              eq(purchaseOrderItems.poId, poId),
-            ),
-          )
-          .for("update");
-        if (!existing) {
-          throw new AppError(
-            `PO item not found for id ${update.id}`,
-            404,
-            "NOT_FOUND",
-          );
-        }
-        const unitPricePaise = update.unitPricePaise ?? existing.unitPricePaise;
-        const gstPercent = update.gstPercent ?? existing.gstPercent;
-        const [updatedItem] = await tx
-          .update(purchaseOrderItems)
-          .set({
-            unitPricePaise,
-            gstPercent,
-            ...computeLinePaise(existing.qty, unitPricePaise, gstPercent),
-          })
-          .where(eq(purchaseOrderItems.id, update.id))
-          .returning(purchaseOrderItemWriteColumns);
-        if (updatedItem) {
-          changedItems.push(updatedItem);
-        }
-      }
-
-      if (inserts.length > 0) {
-        const prItemIds = inserts.map((line) => line.prItemId);
-        const prItemRows = await this.findPurchaseRequestItemsByIdsForUpdate(
-          prItemIds,
-          tx,
-        );
-        const prItemMap = new Map(prItemRows.map((row) => [row.id, row]));
-
-        for (const line of inserts) {
-          const prItem = prItemMap.get(line.prItemId);
-          if (!prItem) {
-            throw new AppError(
-              `Invalid prItemId: ${line.prItemId}`,
-              400,
-              "PO_INVALID_PR_ITEM",
-            );
-          }
-
-          // Same re-assert as createWithItems — see comment there.
-          if (prItem.status !== "pending") {
-            throw new ConflictError(
-              `PR item ${line.prItemId} is no longer pending (already ${prItem.status})`,
-              "PO_LINE_ALREADY_DRAFTED",
-            );
-          }
-
-          const qty = prItem.requestedQty - (prItem.issuedQty ?? 0);
-
-          const [createdItem] = await tx
-            .insert(purchaseOrderItems)
-            .values({
-              poId,
-              itemId: prItem.itemId,
-              qty,
-              unitPricePaise: line.unitPricePaise,
-              uom: prItem.uom,
-              gstPercent: line.gstPercent,
-              ...computeLinePaise(qty, line.unitPricePaise, line.gstPercent),
-            })
-            .returning(purchaseOrderItemWriteColumns);
-
-          if (!createdItem) {
-            throw new AppError(
-              "Failed to create PO item",
-              500,
-              "PO_ITEM_CREATE_FAILED",
-            );
-          }
-
-          await tx.insert(prPoItemLinks).values({
-            prItemId: line.prItemId,
-            poItemId: createdItem.id,
-            linkedQty: qty,
-          });
-
-          await tx
-            .update(purchaseRequestItems)
-            .set({
-              issuedQty: sql`${purchaseRequestItems.issuedQty} + ${qty}`,
-              status: "po_draft",
-            })
-            .where(eq(purchaseRequestItems.id, line.prItemId));
-
-          affectedPrIds.add(prItem.prId);
-          changedItems.push(createdItem);
-        }
-      }
-
-      const remaining = await this.findPoItemsByPoId(poId, tx);
-      if (remaining.length === 0) {
-        throw new BadRequestError(
-          "A purchase order needs at least one line",
-          "PO_NEEDS_A_LINE",
-        );
-      }
-
-      for (const prId of affectedPrIds) {
-        await prRepository.recomputeHeaderStatusFromItems(prId, tx);
-      }
-
-      const recalculatedPo = await this.recalculateTotalsByPoId(poId, tx);
-      if (!recalculatedPo) {
-        throw new AppError("Purchase order not found", 404, "NOT_FOUND");
-      }
-
-      return {
-        po: recalculatedPo,
-        items: changedItems,
-      };
-    });
   },
 
   async getDetails(poId: number) {
@@ -1088,7 +955,7 @@ export const poRepository = {
   // Used by grnService's PO rollup after a GRN line posts. qty/receivedQty
   // per line, unlocked read — the caller (grnService) already holds the
   // relevant GRN-line invariant; this is a plain status recompute, not a
-  // race-sensitive allocation like createWithItems.
+  // race-sensitive allocation like PO create.
   async findPoItemQuantitiesByPoId(poId: number, tx?: Tx) {
     const executor = tx ?? db;
     return executor

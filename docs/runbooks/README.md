@@ -16,6 +16,15 @@ For pipeline agents in an unattended run (first) and the owner (second). One pag
 | A tool call is denied (permission rule, hook, classifier) | [permission-blocked.md](permission-blocked.md) |
 | Session died or was closed in the middle of a run | [resume-after-crash.md](resume-after-crash.md) |
 | Cannot connect to Postgres, port in use, migrations out of sync | [docker-or-port-problem.md](docker-or-port-problem.md) |
+| New worktree: no `backend/.env`, no `node_modules`, test DB not prepared | run `./scripts/worktree-setup.sh` from the worktree (see below) |
+
+## New worktree setup
+`./scripts/worktree-setup.sh` (repo root) gets a fresh worktree ready for checks and tests. Safe to re-run.
+1. `backend/.env` missing here → symlinked from the main checkout, if that has one. An existing file is left alone.
+2. `bun install` in `backend/` and `frontend/`.
+3. `bun run db:test:prepare`, only when `DATABASE_URL_TEST` is set (shell or `.env`) and its port answers;
+   otherwise it says to run `docker compose up -d`.
+Ends with `ready`, or `done with failures` (exit 1) naming the step to re-run by hand.
 
 ## Rules that hold in every runbook
 - **Never wait for the owner** unless it is a hard stop.
@@ -36,7 +45,7 @@ For pipeline agents in an unattended run (first) and the owner (second). One pag
 | Hand-over | `.pipeline/<id>/HANDOVER.md` from `.claude/pipeline/templates/HANDOVER.md`; also the top of the PR body |
 | Last green | `state.json` → `lastGreen`: newest commit where typecheck, lint, tests and contract check all passed |
 | Park | revert one slice to last green, open an issue with the evidence, continue with the rest |
-| Env file | file with `DATABASE_URL`, `DATABASE_URL_TEST`, secrets, `SEED_USER_PASSWORD`. A new worktree has no `backend/.env` (gitignored). Past runs stored the path in `state.json` → `envFile` and ran `bun --env-file=<path> …` |
+| Env file | file with `DATABASE_URL`, `DATABASE_URL_TEST`, secrets, `SEED_USER_PASSWORD`. A new worktree has no `backend/.env` (gitignored) until `./scripts/worktree-setup.sh` links it. Past runs stored the path in `state.json` → `envFile` and ran `bun --env-file=<path> …` |
 
 ## Not there yet (the runbooks say "missing — to be added" where they need these)
 - Allow rules for `gh issue create`, `gh issue list`, `git revert`, `git worktree remove`,

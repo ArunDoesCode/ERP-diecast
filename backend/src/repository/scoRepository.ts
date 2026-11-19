@@ -171,8 +171,11 @@ export const scoRepository = {
         ...getTableColumns(subcontractingOrderItems),
         rawItemSku: rawItem.sku,
         rawItemName: rawItem.name,
+        // BR-SCO-26
+        rawItemUom: rawItem.uom,
         finishedItemSku: finishedItem.sku,
         finishedItemName: finishedItem.name,
+        finishedItemUom: finishedItem.uom,
       })
       .from(subcontractingOrderItems)
       .innerJoin(rawItem, eq(rawItem.id, subcontractingOrderItems.rawItemId))
@@ -194,9 +197,10 @@ export const scoRepository = {
     return row;
   },
 
+  // With `tx`, the supplier row is share-locked so it can't be deactivated or
+  // retyped until the SCO is saved (#57).
   async findVendor(id: number, tx?: Tx) {
-    const executor = tx ?? db;
-    const [row] = await executor
+    const query = (tx ?? db)
       .select({
         id: supplierMaster.id,
         type: supplierMaster.type,
@@ -205,6 +209,7 @@ export const scoRepository = {
       .from(supplierMaster)
       .where(eq(supplierMaster.id, id))
       .limit(1);
+    const [row] = tx ? await query.for("share") : await query;
     return row;
   },
 

@@ -122,6 +122,8 @@ export interface PRLinkedPo {
 	id: number;
 	poNumber: string;
 	supplierId: number;
+	/** BR-PO-24 */
+	supplierName: string;
 	status: PRLinkedPoStatus;
 	totalAmountPaise: number;
 }
@@ -152,9 +154,12 @@ export function todayIso() {
 
 export const prItemInputSchema = z.object({
 	id: z.coerce.number().int().positive().optional(),
-	itemId: z.coerce.number().int().positive("Item id is required"),
+	itemId: z.coerce
+		.number({ error: "Pick an item" })
+		.int()
+		.positive("Pick an item"),
 	requestedQty: z.coerce
-		.number()
+		.number({ error: "Enter a quantity" })
 		.positive("Requested qty must be greater than 0")
 		.refine(
 			(value) => Math.abs(value * 1000 - Math.round(value * 1000)) < 1e-6,

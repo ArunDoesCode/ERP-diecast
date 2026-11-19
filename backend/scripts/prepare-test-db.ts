@@ -69,12 +69,11 @@ async function runChild(
   env: Record<string, string> = {},
   okCodes: number[] = [0],
 ) {
+  // #84: a DB_RESET_CONFIRM left in the shell is never handed on (it would judge another DB).
+  const { DB_RESET_CONFIRM: _dropped, ...inherited } = process.env;
   const proc = Bun.spawn(cmd, {
     cwd: BACKEND_DIR,
-    env: { ...process.env, DATABASE_URL: url, ...env } as Record<
-      string,
-      string
-    >,
+    env: { ...inherited, DATABASE_URL: url, ...env } as Record<string, string>,
     stdin: "ignore",
     stdout: "pipe",
     stderr: "pipe",
@@ -125,7 +124,7 @@ try {
   // Exit 2 = "already bootstrapped": fine on a re-run.
   await runChild(
     "bootstrap-admin",
-    ["bun", "scripts/bootstrap-admin.ts"],
+    [process.execPath, "scripts/bootstrap-admin.ts"],
     {
       BOOTSTRAP_ADMIN_NAME: "Admin",
       BOOTSTRAP_ADMIN_EMAIL: "admin@diecast.local",
@@ -134,7 +133,7 @@ try {
     [0, 2],
   );
   await runChild("seed-approval-policies", [
-    "bun",
+    process.execPath,
     "scripts/seed-approval-policies.ts",
   ]);
   console.log(

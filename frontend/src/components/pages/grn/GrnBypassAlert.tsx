@@ -15,11 +15,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useCan } from "@/hooks/use-can";
-import { useGrnBypassMutation, usePoItemUoms } from "@/lib/api/grn/queries";
-import { qtyStep } from "@/lib/grn-units";
+import { useGrnBypassMutation } from "@/lib/api/grn/queries";
+import { exceedsOverReceiptTolerance, qtyStep } from "@/lib/grn-units";
 import type { GrnItemDetail } from "@/types/grn";
-
-const OVER_RECEIPT_MULTIPLIER = 1.05;
 
 export function GrnBypassAlert({
 	grnId,
@@ -38,8 +36,7 @@ export function GrnBypassAlert({
 	const [acceptedQty, setAcceptedQty] = useState(String(line.receivedQty));
 	const [batchNumber, setBatchNumber] = useState(line.batchNumber ?? "");
 	const [overrideReason, setOverrideReason] = useState("");
-	const uoms = usePoItemUoms(poId, open);
-	const uom = line.poItemId != null ? uoms.get(line.poItemId) : undefined;
+	const uom = line.uom;
 	const mutation = useGrnBypassMutation();
 
 	const accepted = Number(acceptedQty || 0);
@@ -47,7 +44,11 @@ export function GrnBypassAlert({
 		0,
 		Math.round((line.receivedQty - accepted) * 1000) / 1000,
 	);
-	const isOverReceipt = accepted > line.orderedQty * OVER_RECEIPT_MULTIPLIER;
+	const isOverReceipt = exceedsOverReceiptTolerance(
+		line.orderedQty,
+		line.poReceivedQty,
+		accepted,
+	);
 	const canOverride = useCan("grn.over_receipt_override");
 
 	function reset() {
@@ -114,9 +115,9 @@ export function GrnBypassAlert({
 					{isOverReceipt ? (
 						canOverride ? (
 							<div>
-								<p className="mb-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-									This exceeds 105% of the ordered qty. Give a reason to
-									override.
+								<p className="mb-2 rounded-md border border-warning/30 bg-warning-subtle px-3 py-2 text-xs text-warning">
+									With earlier receipts this exceeds 105% of the ordered qty.
+									Give a reason to override.
 								</p>
 								<label
 									htmlFor="grn-bypass-override-reason"
@@ -131,9 +132,9 @@ export function GrnBypassAlert({
 								/>
 							</div>
 						) : (
-							<p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-								This exceeds 105% of the ordered qty. You cannot override it;
-								ask the owner or back office.
+							<p className="rounded-md border border-warning/30 bg-warning-subtle px-3 py-2 text-xs text-warning">
+								With earlier receipts this exceeds 105% of the ordered qty. You
+								cannot override it; ask the owner or back office.
 							</p>
 						)
 					) : null}

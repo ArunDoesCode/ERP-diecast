@@ -11,7 +11,7 @@
 
 const EXIT = { ok: 0, step: 1, guard: 2, input: 4 } as const;
 const BACKEND_DIR = new URL("..", import.meta.url).pathname;
-const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 
 const args = process.argv.slice(2);
 const noFixtures = args.includes("--no-fixtures");
@@ -47,6 +47,16 @@ try {
       "Refused: DATABASE_URL must not carry a query string. Nothing was changed.",
     );
   }
+  // BR-KD-53: an unescaped "@" in the user or password lets parsers disagree on where the host
+  // starts (postgres v3 and libpq read "a@b,prod:p@local" as two hosts, v4 as one), so refuse it.
+  if (
+    (/^[a-z]+:\/\/([^/?#]*)/i.exec(rawUrl)?.[1] ?? "").split("@").length > 2
+  ) {
+    refuse(
+      EXIT.guard,
+      "Refused: DATABASE_URL has an unescaped @ in the user or password (write it as %40). Nothing was changed.",
+    );
+  }
   const { default: postgres } = await import("postgres");
   const o = postgres(rawUrl).options; // lazy: does not connect
   if (o.host.length !== 1) {
@@ -63,8 +73,11 @@ try {
     );
   }
   dbName = o.database;
-  // The driver reads a bracketed IPv6 host as "[" (it then fails to connect: fails closed).
-  dbHost = o.host[0] === "[" ? parsed.hostname : String(o.host[0]);
+  // The driver reports an IPv6 literal without brackets ("::1"); older versions gave "[".
+  dbHost =
+    o.host[0] === "["
+      ? parsed.hostname.replace(/^\[(.*)\]$/, "$1")
+      : String(o.host[0]);
   dbPort = String(o.port[0] ?? 5432);
   dbUser = o.user;
   dbPass = o.pass ?? "";
@@ -84,10 +97,12 @@ if (!/^[A-Za-z0-9_.$-]+$/.test(dbName)) {
 const secrets = [dbPass, encodeURIComponent(dbPass)].filter(
   (s) => s.length > 0,
 );
-const targetLabel = `${dbHost}:${dbPort}/${dbName}`;
+// #85: an IPv6 host goes back in brackets wherever it is written next to a port.
+const urlHost = dbHost.includes(":") ? `[${dbHost}]` : dbHost;
+const targetLabel = `${urlHost}:${dbPort}/${dbName}`;
 // Hand the resolved target on explicitly and drop PG* env, so every child and the in-process
 // client connect to exactly what was judged here.
-process.env.DATABASE_URL = `postgres://${encodeURIComponent(dbUser)}:${encodeURIComponent(dbPass)}@${dbHost}:${dbPort}/${dbName}`;
+process.env.DATABASE_URL = `postgres://${encodeURIComponent(dbUser)}:${encodeURIComponent(dbPass)}@${urlHost}:${dbPort}/${dbName}`;
 for (const k of ["PGHOST", "PGPORT", "PGDATABASE", "PGUSER", "PGPASSWORD"]) {
   delete process.env[k];
 }
@@ -281,7 +296,7 @@ const steps: Step[] = [
     run: () =>
       runChildOrThrow(
         "bootstrap-admin",
-        ["bun", "scripts/bootstrap-admin.ts"],
+        [process.execPath, "scripts/bootstrap-admin.ts"],
         {
           BOOTSTRAP_ADMIN_NAME: "Admin",
           BOOTSTRAP_ADMIN_EMAIL: ADMIN_EMAIL,
@@ -293,7 +308,7 @@ const steps: Step[] = [
     name: "approval policies",
     run: () =>
       runChildOrThrow("seed-approval-policies", [
-        "bun",
+        process.execPath,
         "scripts/seed-approval-policies.ts",
       ]),
   },

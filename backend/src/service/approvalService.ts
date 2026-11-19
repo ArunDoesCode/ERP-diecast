@@ -158,13 +158,19 @@ async function assertCanReadRequest(
 }
 
 async function assertChainHasEligibleApprovers(chain: approvalChainSchemaType) {
+  // #55: every step checked with one query.
+  const active = await approvalRepository.findActiveApprovers(
+    chain.flatMap((step) =>
+      step.approverType === "role" && step.role ? [step.role] : [],
+    ),
+    chain.flatMap((step) =>
+      step.approverType !== "role" && step.employeeId ? [step.employeeId] : [],
+    ),
+  );
   for (const step of chain) {
     if (step.approverType === "role") {
       const roleName = step.role;
-      const activeCount = roleName
-        ? await approvalRepository.countActiveEmployeesByRoleName(roleName)
-        : 0;
-      if (activeCount === 0) {
+      if (!roleName || !active.roleNames.has(roleName)) {
         throw new BadRequestError(
           `Approval step ${step.level} has no active employee with role ${roleName ?? "(missing)"}`,
           "APPROVAL_NO_ELIGIBLE_APPROVER",
@@ -173,10 +179,7 @@ async function assertChainHasEligibleApprovers(chain: approvalChainSchemaType) {
       continue;
     }
 
-    const approver = step.employeeId
-      ? await approvalRepository.findEmployeeWithRoleById(step.employeeId)
-      : undefined;
-    if (!approver?.isActive) {
+    if (!step.employeeId || !active.employeeIds.has(step.employeeId)) {
       throw new BadRequestError(
         `Approval step ${step.level} names employee ${step.employeeId ?? "(missing)"}, who is missing or inactive`,
         "APPROVAL_NO_ELIGIBLE_APPROVER",
@@ -364,10 +367,8 @@ export const approvalService = {
     }
 
     // BR-APR-24 (v2): submit also needs the document type's own key.
+    // docType is validated by the schema and SUBMIT_KEYS covers every value (#61).
     const submitKey = SUBMIT_KEYS[input.docType];
-    if (!submitKey) {
-      throw new BadRequestError(`Unknown document type ${input.docType}`);
-    }
     if (!can(actor, submitKey)) {
       throw new ForbiddenError(
         `Submitting a ${input.docType.toUpperCase()} needs the ${submitKey} permission`,

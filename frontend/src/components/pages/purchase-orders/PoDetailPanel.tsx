@@ -13,6 +13,7 @@ import {
 	usePoCommunicationsQuery,
 	usePurchaseOrderDetailQuery,
 } from "@/lib/api/purchase-orders/queries";
+import { formatDateTime, formatMoney } from "@/lib/format";
 import type { PoCommunicationType } from "@/types/purchase-orders";
 
 const COMM_TYPE_LABEL: Record<PoCommunicationType, string> = {
@@ -20,20 +21,6 @@ const COMM_TYPE_LABEL: Record<PoCommunicationType, string> = {
 	reminder: "Reminder",
 	escalation: "Escalation",
 };
-
-function money(paise?: number | null) {
-	return `₹${((paise ?? 0) / 100).toLocaleString("en-IN", {
-		minimumFractionDigits: 2,
-		maximumFractionDigits: 2,
-	})}`;
-}
-
-function dateTime(value: string) {
-	return new Intl.DateTimeFormat(undefined, {
-		dateStyle: "medium",
-		timeStyle: "short",
-	}).format(new Date(value));
-}
 
 /** PO lines with GST, totals (BR-PO-04) and the communications log (BR-PO-17). */
 export function PoDetailPanel({ poId }: { poId: number }) {
@@ -90,16 +77,16 @@ export function PoDetailPanel({ poId }: { poId: number }) {
 							<TableCell>
 								{item.qty} {item.uom ?? ""}
 							</TableCell>
-							<TableCell>{money(item.unitPricePaise)}</TableCell>
+							<TableCell>{formatMoney(item.unitPricePaise)}</TableCell>
 							<TableCell>{item.gstPercent ?? 0}%</TableCell>
 							<TableCell className="text-right">
-								{money(
+								{formatMoney(
 									item.lineValuePaise ??
 										Math.round(item.qty * item.unitPricePaise),
 								)}
 							</TableCell>
 							<TableCell className="text-right">
-								{money(item.lineTaxPaise)}
+								{formatMoney(item.lineTaxPaise)}
 							</TableCell>
 						</TableRow>
 					))}
@@ -108,11 +95,11 @@ export function PoDetailPanel({ poId }: { poId: number }) {
 
 			<dl className="ml-auto grid w-fit grid-cols-[auto_auto] gap-x-6 gap-y-1 text-right">
 				<dt className="text-muted-foreground">Subtotal</dt>
-				<dd>{money(po.subtotalPaise)}</dd>
+				<dd>{formatMoney(po.subtotalPaise)}</dd>
 				<dt className="text-muted-foreground">GST</dt>
-				<dd>{money(po.taxAmountPaise)}</dd>
+				<dd>{formatMoney(po.taxAmountPaise)}</dd>
 				<dt className="font-medium">Total</dt>
-				<dd className="font-medium">{money(po.totalAmountPaise)}</dd>
+				<dd className="font-medium">{formatMoney(po.totalAmountPaise)}</dd>
 			</dl>
 
 			<section aria-label="Communications log" className="space-y-1">
@@ -128,7 +115,8 @@ export function PoDetailPanel({ poId }: { poId: number }) {
 								<span className="font-medium">
 									{COMM_TYPE_LABEL[row.type] ?? row.type}
 								</span>{" "}
-								via {row.channel.replace("_", " ")} · {dateTime(row.sentAt)}
+								via {row.channel.replace("_", " ")} ·{" "}
+								{formatDateTime(row.sentAt)}
 								{row.note ? (
 									<p className="text-muted-foreground">“{row.note}”</p>
 								) : null}

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,6 +13,7 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { useSupplierHistoryQuery } from "@/lib/api/suppliers/queries";
+import { formatDateTime, formatMoney } from "@/lib/format";
 import type { SupplierHistoryRow } from "@/types/suppliers";
 
 const PAGE_SIZE = 10;
@@ -25,10 +25,7 @@ const PAISE_FIELDS = new Set([
 function formatValue(row: SupplierHistoryRow, value: string | null) {
 	if (value === null || value === "") return "empty";
 	if (PAISE_FIELDS.has(row.field) && /^\d+$/.test(value)) {
-		return (Number(value) / 100).toLocaleString(undefined, {
-			style: "currency",
-			currency: "INR",
-		});
+		return formatMoney(Number(value));
 	}
 	return value;
 }
@@ -96,9 +93,7 @@ export function SupplierHistoryCard({ supplierId }: { supplierId: number }) {
 							) : (
 								rows.map((row) => (
 									<TableRow key={row.id}>
-										<TableCell>
-											{new Date(row.changedAt).toLocaleString()}
-										</TableCell>
+										<TableCell>{formatDateTime(row.changedAt)}</TableCell>
 										<TableCell>
 											{row.changedByName ?? `User #${row.changedBy}`}
 										</TableCell>

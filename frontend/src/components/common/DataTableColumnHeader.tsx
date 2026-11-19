@@ -5,18 +5,19 @@ import {
 	IconArrowsSort,
 	IconArrowUp,
 } from "@tabler/icons-react";
-import type { Column } from "@tanstack/react-table";
+import type { RowData } from "@tanstack/react-table";
 
+import type { DataTableColumn } from "@/components/common/data-table-features";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-type DataTableColumnHeaderProps<TData, TValue> = {
-	column: Column<TData, TValue>;
+type DataTableColumnHeaderProps<TData extends RowData, TValue> = {
+	column: DataTableColumn<TData, TValue>;
 	title: string;
 	className?: string;
 };
 
-export function DataTableColumnHeader<TData, TValue>({
+export function DataTableColumnHeader<TData extends RowData, TValue>({
 	column,
 	title,
 	className,

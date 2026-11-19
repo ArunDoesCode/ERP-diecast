@@ -20,6 +20,8 @@ export type UserMenuProps = {
 	density: Density;
 	onDensityChange: (density: Density) => void;
 	onLogout: () => void;
+	/** true while the logout request runs: the item is disabled (#107). */
+	loggingOut?: boolean;
 };
 
 function initialsOf(name: string): string {
@@ -37,6 +39,7 @@ export function UserMenu({
 	density,
 	onDensityChange,
 	onLogout,
+	loggingOut = false,
 }: UserMenuProps) {
 	const { setTheme, resolvedTheme } = useTheme();
 	const isDark = resolvedTheme === "dark";
@@ -81,7 +84,7 @@ export function UserMenu({
 					Compact
 				</DropdownMenuCheckboxItem>
 				<DropdownMenuSeparator />
-				<DropdownMenuItem onSelect={onLogout}>
+				<DropdownMenuItem onSelect={onLogout} disabled={loggingOut}>
 					<IconLogout />
 					Logout
 				</DropdownMenuItem>

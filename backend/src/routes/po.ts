@@ -4,7 +4,11 @@ import { z } from "zod";
 import { poController } from "../controller/poController";
 import { asyncHandler } from "../lib/async-handler";
 import { requirePermission } from "../lib/auth-middleware";
-import { paginatedResponse, successResponse } from "../lib/response-schemas";
+import {
+  paginatedResponse,
+  paginationMetaSchema,
+  successResponse,
+} from "../lib/response-schemas";
 import { register } from "../lib/route-registry";
 import type { AppEnv } from "../lib/types";
 import {
@@ -20,6 +24,7 @@ import {
   poDetailsSchema,
   poListQuerySchema,
   poResponseSchema,
+  poStatusSchema,
   poUpdateResultSchema,
   shortClosePoSchema,
   updatePoDelaySchema,
@@ -45,7 +50,14 @@ register({
     "List purchase orders, paginated. `overdue=true` (BR-PO-19) filters to dispatched/partial_received POs with open qty whose due date (revised date if set, else expected date) is before today.",
   auth: { type: "permission", key: "po.manage" },
   request: { query: poListQuerySchema },
-  responses: { "200": paginatedResponse(poResponseSchema) },
+  // BR-PO-26: meta.statusCounts = rows per status for the same search.
+  responses: {
+    "200": paginatedResponse(poResponseSchema).extend({
+      meta: paginationMetaSchema.extend({
+        statusCounts: z.record(poStatusSchema, z.number().int().min(0)),
+      }),
+    }),
+  },
   pagination: {
     sortableFields: ["id", "poNumber", "status", "createdAt"],
     searchable: true,

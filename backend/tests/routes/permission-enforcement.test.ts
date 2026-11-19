@@ -194,7 +194,7 @@ describe("BR-AUTH-10 every non-public route declares one key or any-signed-in", 
     expect(bad).toEqual([]);
   });
 
-  test("BR-AUTH-10 only login, refresh and logout are public", () => {
+  test("BR-AUTH-10 only login, qr-login, refresh and logout are public", () => {
     const pub = getRegistry()
       .filter((d) => d.auth.type === "public")
       .map((d) => `${d.method} ${d.path}`)
@@ -203,6 +203,7 @@ describe("BR-AUTH-10 every non-public route declares one key or any-signed-in", 
       [
         "POST /api/auth/login",
         "POST /api/auth/logout",
+        "POST /api/auth/qr-login",
         "POST /api/auth/refresh",
       ].sort(),
     );

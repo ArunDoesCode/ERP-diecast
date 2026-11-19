@@ -1,5 +1,5 @@
-import { Badge } from "@/components/ui/badge";
-import { CHALLAN_DUE_BADGE, formatDaysLeft } from "@/lib/sco-format";
+import { StatusBadge } from "@/components/shared/StatusBadge";
+import { formatDaysLeft } from "@/lib/sco-format";
 import type { Challan } from "@/types/subcontracting";
 
 export function ChallanDueBadge({
@@ -7,12 +7,18 @@ export function ChallanDueBadge({
 }: {
 	challan: Pick<Challan, "dueStatus" | "daysLeft">;
 }) {
-	const style = CHALLAN_DUE_BADGE[challan.dueStatus];
 	const overdue = challan.dueStatus === "overdue";
 	return (
-		<Badge variant={style.variant} className={style.className}>
-			{formatDaysLeft(challan.daysLeft)}
-			{overdue ? " - deemed supply, tell accounts" : ""}
-		</Badge>
+		<span className="inline-flex flex-wrap items-center gap-2">
+			<StatusBadge doc="challanDue" status={challan.dueStatus} />
+			<span className="text-xs text-muted-foreground">
+				{formatDaysLeft(challan.daysLeft)}
+			</span>
+			{overdue ? (
+				<span className="text-xs text-destructive">
+					Deemed supply, tell accounts
+				</span>
+			) : null}
+		</span>
 	);
 }

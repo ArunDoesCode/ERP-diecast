@@ -1,22 +1,18 @@
 "use client";
 
-import type { ColumnDef, PaginationState } from "@tanstack/react-table";
-import { getCoreRowModel, useReactTable } from "@tanstack/react-table";
+import { type PaginationState, useTable } from "@tanstack/react-table";
 import { useMemo } from "react";
-
 import { DataTable } from "@/components/common/DataTable";
 import { DataTableColumnHeader } from "@/components/common/DataTableColumnHeader";
+import {
+	type DataTableColumnDef,
+	dataTableFeatures,
+} from "@/components/common/data-table-features";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useSupplierServicesQuery } from "@/lib/api/suppliers/queries";
+import { formatMoney } from "@/lib/format";
 import type { SupplierService } from "@/types/suppliers";
-
-function toCurrencyFromPaise(value: number) {
-	return (value / 100).toLocaleString(undefined, {
-		style: "currency",
-		currency: "INR",
-	});
-}
 
 export function SupplierServicesOfferingsPane({
 	supplierId,
@@ -50,7 +46,7 @@ export function SupplierServicesOfferingsPane({
 	const serviceRows = serviceQuery.data?.data ?? [];
 	const serviceMeta = serviceQuery.data?.meta;
 
-	const columns = useMemo<ColumnDef<SupplierService>[]>(
+	const columns = useMemo<DataTableColumnDef<SupplierService>[]>(
 		() => [
 			{
 				accessorKey: "serviceName",
@@ -77,8 +73,7 @@ export function SupplierServicesOfferingsPane({
 				header: ({ column }) => (
 					<DataTableColumnHeader column={column} title="Rate" />
 				),
-				cell: ({ row }) =>
-					toCurrencyFromPaise(row.original.serviceUnitPricePaise),
+				cell: ({ row }) => formatMoney(row.original.serviceUnitPricePaise),
 			},
 			{
 				accessorKey: "taxPercentage",
@@ -111,10 +106,10 @@ export function SupplierServicesOfferingsPane({
 		[serviceMeta?.page, serviceMeta?.pageSize, page, pageSize],
 	);
 
-	const table = useReactTable({
+	const table = useTable({
+		features: dataTableFeatures,
 		data: serviceRows,
 		columns,
-		getCoreRowModel: getCoreRowModel(),
 		manualPagination: true,
 		pageCount: serviceMeta?.totalPages ?? 1,
 		onPaginationChange: (updater) => {

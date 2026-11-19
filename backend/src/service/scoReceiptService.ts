@@ -3,6 +3,7 @@ import type { Actor } from "../lib/auth-middleware";
 import { isUniqueViolation } from "../lib/db-errors";
 import { allocateDocumentSequence } from "../lib/document-number";
 import { BadRequestError, ConflictError, NotFoundError } from "../lib/errors";
+import { istDaysBetween, istMonthKey } from "../lib/ist-day";
 import { assertMoneyInRange } from "../lib/money";
 import { nothingLeftAtVendor, rawUsedFor } from "../lib/sco-math";
 import { scoChallanRepository } from "../repository/scoChallanRepository";
@@ -177,6 +178,16 @@ export const scoReceiptService = {
     actorId: number,
     _actor: Actor,
   ): Promise<receiptDetailsSchemaType> {
+    // BR-SCO-27: today or earlier, whole IST days (same as challans).
+    if (
+      input.receivedDate !== undefined &&
+      istDaysBetween(new Date(), input.receivedDate) > 0
+    ) {
+      throw new BadRequestError(
+        "Received date cannot be in the future",
+        "SCO_RECEIPT_DATE_FUTURE",
+      );
+    }
     return db.transaction(async (tx) => {
       const pre = await scoRepository.findHeader(scoId, tx);
       if (!pre) throw new NotFoundError("Subcontracting order not found");
@@ -239,10 +250,13 @@ export const scoReceiptService = {
         throw new ConflictError("Main store or vendor location is not set up");
       }
 
+      // BR-SCO-27: period = IST month of the day the receipt is saved.
       const { periodKey, seq } = await allocateDocumentSequence(
         tx,
         "sco_grn",
         actorId,
+        new Date(),
+        istMonthKey(),
       );
       let receiptId: number;
       try {
@@ -278,13 +292,11 @@ export const scoReceiptService = {
       );
       const openByItem = new Map<number, OpenChallanLine[]>();
 
-      // Stock postings go in item id order so concurrent receipts cannot deadlock.
-      const ordered = [...input.lines].sort(
-        (a, b) =>
-          (byId.get(a.scoItemId)?.rawItemId ?? 0) -
-          (byId.get(b.scoItemId)?.rawItemId ?? 0),
-      );
-      for (const wanted of ordered) {
+      // Receipt lines are saved in the order they were entered (#61); their
+      // stock postings are collected and run afterwards in item id order so
+      // concurrent receipts cannot deadlock.
+      const postings: PostStockInput[] = [];
+      for (const wanted of input.lines) {
         const line = byId.get(wanted.scoItemId);
         if (!line) throw new NotFoundError("SCO line not found");
         const { send, ret } = ratioOf(line);
@@ -369,18 +381,20 @@ export const scoReceiptService = {
             averageEffect: "none" as const,
             createdBy: actorId,
           };
-          await postStock(tx, {
-            ...base,
-            locationId: (vendorLocation as { id: number }).id,
-            transactionType: "out",
-            quantityChange: -wanted.unprocessedQty,
-          });
-          await postStock(tx, {
-            ...base,
-            locationId: (mainStore as { id: number }).id,
-            transactionType: "in",
-            quantityChange: wanted.unprocessedQty,
-          });
+          postings.push(
+            {
+              ...base,
+              locationId: (vendorLocation as { id: number }).id,
+              transactionType: "out",
+              quantityChange: -wanted.unprocessedQty,
+            },
+            {
+              ...base,
+              locationId: (mainStore as { id: number }).id,
+              transactionType: "in",
+              quantityChange: wanted.unprocessedQty,
+            },
+          );
         }
 
         await scoReceiptRepository.addCounters(
@@ -391,6 +405,12 @@ export const scoReceiptService = {
           },
           tx,
         );
+      }
+
+      // Stable sort: the out/in pair of one line keeps its order.
+      postings.sort((x, y) => x.itemId - y.itemId);
+      for (const posting of postings) {
+        await postStock(tx, posting);
       }
 
       const savedLines = await scoReceiptRepository.findLines(receiptId, tx);
@@ -464,8 +484,19 @@ export const scoReceiptService = {
         0,
       );
       assertMoneyInRange(settledValue);
-      const issueCost =
-        settledQty > 0 ? Math.round(settledValue / settledQty) : 0;
+      let issueCost = 0;
+      if (settledQty > 0) {
+        issueCost = Math.round(settledValue / settledQty);
+      } else {
+        // BR-SCO-28: no raw piece settled (ratio < 1 rounded to 0): weighted
+        // average issue cost of all challans of this SCO line, never 0.
+        const all = await scoReceiptRepository.sumChallanCostForScoLine(
+          line.scoItemId,
+          tx,
+        );
+        assertMoneyInRange(all.value);
+        issueCost = all.qty > 0 ? Math.round(all.value / all.qty) : 0;
+      }
 
       const vendorLocation = await scoReceiptRepository.findVendorLocation(
         locked.vendorId,

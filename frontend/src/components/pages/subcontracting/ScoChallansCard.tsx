@@ -1,8 +1,6 @@
 "use client";
 
 import Link from "next/link";
-
-import { formatPaise } from "@/components/pages/inventory/inventory-format";
 import { ChallanDueBadge } from "@/components/pages/subcontracting/ChallanDueBadge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -15,7 +13,7 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { useScoChallansQuery } from "@/lib/api/subcontracting/queries";
-import { formatScoDate } from "@/lib/sco-format";
+import { formatDate, formatMoney } from "@/lib/format";
 
 export function ScoChallansCard({ scoId }: { scoId: number }) {
 	const query = useScoChallansQuery(scoId);
@@ -55,14 +53,14 @@ export function ScoChallansCard({ scoId }: { scoId: number }) {
 											{challan.challanNumber}
 										</Link>
 									</TableCell>
-									<TableCell>{formatScoDate(challan.challanDate)}</TableCell>
+									<TableCell>{formatDate(challan.challanDate)}</TableCell>
 									<TableCell>{challan.ewayBillNo ?? "-"}</TableCell>
 									<TableCell className="text-right">
-										{formatPaise(challan.valuePaise)}
+										{formatMoney(challan.valuePaise)}
 									</TableCell>
 									<TableCell>
 										<span className="mr-2">
-											{formatScoDate(challan.returnDueDate)}
+											{formatDate(challan.returnDueDate)}
 										</span>
 										<ChallanDueBadge challan={challan} />
 									</TableCell>

@@ -27,7 +27,12 @@ export type StatusDoc =
 	| "grnQa"
 	| "sco"
 	| "challanDue"
-	| "approval";
+	| "approval"
+	| "supplier"
+	| "item"
+	| "machine"
+	| "employee"
+	| "policy";
 
 export type StatusTone = {
 	label: string;
@@ -53,6 +58,11 @@ type Entry = readonly [label: string, tone: Tone];
 function table(entries: Record<string, Entry>): Record<string, Entry> {
 	return Object.assign(Object.create(null), entries);
 }
+
+const ACTIVE = table({
+	active: ["Active", "success"],
+	inactive: ["Inactive", "closed"],
+});
 
 const MAP: Record<StatusDoc, Record<string, Entry>> = Object.assign(
 	Object.create(null),
@@ -112,6 +122,11 @@ const MAP: Record<StatusDoc, Record<string, Entry>> = Object.assign(
 			warning: ["Due soon", "warning"],
 			overdue: ["Overdue", "danger"],
 		}),
+		supplier: ACTIVE,
+		item: ACTIVE,
+		machine: ACTIVE,
+		employee: ACTIVE,
+		policy: ACTIVE,
 		approval: table({
 			pending_approval: ["Pending approval", "warning"],
 			approved: ["Approved", "success"],

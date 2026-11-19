@@ -1379,3 +1379,118 @@ describe("BR-INV-23 opening stock only for an item+location with no ledger rows"
     expect(await ledger(itemId)).toHaveLength(0);
   });
 });
+
+// ---------- 2026-11-19 rule changes: BR-GRN-43 (201), BR-GRN-48, BR-INV-26 ----------
+
+describe("BR-GRN-43 owner posts a manual movement -> 201 Created", () => {
+  test("BR-GRN-43 owner stock-take answers exactly 201", async () => {
+    const itemId = await makeItem("own201");
+    const res = await stockTake("owner", itemId, mainStoreId, 5, {
+      unitCostPaise: 100,
+    });
+    expect(res.status).toBe(201);
+    expect(await ledger(itemId)).toHaveLength(1);
+  });
+});
+
+describe("BR-GRN-48 manual movement input caps and unknown references", () => {
+  test("BR-GRN-48 counted qty 1000000001 -> 400, no ledger row", async () => {
+    const itemId = await makeItem("capqty");
+    const res = await stockTake("owner", itemId, mainStoreId, 1_000_000_001, {
+      unitCostPaise: 100,
+    });
+    expect(res.status).toBe(400);
+    expect(await ledger(itemId)).toHaveLength(0);
+  });
+
+  test("BR-GRN-48 opening stock qty 1000000001 -> 400, no ledger row", async () => {
+    const itemId = await makeItem("capopenqty");
+    const res = await openingStock("owner", itemId, mainStoreId, 1_000_000_001);
+    expect(res.status).toBe(400);
+    expect(await ledger(itemId)).toHaveLength(0);
+  });
+
+  test("BR-GRN-48 unit cost above the money limit (10000000000001) -> 400, no ledger row", async () => {
+    const itemId = await makeItem("capcost");
+    const res = await openingStock(
+      "owner",
+      itemId,
+      mainStoreId,
+      1,
+      10_000_000_000_001,
+    );
+    expect(res.status).toBe(400);
+    expect(await ledger(itemId)).toHaveLength(0);
+  });
+
+  test("BR-GRN-48 unit cost above the old 32-bit cap but within the money limit is accepted", async () => {
+    const itemId = await makeItem("cap64");
+    const res = await openingStock(
+      "owner",
+      itemId,
+      mainStoreId,
+      1,
+      3_000_000_000,
+    );
+    expect(res.status).toBe(201);
+    expect(await ledger(itemId)).toHaveLength(1);
+  });
+
+  test("BR-GRN-48 row value above the money limit -> 400 AMOUNT_TOO_LARGE, no ledger row", async () => {
+    const itemId = await makeItem("caprow");
+    const res = await openingStock(
+      "owner",
+      itemId,
+      mainStoreId,
+      1_000_000_000,
+      10_000_000_000_000,
+    );
+    expect(res.status).toBe(400);
+    expect((res.json as { code?: string } | null)?.code).toBe(
+      "AMOUNT_TOO_LARGE",
+    );
+    expect(await ledger(itemId)).toHaveLength(0);
+  });
+
+  test("BR-GRN-48 unknown location id -> 404, no ledger row", async () => {
+    const itemId = await makeItem("noloc");
+    const res = await stockTake("owner", itemId, 99999, 5, {
+      unitCostPaise: 100,
+    });
+    expect(res.status).toBe(404);
+    expect(await ledger(itemId)).toHaveLength(0);
+  });
+
+  test("BR-GRN-48 unknown item id -> 404", async () => {
+    const res = await stockTake("owner", 987654321, mainStoreId, 5, {
+      unitCostPaise: 100,
+    });
+    expect(res.status).toBe(404);
+  });
+});
+
+describe("BR-INV-26 opening stock is stock in only", () => {
+  test("BR-INV-26 opening stock qty -5 -> 400, nothing posted", async () => {
+    const itemId = await makeItem("openneg");
+    const res = await openingStock("owner", itemId, mainStoreId, -5);
+    expect(res.status).toBe(400);
+    expect(await ledger(itemId)).toHaveLength(0);
+  });
+
+  test("BR-INV-26 opening stock +500 @ 21000 -> posted", async () => {
+    const itemId = await makeItem("openpos");
+    const res = await openingStock("owner", itemId, mainStoreId, 500, 21000);
+    expect(res.status).toBe(201);
+    const rows = await ledger(itemId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.quantityChange).toBe(500);
+    expect(rows[0]?.unitCostPaise).toBe(21000);
+  });
+
+  test("BR-INV-26 opening stock cost 0 -> 400, nothing posted", async () => {
+    const itemId = await makeItem("opencost0");
+    const res = await openingStock("owner", itemId, mainStoreId, 5, 0);
+    expect(res.status).toBe(400);
+    expect(await ledger(itemId)).toHaveLength(0);
+  });
+});

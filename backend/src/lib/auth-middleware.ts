@@ -36,25 +36,17 @@ export const isSuperAdminRoleName = (roleName: string): boolean =>
 
 const ACTOR_CACHE_TTL_MS = 2000;
 const actorCache = new Map<number, { actor: Actor; expiresAt: number }>();
+// #45: concurrent misses for one employee share one load (one query).
+const inFlight = new Map<number, Promise<Actor | null>>();
+// Bumped by every invalidation, so a load that started before a change never
+// writes its stale result into the cache.
+let cacheGeneration = 0;
 
-export const loadActor: LoadActorFn = async (employeeId) => {
-  const hit = actorCache.get(employeeId);
-  if (hit && hit.expiresAt > Date.now()) return hit.actor;
-
-  const row = await authRepository.getEmployeeRoleById(employeeId);
-  if (!row) {
-    actorCache.delete(employeeId);
-    return null;
-  }
+async function readActor(employeeId: number): Promise<Actor | null> {
+  const row = await authRepository.getActorRowById(employeeId);
+  if (!row) return null;
   const isSuperAdmin = isSuperAdminRoleName(row.roleName);
-  const permissions = new Set<PermissionKey>(
-    isSuperAdmin
-      ? PERMISSION_KEYS
-      : ((await authRepository.getPermissionKeysByRoleId(
-          row.roleId,
-        )) as PermissionKey[]),
-  );
-  const actor: Actor = {
+  return {
     id: row.id,
     name: row.name,
     email: row.email,
@@ -62,23 +54,54 @@ export const loadActor: LoadActorFn = async (employeeId) => {
     roleName: row.roleName,
     isSuperAdmin,
     isActive: row.isActive,
-    permissions,
+    permissions: new Set<PermissionKey>(
+      isSuperAdmin ? PERMISSION_KEYS : (row.keys as PermissionKey[]),
+    ),
   };
-  actorCache.set(employeeId, {
-    actor,
-    expiresAt: Date.now() + ACTOR_CACHE_TTL_MS,
-  });
-  return actor;
+}
+
+export const loadActor: LoadActorFn = async (employeeId) => {
+  const hit = actorCache.get(employeeId);
+  if (hit && hit.expiresAt > Date.now()) return hit.actor;
+
+  const pending = inFlight.get(employeeId);
+  if (pending) return pending;
+
+  const generation = cacheGeneration;
+  const load = readActor(employeeId)
+    .then((actor) => {
+      if (generation === cacheGeneration) {
+        if (actor) {
+          actorCache.set(employeeId, {
+            actor,
+            expiresAt: Date.now() + ACTOR_CACHE_TTL_MS,
+          });
+        } else {
+          actorCache.delete(employeeId);
+        }
+      }
+      return actor;
+    })
+    .finally(() => {
+      if (inFlight.get(employeeId) === load) inFlight.delete(employeeId);
+    });
+  inFlight.set(employeeId, load);
+  return load;
 };
 
 export const invalidateActor: InvalidateActorFn = (employeeId) => {
+  cacheGeneration += 1;
   actorCache.delete(employeeId);
+  inFlight.delete(employeeId);
 };
 
 export const invalidateRole: InvalidateRoleFn = (roleId) => {
+  cacheGeneration += 1;
   for (const [id, entry] of actorCache) {
     if (entry.actor.roleId === roleId) actorCache.delete(id);
   }
+  // A load in flight may be for a holder of this role; let the next caller re-read.
+  inFlight.clear();
 };
 
 /** Permission decision for service-layer checks (BR-AUTH-11); super-admin holds every key. */
@@ -109,7 +132,7 @@ export const requireAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
     }
 
     const actor = await loadActor(Number(payload.userId));
-    if (!actor || !actor.isActive) {
+    if (!actor?.isActive) {
       throw new UnauthorizedError("Unauthorized");
     }
 

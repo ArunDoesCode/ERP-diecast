@@ -22,7 +22,7 @@ export function LoginView() {
 				</Card>
 			</div>
 
-			<div className="flex flex-1 items-center justify-center bg-gray-600">
+			<div className="flex flex-1 items-center justify-center bg-muted text-muted-foreground">
 				Company image or logo
 			</div>
 		</main>

@@ -1,13 +1,11 @@
 "use client";
 
 import { useState } from "react";
-
-import { formatPaise } from "@/components/pages/inventory/inventory-format";
-import { PurchaseRequisitionsPagination } from "@/components/pages/purchase-requisitions/PurchaseRequisitionsPagination";
 import {
 	SortableHead,
 	VendorFilter,
 } from "@/components/pages/subcontracting/ReportFilters";
+import { Pagination } from "@/components/shared/Pagination";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -18,6 +16,7 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { useVendorStockQuery } from "@/lib/api/subcontracting/queries";
+import { formatMoney } from "@/lib/format";
 import type { VendorStockSortField } from "@/types/subcontracting";
 
 export function VendorStockReport() {
@@ -97,7 +96,7 @@ export function VendorStockReport() {
 										</TableCell>
 										<TableCell className="text-right">{row.qty}</TableCell>
 										<TableCell className="text-right">
-											{formatPaise(row.valuePaise)}
+											{formatMoney(row.valuePaise)}
 										</TableCell>
 									</TableRow>
 								))}
@@ -106,10 +105,10 @@ export function VendorStockReport() {
 					)}
 				</CardContent>
 			</Card>
-			<PurchaseRequisitionsPagination
+			<Pagination
 				page={page}
 				pageSize={pageSize}
-				meta={query.data?.meta}
+				total={query.data?.meta.total ?? 0}
 				onPageChange={setPage}
 				onPageSizeChange={(next) => {
 					setPageSize(next);
