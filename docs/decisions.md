@@ -173,3 +173,7 @@ If a decision is reversed, add a new entry that references the old one — don't
 ### D-029 — New detail pages are two-pane (2026-11-20, owner)
 - **Decision:** detail pages of the nine SCM modules use two panes (document left, money / history / next step right), lists are full-page, forms are full-page with labels above fields, and each document offers its next step. This overrides the design-system skill's one-column detail default for these screens; design-reviewer accepts it.
 - **Why:** owner standards relayed 2026-11-20 ("follow best ui ux standards, and flows").
+
+### D-030 — Overnight SCM build: one epic branch for all nine modules (2026-11-20, coordinator under D-028)
+- **Decision:** the nine frozen SCM specs and their builds live on one branch `epic/scm` (cut from `epic/design-system-v2`, PR #111). Each module is a sub-feature branch `feature/scm-<module>` merged locally into `epic/scm` in build order (bom → sale-order → reorder → purchase-returns → supplier-invoice → rfq → stock-transfer → supplier-rating → dispatch). One push and one PR into `main` at the end; merge #111 first. Modules not built tonight keep their frozen spec on the branch.
+- **Why:** sale-order and dispatch depend on bom; one test DB forces serial builds; the session cannot create sibling worktrees; the owner asked for "a complete merge in the morning".
