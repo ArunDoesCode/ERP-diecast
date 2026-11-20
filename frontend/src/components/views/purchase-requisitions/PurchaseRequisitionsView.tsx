@@ -2,8 +2,8 @@
 
 import { IconFileOff, IconPlus, IconSearch } from "@tabler/icons-react";
 import { useTable } from "@tanstack/react-table";
-import dynamic from "next/dynamic";
-import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useMemo } from "react";
 import { DataTable } from "@/components/common/DataTable";
 import {
 	type DataTableColumnDef,
@@ -38,18 +38,6 @@ import {
 	prTypeValues,
 } from "@/types/purchase-requisitions";
 
-const CreatePurchaseRequisitionModal = dynamic(() =>
-	import(
-		"@/components/pages/purchase-requisitions/PurchaseRequisitionModals"
-	).then((module) => module.CreatePurchaseRequisitionModal),
-);
-
-const EditPurchaseRequisitionModal = dynamic(() =>
-	import(
-		"@/components/pages/purchase-requisitions/PurchaseRequisitionModals"
-	).then((module) => module.EditPurchaseRequisitionModal),
-);
-
 export function PurchaseRequisitionsView() {
 	const {
 		filtersActive,
@@ -71,10 +59,7 @@ export function PurchaseRequisitionsView() {
 		typeFilter,
 	} = usePRListControls();
 
-	const [createOpen, setCreateOpen] = useState(false);
-	const [selectedPrId, setSelectedPrId] = useState<number | null>(null);
-	const [editOpen, setEditOpen] = useState(false);
-	const canLinkMachine = useCan("pr.link_machine");
+	const canManage = useCan("pr.manage");
 
 	const requisitionsQuery = usePurchaseRequisitionsQuery({
 		page,
@@ -98,16 +83,12 @@ export function PurchaseRequisitionsView() {
 				accessorKey: "prNumber",
 				header: "PR no.",
 				cell: ({ row }) => (
-					<button
-						type="button"
-						onClick={() => {
-							setSelectedPrId(row.original.id);
-							setEditOpen(true);
-						}}
+					<Link
+						href={`/purchase-requisitions/${row.original.id}/edit`}
 						className="cursor-pointer font-mono text-brand-accent hover:underline"
 					>
 						{formatDocNo(row.original.prNumber)}
-					</button>
+					</Link>
 				),
 			},
 			{
@@ -170,10 +151,14 @@ export function PurchaseRequisitionsView() {
 			icon={IconFileOff}
 			title="No purchase requisitions yet"
 			action={
-				<Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
-					<IconPlus />
-					Create PR
-				</Button>
+				canManage ? (
+					<Button size="sm" asChild>
+						<Link href="/purchase-requisitions/new">
+							<IconPlus />
+							New requisition
+						</Link>
+					</Button>
+				) : undefined
 			}
 		/>
 	);
@@ -184,10 +169,14 @@ export function PurchaseRequisitionsView() {
 				title="Purchase requisitions"
 				description="Ask for items to be bought, and follow each request to its order."
 				actions={
-					<Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
-						<IconPlus />
-						Create PR
-					</Button>
+					canManage ? (
+						<Button size="sm" asChild>
+							<Link href="/purchase-requisitions/new">
+								<IconPlus />
+								New requisition
+							</Link>
+						</Button>
+					) : undefined
 				}
 			/>
 
@@ -287,28 +276,6 @@ export function PurchaseRequisitionsView() {
 				onPageChange={setPage}
 				onPageSizeChange={onPageSizeChange}
 			/>
-
-			{createOpen ? (
-				<CreatePurchaseRequisitionModal
-					open={createOpen}
-					onOpenChange={setCreateOpen}
-					canLinkMachine={canLinkMachine}
-				/>
-			) : null}
-
-			{editOpen && selectedPrId != null ? (
-				<EditPurchaseRequisitionModal
-					prId={selectedPrId}
-					open={editOpen}
-					onOpenChange={(nextOpen) => {
-						setEditOpen(nextOpen);
-						if (!nextOpen) {
-							setSelectedPrId(null);
-						}
-					}}
-					canLinkMachine={canLinkMachine}
-				/>
-			) : null}
 		</div>
 	);
 }
