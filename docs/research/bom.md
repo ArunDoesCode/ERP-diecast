@@ -126,4 +126,8 @@ Not found: any product that writes remelt credit into material requirements. Our
 | 7 | Are loose items (screws, packing) on the BOM? | A yes / B no | Size of BOM lists |
 
 ## Follow-ups
-(none yet)
+| Question | Finding | Link | Read on |
+|---|---|---|---|
+| Where-used (spec pass 2) | ERPNext: "Item Where Used" report (item filter → BOMs using it) and "BOM Search" report (find BOMs by raw material) | https://docs.frappe.io/erpnext/item-where-used-report · https://docs.frappe.io/erpnext/bom-search | 2026-11-20 (search summary) |
+| Where-used | Odoo: "Used In" smart button lists every BoM line containing the component | https://www.odoo.com/documentation/saas-19.3/applications/inventory_and_mrp/manufacturing/basic_setup/bill_configuration.html | 2026-11-20 (search summary) |
+| Where-used | SAP Business One: no B1 page found describing a where-used report — benchmark silent | (none found) | 2026-11-20 |

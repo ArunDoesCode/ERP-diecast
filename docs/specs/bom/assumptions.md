@@ -1,0 +1,73 @@
+# BOM — assumptions
+
+> Every choice an agent made without the owner, during spec **and** build. Append-only, never renumber.
+> Rule for choosing: do what ERPNext / Odoo / SAP do; if they disagree, the stricter one. No option surveys.
+> Tag `confirm` = touches money, stock, tax, permissions or what a factory user sees → the owner answers
+> yes / no. Rows from the spec phase are listed by name in `OWNER.md` → "Decided for you — please confirm";
+> rows from the build are listed in the hand-over. Tag `info` = technical, no answer needed.
+> A "no" becomes a card (before freeze) or a normal change request (after).
+> Owner delegated every decision (chat, 2026-11-20); `confirm` rows still go to OWNER.md for a yes / no.
+
+Links used below (all read 2026-11-20 unless marked):
+[EN-BOM] https://docs.frappe.io/erpnext/user/manual/en/bill-of-materials ·
+[EN-SUB] https://docs.frappe.io/erpnext/user/manual/en/subcontracting-order ·
+[EN-WU] https://docs.frappe.io/erpnext/item-where-used-report ·
+[EN-SRCH] https://docs.frappe.io/erpnext/bom-search ·
+[OD-ECO] https://www.odoo.com/documentation/18.0/applications/inventory_and_mrp/plm/manage_changes/engineering_change_orders.html ·
+[OD-ECO17] https://www.odoo.com/documentation/17.0/applications/inventory_and_mrp/plm/manage_changes/engineering_change_orders.html ·
+[OD-BOM] https://www.odoo.com/documentation/saas-19.3/applications/inventory_and_mrp/manufacturing/basic_setup/bill_configuration.html ·
+[OD-SUB] https://www.odoo.com/documentation/19.0/applications/inventory_and_mrp/manufacturing/subcontracting/subcontracting_resupply.html ·
+[B1-BOM] https://learning.sap.com/courses/managing-logistics-in-sap-business-one/utilizing-bill-of-materials-bom-in-sap-business-one ·
+[B1-INACT] https://community.sap.com/t5/enterprise-resource-planning-q-a/system-is-not-giving-error-if-phantom-bom-status-is-2-inactive/qaq-p/13935530 ·
+[APRIORI] https://www.apriori.com/Collateral/Documents/English-US/online_help/2019_R2/COST_MODEL_GUIDE/AP_CMG0175Material_Cost_and_Utilization_for_Die_Casting.html
+
+| Id | Date | Phase | Question | Choice | Source | Tag | Owner answer |
+|---|---|---|---|---|---|---|---|
+| A-01 | 2026-11-20 | spec | BR-BOM-12, 17: how many live revisions per part? | Exactly one active; release retires the previous one in the same step (DB-enforced) | Odoo archives the old BOM on ECO Apply [OD-ECO]; ERPNext allows many active, one "default" [EN-BOM]; SAP B1 silent [B1-BOM] → stricter (Odoo) | confirm | yes (owner pre-approved, chat 2026-11-20) |
+| A-02 | 2026-11-20 | spec | BR-BOM-11, 14: change a released BOM? | Never; change = new revision copied from it; old documents keep their revision | ERPNext submitted BOM not editable [EN-BOM]; Odoo ECO works on a copy [OD-ECO]; SAP B1 silent [B1-BOM] | confirm | yes (owner pre-approved, chat 2026-11-20) |
+| A-03 | 2026-11-20 | spec | BR-BOM-20: lock item SKU / unit once on a BOM? | Yes, for the part, every line, the sent item and the alloy, on any revision incl. drafts (inventory BR-INV-04 change). Merges data.md row "alloy counts as in use" (coordinator answer 1) | ERPNext and Odoo lock a unit change once the item has transactions (item / UoM docs, not re-read this run) but don't name BOM lines; a unit change silently breaks every qty per piece → stricter | confirm | yes (owner pre-approved, chat 2026-11-20) |
+| A-04 | 2026-11-20 | spec | BR-BOM-07: what a job-work BOM sends | Exactly one sent item; anything the job worker adds himself is in his price, not listed | ERPNext subcontracting BOM lists supplied items, supplier-bought ones at zero value [EN-SUB]; Odoo subcontract BOM lists resupplied components [OD-SUB]; today's SCO line carries one raw item (BR-SCO-02) → stricter single item | confirm | yes (owner pre-approved, chat 2026-11-20) |
+| A-05 | 2026-11-20 | spec | BR-BOM-09, 16: component with no active BOM; part whose BOM is retired | Treated as bought, tagged "No BOM", never skipped; per-line "buy as is" flag; retiring a part's only BOM makes parents treat it as bought, listed in the retire confirm | ERPNext Do Not Explode [EN-BOM]; SAP B1 component may have its own BOM [B1-BOM]; Odoo multi-level explodes only products with a BOM [OD-BOM] | confirm | yes (owner pre-approved, chat 2026-11-20) |
+| A-06 | 2026-11-20 | spec | BR-BOM-07: job worker and service on a revision | Fixed with the revision; the draft SCO raised from it may switch to another active job worker with the same service (sale-order BR-SO-43) | Odoo subcontract BOM names its subcontractors, PO vendor chosen at purchase [OD-SUB]; ERPNext subcontracting BOM per finished item, supplier picked on the order [EN-SUB]; SAP B1 silent | confirm | yes (owner pre-approved, chat 2026-11-20) |
+| A-07 | 2026-11-20 | spec | BR-BOM-21: item / job worker / service deactivated while on an active BOM | Deactivation allowed; active BOM keeps it tagged "inactive"; a draft with it can't be saved or released | SAP case: no error on inactive reference [B1-INACT]; ERPNext checks disabled items when a BOM is saved [EN-BOM, not re-read]; Odoo silent → stricter: warn + block release | confirm | yes (owner pre-approved, chat 2026-11-20) |
+| A-08 | 2026-11-20 | spec | Who-table: seed roles | `bom.view` ow, bo, fs; `bom.manage` ow, bo; `bom.release` ow (card 3) | ERPNext submit is a separate right [EN-BOM]; Odoo ECO approvers [OD-ECO]; SAP B1 per-window authorisation (silent on BOM) | confirm | yes (owner pre-approved, chat 2026-11-20) |
+| A-09 | 2026-11-20 | spec | BR-BOM-18: one calculation or two | Needs preview is the one calculation sale order calls per level; it wins over any sale-order formula; "released" = active (coordinator answer 2) | ERPNext exploded items come from one BOM function [EN-BOM]; Odoo BoM structure report same [OD-BOM] | info | — |
+| A-10 | 2026-11-20 | spec | BR-BOM-04: weight unit | kg with 3 decimals (no gram unit in the item list, BR-INV-02) | ERPNext / Odoo qty precision per unit [EN-BOM, OD-BOM] | info | — |
+| A-11 | 2026-11-20 | spec | BR-BOM-03: qty per piece decimals | 3 decimals for any unit (packing 0.020 per piece) | Odoo fractional component qty [OD-BOM]; ERPNext float qty [EN-BOM] | info | — |
+| A-12 | 2026-11-20 | spec | BR-BOM-14: parallel drafts | One open draft per part; no merge | ERPNext has no rebase; Odoo 17 rebase [OD-ECO17] → stricter | info | — |
+| A-13 | 2026-11-20 | spec | BR-BOM-02, 03, 04, 10, 18: numbering and limits | Letters never reused; `BOM-<SKU>-<rev>`; 50 lines, 10 levels, % < 50, cavities 1–64, preview qty ≤ 1,000,000 | own limits; ERPNext naming series never reuses [EN-BOM] | info | — |
+| A-14 | 2026-11-20 | spec | BR-BOM-15: delete | Only drafts; audit row kept | ERPNext draft delete [EN-BOM] | info | — |
+| A-15 | 2026-11-20 | spec | BR-BOM-26: half-filled draft | Save allowed; completeness checked at release | ERPNext saves a draft BOM before submit [EN-BOM]; Odoo ECO draft [OD-ECO] | info | — |
+| A-16 | 2026-11-20 | spec | BR-BOM-03: alloy also as a line | 400 (double count) | ERPNext allows repeated items [EN-BOM]; Odoo silent → stricter | info | — |
+| A-17 | 2026-11-20 | spec | BR-BOM-14: "Create" on a part with only retired revisions | 409 `BOM_ALREADY_EXISTS` pointing to start revision (coordinator answer 4; merges api.md row) | ERPNext allows many BOMs [EN-BOM]; ours stricter | info | — |
+| A-18 | 2026-11-20 | spec | BR-BOM-18: preview on a part with no active BOM | 409 `NO_ACTIVE_BOM` (coordinator answer 4) | ERPNext / Odoo need a BOM to explode [EN-BOM, OD-BOM] | info | — |
+| A-19 | 2026-11-20 | spec | BR-BOM-27: prices on BOM | None in v1 (no costing) | ERPNext / Odoo have BOM cost [EN-BOM, OD-ECO]; out of brief | info | — |
+| A-20 | 2026-11-20 | spec | data: store computed casting figures? | Compute on read in `bom-math.ts`; released rows frozen | ERPNext computes totals from stored inputs [EN-BOM]; stricter = never a second copy | info | — |
+| A-21 | 2026-11-20 | spec | data: one active + one draft per part; loops from parallel releases | Two partial unique indexes + per-part row lock; global advisory lock + cycle re-check at release | Odoo one live [OD-ECO]; ERPNext many [EN-BOM]; loop rule own (research Q1) | info | — |
+| A-22 | 2026-11-20 | spec | data: revision storage | `revision_no` int + `bom_part_seq` counter; letter derived | own rule BR-BOM-02; `document-number.ts` pattern; benchmark silent | info | — |
+| A-23 | 2026-11-20 | spec | data: casting / job-work fields | Nullable columns on `boms` with CHECKs | ERPNext header-level BOM fields [EN-BOM] | info | — |
+| A-24 | 2026-11-20 | spec | data: decimals | `numeric`, scaled BigInt in code, no float | ERPNext / Odoo fixed precision [EN-BOM, OD-BOM]; domain invariant | info | — |
+| A-25 | 2026-11-20 | spec | data: audit | One `bom_history` row per action, jsonb before/after, no FK (survives draft delete) | `supplier_history` pattern; ERPNext version log per save [EN-BOM] | info | — |
+| A-26 | 2026-11-20 | spec | data: delete of lines | Cascade only from a draft BOM | ERPNext draft delete [EN-BOM] | info | — |
+| A-27 | 2026-11-20 | spec | data: needs rounding | Became owner card 7 (option A: per node and per path, never under-orders; coordinator answer 3) | see spec Cards table | info | — |
+| A-28 | 2026-11-20 | spec | data: walk shape | Path tree, one row per path, row cap 1,000 | ERPNext / Odoo exploded view per path [EN-BOM, OD-BOM] | info | — |
+| A-29 | 2026-11-20 | spec | api: needs shape shared with sale order | One service `computeBomNeeds` + `expandBomLevel`; `GET /needs` thin wrapper; sale order calls the service | ERPNext exploded items [EN-BOM]; Odoo BoM structure [OD-BOM] | info | — |
+| A-30 | 2026-11-20 | spec | api: GET or POST for needs | GET (read-only, nothing saved) | project convention; benchmark silent | info | — |
+| A-31 | 2026-11-20 | spec | api: where-used | Active revisions only, role `line` / `sent_item` / `alloy`, paginated; retire confirm reuses it (verified, replaces "from memory") | ERPNext Item Where Used report + BOM Search [EN-WU, EN-SRCH]; Odoo "Used In" smart button [OD-BOM]; SAP B1: benchmark silent (no B1 page found) | info | — |
+| A-32 | 2026-11-20 | spec | api: change summary | Separate `GET change-summary` (dry-run `problems[]`); release returns the applied summary | Odoo ECO shows diffs before Apply [OD-ECO]; ERPNext no diff | info | — |
+| A-33 | 2026-11-20 | spec | api: draft edit | One `PATCH` of the draft (header + full line list) in one transaction (code review: edit is PATCH) | ERPNext saves the BOM as a whole [EN-BOM] | info | — |
+| A-34 | 2026-11-20 | spec | api: start revision | `POST /parts/:partId/revisions`; source chosen by BR-BOM-14 | ERPNext copy BOM [EN-BOM]; Odoo ECO copies live BOM [OD-ECO] | info | — |
+| A-35 | 2026-11-20 | spec | api: error codes | `BOM_NOT_DRAFT`, `BOM_DRAFT_OPEN`, `BOM_ALREADY_EXISTS`, `BOM_NOT_ACTIVE`, `NO_ACTIVE_BOM`, `BOM_RELEASE_CONFLICT`, `BOM_RELEASE_INVALID`, `BOM_LOOP`, `BOM_TOO_DEEP`, `BOM_TOO_LARGE`; reuse `VALIDATION_ERROR`, `NOT_FOUND`, `ITEM_IN_USE`, `PERMISSION_DENIED` | `lib/errors.ts`; benchmark silent | info | — |
+| A-36 | 2026-11-20 | spec | api: field limits | note 200, reason 500, weights ≤ 1,000 kg, line qty ≤ 100,000, send/return ≤ 1,000 | own limits; benchmark silent | info | — |
+| A-37 | 2026-11-20 | spec | screens: part page layout | Two panes (owner standard D-029) | `docs/decisions.md` D-029; benchmark silent | info | — |
+| A-38 | 2026-11-20 | spec | screens: needs preview and where-used | Right-pane panels of the part page, no extra screens | Odoo BoM structure + Used In on the BoM [OD-BOM]; ERPNext separate reports [EN-WU] | info | — |
+| A-39 | 2026-11-20 | spec | screens: where-used for an item with no BOM | Tree item opens `/bom/part/<itemId>`: "No BOM" + Create BOM + Used in | Odoo Used In on the product [OD-BOM] | info | — |
+| A-40 | 2026-11-20 | spec | screens: "Create BOM" entries | List header and the no-BOM part page | ERPNext / Odoo "New" on BOM list [EN-BOM, OD-BOM] | info | — |
+| A-41 | 2026-11-20 | spec | screens: when the preview runs | On button / Enter, not per keystroke | benchmark silent; avoids load up to 1,000,000 | info | — |
+| A-42 | 2026-11-20 | spec | screens: where Release lives | Part page only, not the form | Odoo ECO Apply on the ECO [OD-ECO] | info | — |
+| A-43 | 2026-11-20 | spec | screens: part page default revision | Active, else draft, else newest | Odoo opens the live BoM [OD-BOM] | info | — |
+| A-44 | 2026-11-20 | spec | screens: status badge `bom` (api + screens rows merged) | draft neutral, active success, retired closed (existing tones) | design-system v2; benchmark silent | info | — |
+| A-45 | 2026-11-20 | spec | BR-BOM-22: can a write key expose BOM content without `bom.view`? | No: each route checks one key (BR-AUTH-09/10); write routes return only `{ id, status, version }`; read routes accept `bom.view`, `bom.manage` or `bom.release`; seed roles with a write key also hold `bom.view` | ERPNext role permissions: write / submit sit on top of read for a doctype (role-permission docs, not re-read this run); Odoo access rights: write implies read; SAP B1 silent → stricter, enforced | confirm | yes (owner pre-approved, chat 2026-11-20) |
+| A-46 | 2026-11-20 | spec | BR-BOM-28: guard against changes between review and release, and between two editors | Version token on the draft, returned by detail and change summary, required on PATCH and release; mismatch → 409 `BOM_CHANGED_SINCE_REVIEW` | ERPNext refuses a save when the document was modified after it was opened (timestamp check, not re-read this run); Odoo ECO review then Apply [OD-ECO] → stricter: token also on release | info | — |
+| A-47 | 2026-11-20 | spec | BR-BOM-12, 16: reason length | Trimmed, 3–500 characters (release unless it is the part's first release; retire always) | project standard for reasons (sale-order BR-SO-16..18 use 3–500); benchmark silent | info | — |
+| A-48 | 2026-11-20 | spec | BR-BOM-01 (spec review SPEC-01): which items may have a BOM? | Only items of a new inventory category "Manufactured part" (pcs / set); inventory BR-INV-02 change request; back office re-categorises existing made parts | Odoo: a product is made only with the Manufacture route / product type set ([OD-BOM]); ERPNext marks made items with a default BOM and "Include item in manufacturing" ([EN-BOM], not re-read); SAP B1 item "Procurement Method: Make" (silent in [B1-BOM]) → stricter: enforced category | confirm | yes (owner pre-approved, chat 2026-11-20) |
