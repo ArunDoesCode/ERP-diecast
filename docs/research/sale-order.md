@@ -123,3 +123,7 @@ ERPNext ties create/cancel to stock and purchase roles and does not name who may
 | 7 | Count open POs due after the SO date as cover? | A yes / B no | Net requirement default |
 
 ## Follow-ups
+| Question | Answer | Link | Read on |
+|---|---|---|---|
+| Does cancelling a delivery reopen a closed SO? (spec BR-SO-55) | SAP B1: cancelling a document that creates a cancellation document reopens its base documents with balances restored | https://help.sap.com/saphelp_sbo92/helpdata/en/ca/080f4f7ad8498b9a39eae01f95764c/content.htm | 2026-11-20 |
+| Can a partly delivered SO be cancelled? (spec BR-SO-18) | SAP B1: no — cancel only if not drawn to a target document; close instead | https://help.sap.com/saphelp_sbo92/helpdata/en/44/fd93f693202463e10000000a1553f7/content.htm | 2026-11-20 |
