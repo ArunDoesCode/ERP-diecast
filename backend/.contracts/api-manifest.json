@@ -579,7 +579,7 @@
           "pageSize": "integer.nonnegative.required",
           "q": "string.optional",
           "isActive": "unrepresentable.optional",
-          "category": "enum:Raw Material,Consumable,Spare Part,Tooling,Packing.optional",
+          "category": "enum:Raw Material,Consumable,Spare Part,Tooling,Packing,Manufactured part.optional",
           "sortBy": "enum:sku,name,category,currentStock,createdAt.optional",
           "sortDir": "enum:asc,desc.required"
         }
@@ -624,7 +624,7 @@
           "sku": "string.nonempty.required",
           "name": "string.nonempty.required",
           "description": "string.nullable.optional",
-          "category": "enum:Raw Material,Consumable,Spare Part,Tooling,Packing.required",
+          "category": "enum:Raw Material,Consumable,Spare Part,Tooling,Packing,Manufactured part.required",
           "uom": "enum:kg,pcs,ltr,m,set.required",
           "reorderLevel": "number.nonnegative.optional",
           "standardRatePaise": "integer.nonnegative.required"
@@ -671,7 +671,7 @@
           "sku": "string.nonempty.optional",
           "name": "string.nonempty.optional",
           "description": "string.nullable.optional",
-          "category": "enum:Raw Material,Consumable,Spare Part,Tooling,Packing.optional",
+          "category": "enum:Raw Material,Consumable,Spare Part,Tooling,Packing,Manufactured part.optional",
           "uom": "enum:kg,pcs,ltr,m,set.optional",
           "reorderLevel": "number.nonnegative.optional",
           "standardRatePaise": "integer.nonnegative.optional",
@@ -956,7 +956,7 @@
           "page": "integer.nonnegative.required",
           "pageSize": "integer.nonnegative.required",
           "q": "string.optional",
-          "category": "enum:Raw Material,Consumable,Spare Part,Tooling,Packing.optional",
+          "category": "enum:Raw Material,Consumable,Spare Part,Tooling,Packing,Manufactured part.optional",
           "locationId": "integer.positive.optional",
           "belowReorder": "unrepresentable.optional",
           "sortBy": "enum:sku,name,category,currentStock,valuePaise.optional",
@@ -1285,6 +1285,569 @@
             "screens": "array<object>.required"
           },
           "message": "string.required"
+        }
+      }
+    },
+    {
+      "id": "GET /api/bom",
+      "method": "GET",
+      "path": "/api/bom",
+      "tags": [
+        "bom"
+      ],
+      "summary": "List BOM revisions, paginated (BR-BOM-25). Filters: `status` (comma list; default active,draft, or all three when `partId` is given), `kind`, `q` (part SKU / name), `partId` (all revisions of one part).",
+      "auth": {
+        "type": "permission",
+        "key": "bom.view",
+        "alsoKeys": [
+          "bom.manage",
+          "bom.release"
+        ]
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "sortDir": "enum:asc,desc.required",
+          "sortBy": "enum:partSku,partName,revisionNo,kind,status,releasedAt,createdAt.optional",
+          "status": "array<enum:draft,active,retired>.optional",
+          "kind": "enum:casting,job_work,assembly.optional",
+          "q": "string.optional",
+          "partId": "integer.nonnegative.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "partSku",
+          "partName",
+          "revisionNo",
+          "kind",
+          "status",
+          "releasedAt",
+          "createdAt"
+        ],
+        "searchable": true
+      }
+    },
+    {
+      "id": "GET /api/bom/needs",
+      "method": "GET",
+      "path": "/api/bom/needs",
+      "tags": [
+        "bom"
+      ],
+      "summary": "Needs preview for a part and quantity, full tree or one level (BR-BOM-18). Reads no stock, writes nothing, no prices. 409 NO_ACTIVE_BOM when the part has no active revision.",
+      "auth": {
+        "type": "permission",
+        "key": "bom.view",
+        "alsoKeys": [
+          "bom.manage",
+          "bom.release"
+        ]
+      },
+      "request": {
+        "query": {
+          "partId": "integer.nonnegative.required",
+          "qty": "integer.nonnegative.required",
+          "levels": "enum:1,all.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "partId": "integer.required",
+            "qty": "integer.required",
+            "rootBomId": "integer.required",
+            "revision": "string.required",
+            "rows": "array<object>.required",
+            "toBuy": "array<object>.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "GET /api/bom/items/:itemId/where-used",
+      "method": "GET",
+      "path": "/api/bom/items/:itemId/where-used",
+      "tags": [
+        "bom"
+      ],
+      "summary": "Parts whose ACTIVE revision uses the item, as a line, the sent item or the alloy (BR-BOM-19, 16). Paginated.",
+      "auth": {
+        "type": "permission",
+        "key": "bom.view",
+        "alsoKeys": [
+          "bom.manage",
+          "bom.release"
+        ]
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "sortDir": "enum:asc,desc.required",
+          "sortBy": "enum:partSku,revisionNo.optional"
+        },
+        "params": {
+          "itemId": "integer.nonnegative.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "partSku",
+          "revisionNo"
+        ],
+        "searchable": false
+      }
+    },
+    {
+      "id": "GET /api/bom/parts/:partId/history",
+      "method": "GET",
+      "path": "/api/bom/parts/:partId/history",
+      "tags": [
+        "bom"
+      ],
+      "summary": "Audit rows of a part's BOMs, newest first (BR-BOM-23). Paginated.",
+      "auth": {
+        "type": "permission",
+        "key": "bom.view",
+        "alsoKeys": [
+          "bom.manage",
+          "bom.release"
+        ]
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "sortDir": "enum:asc,desc.required",
+          "sortBy": "enum:changedAt.optional"
+        },
+        "params": {
+          "partId": "integer.nonnegative.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "changedAt"
+        ],
+        "searchable": false
+      }
+    },
+    {
+      "id": "POST /api/bom/parts/:partId/revisions",
+      "method": "POST",
+      "path": "/api/bom/parts/:partId/revisions",
+      "tags": [
+        "bom"
+      ],
+      "summary": "Start a new draft revision of a part: copy of the active revision, else the latest retired (BR-BOM-14). 409 BOM_DRAFT_OPEN when a draft exists.",
+      "auth": {
+        "type": "permission",
+        "key": "bom.manage"
+      },
+      "request": {
+        "params": {
+          "partId": "integer.nonnegative.required"
+        }
+      },
+      "responses": {
+        "201": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "status": "enum:draft,active,retired.required",
+            "version": "integer.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "GET /api/bom/:id",
+      "method": "GET",
+      "path": "/api/bom/:id",
+      "tags": [
+        "bom"
+      ],
+      "summary": "One BOM revision: header, lines, computed casting figures, audit, `nextStep` (BR-BOM-05, 21, 23, 24).",
+      "auth": {
+        "type": "permission",
+        "key": "bom.view",
+        "alsoKeys": [
+          "bom.manage",
+          "bom.release"
+        ]
+      },
+      "request": {
+        "params": {
+          "id": "integer.nonnegative.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "number": "string.required",
+            "partId": "integer.required",
+            "part": {
+              "sku": "string.required",
+              "name": "string.required",
+              "unit": "string.required",
+              "inactive": "boolean.required"
+            },
+            "revisionNo": "integer.required",
+            "revision": "string.required",
+            "kind": "enum:casting,job_work,assembly.required",
+            "status": "enum:draft,active,retired.required",
+            "version": "integer.required",
+            "casting": {
+              "alloyItemId": "integer.nullable.required",
+              "alloy": {
+                "sku": "string.required",
+                "name": "string.required",
+                "unit": "string.required",
+                "inactive": "boolean.required"
+              },
+              "netWeightKg": "unknown.required",
+              "shotWeightKg": "unknown.required",
+              "cavities": "integer.nullable.required",
+              "meltLossPct": "unknown.required",
+              "castingRejectPct": "unknown.required",
+              "computed": {
+                "pouredWeightKg": "unknown.required",
+                "yieldPct": "unknown.required",
+                "alloyPerGoodPieceKg": "unknown.required"
+              }
+            },
+            "jobWork": {
+              "sentItemId": "integer.nullable.required",
+              "sentItem": {
+                "sku": "string.required",
+                "name": "string.required",
+                "unit": "string.required",
+                "inactive": "boolean.required"
+              },
+              "sendQty": "integer.nullable.required",
+              "returnQty": "integer.nullable.required",
+              "jobWorkerId": "integer.nullable.required",
+              "jobWorkerName": "unknown.required",
+              "jobWorkerInactive": "unknown.required",
+              "serviceId": "integer.nullable.required",
+              "serviceName": "unknown.required",
+              "serviceInactive": "unknown.required",
+              "jobWorkLossPct": "unknown.required"
+            },
+            "lines": "array<object>.required",
+            "changeReason": "unknown.required",
+            "releasedByName": "unknown.required",
+            "releasedAt": "unrepresentable.nullable.required",
+            "retiredByName": "unknown.required",
+            "retiredAt": "unrepresentable.nullable.required",
+            "retireReason": "unknown.required",
+            "createdByName": "unknown.required",
+            "createdAt": "unrepresentable.required",
+            "lastUpdatedByName": "unknown.required",
+            "lastUpdatedAt": "unrepresentable.required",
+            "nextStep": "enum:create,release,waiting_for_release,start_revision,open_active.required",
+            "nextRevision": "unknown.required",
+            "activeBomId": "integer.nullable.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "GET /api/bom/:id/tree",
+      "method": "GET",
+      "path": "/api/bom/:id/tree",
+      "tags": [
+        "bom"
+      ],
+      "summary": "Level tree under this revision: quantity per piece, `no_bom` / inactive tags; 400 BOM_TOO_LARGE above 1,000 nodes (BR-BOM-09, 10, 21).",
+      "auth": {
+        "type": "permission",
+        "key": "bom.view",
+        "alsoKeys": [
+          "bom.manage",
+          "bom.release"
+        ]
+      },
+      "request": {
+        "params": {
+          "id": "integer.nonnegative.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "unknown.required"
+        }
+      }
+    },
+    {
+      "id": "GET /api/bom/:id/change-summary",
+      "method": "GET",
+      "path": "/api/bom/:id/change-summary",
+      "tags": [
+        "bom"
+      ],
+      "summary": "Dry run of release: added / removed / changed lines and header old -> new vs the part's active revision, plus `problems[]` (BR-BOM-12, 13).",
+      "auth": {
+        "type": "permission",
+        "key": "bom.view",
+        "alsoKeys": [
+          "bom.manage",
+          "bom.release"
+        ]
+      },
+      "request": {
+        "params": {
+          "id": "integer.nonnegative.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "bomId": "integer.required",
+            "version": "integer.required",
+            "against": {
+              "id": "integer.required",
+              "revision": "string.required"
+            },
+            "firstRevision": "boolean.required",
+            "header": "array<object>.required",
+            "lines": {
+              "added": "array<object>.required",
+              "removed": "array<object>.required",
+              "changed": "array<object>.required"
+            },
+            "canRelease": "boolean.required",
+            "problems": "array<object>.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/bom",
+      "method": "POST",
+      "path": "/api/bom",
+      "tags": [
+        "bom"
+      ],
+      "summary": "Create the first BOM of a part: draft revision A (BR-BOM-01..08, 10). 409 BOM_ALREADY_EXISTS when the part has a revision.",
+      "auth": {
+        "type": "permission",
+        "key": "bom.manage"
+      },
+      "request": {
+        "body": {
+          "partId": "integer.positive.required",
+          "kind": "enum:casting,job_work,assembly.required",
+          "casting": {
+            "alloyItemId": "integer.positive.optional",
+            "netWeightKg": "number.nonnegative.optional",
+            "shotWeightKg": "number.nonnegative.optional",
+            "cavities": "integer.nonnegative.optional",
+            "meltLossPct": "number.nonnegative.optional",
+            "castingRejectPct": "number.nonnegative.optional"
+          },
+          "jobWork": {
+            "sentItemId": "integer.positive.optional",
+            "sendQty": "integer.nonnegative.optional",
+            "returnQty": "integer.nonnegative.optional",
+            "jobWorkerId": "integer.positive.optional",
+            "serviceId": "integer.positive.optional",
+            "jobWorkLossPct": "number.nonnegative.optional"
+          },
+          "lines": "array<object>.required"
+        }
+      },
+      "responses": {
+        "201": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "status": "enum:draft,active,retired.required",
+            "version": "integer.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "PATCH /api/bom/:id",
+      "method": "PATCH",
+      "path": "/api/bom/:id",
+      "tags": [
+        "bom"
+      ],
+      "summary": "Replace a draft's header and lines; needs the `version` from the last read (BR-BOM-03..11). 409 BOM_NOT_DRAFT / BOM_CHANGED_SINCE_REVIEW.",
+      "auth": {
+        "type": "permission",
+        "key": "bom.manage"
+      },
+      "request": {
+        "body": {
+          "version": "integer.nonnegative.required",
+          "kind": "enum:casting,job_work,assembly.required",
+          "casting": {
+            "alloyItemId": "integer.positive.optional",
+            "netWeightKg": "number.nonnegative.optional",
+            "shotWeightKg": "number.nonnegative.optional",
+            "cavities": "integer.nonnegative.optional",
+            "meltLossPct": "number.nonnegative.optional",
+            "castingRejectPct": "number.nonnegative.optional"
+          },
+          "jobWork": {
+            "sentItemId": "integer.positive.optional",
+            "sendQty": "integer.nonnegative.optional",
+            "returnQty": "integer.nonnegative.optional",
+            "jobWorkerId": "integer.positive.optional",
+            "serviceId": "integer.positive.optional",
+            "jobWorkLossPct": "number.nonnegative.optional"
+          },
+          "lines": "array<object>.required"
+        },
+        "params": {
+          "id": "integer.nonnegative.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "status": "enum:draft,active,retired.required",
+            "version": "integer.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "DELETE /api/bom/:id",
+      "method": "DELETE",
+      "path": "/api/bom/:id",
+      "tags": [
+        "bom"
+      ],
+      "summary": "Delete a draft BOM (BR-BOM-15). 409 BOM_NOT_DRAFT.",
+      "auth": {
+        "type": "permission",
+        "key": "bom.manage"
+      },
+      "request": {
+        "params": {
+          "id": "integer.nonnegative.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "deleted": "boolean.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/bom/:id/release",
+      "method": "POST",
+      "path": "/api/bom/:id/release",
+      "tags": [
+        "bom"
+      ],
+      "summary": "Release a draft: draft -> active, the previous active -> retired (BR-BOM-12, 13, 17). 400 BOM_RELEASE_INVALID lists every problem; 409 BOM_NOT_DRAFT / BOM_RELEASE_CONFLICT / BOM_CHANGED_SINCE_REVIEW.",
+      "auth": {
+        "type": "permission",
+        "key": "bom.release"
+      },
+      "request": {
+        "body": {
+          "version": "integer.nonnegative.required",
+          "reason": "string.nonempty.optional"
+        },
+        "params": {
+          "id": "integer.nonnegative.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "status": "enum:draft,active,retired.required",
+            "version": "integer.required",
+            "retiredPreviousId": "integer.nullable.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/bom/:id/retire",
+      "method": "POST",
+      "path": "/api/bom/:id/retire",
+      "tags": [
+        "bom"
+      ],
+      "summary": "Retire an active BOM with no replacement; reason 3-500 chars (BR-BOM-16). 409 BOM_NOT_ACTIVE.",
+      "auth": {
+        "type": "permission",
+        "key": "bom.release"
+      },
+      "request": {
+        "body": {
+          "reason": "string.nonempty.required"
+        },
+        "params": {
+          "id": "integer.nonnegative.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "status": "enum:draft,active,retired.required",
+            "version": "integer.required"
+          }
         }
       }
     },

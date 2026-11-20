@@ -3,6 +3,7 @@ import type { AppEnv } from "../lib/types";
 import { approvalRoutes } from "./approval";
 import { assetRoutes } from "./asset";
 import { authRoutes } from "./auth";
+import { bomRoutes } from "./bom";
 import { companyRoutes } from "./company";
 import { grnRoutes } from "./grn";
 import { poRoutes } from "./po";
@@ -21,6 +22,7 @@ const MAIN_ROUTES = {
   grn: "/grn",
   approval: "/approval",
   sco: "/sco",
+  bom: "/bom",
   company: "/company",
 } as const;
 
@@ -37,4 +39,5 @@ mainRouter.route(MAIN_ROUTES.po, poRoutes);
 mainRouter.route(MAIN_ROUTES.grn, grnRoutes);
 mainRouter.route(MAIN_ROUTES.approval, approvalRoutes);
 mainRouter.route(MAIN_ROUTES.sco, scoRoutes);
+mainRouter.route(MAIN_ROUTES.bom, bomRoutes);
 mainRouter.route(MAIN_ROUTES.company, companyRoutes);

@@ -21,6 +21,7 @@ export const ITEM_CATEGORIES = [
   "Spare Part",
   "Tooling",
   "Packing",
+  "Manufactured part",
 ] as const;
 export const ITEM_UNITS = ["kg", "pcs", "ltr", "m", "set"] as const;
 export const itemCategorySchema = z.enum(ITEM_CATEGORIES);
