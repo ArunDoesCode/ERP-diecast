@@ -12,6 +12,9 @@ import {
 } from "../db/schemas/02_procurement-approval";
 import { prTypeEnum } from "../db/schemas/02_procurement-purchasing";
 import { searchTermSchema } from "../lib/safe-search";
+import { poDetailsSchema } from "./po.types";
+import { prDetailsSchema } from "./pr.types";
+import { scoDetailsSchema } from "./sco.types";
 
 // BR-STD-16: policy amount limits stop at 1,000,000,000,000 paise.
 const MAX_POLICY_AMOUNT_PAISE = 1_000_000_000_000;
@@ -386,4 +389,32 @@ export const approvalHistoryItemSchema = approvalRequestListItemSchema.extend({
 });
 export type approvalHistoryItemSchemaType = z.infer<
   typeof approvalHistoryItemSchema
+>;
+
+// GET /getDocumentView/:docType/:docId (BR-FF-53, 81, 83, 88): read-only view
+// of a PR / PO / SCO for the inbox preview. Same body as the module's
+// *details route, plus the requester's note, the open request, the trail and
+// whether the caller can act now.
+export const approvalDocumentViewParamSchema = z.object({
+  docType: approvalDocTypeSchema,
+  docId: z.coerce.number().int().min(1).max(2147483647),
+});
+export type approvalDocumentViewParamSchemaType = z.infer<
+  typeof approvalDocumentViewParamSchema
+>;
+
+const approvalDocumentViewExtras = {
+  requesterNote: z.string().max(2000).nullable(),
+  request: approvalRequestListItemSchema.nullable(),
+  trail: z.array(approvalTrailEntrySchema),
+  canAct: z.boolean(),
+};
+
+export const approvalDocumentViewSchema = z.union([
+  prDetailsSchema.extend(approvalDocumentViewExtras),
+  poDetailsSchema.extend(approvalDocumentViewExtras),
+  scoDetailsSchema.extend(approvalDocumentViewExtras),
+]);
+export type approvalDocumentViewSchemaType = z.infer<
+  typeof approvalDocumentViewSchema
 >;

@@ -2,6 +2,7 @@ import { db } from "../db/client";
 import { type Actor, can } from "../lib/auth-middleware";
 import { isUniqueViolation } from "../lib/db-errors";
 import {
+  AppError,
   BadRequestError,
   ConflictError,
   ForbiddenError,
@@ -17,6 +18,8 @@ import type {
   approvalActionRequestSchemaType,
   approvalChainSchemaType,
   approvalDocLookupParamSchemaType,
+  approvalDocumentViewParamSchemaType,
+  approvalDocumentViewSchemaType,
   approvalPolicyIdParamSchemaType,
   approvalPolicyListQuerySchemaType,
   approvalRequestIdParamSchemaType,
@@ -125,10 +128,25 @@ function canSubmitForApproval(status: string) {
   return status === "draft";
 }
 
-async function assertCanReadRequest(
+export type AssertCanReadRequestOptions = {
+  /**
+   * Read-via-approval rule (BR-FF-53): also require the request to be
+   * pending_approval (requester path included) and the caller on the current
+   * step or already in this request's trail. Omitted = today's behaviour.
+   */
+  viaApprovalOnly?: boolean;
+};
+
+export async function assertCanReadRequest(
   request: NonNullable<ApprovalRequestRow>,
   actor: ActorContext,
+  options: AssertCanReadRequestOptions = {},
 ) {
+  if (options.viaApprovalOnly) {
+    // Contract stub: the pending + current-step / trail branch lands in the implement step.
+    throw new AppError("Not implemented", 501, "NOT_IMPLEMENTED");
+  }
+
   if (can(actor.actor, "approval.view_all")) {
     return;
   }
@@ -214,6 +232,14 @@ async function assertEligibleActorForCurrentStep(
 }
 
 export const approvalService = {
+  // Contract stub (BR-FF-53, 81, 83, 88). Access check runs before any lookup.
+  async getDocumentView(
+    _params: approvalDocumentViewParamSchemaType,
+    _actor: ActorContext,
+  ): Promise<approvalDocumentViewSchemaType> {
+    throw new AppError("Not implemented", 501, "NOT_IMPLEMENTED");
+  },
+
   async getPolicies(query: approvalPolicyListQuerySchemaType) {
     const { rows, total } = await approvalRepository.listPolicies({
       page: query.page,

@@ -223,3 +223,61 @@ export const grnListQuerySchema = z
   })
   .strict();
 export type grnListQuerySchemaType = z.infer<typeof grnListQuerySchema>;
+
+// GET /grn/getreceivablepos (BR-FF-61..64, 66, 70..72). Receive picker + form.
+const DOC_ID_MAX = 2147483647;
+
+export const receivablePoBucketSchema = z.enum(["late", "today", "later"]);
+
+export const receivablePosQuerySchema = z
+  .object({
+    page: z.coerce.number().int().min(1).default(1),
+    pageSize: z.coerce.number().int().min(1).max(100).default(10),
+    sortBy: z.enum(["dueDate", "poNumber", "supplierName"]).default("dueDate"),
+    sortDir: z.enum(["asc", "desc"]).default("asc"),
+    q: searchTermSchema,
+    poId: z.coerce.number().int().min(1).max(DOC_ID_MAX).optional(),
+    bucket: receivablePoBucketSchema.optional(),
+  })
+  .strict();
+export type receivablePosQuerySchemaType = z.infer<
+  typeof receivablePosQuerySchema
+>;
+
+// No price, GST, line value or totals, ever (BR-FF-62, 06).
+export const receivablePoLineSchema = z.object({
+  poItemId: z.number().int(),
+  itemId: z.number().int(),
+  sku: z.string(),
+  itemName: z.string(),
+  uom: z.string(),
+  orderedQty: z.number(),
+  receivedQty: z.number(),
+  pendingQaQty: z.number(),
+  openQty: z.number(),
+});
+
+export const receivablePoRowSchema = z.object({
+  poId: z.number().int(),
+  poNumber: z.string(),
+  supplierId: z.number().int(),
+  supplierName: z.string(),
+  status: z.enum(["dispatched", "partial_received"]),
+  dueDate: z.string().nullable(),
+  isLate: z.boolean(),
+  lines: z.array(receivablePoLineSchema),
+});
+export type receivablePoRowSchemaType = z.infer<typeof receivablePoRowSchema>;
+
+// paginationMeta plus `today` (IST day, YYYY-MM-DD) — the picker's "today".
+export const receivablePosResponseSchema = z.object({
+  success: z.literal(true),
+  data: z.array(receivablePoRowSchema),
+  meta: z.object({
+    page: z.number().int().min(1),
+    pageSize: z.number().int().min(1),
+    total: z.number().int().min(0),
+    totalPages: z.number().int().min(0),
+    today: z.string(),
+  }),
+});

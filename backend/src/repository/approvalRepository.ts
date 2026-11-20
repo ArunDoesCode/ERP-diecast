@@ -437,6 +437,18 @@ export const approvalRepository = {
     };
   },
 
+  /**
+   * Latest approval request of a document in ANY status (BR-FF-53 step 1),
+   * on idx_approval_requests_doc. Contract stub: query lands in the implement step.
+   */
+  async findLatestApprovalByDoc(
+    _docType: ApprovalDocType,
+    _docId: number,
+    _tx?: Tx,
+  ): Promise<RequestSelect | undefined> {
+    throw new Error("findLatestApprovalByDoc: not implemented");
+  },
+
   async findPendingRequestByDoc(
     docType: ApprovalDocType,
     docId: number,

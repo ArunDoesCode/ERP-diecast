@@ -17,6 +17,8 @@ import {
   grnListRowSchema,
   grnQaActionBodySchema,
   grnSchema,
+  receivablePosQuerySchema,
+  receivablePosResponseSchema,
   updateGrnSchema,
 } from "../types/grn.types";
 import { END_POINTS } from "./end-points";
@@ -43,6 +45,29 @@ register({
     sortableFields: ["id", "grnNumber", "status", "receivedDate"],
     searchable: true,
   },
+});
+
+grnRouter.get(
+  GRN_ROUTES.receivablePos,
+  requirePermission("grn.edit_draft"),
+  asyncHandler(grnController.getReceivablePos),
+);
+register({
+  method: "GET",
+  path: `${GRN_BASE_PATH}${GRN_ROUTES.receivablePos}`,
+  tags: ["grn"],
+  summary:
+    "Receivable POs (dispatched / partial_received with an open line) with their open lines, no prices (BR-FF-61..64, 66, 70..72).",
+  auth: { type: "permission", key: "grn.edit_draft" },
+  request: { query: receivablePosQuerySchema },
+  responses: { "200": receivablePosResponseSchema },
+  pagination: {
+    sortableFields: ["dueDate", "poNumber", "supplierName"],
+    searchable: true,
+  },
+  notes: [
+    "meta carries `today` (IST day) beside the pagination fields. Unknown or not-receivable poId returns 200 with empty data.",
+  ],
 });
 
 grnRouter.get(

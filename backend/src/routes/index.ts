@@ -4,7 +4,9 @@ import { approvalRoutes } from "./approval";
 import { assetRoutes } from "./asset";
 import { authRoutes } from "./auth";
 import { companyRoutes } from "./company";
+import { documentRoutes } from "./document";
 import { grnRoutes } from "./grn";
+import { homeRoutes } from "./home";
 import { poRoutes } from "./po";
 import { prRoutes } from "./pr";
 import { scoRoutes } from "./sco";
@@ -22,6 +24,8 @@ const MAIN_ROUTES = {
   approval: "/approval",
   sco: "/sco",
   company: "/company",
+  home: "/home",
+  document: "/document",
 } as const;
 
 export { authRoutes } from "./auth";
@@ -38,3 +42,5 @@ mainRouter.route(MAIN_ROUTES.grn, grnRoutes);
 mainRouter.route(MAIN_ROUTES.approval, approvalRoutes);
 mainRouter.route(MAIN_ROUTES.sco, scoRoutes);
 mainRouter.route(MAIN_ROUTES.company, companyRoutes);
+mainRouter.route(MAIN_ROUTES.home, homeRoutes);
+mainRouter.route(MAIN_ROUTES.document, documentRoutes);

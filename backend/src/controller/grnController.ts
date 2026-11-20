@@ -1,6 +1,6 @@
 import type { Context } from "hono";
 
-import { BadRequestError, UnauthorizedError } from "../lib/errors";
+import { AppError, BadRequestError, UnauthorizedError } from "../lib/errors";
 import type { AppEnv } from "../lib/types";
 import { grnService } from "../service/grnService";
 import {
@@ -9,6 +9,7 @@ import {
   grnCorrectionSchema,
   grnListQuerySchema,
   grnQaActionSchema,
+  receivablePosQuerySchema,
   updateGrnSchema,
 } from "../types/grn.types";
 
@@ -33,6 +34,15 @@ export const grnController = {
     const id = parseId(c.req.param("id"), "GRN id");
     const data = await grnService.getDetails(id);
     return c.json({ success: true, data });
+  },
+
+  async getReceivablePos(c: Context<AppEnv>) {
+    const query = receivablePosQuerySchema.parse(
+      Object.fromEntries(new URL(c.req.url).searchParams),
+    );
+    // Contract stub: the grnService method lands in the implement step.
+    void query;
+    throw new AppError("Not implemented", 501, "NOT_IMPLEMENTED");
   },
 
   async list(c: Context<AppEnv>) {

@@ -13,6 +13,8 @@ import { register } from "../lib/route-registry";
 import type { AppEnv } from "../lib/types";
 import {
   approvalActionRequestSchema,
+  approvalDocumentViewParamSchema,
+  approvalDocumentViewSchema,
   approvalHistoryItemSchema,
   approvalPolicyListQuerySchema,
   approvalPolicySchema,
@@ -210,6 +212,24 @@ register({
     "Approval history of a document (BR-APR-54): all its requests newest first, each with its trail oldest first. Readable per BR-APR-51.",
   auth: { type: "any-authenticated" },
   responses: { "200": successResponse(z.array(approvalHistoryItemSchema)) },
+});
+
+approvalRouter.get(
+  APPROVAL_ROUTES.getDocumentView,
+  asyncHandler(approvalController.getDocumentView),
+);
+register({
+  method: "GET",
+  path: `${APPROVAL_BASE_PATH}${APPROVAL_ROUTES.getDocumentView}`,
+  tags: ["approval"],
+  summary:
+    "Read-only view of a PR / PO / SCO for the approval inbox preview (BR-FF-53, 81, 83, 88): details body + requesterNote, open request, trail, canAct. Service enforces the one read rule (doc key, approval.view_all, or read-via-approval).",
+  auth: { type: "any-authenticated" },
+  request: { params: approvalDocumentViewParamSchema },
+  responses: { "200": successResponse(approvalDocumentViewSchema) },
+  notes: [
+    "403 FORBIDDEN (same body whether or not the id exists) before any lookup; 404 NOT_FOUND only after access passed.",
+  ],
 });
 
 export { approvalRouter as approvalRoutes };

@@ -107,6 +107,7 @@ export const END_POINTS = {
     create: "/creategrn",
     update: "/updategrn",
     remove: "/deletegrn/:id",
+    receivablePos: "/getreceivablepos",
     qaAction: "/:id/lines/:lineId/qa",
     bypass: "/:id/lines/:lineId/bypass",
     correction: "/:id/lines/:lineId/correction",
@@ -146,5 +147,12 @@ export const END_POINTS = {
     getMyPendingApprovals: "/getMyPendingApprovals",
     getCurrentApprovalByDoc: "/getCurrentApprovalByDoc/:docType/:docId",
     getApprovalHistory: "/getApprovalHistory/:docType/:docId",
+    getDocumentView: "/getDocumentView/:docType/:docId",
+  },
+  home: {
+    counts: "/getcounts",
+  },
+  document: {
+    panel: "/getpanel/:docType/:docId",
   },
 } as const;

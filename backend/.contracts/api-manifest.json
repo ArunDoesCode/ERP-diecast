@@ -432,6 +432,33 @@
       }
     },
     {
+      "id": "GET /api/approval/getDocumentView/:docType/:docId",
+      "method": "GET",
+      "path": "/api/approval/getDocumentView/:docType/:docId",
+      "tags": [
+        "approval"
+      ],
+      "summary": "Read-only view of a PR / PO / SCO for the approval inbox preview (BR-FF-53, 81, 83, 88): details body + requesterNote, open request, trail, canAct. Service enforces the one read rule (doc key, approval.view_all, or read-via-approval).",
+      "auth": {
+        "type": "any-authenticated"
+      },
+      "request": {
+        "params": {
+          "docType": "enum:pr,po,sco.required",
+          "docId": "integer.nonnegative.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "union<[object Object]|[object Object]|[object Object]>.required"
+        }
+      },
+      "notes": [
+        "403 FORBIDDEN (same body whether or not the id exists) before any lookup; 404 NOT_FOUND only after access passed."
+      ]
+    },
+    {
       "id": "GET /api/asset/machines",
       "method": "GET",
       "path": "/api/asset/machines",
@@ -1383,6 +1410,55 @@
       }
     },
     {
+      "id": "GET /api/document/getpanel/:docType/:docId",
+      "method": "GET",
+      "path": "/api/document/getpanel/:docType/:docId",
+      "tags": [
+        "document"
+      ],
+      "summary": "Side panel of a PR / PO / GRN: totals, approvals, linked documents, history (BR-FF-42, 50..55). Service enforces doc key, approval.view_all or the read-via-approval rule.",
+      "auth": {
+        "type": "any-authenticated"
+      },
+      "request": {
+        "params": {
+          "docType": "enum:pr,po,grn.required",
+          "docId": "integer.nonnegative.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "totals": {
+              "lineCount": "integer.optional",
+              "estimatedAmountPaise": "integer.optional",
+              "subtotalPaise": "integer.optional",
+              "taxAmountPaise": "integer.optional",
+              "totalAmountPaise": "integer.optional",
+              "receivedPct": "number.nonnegative.optional",
+              "arrivedQty": "number.optional",
+              "acceptedQty": "unknown.optional",
+              "rejectedQty": "unknown.optional",
+              "uom": "string.optional"
+            },
+            "approvals": {
+              "status": "unknown.required",
+              "currentLevel": "integer.nullable.required",
+              "totalLevels": "integer.nullable.required",
+              "trail": "array<object>.required"
+            },
+            "linked": "array<object>.required",
+            "history": "array<object>.required",
+            "historyTruncated": "boolean.required"
+          }
+        }
+      },
+      "notes": [
+        "403 FORBIDDEN (same body whether or not the id exists) before any lookup; 404 NOT_FOUND only after access passed."
+      ]
+    },
+    {
       "id": "GET /api/grn/getgrns",
       "method": "GET",
       "path": "/api/grn/getgrns",
@@ -1427,6 +1503,54 @@
         ],
         "searchable": true
       }
+    },
+    {
+      "id": "GET /api/grn/getreceivablepos",
+      "method": "GET",
+      "path": "/api/grn/getreceivablepos",
+      "tags": [
+        "grn"
+      ],
+      "summary": "Receivable POs (dispatched / partial_received with an open line) with their open lines, no prices (BR-FF-61..64, 66, 70..72).",
+      "auth": {
+        "type": "permission",
+        "key": "grn.edit_draft"
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "sortBy": "enum:dueDate,poNumber,supplierName.required",
+          "sortDir": "enum:asc,desc.required",
+          "q": "string.optional",
+          "poId": "integer.nonnegative.optional",
+          "bucket": "enum:late,today,later.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required",
+            "today": "string.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "dueDate",
+          "poNumber",
+          "supplierName"
+        ],
+        "searchable": true
+      },
+      "notes": [
+        "meta carries `today` (IST day) beside the pagination fields. Unknown or not-receivable poId returns 200 with empty data."
+      ]
     },
     {
       "id": "GET /api/grn/getgrndetails/:id",
@@ -1731,6 +1855,35 @@
           }
         }
       }
+    },
+    {
+      "id": "GET /api/home/getcounts",
+      "method": "GET",
+      "path": "/api/home/getcounts",
+      "tags": [
+        "home"
+      ],
+      "summary": "Home tile counts for the caller (BR-FF-10..33). A tile the caller has no key for is absent, never 403. Optional `tiles` csv retries / limits tiles.",
+      "auth": {
+        "type": "any-authenticated"
+      },
+      "request": {
+        "query": {
+          "tiles": "string.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "today": "string.required",
+            "tiles": "array<object>.required"
+          }
+        }
+      },
+      "notes": [
+        "Tiles the caller lacks the key for (own key or target list key) are omitted; a failed tile is { key, error: true } with HTTP 200."
+      ]
     },
     {
       "id": "GET /api/po/getpos",
