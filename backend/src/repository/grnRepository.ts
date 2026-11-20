@@ -23,6 +23,7 @@ import {
 import {
   grnCorrections,
   grnItems,
+  grnStatusEnum,
   grns,
   prPoItemLinks,
   purchaseOrderItems,
@@ -637,7 +638,12 @@ export const grnRepository = {
 
   async getDetails(grnId: number) {
     const [grnRows, items] = await Promise.all([
-      db.select(grnColumns).from(grns).where(eq(grns.id, grnId)).limit(1),
+      db
+        .select({ ...grnColumns, supplierName: supplierMaster.name })
+        .from(grns)
+        .leftJoin(supplierMaster, eq(supplierMaster.id, grns.supplierId))
+        .where(eq(grns.id, grnId))
+        .limit(1),
       db
         .select(grnItemDetailColumns)
         .from(grnItems)
@@ -757,43 +763,126 @@ export const grnRepository = {
     return row;
   },
 
-  async list(params: grnListQuerySchemaType) {
+  async list(params: grnListQuerySchemaType, today: string) {
     const sortColumn =
       params.sortBy && params.sortBy in grnSortColumns
         ? grnSortColumns[params.sortBy as keyof typeof grnSortColumns]
         : grns.id;
     const orderFn = params.sortDir === "desc" ? desc : asc;
 
-    const filters = [
+    // BR-FF-28: any line pending QA (same predicate as the Home tile).
+    const hasPendingLine = sql`exists (
+      select 1 from ${grnItems}
+      where ${grnItems.grnId} = ${grns.id} and ${grnItems.qaStatus} = 'pending'
+    )`;
+    // BR-FF-109: strip counts follow the search and PO, not status / QA / bucket.
+    const searchFilters = [
       safeSearch(params.q, grns.grnNumber),
       params.poId !== undefined ? eq(grns.poId, params.poId) : undefined,
-      params.status !== undefined ? eq(grns.status, params.status) : undefined,
+    ].filter((filter) => filter !== undefined);
+    const receivedDay = sql`(${grns.receivedDate})::date`;
+    // bucket=late implies QA pending (CR-05).
+    const qaStatus = params.bucket === "late" ? "pending" : params.qaStatus;
+    const filters = [
+      ...searchFilters,
+      params.status && params.status.length > 0
+        ? inArray(grns.status, params.status)
+        : undefined,
       // qaStatus filters at the line level — a GRN "matches" if any of its
       // lines carry that qaStatus. EXISTS keeps the header-level
       // pagination/count at 1 row per GRN instead of fanning out via a join.
-      params.qaStatus !== undefined
+      qaStatus !== undefined
         ? sql`exists (
             select 1 from ${grnItems}
             where ${grnItems.grnId} = ${grns.id}
-              and ${grnItems.qaStatus} = ${params.qaStatus}
+              and ${grnItems.qaStatus} = ${qaStatus}
           )`
+        : undefined,
+      params.bucket === "late"
+        ? sql`${receivedDay} < ${today}::date`
+        : undefined,
+      params.bucket === "today"
+        ? sql`${receivedDay} = ${today}::date`
+        : undefined,
+      params.bucket === "later"
+        ? sql`${receivedDay} > ${today}::date`
         : undefined,
     ].filter((filter) => filter !== undefined);
 
     const whereClause = filters.length > 0 ? and(...filters) : undefined;
+    const countWhere = and(...searchFilters);
 
-    const [rows, [totalRow]] = await Promise.all([
+    const [rows, [totalRow], statusRows, [qaPendingRow]] = await Promise.all([
       db
-        .select({ ...grnColumns, poNumber: purchaseOrders.poNumber })
+        .select({
+          ...grnColumns,
+          poNumber: purchaseOrders.poNumber,
+          supplierName: supplierMaster.name,
+        })
         .from(grns)
         .leftJoin(purchaseOrders, eq(purchaseOrders.id, grns.poId))
+        .leftJoin(supplierMaster, eq(supplierMaster.id, grns.supplierId))
         .where(whereClause)
         .orderBy(orderFn(sortColumn), asc(grns.id))
         .limit(params.pageSize)
         .offset((params.page - 1) * params.pageSize),
       db.select({ value: count() }).from(grns).where(whereClause),
+      db
+        .select({ status: grns.status, value: count() })
+        .from(grns)
+        .where(countWhere)
+        .groupBy(grns.status),
+      db
+        .select({ value: count() })
+        .from(grns)
+        .where(and(countWhere, hasPendingLine)),
     ]);
 
-    return { rows, total: totalRow?.value ?? 0 };
+    // PERF-04: line count and QA mix of the page's GRNs, one grouped query.
+    const ids = rows.map((r) => r.id);
+    const lineAgg =
+      ids.length === 0
+        ? []
+        : await db
+            .select({
+              grnId: grnItems.grnId,
+              lines: count(),
+              pending: sql<number>`count(*) filter (where ${grnItems.qaStatus} = 'pending')`,
+              passed: sql<number>`count(*) filter (where ${grnItems.qaStatus} in ('passed', 'waived'))`,
+              failed: sql<number>`count(*) filter (where ${grnItems.qaStatus} = 'failed')`,
+            })
+            .from(grnItems)
+            .where(inArray(grnItems.grnId, ids))
+            .groupBy(grnItems.grnId);
+    const aggByGrn = new Map(lineAgg.map((a) => [a.grnId, a]));
+
+    const statusCounts: Record<string, number> = Object.fromEntries(
+      grnStatusEnum.enumValues.map((status) => [status, 0]),
+    );
+    for (const r of statusRows) statusCounts[r.status] = r.value;
+    // Overlaps Draft: a draft can also be QA pending (BR-FF-109).
+    statusCounts.qa_pending = qaPendingRow?.value ?? 0;
+
+    return {
+      rows: rows.map((r) => {
+        const a = aggByGrn.get(r.id);
+        const lines = a?.lines ?? 0;
+        const pending = Number(a?.pending ?? 0);
+        const passed = Number(a?.passed ?? 0);
+        const failed = Number(a?.failed ?? 0);
+        // BR-FF-115: pending > passed (passed / waived) > failed > mixed.
+        const qaSummary: "pending" | "passed" | "failed" | "mixed" =
+          pending > 0
+            ? "pending"
+            : lines > 0 && passed === lines
+              ? "passed"
+              : lines > 0 && failed === lines
+                ? "failed"
+                : "mixed";
+        return { ...r, lineCount: lines, qaSummary };
+      }),
+      total: totalRow?.value ?? 0,
+      statusCounts,
+    };
   },
 };

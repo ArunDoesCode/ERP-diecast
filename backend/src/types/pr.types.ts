@@ -72,10 +72,10 @@ export const prItemDetailSchema = prItemSchema.extend({
   defaultSupplierName: z.string().nullable(),
   // Contract step 2 (BR-FF-43, 48, 49): optional until implemented.
   /** PO the line is on via pr_po_item_links, else null (BR-FF-43). */
-  onPoId: z.number().int().nullable().optional(),
-  onPoNumber: z.string().nullable().optional(),
+  onPoId: z.number().int().nullable(),
+  onPoNumber: z.string().nullable(),
   /** Rate the Create PO dialog pre-fills; 0 / null = dialog asks (BR-FF-49). */
-  suggestedRatePaise: z.number().int().nonnegative().nullable().optional(),
+  suggestedRatePaise: z.number().int().nonnegative().nullable(),
 });
 export type prItemDetailSchemaType = z.infer<typeof prItemDetailSchema>;
 
@@ -313,12 +313,12 @@ export const prListQuerySchema = z
 // Contract step 2: list row = stored PR + display fields (optional until the
 // handler fills them: BR-FF-12, 21..23, 106, 109).
 export const prListRowSchema = prSchema.extend({
-  requestedByName: z.string().optional(),
-  lineCount: z.number().int().min(0).optional(),
+  requestedByName: z.string(),
+  lineCount: z.number().int().min(0),
   /** Earliest required-by among pending lines (YYYY-MM-DD) or null. */
-  earliestRequiredBy: z.string().nullable().optional(),
+  earliestRequiredBy: z.string().nullable(),
   /** Latest approval request of this PR was sent back. */
-  sentBack: z.boolean().optional(),
+  sentBack: z.boolean(),
 });
 export type prListRowSchemaType = z.infer<typeof prListRowSchema>;
 

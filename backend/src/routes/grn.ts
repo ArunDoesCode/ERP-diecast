@@ -49,7 +49,7 @@ register({
   responses: {
     "200": paginatedResponse(grnListRowSchema).extend({
       meta: paginationMetaSchema.extend({
-        statusCounts: z.record(z.string(), z.number().int().min(0)).optional(),
+        statusCounts: z.record(z.string(), z.number().int().min(0)),
       }),
     }),
   },

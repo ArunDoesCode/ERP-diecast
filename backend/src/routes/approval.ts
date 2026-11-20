@@ -188,7 +188,7 @@ register({
   responses: {
     "200": paginatedResponse(myPendingApprovalRowSchema).extend({
       meta: paginationMetaSchema.extend({
-        typeCounts: myPendingTypeCountsSchema.optional(),
+        typeCounts: myPendingTypeCountsSchema,
       }),
     }),
   },

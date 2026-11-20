@@ -1482,7 +1482,7 @@
           "sortBy": "enum:id,grnNumber,status,receivedDate.optional",
           "sortDir": "enum:asc,desc.required",
           "poId": "integer.positive.optional",
-          "status": "enum:draft,pending_qa,accepted,rejected,partial_accepted.optional",
+          "status": "array<enum:draft,pending_qa,accepted,rejected,partial_accepted>.optional",
           "qaStatus": "enum:pending,passed,failed,waived.optional",
           "q": "string.optional",
           "bucket": "enum:late,today,later.optional"
@@ -1589,7 +1589,8 @@
               "vehicleNo": "unknown.required",
               "driverName": "unknown.required",
               "driverPhone": "unknown.required",
-              "remarks": "unknown.required"
+              "remarks": "unknown.required",
+              "supplierName": "unknown.required"
             },
             "po": {
               "id": "integer.required",
@@ -1643,7 +1644,8 @@
               "vehicleNo": "unknown.required",
               "driverName": "unknown.required",
               "driverPhone": "unknown.required",
-              "remarks": "unknown.required"
+              "remarks": "unknown.required",
+              "supplierName": "unknown.required"
             },
             "po": {
               "id": "integer.required",
@@ -1697,7 +1699,8 @@
               "vehicleNo": "unknown.required",
               "driverName": "unknown.required",
               "driverPhone": "unknown.required",
-              "remarks": "unknown.required"
+              "remarks": "unknown.required",
+              "supplierName": "unknown.required"
             },
             "po": {
               "id": "integer.required",
@@ -1928,7 +1931,7 @@
             "total": "integer.nonnegative.required",
             "totalPages": "integer.nonnegative.required",
             "statusCounts": {},
-            "lateCount": "integer.nonnegative.optional"
+            "lateCount": "integer.nonnegative.required"
           }
         }
       },
@@ -2698,7 +2701,7 @@
             "total": "integer.nonnegative.required",
             "totalPages": "integer.nonnegative.required",
             "statusCounts": {},
-            "toOrderCount": "integer.nonnegative.optional"
+            "toOrderCount": "integer.nonnegative.required"
           }
         }
       },

@@ -51,7 +51,7 @@ register({
       meta: paginationMetaSchema.extend({
         statusCounts: z.record(prStatusSchema, z.number().int().min(0)),
         // BR-FF-02, 21: rows toOrder=true would return under the other filters.
-        toOrderCount: z.number().int().min(0).optional(),
+        toOrderCount: z.number().int().min(0),
       }),
     }),
   },

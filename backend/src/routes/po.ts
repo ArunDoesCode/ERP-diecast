@@ -57,7 +57,7 @@ register({
       meta: paginationMetaSchema.extend({
         statusCounts: z.record(poStatusSchema, z.number().int().min(0)),
         // BR-FF-24..26, 107: rows the Late filter returns (one BR-PO-19 predicate).
-        lateCount: z.number().int().min(0).optional(),
+        lateCount: z.number().int().min(0),
       }),
     }),
   },

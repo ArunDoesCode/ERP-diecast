@@ -47,9 +47,9 @@ export type poResponseSchemaType = z.infer<typeof poResponseSchema>;
 // GET /po/getpos row: the PO plus list display fields (BR-FF-24..26, 107, 109).
 // Optional until the handler fills them.
 export const poListRowSchema = poResponseSchema.extend({
-  lineCount: z.number().int().min(0).optional(),
+  lineCount: z.number().int().min(0),
   /** Received share of ordered qty, whole percent 0..100. */
-  receivedPct: z.number().int().min(0).max(100).optional(),
+  receivedPct: z.number().int().min(0).max(100),
 });
 export type poListRowSchemaType = z.infer<typeof poListRowSchema>;
 
@@ -87,9 +87,9 @@ export const poItemDetailSchema = poItemSchema
     prNumber: z.string().nullable(),
     // Contract step 2 (BR-FF-09, 43): optional until implemented.
     /** Qty on GRN lines whose QA is still pending. */
-    pendingQaQty: z.number().optional(),
+    pendingQaQty: z.number(),
     /** Ordered - received - pending QA, never below 0. */
-    openQty: z.number().optional(),
+    openQty: z.number(),
   });
 export type poItemDetailSchemaType = z.infer<typeof poItemDetailSchema>;
 

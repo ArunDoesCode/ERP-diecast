@@ -33,7 +33,7 @@ export const prController = {
     const query = prListQuerySchema.parse(
       Object.fromEntries(new URL(c.req.url).searchParams),
     );
-    const { data, meta } = await prService.list(query);
+    const { data, meta } = await prService.list(query, parseActorId(c));
     return c.json({ success: true, data, meta });
   },
 

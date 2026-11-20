@@ -54,12 +54,12 @@ export type grnQaSummarySchemaType = z.infer<typeof grnQaSummarySchema>;
 export const grnListRowSchema = grnSchema.extend({
   poNumber: z.string().nullable(),
   // Contract step 2 (BR-FF-28, 108, 109, 115): optional until implemented.
-  supplierName: z.string().nullable().optional(),
-  lineCount: z.number().int().min(0).optional(),
+  supplierName: z.string().nullable(),
+  lineCount: z.number().int().min(0),
   /** pending if any line pending; passed (passed/waived); failed; else mixed. */
-  qaSummary: grnQaSummarySchema.optional(),
+  qaSummary: grnQaSummarySchema,
   /** Caller holds po.manage; else the PO number is plain text (BR-FF-03). */
-  poCanOpen: z.boolean().optional(),
+  poCanOpen: z.boolean(),
 });
 export type grnListRowSchemaType = z.infer<typeof grnListRowSchema>;
 
@@ -98,7 +98,8 @@ export type grnItemDetailSchemaType = z.infer<typeof grnItemDetailSchema>;
 
 // GET /grn/getgrndetails/:id response payload.
 export const grnDetailsSchema = z.object({
-  grn: grnSchema,
+  // supplierName: the GRN header shows the supplier (additive, BR-FF-108).
+  grn: grnSchema.extend({ supplierName: z.string().nullable() }),
   po: grnLinkedPoSchema.nullable(),
   prs: z.array(grnLinkedPrSchema),
   items: z.array(grnItemDetailSchema),
@@ -232,7 +233,20 @@ export const grnListQuerySchema = z
     sortBy: z.enum(["id", "grnNumber", "status", "receivedDate"]).optional(),
     sortDir: z.enum(["asc", "desc"]).default("asc"),
     poId: z.coerce.number().int().positive().optional(),
-    status: grnStatusSchema.optional(),
+    // Comma-separated statuses, e.g. "accepted,partial_accepted" (Done chip).
+    status: z
+      .string()
+      .max(200)
+      .optional()
+      .transform((value) =>
+        value
+          ? value
+              .split(",")
+              .map((entry) => entry.trim())
+              .filter(Boolean)
+          : undefined,
+      )
+      .pipe(z.array(grnStatusSchema).max(20).optional()),
     qaStatus: grnQaStatusSchema.optional(),
     q: searchTermSchema,
     // BR-FF-28, 108: received-date bucket (late = before IST today).

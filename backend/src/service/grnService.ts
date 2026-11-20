@@ -5,6 +5,7 @@ import {
   InternalServerError,
   NotFoundError,
 } from "../lib/errors";
+import { istDayKey } from "../lib/ist-day";
 import { grnRepository } from "../repository/grnRepository";
 import { poRepository } from "../repository/poRepository";
 import { postStock } from "../repository/stockPostingRepository";
@@ -273,11 +274,18 @@ export const grnService = {
     return row;
   },
 
-  async list(params: grnListQuerySchemaType) {
-    const { rows, total } = await grnRepository.list(params);
+  async list(params: grnListQuerySchemaType, actor: Actor) {
+    const { rows, total, statusCounts } = await grnRepository.list(
+      params,
+      istDayKey(),
+    );
+    const poCanOpen = can(actor, "po.manage");
     return {
-      data: rows,
-      meta: toPaginatedMeta(params.page, params.pageSize, total),
+      data: rows.map((r) => ({ ...r, poCanOpen })),
+      meta: {
+        ...toPaginatedMeta(params.page, params.pageSize, total),
+        statusCounts,
+      },
     };
   },
 

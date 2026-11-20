@@ -113,6 +113,10 @@ export const scoChallanRepository = {
         ? sql`${days} between 0 and 60`
         : undefined,
       params.dueStatus === "ok" ? sql`${days} > 60` : undefined,
+      // BR-FF-14, 29: bucket on returnDueDate (IST today); late = overdue.
+      params.bucket === "late" ? sql`${days} < 0` : undefined,
+      params.bucket === "today" ? sql`${days} = 0` : undefined,
+      params.bucket === "later" ? sql`${days} > 0` : undefined,
     );
     const orderFn = params.sortDir === "desc" ? desc : asc;
     const [rows, [totalRow]] = await Promise.all([

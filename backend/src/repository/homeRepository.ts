@@ -9,7 +9,6 @@ import { itemMaster } from "../db/schemas/02_procurement-catalog";
 import {
   grnItems,
   grns,
-  purchaseOrderItems,
   purchaseOrders,
   purchaseRequestItems,
   purchaseRequests,
@@ -17,6 +16,8 @@ import {
   scoChallans,
 } from "../db/schemas/02_procurement-purchasing";
 import type { HomeTileKey } from "../types/home.types";
+import { hasOpenQtySql } from "./openQty";
+import { dayOfSql, poDueSql, poInTransitSql, poLateSql } from "./poPredicates";
 
 // Raw per-tile numbers; the service adds tone and the hint shape.
 export type HomeTileRaw = {
@@ -45,7 +46,7 @@ type TileSpec = {
   sentBack?: SQL;
 };
 
-const dayOf = (e: SQL) => sql`(${e})::date`;
+const dayOf = dayOfSql;
 
 // Builds the `count(*) filter (where …)` columns for the wanted tiles of one
 // source table and runs a single SELECT (PERF-01).
@@ -103,29 +104,10 @@ async function runTable(
   return out;
 }
 
-const poDue = sql`coalesce(${purchaseOrders.revisedDeliveryDate}, ${purchaseOrders.expectedDeliveryDate})`;
-const IN_TRANSIT = sql`${purchaseOrders.status} in ('dispatched', 'partial_received')`;
-
-// BR-FF-09 open quantity > 0 on any line: ordered - accepted - arrived and
-// still pending QA. (Same expression as the receivable-PO picker; kept here
-// until it is shared.)
-const HAS_OPEN_QTY = sql`exists (
-  select 1 from ${purchaseOrderItems}
-  where ${purchaseOrderItems.poId} = ${purchaseOrders.id}
-    and ${purchaseOrderItems.qty} - coalesce(${purchaseOrderItems.receivedQty}, 0)
-      - coalesce((select sum(${grnItems.receivedQty}) from ${grnItems}
-          where ${grnItems.poItemId} = ${purchaseOrderItems.id}
-            and ${grnItems.qaStatus} = 'pending'), 0) > 0
-)`;
-
-// BR-PO-19 (frozen, A-54): ordered - received > 0, due before IST today.
-const poLate = (today: string) => sql`(${IN_TRANSIT}
-  and ${dayOf(poDue)} < ${today}::date
-  and exists (
-    select 1 from ${purchaseOrderItems}
-    where ${purchaseOrderItems.poId} = ${purchaseOrders.id}
-      and ${purchaseOrderItems.qty} - coalesce(${purchaseOrderItems.receivedQty}, 0) > 0
-  ))`;
+const poDue = poDueSql;
+const IN_TRANSIT = poInTransitSql;
+const HAS_OPEN_QTY = hasOpenQtySql;
+const poLate = poLateSql;
 
 const lastRequestSentBack = (docType: "pr" | "po", docIdCol: SQL) => sql`(
   select ${approvalRequests.status} from ${approvalRequests}

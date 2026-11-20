@@ -48,7 +48,7 @@ export const grnController = {
     const query = grnListQuerySchema.parse(
       Object.fromEntries(new URL(c.req.url).searchParams),
     );
-    const { data, meta } = await grnService.list(query);
+    const { data, meta } = await grnService.list(query, c.get("actor"));
     return c.json({ success: true, data, meta });
   },
 
