@@ -125,6 +125,8 @@ jobs:
       PORT: 4000
       NEXT_PUBLIC_API_URL: http://localhost:4000/api
       SEED_USER_PASSWORD: ci-seed-password-1
+      # Every Playwright login hits one shared rate-limit counter; 10 / 15 min is far too few for the suite.
+      AUTH_RATE_LIMIT_MAX: 10000
     steps:
       - uses: actions/checkout@v7
       - name: Find specs

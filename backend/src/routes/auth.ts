@@ -4,6 +4,7 @@ import { z } from "zod";
 import { authController } from "../controller/authController";
 import { asyncHandler } from "../lib/async-handler";
 import { requireAuth } from "../lib/auth-middleware";
+import { env } from "../lib/env";
 import { rateLimiter } from "../lib/rate-limiter";
 import { successResponseWithMessage } from "../lib/response-schemas";
 import { register } from "../lib/route-registry";
@@ -37,7 +38,7 @@ const authRouter = new Hono<AppEnv>();
 
 authRouter.post(
   AUTH_ROUTES.login,
-  rateLimiter({ windowMs: 15 * 60_000, max: 10 }),
+  rateLimiter({ windowMs: 15 * 60_000, max: env.AUTH_RATE_LIMIT_MAX }),
   asyncHandler(authController.login),
 );
 register({
@@ -63,7 +64,7 @@ register({
 // BR-AUTH-29: same rate limit as login (BR-AUTH-04), its own counter.
 authRouter.post(
   AUTH_ROUTES.qrLogin,
-  rateLimiter({ windowMs: 15 * 60_000, max: 10 }),
+  rateLimiter({ windowMs: 15 * 60_000, max: env.AUTH_RATE_LIMIT_MAX }),
   asyncHandler(authController.qrLogin),
 );
 register({
