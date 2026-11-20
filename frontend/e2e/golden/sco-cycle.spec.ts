@@ -101,9 +101,11 @@ test("T-5 (5) SCO: create, approve, challan, receipt, QA, close: closed, vendor 
 
 	// The vendor-stock report lists only what is still at a vendor: this vendor is gone from it.
 	await page.goto("/subcontracting/reports");
+	// Wait until the report has loaded: either the table or the empty state.
 	await expect(
-		page.getByRole("columnheader", { name: "Vendor" }),
+		page
+			.getByRole("columnheader", { name: "Vendor" })
+			.or(page.getByText("No material is at any vendor.")),
 	).toBeVisible();
-	await expect(page.getByRole("row").nth(1)).toBeVisible();
 	await expect(page.getByText(s.vendorName)).toHaveCount(0);
 });

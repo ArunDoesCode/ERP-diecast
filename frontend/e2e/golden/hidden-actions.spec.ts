@@ -16,7 +16,11 @@ test("T-5 (7) QA inspector sees no PO menu and no New SCO button; typed PO URL r
 	await uiLogin(bo, "back_office");
 	await expect(bo.getByRole("link", { name: /^POs/ })).toBeVisible();
 	await bo.getByRole("link", { name: "Subcontracting" }).first().click();
-	await expect(bo.getByRole("link", { name: "New SCO" })).toBeVisible();
+	await expect(
+		bo
+			.getByRole("group", { name: "Page actions" })
+			.getByRole("link", { name: "New SCO" }),
+	).toBeVisible();
 	await boCtx.close();
 
 	// QA inspector: the menu has no PO entry, the SCO list has no "New SCO".
