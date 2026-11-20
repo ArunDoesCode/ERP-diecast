@@ -813,6 +813,9 @@ describe("GRN list: BR-FF-109 strip counts, BR-FF-02, bucket", () => {
 
   test("BR-FF-02 Late receipts-to-inspect: bucket=late rows = Home tile late count; bucket=late implies QA pending", async () => {
     const before = await tile("a", "grns_to_inspect");
+    const todayListBefore = (
+      await grnList("a", "bucket=today&qaStatus=pending")
+    ).json.meta.total;
     const po = await mkPo("dispatched", {
       lines: [{ qty: 100 }, { qty: 100 }],
     });
@@ -840,9 +843,10 @@ describe("GRN list: BR-FF-109 strip counts, BR-FF-02, bucket", () => {
 
     const after = await tile("a", "grns_to_inspect");
     expect(delta(before, after).late).toBe(l.json.meta.total);
-    expect(delta(before, after).today).toBe(
-      (await grnList("a", "bucket=today&qaStatus=pending")).json.meta.total,
-    );
+    // like with like: change in the tile equals change in the list total
+    const todayListAfter = (await grnList("a", "bucket=today&qaStatus=pending"))
+      .json.meta.total;
+    expect(delta(before, after).today).toBe(todayListAfter - todayListBefore);
   });
 
   test("BR-FF-02 bucket=late with a qaStatus other than pending -> 400 VALIDATION_ERROR; with pending -> 200", async () => {
@@ -870,6 +874,7 @@ describe("BR-FF-29 job-work due back: list bucket = tile", () => {
 
   test("BR-FF-14 / BR-FF-29 today and later buckets split on return due date; the three buckets add up to the open list and to the tile", async () => {
     const before = await tile("a", "jobwork_due");
+    const listBefore = (await challans("a")).json.meta.total;
     const today = await mkChallan(dayAt(0), 10, 0);
     const later = await mkChallan(dayAt(40), 10, 3);
     const t = await challans("a", "bucket=today");
@@ -887,7 +892,8 @@ describe("BR-FF-29 job-work due back: list bucket = tile", () => {
       all.json.meta.total,
     );
     const after = await tile("a", "jobwork_due");
-    expect(delta(before, after).count).toBe(all.json.meta.total);
+    // like with like: change in the tile equals change in the open list total
+    expect(delta(before, after).count).toBe(all.json.meta.total - listBefore);
   });
 
   test("BR-FF-29 bucket=late with dueStatus other than overdue -> 400 VALIDATION_ERROR", async () => {
