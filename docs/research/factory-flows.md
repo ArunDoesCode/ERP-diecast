@@ -132,3 +132,20 @@ Docs found say nothing on list summary strips or pop-up vs full-page forms (desi
 | 5 | What does the plant head check first each morning? | A stock, B late orders, C pending approvals, D rejects | First tile on plant head home |
 
 ## Follow-ups
+
+### Decision benchmarks (2026-11-20)
+Read 2026-11-20. Docs silent on most UI-layout choices (6, 11, 12); marked "design choice".
+| # | Verdict | Basis |
+|---|---|---|
+| 1 | Keep A, drafts only, never auto-sent | No product has one click for many suppliers: ERPNext splits one request over several POs, Odoo makes one RFQ per vendor. Separate drafts per supplier is the same idea. https://docs.frappe.io/erpnext/user/manual/en/material-request · https://www.odoo.com/documentation/master/applications/inventory_and_mrp/purchase/manage_deals/calls_for_tenders.html |
+| 2 | Keep A (empty + button) | Products disagree with draft: Copy To / Create Receipt pre-fill open quantity (earlier Q2/Q4). Empty is stricter: stops blind "all arrived" taps. Not re-verified in a new page. |
+| 3 | Keep A (my approval) | SAP puts pending approvals first in its alerts window; work stuck behind a person blocks others. SME Q5 still open. https://help.sap.com/saphelp_sbo92/helpdata/en/45/06da03d8696c30e10000000a114a6b/content.htm |
+| 4 | Keep | Odoo activities per user, SAP alerts per authorizer, ERPNext workspace per user/role. https://www.odoo.com/documentation/18.0/applications/essentials/activities.html |
+| 5 | Keep | Odoo Late / Today / Future, red / orange / green. Neutral for "later" is our small change. Same link as 4. |
+| 6 | Keep | ERPNext workflow shows only allowed actions. https://docs.frappe.io/erpnext/user/manual/en/workflows |
+| 7 | Keep | ERPNext saves and submits as separate steps, so a failed submit leaves the saved draft. A combined button is design choice. https://docs.frappe.io/erpnext/permissions |
+| 8 | Keep, only while approval is pending | SAP approver drills from the alert to the draft; ERPNext allows Read or per-document Share. Whether SAP skips module rights: docs silent. https://docs.frappe.io/erpnext/user/manual/en/sharing |
+| 9 | Keep | Odoo has no documented hide-prices setting (forum "See Prices" lead only, unverified); build it as our own rule, default hidden. https://www.odoo.com/forum/help-1/how-to-hide-cost-price-and-sale-price-for-users-in-inventory-and-manufacturingodoo-18-community-272973 |
+| 10 | Keep, if preview shows all lines, prices, totals | Products disagree: SAP decision report answers in the report list; ERPNext/Odoo act on the opened document. Stricter = approver sees everything first. https://help.sap.com/saphelp_sbo882/helpdata/en/45/06da6fd8696c30e10000000a114a6b/content.htm |
+| 11 | Keep | Design choice; no product documents menu order. |
+| 12 | Keep 50 | Odoo default 80, ERPNext default 20 saved per user (forum/third-party only, no official page). https://discuss.frappe.io/t/list-view-default-page-length/88123 |
