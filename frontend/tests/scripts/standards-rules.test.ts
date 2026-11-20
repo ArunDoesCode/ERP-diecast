@@ -359,4 +359,42 @@ describe("BR-DS-28 sizes only from the token tables", () => {
 	test("BR-DS-28 a clean file has no findings", () => {
 		expect(checkSize(VIEW, jsx("flex p-2 text-sm"))).toEqual([]);
 	});
+	// SPEC-02: the control and its height class can sit on different lines.
+	for (const tag of ["Button", "Input", "SelectTrigger", "button", "input"]) {
+		for (const cls of ["h-7", "h-6", "h-[28px]", "size-7"]) {
+			test(`BR-DS-28 flags <${tag}> with ${cls} on a later line`, () => {
+				const src = `export const X = () => (\n\t<${tag}\n\t\tvariant="outline"\n\t\tclassName="flex ${cls} px-2"\n\t/>\n);\n`;
+				const f = checkSize(VIEW, src);
+				expect(f.length).toBeGreaterThanOrEqual(1);
+				expect(rules(f)).toContain("size");
+			});
+		}
+	}
+
+	test("BR-DS-28 flags a multi-line cn() className on a Button", () => {
+		const src = `export const X = () => (\n\t<Button\n\t\tclassName={cn(\n\t\t\t"flex",\n\t\t\t"h-7",\n\t\t)}\n\t/>\n);\n`;
+		expect(rules(checkSize(VIEW, src))).toContain("size");
+	});
+
+	test("BR-DS-28 accepts a multi-line Button at h-9", () => {
+		const src = `export const X = () => (\n\t<Button\n\t\tvariant="outline"\n\t\tclassName="flex h-9 px-2"\n\t/>\n);\n`;
+		expect(checkSize(VIEW, src)).toEqual([]);
+	});
+
+	test("BR-DS-28 a small height on a non-control multi-line element is not flagged", () => {
+		const src = `export const X = () => (\n\t<div\n\t\tclassName="flex h-7 px-2"\n\t/>\n);\n`;
+		expect(checkSize(VIEW, src)).toEqual([]);
+	});
+
+	test("BR-DS-28 a small height on a later control is not hidden by an earlier OK control", () => {
+		const src = `export const X = () => (\n\t<>\n\t\t<Button\n\t\t\tclassName="h-9"\n\t\t/>\n\t\t<Button\n\t\t\tclassName="h-7"\n\t\t/>\n\t</>\n);\n`;
+		expect(rules(checkSize(VIEW, src))).toContain("size");
+	});
+
+	for (const cls of ["h-1", "h-2", "h-3", "h-4", "size-4"]) {
+		test(`BR-DS-28 flags control height ${cls} on a button`, () => {
+			const src = `export const X = () => <button className="${cls}" />;\n`;
+			expect(rules(checkSize(VIEW, src))).toContain("size");
+		});
+	}
 });
