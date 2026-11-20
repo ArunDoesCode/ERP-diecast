@@ -7,6 +7,7 @@ const API_Header = {
 	pr: "/pr",
 	po: "/po",
 	grn: "/grn",
+	document: "/document",
 	sco: "/sco",
 	company: "/company",
 };
@@ -157,6 +158,10 @@ export const API_ROUTES = {
 			`${API_Header.grn}/${grnId}/lines/${lineId}/bypass`,
 		correction: (grnId: number, lineId: number) =>
 			`${API_Header.grn}/${grnId}/lines/${lineId}/correction`,
+	},
+	document: {
+		panel: (docType: "pr" | "po" | "grn", docId: number) =>
+			`${API_Header.document}/getpanel/${docType}/${docId}`,
 	},
 	subcontracting: {
 		list: `${API_Header.sco}/getscos`,

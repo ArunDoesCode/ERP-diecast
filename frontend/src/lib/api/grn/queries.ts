@@ -10,11 +10,11 @@ import { toast } from "sonner";
 
 import { assetKeys } from "@/lib/api/asset/queries";
 import { ApiClientError } from "@/lib/api/client";
+import { documentKeys } from "@/lib/api/document/queries";
 import { purchaseOrderKeys } from "@/lib/api/purchase-orders/queries";
 import type {
 	GrnBypassPayload,
 	GrnCreatePayload,
-	GrnListParams,
 	GrnQaDecisionPayload,
 	GrnUpdatePayload,
 } from "@/types/grn";
@@ -30,10 +30,11 @@ import {
 	getReceivablePos,
 	updateGrn,
 } from "./fetchers";
+import type { GrnListQuery } from "./list-types";
 import type { ReceivableParams } from "./receivable-types";
 
 export const grnKeys = {
-	list: (params?: GrnListParams) =>
+	list: (params?: GrnListQuery) =>
 		params ? (["grn", "list", params] as const) : (["grn", "list"] as const),
 	detail: (grnId: number) => ["grn", "detail", grnId] as const,
 	receivable: (params?: ReceivableParams) =>
@@ -46,7 +47,7 @@ function errorMessage(error: unknown, fallback: string) {
 	return error instanceof ApiClientError ? error.message : fallback;
 }
 
-export function useGrnsQuery(params: GrnListParams) {
+export function useGrnsQuery(params: GrnListQuery) {
 	return useQuery({
 		queryKey: grnKeys.list(params),
 		queryFn: () => getGrns(params),
@@ -157,6 +158,7 @@ function invalidateGrnAndPO(
 	return Promise.all([
 		queryClient.invalidateQueries({ queryKey: grnKeys.list() }),
 		queryClient.invalidateQueries({ queryKey: grnKeys.detail(grnId) }),
+		queryClient.invalidateQueries({ queryKey: documentKeys.all }),
 		// Stock and moving average change on QA/bypass/correction postings.
 		queryClient.invalidateQueries({ queryKey: assetKeys.items() }),
 		queryClient.invalidateQueries({ queryKey: assetKeys.stock() }),

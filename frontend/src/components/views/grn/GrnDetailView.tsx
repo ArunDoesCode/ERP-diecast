@@ -6,11 +6,17 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { EditGrnModal } from "@/components/pages/grn/EditGrnModal";
-import { GrnLinesTable } from "@/components/pages/grn/GrnLinesTable";
+import {
+	GrnLinesTable,
+	isPendingLine,
+} from "@/components/pages/grn/GrnLinesTable";
+import { GrnQaDecisionModal } from "@/components/pages/grn/GrnQaDecisionModal";
 import { DetailHeader } from "@/components/shared/DetailHeader";
 import { DocumentFlow } from "@/components/shared/DocumentFlow";
+import { DocumentSidePanel } from "@/components/shared/DocumentSidePanel";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { TwoPaneLayout } from "@/components/shared/TwoPaneLayout";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -34,11 +40,13 @@ import { useCan } from "@/hooks/use-can";
 import { useDeleteGrnMutation, useGrnDetailQuery } from "@/lib/api/grn/queries";
 import { formatDate, formatDocNo } from "@/lib/format";
 import { useBreadcrumbLast } from "@/lib/shell/breadcrumb-last";
-import type { Grn, GrnLinkedPo, GrnLinkedPr } from "@/types/grn";
+import type { Grn, GrnItemDetail, GrnLinkedPo, GrnLinkedPr } from "@/types/grn";
 
 export function GrnDetailView({ grnId }: { grnId: number }) {
 	const canEditDraft = useCan("grn.edit_draft");
+	const canDecideQa = useCan("grn.qa_decide");
 	const [editOpen, setEditOpen] = useState(false);
+	const [inspectLine, setInspectLine] = useState<GrnItemDetail | null>(null);
 
 	const detailQuery = useGrnDetailQuery(grnId, grnId > 0);
 	const detail = detailQuery.data?.success ? detailQuery.data.data : undefined;
@@ -47,6 +55,9 @@ export function GrnDetailView({ grnId }: { grnId: number }) {
 	useBreadcrumbLast(grn?.grnNumber);
 
 	const canManage = canEditDraft && grn?.status === "draft";
+	// Next step (BR-FF-44): Inspect the first pending line.
+	const firstPending = items.find(isPendingLine);
+	const showInspect = canDecideQa && firstPending !== undefined;
 
 	if (detailQuery.isLoading) {
 		return (
@@ -100,24 +111,58 @@ export function GrnDetailView({ grnId }: { grnId: number }) {
 					{ label: "Vehicle", value: grn.vehicleNo ?? "–" },
 				]}
 				actions={
-					canManage ? (
-						<GrnDraftActions grn={grn} onEdit={() => setEditOpen(true)} />
+					showInspect || canManage ? (
+						<>
+							{showInspect ? (
+								<Button
+									type="button"
+									onClick={() => setInspectLine(firstPending)}
+								>
+									Inspect
+								</Button>
+							) : null}
+							{canManage ? (
+								<GrnDraftActions grn={grn} onEdit={() => setEditOpen(true)} />
+							) : null}
+						</>
 					) : undefined
 				}
 			/>
 
 			<GrnDocumentFlow grn={grn} po={detail.po} prs={detail.prs} />
 
-			<GrnDeliveryDetails grn={grn} />
+			<TwoPaneLayout
+				sideLabel="Receipt summary"
+				side={<DocumentSidePanel docType="grn" docId={grn.id} />}
+			>
+				<GrnDeliveryDetails grn={grn} />
 
-			<Card>
-				<CardHeader>
-					<CardTitle>Lines</CardTitle>
-				</CardHeader>
-				<CardContent>
-					<GrnLinesTable grnId={grn.id} poId={grn.poId ?? 0} items={items} />
-				</CardContent>
-			</Card>
+				<Card>
+					<CardHeader>
+						<CardTitle>Lines</CardTitle>
+					</CardHeader>
+					<CardContent>
+						<GrnLinesTable
+							grnId={grn.id}
+							poId={grn.poId ?? 0}
+							items={items}
+							onInspect={setInspectLine}
+						/>
+					</CardContent>
+				</Card>
+			</TwoPaneLayout>
+
+			{inspectLine ? (
+				<GrnQaDecisionModal
+					grnId={grn.id}
+					poId={grn.poId ?? 0}
+					line={inspectLine}
+					open
+					onOpenChange={(open) => {
+						if (!open) setInspectLine(null);
+					}}
+				/>
+			) : null}
 
 			{editOpen ? (
 				<EditGrnModal
@@ -141,6 +186,8 @@ function GrnDocumentFlow({
 	po: GrnLinkedPo | null;
 	prs: GrnLinkedPr[];
 }) {
+	const canOpenPr = useCan("pr.manage");
+	const canOpenPo = useCan("po.manage");
 	const firstPr = prs[0];
 	return (
 		<DocumentFlow
@@ -152,7 +199,11 @@ function GrnDocumentFlow({
 							? `${firstPr.prNumber} +${prs.length - 1}`
 							: firstPr.prNumber
 						: undefined,
-					href: firstPr ? `/purchase-orders/${firstPr.id}` : undefined,
+					// A step the viewer cannot open is plain text (BR-FF-03).
+					href:
+						firstPr && canOpenPr
+							? `/purchase-requisitions/${firstPr.id}`
+							: undefined,
 					status: firstPr ? (
 						<StatusBadge doc="pr" status={firstPr.status} />
 					) : undefined,
@@ -161,6 +212,7 @@ function GrnDocumentFlow({
 				{
 					label: "Purchase order",
 					docNo: po?.poNumber,
+					href: po && canOpenPo ? `/purchase-orders/${po.id}` : undefined,
 					status: po ? <StatusBadge doc="po" status={po.status} /> : undefined,
 					state: po ? "done" : "todo",
 				},
@@ -205,7 +257,7 @@ function GrnDraftActions({ grn, onEdit }: { grn: Grn; onEdit: () => void }) {
 
 	return (
 		<>
-			<Button type="button" size="sm" variant="outline" onClick={onEdit}>
+			<Button type="button" variant="outline" onClick={onEdit}>
 				Edit
 			</Button>
 			<DropdownMenu>

@@ -18,6 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useCan } from "@/hooks/use-can";
 import { useUnsavedChangesGuard } from "@/hooks/use-unsaved-changes-guard";
 import { ApiClientError } from "@/lib/api/client";
+import { useDocumentPanelQuery } from "@/lib/api/document/queries";
 import {
 	useCreateGrnMutation,
 	useReceivablePosQuery,
@@ -67,6 +68,14 @@ export function GrnReceiveFormView() {
 		canReceive && poId != null,
 	);
 	const createMutation = useCreateGrnMutation();
+	// Earlier receipts of this order. A store keeper without po.manage gets 403: block stays hidden.
+	const panelQuery = useDocumentPanelQuery(
+		"po",
+		canReceive && poId != null ? poId : 0,
+	);
+	const earlierReceipts = (panelQuery.data?.data.linked ?? []).filter(
+		(doc) => doc.docType === "grn",
+	);
 
 	const [challanNo, setChallanNo] = useState("");
 	const [vehicleNo, setVehicleNo] = useState("");
@@ -267,6 +276,37 @@ export function GrnReceiveFormView() {
 								<StatusBadge doc="po" status={order.status} />
 							</dd>
 						</dl>
+						{earlierReceipts.length > 0 ? (
+							<div className="space-y-2 border-t pt-3">
+								<h3 className="text-[13px] leading-[18px] font-semibold tracking-wide text-muted-foreground uppercase">
+									Earlier receipts
+								</h3>
+								<ul className="space-y-1.5">
+									{earlierReceipts.map((doc) => (
+										<li
+											key={doc.id}
+											className="flex flex-wrap items-center gap-2"
+										>
+											{doc.canOpen ? (
+												<Link
+													href={`/grn/${doc.id}`}
+													className="font-mono text-brand-accent hover:underline"
+												>
+													{doc.number}
+												</Link>
+											) : (
+												<span className="font-mono">{doc.number}</span>
+											)}
+											{doc.qaStatus ? (
+												<StatusBadge doc="grnQa" status={doc.qaStatus} />
+											) : (
+												<StatusBadge doc="grn" status={doc.status} />
+											)}
+										</li>
+									))}
+								</ul>
+							</div>
+						) : null}
 					</div>
 				}
 			>

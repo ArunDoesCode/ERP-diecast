@@ -9,13 +9,12 @@ import type {
 	GrnDeleteResult,
 	GrnDetailResult,
 	GrnLineActionResult,
-	GrnListParams,
-	GrnListResult,
 	GrnQaDecisionPayload,
 	GrnUpdatePayload,
 	GrnUpdateResult,
 } from "@/types/grn";
 
+import type { GrnListQuery, GrnListResultV2 } from "./list-types";
 import type { ReceivableParams, ReceivableResult } from "./receivable-types";
 
 function toQueryString(params?: Record<string, unknown>) {
@@ -30,8 +29,8 @@ function toQueryString(params?: Record<string, unknown>) {
 	return `?${new URLSearchParams(entries.map(([key, value]) => [key, String(value)]))}`;
 }
 
-export function getGrns(params?: GrnListParams) {
-	return api.get<GrnListResult>(
+export function getGrns(params?: GrnListQuery) {
+	return api.get<GrnListResultV2>(
 		`${API_ROUTES.grn.list}${toQueryString(params)}`,
 	);
 }
