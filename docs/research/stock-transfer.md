@@ -116,4 +116,6 @@ Stock view already shows per-location balances. So the minimum location model is
 | 4 | Are scrap / rework / quarantine separate locations? | A yes / B no | Whether transfer feeds scrap flow |
 
 ## Follow-ups
-None yet.
+| Question | Finding | Link | Read on |
+|---|---|---|---|
+| Who may create, post and cancel a material transfer in ERPNext? | Stock Entry roles Stock User, Manufacturing User, Manufacturing Manager, Stock Manager all have create, submit, cancel, amend; no separate "reverse" role | https://github.com/frappe/erpnext/blob/develop/erpnext/stock/doctype/stock_entry/stock_entry.json | 2026-11-20 |
