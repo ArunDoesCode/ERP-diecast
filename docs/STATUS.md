@@ -20,7 +20,7 @@
 | suppliers | frozen v1 | [map](modules/suppliers.md) | full | merged (PR #13) |
 | subcontracting | frozen v4 | [map](modules/subcontracting.md) | full — incl. IST day | merged (PR #14, #86) → UAT-1 |
 | db-migrations | frozen v1 | — | full — baseline + `db:migrate` | merged (PR #86) |
-| design-system | frozen v1 | [map](modules/design-system.md) | full — tokens, shell, shared components; purchase orders + GRN adopted | merged (PR #108); roll-out to other modules #104 |
+| design-system | frozen v2 | [map](modules/design-system.md) | full — v2 look (graphite + indigo, 14 px, 36 px controls, 44 px rows, label-above fields) app-wide | v1 merged (PR #108); v2 epic PR open, waiting for your merge |
 | bom | none | — | none | after workflow v2 (first customer of the new flow) |
 | sale-order | none | — | none | after bom |
 
@@ -42,6 +42,7 @@ Legend — Code: none / schema only / partial / full. Tests per module: see each
 
 ## Recently done
 - 2026-11-19 — All 57 open issues fixed on `claude/cranky-payne-f2bc8a`; full flow run (purchase, GRN, subcontracting) passes in the browser; 1773 backend + 301 frontend tests, 7 golden-path e2e on desktop + tablet. Frontend TypeScript stays 6.0.3 until a Next.js upgrade (TS 7 breaks `next build` on 16.2). Deploy note: everyone signs in once; operator QR badges must be regenerated.
+- 2026-11-20 — Design system v2 built (epic `epic/design-system-v2`): new colours, bigger type and controls on every screen, one field look; one push and one PR at the end (owner).
 - 2026-11-19 — Design review of PO + GRN screens (light/dark, desktop/tablet, axe): DES-001..012 fixed; GRN list + detail on the shared patterns; BR-GRN-45 PO/PR numbers + document flow on GRN (#109). Closed #16, #44, #63 (fixed by PR #86) and duplicates #88, #89, #90.
 - 2026-11-18 — PR #108 merged: design-system epic into `main`.
 - 2026-11-18 — Design system epic built (3 sub-features, PRs #101–#103 into `epic/design-system`); CI now runs frontend unit tests + contrast check; e2e runs locally before push and in CI only on PRs into `main` (D-024). Follow-ups #104–#107

@@ -58,7 +58,7 @@ Answer like "1 yes, 2 no". A "no" becomes a card.
 3. A partly accepted GRN turns amber (today violet); a waived QA check turns grey (today blue).
 4. Status names read as plain words: "Partly ordered", "Partly received", "Pending QA", "Sent back" (today "partial ordered").
 5. Money shows paise in tables, documents and forms (₹4,82,000.00) and whole rupees on summary cards.
-6. (2026-11-20, not answered yet; built as written unless you say no) Every form field gets one look: the label above the field. Today two looks are mixed.
+6. (2026-11-20, yes: "a") Every form field gets one look: the label above the field. Today two looks are mixed.
 
 Everything else: about 55 technical choices logged. No reading needed.
 ## 6. Not included
