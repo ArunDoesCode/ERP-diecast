@@ -30,7 +30,6 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { FloatingLabelInput } from "@/components/ui/floating-label";
 import {
 	Form,
 	FormControl,
@@ -39,6 +38,8 @@ import {
 	FormLabel,
 	FormMessage,
 } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
 	Select,
 	SelectContent,
@@ -318,11 +319,13 @@ function MovementCreateForm({ onDone }: MovementCreateFormProps) {
 					control={form.control}
 					name="quantity"
 					render={({ field }) => (
-						<FormItem className="min-h-19">
+						<FormItem className="min-h-19 gap-1.5">
+							<Label htmlFor="movement-quantity">
+								{isOpening ? "Opening quantity" : "Counted quantity"}
+							</Label>
 							<FormControl>
-								<FloatingLabelInput
+								<Input
 									id="movement-quantity"
-									label={isOpening ? "Opening quantity" : "Counted quantity"}
 									type="number"
 									step="0.001"
 									min="0"
@@ -348,15 +351,15 @@ function MovementCreateForm({ onDone }: MovementCreateFormProps) {
 					control={form.control}
 					name="unitCost"
 					render={({ field }) => (
-						<FormItem className="min-h-19">
+						<FormItem className="min-h-19 gap-1.5">
+							<Label htmlFor="movement-unit-cost">
+								{isOpening
+									? "Rate per unit (₹)"
+									: "Cost per unit (₹) - needed if counted is more than balance"}
+							</Label>
 							<FormControl>
-								<FloatingLabelInput
+								<Input
 									id="movement-unit-cost"
-									label={
-										isOpening
-											? "Rate per unit (₹)"
-											: "Cost per unit (₹) - needed if counted is more than balance"
-									}
 									type="number"
 									step="0.01"
 									min="0"
@@ -382,11 +385,13 @@ function MovementCreateForm({ onDone }: MovementCreateFormProps) {
 					control={form.control}
 					name="batchNumber"
 					render={({ field }) => (
-						<FormItem className="min-h-19">
+						<FormItem className="min-h-19 gap-1.5">
+							<Label htmlFor="movement-batch-number">
+								Batch number (optional)
+							</Label>
 							<FormControl>
-								<FloatingLabelInput
+								<Input
 									id="movement-batch-number"
-									label="Batch number (optional)"
 									name={field.name}
 									value={field.value ?? ""}
 									onBlur={field.onBlur}
@@ -405,11 +410,11 @@ function MovementCreateForm({ onDone }: MovementCreateFormProps) {
 					control={form.control}
 					name="reason"
 					render={({ field }) => (
-						<FormItem className="min-h-19">
+						<FormItem className="min-h-19 gap-1.5">
+							<Label htmlFor="movement-reason">Reason</Label>
 							<FormControl>
-								<FloatingLabelInput
+								<Input
 									id="movement-reason"
-									label="Reason"
 									name={field.name}
 									value={field.value ?? ""}
 									onBlur={field.onBlur}

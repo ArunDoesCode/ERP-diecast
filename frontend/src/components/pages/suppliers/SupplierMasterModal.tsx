@@ -13,7 +13,6 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { FloatingLabelInput } from "@/components/ui/floating-label";
 import {
 	Form,
 	FormControl,
@@ -22,6 +21,8 @@ import {
 	FormLabel,
 	FormMessage,
 } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
 	Select,
 	SelectContent,
@@ -127,12 +128,12 @@ export function SupplierMasterModal({
 											control={form.control}
 											name="name"
 											render={({ field }) => (
-												<FormItem className="min-h-19">
+												<FormItem className="min-h-19 content-start gap-1.5">
+													<Label htmlFor="supplier-name">Supplier name</Label>
 													<FormControl>
-														<FloatingLabelInput
+														<Input
 															{...field}
 															id="supplier-name"
-															label="Supplier name"
 															maxLength={200}
 														/>
 													</FormControl>
@@ -154,7 +155,7 @@ export function SupplierMasterModal({
 															value={field.value ?? "raw_material"}
 															onValueChange={field.onChange}
 														>
-															<SelectTrigger className="h-12 w-full rounded-lg px-3 text-base md:text-sm">
+															<SelectTrigger className="w-full">
 																<SelectValue placeholder="Select supplier type" />
 															</SelectTrigger>
 															<SelectContent>
@@ -182,13 +183,15 @@ export function SupplierMasterModal({
 											control={form.control}
 											name="gstNumber"
 											render={({ field }) => (
-												<FormItem className="min-h-19">
+												<FormItem className="min-h-19 content-start gap-1.5">
+													<Label htmlFor="supplier-gst">
+														GST number (optional)
+													</Label>
 													<FormControl>
-														<FloatingLabelInput
+														<Input
 															{...field}
 															value={field.value ?? ""}
 															id="supplier-gst"
-															label="GST number (optional)"
 															maxLength={15}
 															onChange={(event) => {
 																const previousGst = field.value ?? "";
@@ -227,13 +230,15 @@ export function SupplierMasterModal({
 											control={form.control}
 											name="panNumber"
 											render={({ field }) => (
-												<FormItem className="min-h-19">
+												<FormItem className="min-h-19 content-start gap-1.5">
+													<Label htmlFor="supplier-pan">
+														PAN number (optional, filled from GST)
+													</Label>
 													<FormControl>
-														<FloatingLabelInput
+														<Input
 															{...field}
 															value={field.value ?? ""}
 															id="supplier-pan"
-															label="PAN number (optional, filled from GST)"
 															maxLength={10}
 															onChange={(event) =>
 																field.onChange(event.target.value.toUpperCase())
@@ -256,13 +261,15 @@ export function SupplierMasterModal({
 											control={form.control}
 											name="contactPerson"
 											render={({ field }) => (
-												<FormItem className="min-h-19">
+												<FormItem className="min-h-19 content-start gap-1.5">
+													<Label htmlFor="supplier-contact">
+														Contact person (optional)
+													</Label>
 													<FormControl>
-														<FloatingLabelInput
+														<Input
 															{...field}
 															value={field.value ?? ""}
 															id="supplier-contact"
-															label="Contact person (optional)"
 															maxLength={200}
 														/>
 													</FormControl>
@@ -274,13 +281,15 @@ export function SupplierMasterModal({
 											control={form.control}
 											name="phone"
 											render={({ field }) => (
-												<FormItem className="min-h-19">
+												<FormItem className="min-h-19 content-start gap-1.5">
+													<Label htmlFor="supplier-phone">
+														Phone (optional)
+													</Label>
 													<FormControl>
-														<FloatingLabelInput
+														<Input
 															{...field}
 															value={field.value ?? ""}
 															id="supplier-phone"
-															label="Phone (optional)"
 															maxLength={30}
 														/>
 													</FormControl>
@@ -292,13 +301,15 @@ export function SupplierMasterModal({
 											control={form.control}
 											name="email"
 											render={({ field }) => (
-												<FormItem className="min-h-19">
+												<FormItem className="min-h-19 content-start gap-1.5">
+													<Label htmlFor="supplier-email">
+														Email (optional)
+													</Label>
 													<FormControl>
-														<FloatingLabelInput
+														<Input
 															{...field}
 															value={field.value ?? ""}
 															id="supplier-email"
-															label="Email (optional)"
 															maxLength={254}
 															type="email"
 														/>
@@ -311,13 +322,15 @@ export function SupplierMasterModal({
 											control={form.control}
 											name="address"
 											render={({ field }) => (
-												<FormItem className="min-h-19">
+												<FormItem className="min-h-19 content-start gap-1.5">
+													<Label htmlFor="supplier-address">
+														Address (optional)
+													</Label>
 													<FormControl>
-														<FloatingLabelInput
+														<Input
 															{...field}
 															value={field.value ?? ""}
 															id="supplier-address"
-															label="Address (optional)"
 															maxLength={500}
 														/>
 													</FormControl>
@@ -337,11 +350,13 @@ export function SupplierMasterModal({
 											control={form.control}
 											name="defaultPaymentTermsDays"
 											render={({ field }) => (
-												<FormItem className="min-h-19">
+												<FormItem className="min-h-19 content-start gap-1.5">
+													<Label htmlFor="supplier-payment">
+														Default payment terms (days, 0-365)
+													</Label>
 													<FormControl>
-														<FloatingLabelInput
+														<Input
 															id="supplier-payment"
-															label="Default payment terms (days, 0-365)"
 															type="number"
 															min={0}
 															max={365}

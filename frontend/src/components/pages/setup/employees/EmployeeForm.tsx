@@ -6,7 +6,6 @@ import { type Resolver, useForm } from "react-hook-form";
 
 import { QrTokenPanel } from "@/components/pages/setup/employees/QrTokenPanel";
 import { Button } from "@/components/ui/button";
-import { FloatingLabelInput } from "@/components/ui/floating-label";
 import {
 	Form,
 	FormControl,
@@ -15,6 +14,8 @@ import {
 	FormLabel,
 	FormMessage,
 } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
 	Select,
 	SelectContent,
@@ -116,9 +117,10 @@ export function EmployeeForm({
 					control={form.control}
 					name="name"
 					render={({ field }) => (
-						<FormItem className="min-h-19 mt-2">
+						<FormItem className="min-h-19 mt-2 gap-1.5">
+							<Label htmlFor="name">Name</Label>
 							<FormControl>
-								<FloatingLabelInput {...field} id="name" label="Name" />
+								<Input {...field} id="name" />
 							</FormControl>
 							<FormMessage />
 						</FormItem>
@@ -129,9 +131,10 @@ export function EmployeeForm({
 					control={form.control}
 					name="phone"
 					render={({ field }) => (
-						<FormItem className="min-h-19">
+						<FormItem className="min-h-19 gap-1.5">
+							<Label htmlFor="phone">Phone</Label>
 							<FormControl>
-								<FloatingLabelInput {...field} id="phone" label="Phone" />
+								<Input {...field} id="phone" />
 							</FormControl>
 							<FormMessage />
 						</FormItem>
@@ -142,11 +145,11 @@ export function EmployeeForm({
 					control={form.control}
 					name="dailyRatePaise"
 					render={({ field }) => (
-						<FormItem className="min-h-19">
+						<FormItem className="min-h-19 gap-1.5">
+							<Label htmlFor="dailyRatePaise">Daily Rate (paise)</Label>
 							<FormControl>
-								<FloatingLabelInput
+								<Input
 									id="dailyRatePaise"
-									label="Daily Rate (paise)"
 									type="number"
 									name={field.name}
 									value={field.value}
@@ -224,14 +227,10 @@ export function EmployeeForm({
 							control={form.control}
 							name="email"
 							render={({ field }) => (
-								<FormItem className="min-h-19">
+								<FormItem className="min-h-19 gap-1.5">
+									<Label htmlFor="email">Email</Label>
 									<FormControl>
-										<FloatingLabelInput
-											{...field}
-											id="email"
-											label="Email"
-											type="email"
-										/>
+										<Input {...field} id="email" type="email" />
 									</FormControl>
 									<FormMessage />
 								</FormItem>
@@ -242,14 +241,10 @@ export function EmployeeForm({
 							control={form.control}
 							name="password"
 							render={({ field }) => (
-								<FormItem className="min-h-19">
+								<FormItem className="min-h-19 gap-1.5">
+									<Label htmlFor="password">Password</Label>
 									<FormControl>
-										<FloatingLabelInput
-											{...field}
-											id="password"
-											label="Password"
-											type="password"
-										/>
+										<Input {...field} id="password" type="password" />
 									</FormControl>
 									<FormMessage />
 								</FormItem>

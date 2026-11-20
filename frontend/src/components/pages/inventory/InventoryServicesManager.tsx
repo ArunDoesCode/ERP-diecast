@@ -30,7 +30,6 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { FloatingLabelInput } from "@/components/ui/floating-label";
 import {
 	Form,
 	FormControl,
@@ -39,6 +38,8 @@ import {
 	FormLabel,
 	FormMessage,
 } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import {
@@ -160,13 +161,10 @@ function ServiceEditorForm({ mode, service, onDone }: ServiceEditorFormProps) {
 						control={form.control}
 						name="code"
 						render={({ field }) => (
-							<FormItem className="min-h-19 mt-2">
+							<FormItem className="min-h-19 mt-2 gap-1.5">
+								<Label htmlFor="service-code">Code</Label>
 								<FormControl>
-									<FloatingLabelInput
-										{...field}
-										id="service-code"
-										label="Code"
-									/>
+									<Input {...field} id="service-code" />
 								</FormControl>
 								<FormMessage />
 							</FormItem>
@@ -177,13 +175,10 @@ function ServiceEditorForm({ mode, service, onDone }: ServiceEditorFormProps) {
 						control={form.control}
 						name="name"
 						render={({ field }) => (
-							<FormItem className="min-h-19 mt-2">
+							<FormItem className="min-h-19 mt-2 gap-1.5">
+								<Label htmlFor="service-name">Service name</Label>
 								<FormControl>
-									<FloatingLabelInput
-										{...field}
-										id="service-name"
-										label="Service name"
-									/>
+									<Input {...field} id="service-name" />
 								</FormControl>
 								<FormMessage />
 							</FormItem>
@@ -194,13 +189,10 @@ function ServiceEditorForm({ mode, service, onDone }: ServiceEditorFormProps) {
 						control={form.control}
 						name="defaultUom"
 						render={({ field }) => (
-							<FormItem className="min-h-19">
+							<FormItem className="min-h-19 gap-1.5">
+								<Label htmlFor="service-uom">Default UOM</Label>
 								<FormControl>
-									<FloatingLabelInput
-										{...field}
-										id="service-uom"
-										label="Default UOM"
-									/>
+									<Input {...field} id="service-uom" />
 								</FormControl>
 								<FormMessage />
 							</FormItem>
@@ -211,11 +203,13 @@ function ServiceEditorForm({ mode, service, onDone }: ServiceEditorFormProps) {
 						control={form.control}
 						name="sacCode"
 						render={({ field }) => (
-							<FormItem className="min-h-19">
+							<FormItem className="min-h-19 gap-1.5">
+								<Label htmlFor="service-sac">
+									SAC code (6 digits, starts 99)
+								</Label>
 								<FormControl>
-									<FloatingLabelInput
+									<Input
 										id="service-sac"
-										label="SAC code (6 digits, starts 99)"
 										inputMode="numeric"
 										maxLength={6}
 										name={field.name}
@@ -236,11 +230,13 @@ function ServiceEditorForm({ mode, service, onDone }: ServiceEditorFormProps) {
 						control={form.control}
 						name="description"
 						render={({ field }) => (
-							<FormItem className="min-h-19">
+							<FormItem className="min-h-19 gap-1.5">
+								<Label htmlFor="service-description">
+									Description (optional)
+								</Label>
 								<FormControl>
-									<FloatingLabelInput
+									<Input
 										id="service-description"
-										label="Description (optional)"
 										name={field.name}
 										value={field.value ?? ""}
 										onBlur={field.onBlur}

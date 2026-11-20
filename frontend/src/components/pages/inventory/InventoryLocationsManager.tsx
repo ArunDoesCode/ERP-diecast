@@ -32,7 +32,6 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { FloatingLabelInput } from "@/components/ui/floating-label";
 import {
 	Form,
 	FormControl,
@@ -41,6 +40,8 @@ import {
 	FormLabel,
 	FormMessage,
 } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
 	Select,
 	SelectContent,
@@ -249,13 +250,10 @@ function LocationEditorForm({
 					control={form.control}
 					name="name"
 					render={({ field }) => (
-						<FormItem className="min-h-19 mt-2">
+						<FormItem className="min-h-19 mt-2 gap-1.5">
+							<Label htmlFor="location-name">Location name</Label>
 							<FormControl>
-								<FloatingLabelInput
-									{...field}
-									id="location-name"
-									label="Location name"
-								/>
+								<Input {...field} id="location-name" />
 							</FormControl>
 							<FormMessage />
 						</FormItem>

@@ -30,7 +30,6 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { FloatingLabelInput } from "@/components/ui/floating-label";
 import {
 	Form,
 	FormControl,
@@ -39,6 +38,8 @@ import {
 	FormLabel,
 	FormMessage,
 } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
 	Select,
 	SelectContent,
@@ -221,9 +222,10 @@ function ItemEditorForm({ mode, item, onDone }: ItemEditorFormProps) {
 						control={form.control}
 						name="sku"
 						render={({ field }) => (
-							<FormItem className="min-h-19">
+							<FormItem className="min-h-19 gap-1.5">
+								<Label htmlFor="item-sku">SKU</Label>
 								<FormControl>
-									<FloatingLabelInput {...field} id="item-sku" label="SKU" />
+									<Input {...field} id="item-sku" />
 								</FormControl>
 								<FormMessage />
 							</FormItem>
@@ -234,13 +236,10 @@ function ItemEditorForm({ mode, item, onDone }: ItemEditorFormProps) {
 						control={form.control}
 						name="name"
 						render={({ field }) => (
-							<FormItem className="min-h-19">
+							<FormItem className="min-h-19 gap-1.5">
+								<Label htmlFor="item-name">Item name</Label>
 								<FormControl>
-									<FloatingLabelInput
-										{...field}
-										id="item-name"
-										label="Item name"
-									/>
+									<Input {...field} id="item-name" />
 								</FormControl>
 								<FormMessage />
 							</FormItem>
@@ -307,11 +306,11 @@ function ItemEditorForm({ mode, item, onDone }: ItemEditorFormProps) {
 						control={form.control}
 						name="standardRate"
 						render={({ field }) => (
-							<FormItem className="min-h-19">
+							<FormItem className="min-h-19 gap-1.5">
+								<Label htmlFor="item-standard-rate">Standard rate (₹)</Label>
 								<FormControl>
-									<FloatingLabelInput
+									<Input
 										id="item-standard-rate"
-										label="Standard rate (₹)"
 										type="number"
 										step="0.01"
 										min="0"
@@ -336,11 +335,13 @@ function ItemEditorForm({ mode, item, onDone }: ItemEditorFormProps) {
 						control={form.control}
 						name="reorderLevel"
 						render={({ field }) => (
-							<FormItem className="min-h-19">
+							<FormItem className="min-h-19 gap-1.5">
+								<Label htmlFor="item-reorder-level">
+									Reorder level (optional)
+								</Label>
 								<FormControl>
-									<FloatingLabelInput
+									<Input
 										id="item-reorder-level"
-										label="Reorder level (optional)"
 										type="number"
 										step="0.001"
 										min="0"
@@ -385,11 +386,11 @@ function ItemEditorForm({ mode, item, onDone }: ItemEditorFormProps) {
 							control={form.control}
 							name="hsnCode"
 							render={({ field }) => (
-								<FormItem className="col-span-2 min-h-19">
+								<FormItem className="col-span-2 min-h-19 gap-1.5">
+									<Label htmlFor="item-hsn-code">HSN code (optional)</Label>
 									<FormControl>
-										<FloatingLabelInput
+										<Input
 											id="item-hsn-code"
-											label="HSN code (optional)"
 											maxLength={20}
 											name={field.name}
 											value={field.value ?? ""}
@@ -408,11 +409,11 @@ function ItemEditorForm({ mode, item, onDone }: ItemEditorFormProps) {
 						control={form.control}
 						name="description"
 						render={({ field }) => (
-							<FormItem className="col-span-2 min-h-19">
+							<FormItem className="col-span-2 min-h-19 gap-1.5">
+								<Label htmlFor="item-description">Description (optional)</Label>
 								<FormControl>
-									<FloatingLabelInput
+									<Input
 										id="item-description"
-										label="Description (optional)"
 										name={field.name}
 										value={field.value ?? ""}
 										onBlur={field.onBlur}

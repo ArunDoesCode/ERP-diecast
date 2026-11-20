@@ -47,7 +47,6 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { FloatingLabelInput } from "@/components/ui/floating-label";
 import {
 	Form,
 	FormControl,
@@ -56,6 +55,8 @@ import {
 	FormLabel,
 	FormMessage,
 } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TableCell } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -206,7 +207,7 @@ export function CreatePurchaseRequisitionModal({
 											control={form.control}
 											name="type"
 											render={({ field }) => (
-												<FormItem className="min-h-19">
+												<FormItem className="min-h-19 content-start gap-1.5">
 													<FormLabel
 														className="sr-only"
 														htmlFor="create-pr-type"
@@ -217,7 +218,7 @@ export function CreatePurchaseRequisitionModal({
 														<select
 															id="create-pr-type"
 															aria-label="PR type"
-															className="h-12 w-full rounded-lg border border-input bg-input/20 px-3 text-sm"
+															className="h-9 w-full rounded-md border border-input bg-input/20 px-3 text-sm"
 															value={field.value}
 															onChange={(event) =>
 																field.onChange(event.target.value)
@@ -240,7 +241,7 @@ export function CreatePurchaseRequisitionModal({
 												control={form.control}
 												name="assetId"
 												render={({ field }) => (
-													<FormItem className="min-h-19">
+													<FormItem className="min-h-19 content-start gap-1.5">
 														<FormLabel>Machine</FormLabel>
 														<FormControl>
 															<SearchableSelect
@@ -358,10 +359,12 @@ export function CreatePurchaseRequisitionModal({
 														name={`items.${index}.requestedQty`}
 														render={({ field }) => (
 															<FormItem>
+																<Label htmlFor={`create-item-qty-${index}`}>
+																	Qty
+																</Label>
 																<FormControl>
-																	<FloatingLabelInput
+																	<Input
 																		id={`create-item-qty-${index}`}
-																		label="Qty"
 																		type="number"
 																		step="0.001"
 																		min="0"
@@ -733,12 +736,13 @@ export function EditPurchaseRequisitionModal({
 									>
 										{activeStep === "details" ? (
 											<div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-												<FormItem className="min-h-19">
+												<FormItem className="min-h-19 content-start gap-1.5">
 													{/* <FormLabel>PR type</FormLabel> */}
+													<Label htmlFor="pr-type">PR type</Label>
 													<FormControl>
-														<FloatingLabelInput
+														<Input
+															id="pr-type"
 															value={pr.type}
-															label="PR type"
 															readOnly
 															disabled
 														/>
@@ -746,12 +750,12 @@ export function EditPurchaseRequisitionModal({
 												</FormItem>
 
 												{canLinkMachine ? (
-													<FormItem className="min-h-19">
-														<FormLabel>Machine</FormLabel>
+													<FormItem className="min-h-19 content-start gap-1.5">
+														<Label htmlFor="pr-machine-id">Machine id</Label>
 														<FormControl>
-															<FloatingLabelInput
+															<Input
+																id="pr-machine-id"
 																value={pr.assetId ? String(pr.assetId) : ""}
-																label="Machine id"
 																readOnly
 																disabled
 															/>
@@ -861,10 +865,12 @@ export function EditPurchaseRequisitionModal({
 																name={`items.${index}.requestedQty`}
 																render={({ field }) => (
 																	<FormItem>
+																		<Label htmlFor={`edit-item-qty-${index}`}>
+																			Qty
+																		</Label>
 																		<FormControl>
-																			<FloatingLabelInput
+																			<Input
 																				id={`edit-item-qty-${index}`}
-																				label="Qty"
 																				type="number"
 																				step="0.001"
 																				min="0"

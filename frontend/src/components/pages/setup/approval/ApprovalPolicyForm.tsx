@@ -4,7 +4,6 @@ import type { UseFieldArrayReturn, UseFormReturn } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FloatingLabelInput } from "@/components/ui/floating-label";
 import {
 	Form,
 	FormControl,
@@ -13,6 +12,8 @@ import {
 	FormLabel,
 	FormMessage,
 } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
 	Select,
 	SelectContent,
@@ -97,13 +98,10 @@ export function ApprovalPolicyForm({
 									control={form.control}
 									name="name"
 									render={({ field }) => (
-										<FormItem className="min-h-19">
+										<FormItem className="min-h-19 gap-1.5">
+											<Label htmlFor="approval-policy-name">Policy name</Label>
 											<FormControl>
-												<FloatingLabelInput
-													id="approval-policy-name"
-													label="Policy name"
-													{...field}
-												/>
+												<Input id="approval-policy-name" {...field} />
 											</FormControl>
 											<FormMessage />
 										</FormItem>
@@ -131,11 +129,11 @@ export function ApprovalPolicyForm({
 								control={form.control}
 								name="priority"
 								render={({ field }) => (
-									<FormItem className="min-h-19">
+									<FormItem className="min-h-19 gap-1.5">
+										<Label htmlFor="approval-policy-priority">Priority</Label>
 										<FormControl>
-											<FloatingLabelInput
+											<Input
 												id="approval-policy-priority"
-												label="Priority"
 												type="number"
 												min={1}
 												name={field.name}
@@ -231,11 +229,13 @@ export function ApprovalPolicyForm({
 								control={form.control}
 								name="minAmountPaise"
 								render={({ field }) => (
-									<FormItem className="min-h-19">
+									<FormItem className="min-h-19 gap-1.5">
+										<Label htmlFor="approval-policy-min-amount">
+											Min amount (₹)
+										</Label>
 										<FormControl>
-											<FloatingLabelInput
+											<Input
 												id="approval-policy-min-amount"
-												label="Min amount (₹)"
 												type="number"
 												min={0}
 												step="0.01"
@@ -251,11 +251,13 @@ export function ApprovalPolicyForm({
 								control={form.control}
 								name="maxAmountPaise"
 								render={({ field }) => (
-									<FormItem className="min-h-19">
+									<FormItem className="min-h-19 gap-1.5">
+										<Label htmlFor="approval-policy-max-amount">
+											Max amount (₹)
+										</Label>
 										<FormControl>
-											<FloatingLabelInput
+											<Input
 												id="approval-policy-max-amount"
-												label="Max amount (₹)"
 												type="number"
 												min={0}
 												step="0.01"

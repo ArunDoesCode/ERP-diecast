@@ -16,7 +16,6 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { FloatingLabelInput } from "@/components/ui/floating-label";
 import {
 	Form,
 	FormControl,
@@ -25,6 +24,8 @@ import {
 	FormLabel,
 	FormMessage,
 } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
 	Select,
 	SelectContent,
@@ -122,10 +123,7 @@ function GstSelect({
 }) {
 	return (
 		<Select value={String(value)} onValueChange={(v) => onChange(Number(v))}>
-			<SelectTrigger
-				id={id}
-				className="h-12 w-full rounded-lg px-3 text-base md:text-sm"
-			>
+			<SelectTrigger id={id} className="w-full">
 				<SelectValue placeholder="Select GST %" />
 			</SelectTrigger>
 			<SelectContent>
@@ -391,7 +389,7 @@ export function SupplierOfferingsDialog({
 								control={itemForm.control}
 								name="itemId"
 								render={({ field }) => (
-									<FormItem className="min-h-19">
+									<FormItem className="min-h-19 content-start gap-1.5">
 										<FormLabel>Item</FormLabel>
 										<FormControl>
 											<SearchableSelect
@@ -430,12 +428,12 @@ export function SupplierOfferingsDialog({
 									control={itemForm.control}
 									name="supplierSku"
 									render={({ field }) => (
-										<FormItem className="min-h-19">
+										<FormItem className="min-h-19 content-start gap-1.5">
+											<Label htmlFor="supplier-item-sku">Supplier SKU</Label>
 											<FormControl>
-												<FloatingLabelInput
+												<Input
 													{...field}
 													id="supplier-item-sku"
-													label="Supplier SKU"
 													maxLength={100}
 												/>
 											</FormControl>
@@ -448,12 +446,14 @@ export function SupplierOfferingsDialog({
 									control={itemForm.control}
 									name="supplierUnitPriceRupees"
 									render={({ field }) => (
-										<FormItem className="min-h-19">
+										<FormItem className="min-h-19 content-start gap-1.5">
+											<Label htmlFor="supplier-item-price">
+												Unit price (₹ per unit)
+											</Label>
 											<FormControl>
-												<FloatingLabelInput
+												<Input
 													{...field}
 													id="supplier-item-price"
-													label="Unit price (₹ per unit)"
 													inputMode="decimal"
 												/>
 											</FormControl>
@@ -466,7 +466,7 @@ export function SupplierOfferingsDialog({
 									control={itemForm.control}
 									name="taxPercentage"
 									render={({ field }) => (
-										<FormItem className="min-h-19">
+										<FormItem className="min-h-19 content-start gap-1.5">
 											<FormLabel htmlFor="supplier-item-tax">GST %</FormLabel>
 											<FormControl>
 												<GstSelect
@@ -484,11 +484,13 @@ export function SupplierOfferingsDialog({
 									control={itemForm.control}
 									name="leadTimeDays"
 									render={({ field }) => (
-										<FormItem className="min-h-19">
+										<FormItem className="min-h-19 content-start gap-1.5">
+											<Label htmlFor="supplier-item-lead">
+												Lead time days (0-365)
+											</Label>
 											<FormControl>
-												<FloatingLabelInput
+												<Input
 													id="supplier-item-lead"
-													label="Lead time days (0-365)"
 													type="number"
 													min={0}
 													max={365}
@@ -508,11 +510,13 @@ export function SupplierOfferingsDialog({
 									control={itemForm.control}
 									name="qty"
 									render={({ field }) => (
-										<FormItem className="min-h-19">
+										<FormItem className="min-h-19 content-start gap-1.5">
+											<Label htmlFor="supplier-item-qty">
+												Qty capacity (0 = no limit)
+											</Label>
 											<FormControl>
-												<FloatingLabelInput
+												<Input
 													id="supplier-item-qty"
-													label="Qty capacity (0 = no limit)"
 													type="number"
 													step="0.001"
 													min={0}
@@ -532,12 +536,12 @@ export function SupplierOfferingsDialog({
 									control={itemForm.control}
 									name="uom"
 									render={({ field }) => (
-										<FormItem className="min-h-19">
+										<FormItem className="min-h-19 content-start gap-1.5">
+											<Label htmlFor="supplier-item-uom">UOM</Label>
 											<FormControl>
-												<FloatingLabelInput
+												<Input
 													{...field}
 													id="supplier-item-uom"
-													label="UOM"
 													disabled
 													readOnly
 												/>
@@ -583,7 +587,7 @@ export function SupplierOfferingsDialog({
 									control={serviceForm.control}
 									name="serviceId"
 									render={({ field }) => (
-										<FormItem className="min-h-19">
+										<FormItem className="min-h-19 content-start gap-1.5">
 											<FormLabel>Service</FormLabel>
 											<FormControl>
 												<SearchableSelect
@@ -613,12 +617,14 @@ export function SupplierOfferingsDialog({
 									control={serviceForm.control}
 									name="serviceUnitPriceRupees"
 									render={({ field }) => (
-										<FormItem className="min-h-19">
+										<FormItem className="min-h-19 content-start gap-1.5">
+											<Label htmlFor="supplier-service-price">
+												Service rate (₹)
+											</Label>
 											<FormControl>
-												<FloatingLabelInput
+												<Input
 													{...field}
 													id="supplier-service-price"
-													label="Service rate (₹)"
 													inputMode="decimal"
 												/>
 											</FormControl>
@@ -631,7 +637,7 @@ export function SupplierOfferingsDialog({
 									control={serviceForm.control}
 									name="taxPercentage"
 									render={({ field }) => (
-										<FormItem className="min-h-19">
+										<FormItem className="min-h-19 content-start gap-1.5">
 											<FormLabel htmlFor="supplier-service-tax">
 												GST %
 											</FormLabel>
@@ -651,11 +657,13 @@ export function SupplierOfferingsDialog({
 									control={serviceForm.control}
 									name="leadTimeDays"
 									render={({ field }) => (
-										<FormItem className="min-h-19">
+										<FormItem className="min-h-19 content-start gap-1.5">
+											<Label htmlFor="supplier-service-lead">
+												Lead time days (0-365)
+											</Label>
 											<FormControl>
-												<FloatingLabelInput
+												<Input
 													id="supplier-service-lead"
-													label="Lead time days (0-365)"
 													type="number"
 													min={0}
 													max={365}
