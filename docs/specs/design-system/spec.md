@@ -1,7 +1,7 @@
 ---
 module: design-system
 status: frozen           # draft | frozen (set only by /freeze)
-version: 1
+version: 2
 frozen_on: 2026-11-18
 owner: Arun
 depends_on: []
@@ -19,7 +19,7 @@ research:
 One set of colour, type and motion tokens, one status map, nine shared components and one formatter for the
 frontend (Next.js 16, Tailwind v4, shadcn radix-mira, Manrope, Tabler icons, next-themes).
 Users: purchase, stores and planning staff on desktops, long sessions, dense tables. Tone: calm,
-industrial, precise: emerald primary, steel-blue accent, cool grey neutrals (hue 250).
+industrial, precise: graphite primary, indigo accent, neutral greys (hue 286). v1 was emerald, steel blue, hue 250.
 Done = tokens, shared components and shell are in place, purchase orders (list, detail, form) use
 them as the reference module, light and dark both pass contrast, and motion exists only in the
 eight allowed places. No backend change, no new library, no business rule of any module changes.
@@ -35,22 +35,22 @@ keep today's value.
 
 | Token | Light | Dark | Use |
 |---|---|---|---|
-| `--background` | `oklch(0.982 0.005 250)` | `oklch(0.17 0.012 250)` | Page |
-| `--foreground` | `oklch(0.21 0.018 250)` | `oklch(0.95 0.006 250)` | Text |
-| `--card`, `--popover` | `oklch(1 0 0)` | `oklch(0.215 0.014 250)`, `oklch(0.24 0.015 250)` | Cards, tables; dialogs, menus, toasts |
+| `--background` | `oklch(0.985 0.002 286)` | `oklch(0.17 0.005 286)` | Page |
+| `--foreground` | `oklch(0.21 0.006 286)` | `oklch(0.95 0.003 286)` | Text |
+| `--card`, `--popover` | `oklch(1 0 0)` | `oklch(0.215 0.006 286)`, `oklch(0.24 0.006 286)` | Cards, tables; dialogs, menus, toasts |
 | `--card-foreground`, `--popover-foreground` | = foreground | = foreground | Text on them |
-| `--primary` | `oklch(0.508 0.118 165.612)` (kept) | `oklch(0.432 0.095 166.913)` (kept) | Fill of the main action; never text colour |
-| `--primary-foreground` | `oklch(0.979 0.021 166.113)` (kept) | same (kept) | Text on primary |
-| `--secondary` | `oklch(0.955 0.008 250)` | `oklch(0.27 0.014 250)` | Secondary button fill |
-| `--secondary-foreground` | `oklch(0.25 0.018 250)` | `oklch(0.95 0.006 250)` | Text on it |
-| `--muted` | `oklch(0.962 0.006 250)` | `oklch(0.26 0.014 250)` | Skeleton, quiet fills |
-| `--muted-foreground` | `oklch(0.49 0.02 250)` | `oklch(0.72 0.015 250)` | Secondary text, column heads |
-| `--accent` | `oklch(0.95 0.01 250)` | `oklch(0.28 0.016 250)` | Hover surface (shadcn meaning, unchanged role) |
-| `--accent-foreground` | `oklch(0.25 0.018 250)` | `oklch(0.95 0.006 250)` | Text on hover surface |
-| `--table-header` | `oklch(0.95 0.018 262)` | `oklch(0.27 0.03 264)` | Table header row tint (new) |
-| `--border` | `oklch(0.91 0.008 250)` | `oklch(1 0 0 / 10%)` | Decorative lines |
-| `--input` | `oklch(0.64 0.015 250)` | `oklch(0.56 0.02 250)` | Field and outline-button border (3:1 on every surface) |
-| `--ring`, `--sidebar-ring` | `oklch(0.55 0.12 262)` | `oklch(0.72 0.1 262)` | Focus ring (content, sidebar) |
+| `--primary` | `oklch(0.21 0.006 286)` | `oklch(0.92 0.004 286)` | Fill of the main action; never text colour |
+| `--primary-foreground` | `oklch(0.985 0 0)` | `oklch(0.21 0.006 286)` | Text on primary |
+| `--secondary` | `oklch(0.955 0.003 286)` | `oklch(0.27 0.006 286)` | Secondary button fill |
+| `--secondary-foreground` | `oklch(0.25 0.006 286)` | `oklch(0.95 0.003 286)` | Text on it |
+| `--muted` | `oklch(0.962 0.003 286)` | `oklch(0.26 0.006 286)` | Skeleton, quiet fills |
+| `--muted-foreground` | `oklch(0.49 0.012 286)` | `oklch(0.72 0.01 286)` | Secondary text, column heads |
+| `--accent` | `oklch(0.95 0.004 286)` | `oklch(0.28 0.007 286)` | Hover surface (shadcn meaning, unchanged role) |
+| `--accent-foreground` | `oklch(0.25 0.006 286)` | `oklch(0.95 0.003 286)` | Text on hover surface |
+| `--table-header` | `oklch(0.955 0.004 286)` | `oklch(0.265 0.008 286)` | Table header row tint (new) |
+| `--border` | `oklch(0.91 0.004 286)` | `oklch(1 0 0 / 10%)` | Decorative lines |
+| `--input` | `oklch(0.64 0.01 286)` | `oklch(0.56 0.012 286)` | Field and outline-button border (3:1 on every surface) |
+| `--ring`, `--sidebar-ring` | `oklch(0.511 0.262 277)` | `oklch(0.68 0.155 277)` | Focus ring (content, sidebar); same indigo as the accent |
 | `--success` | `oklch(0.5 0.125 150)` | `oklch(0.8 0.14 152)` | Tone text, icon, solid fill |
 | `--success-foreground` | `oklch(0.985 0.02 150)` | `oklch(0.2 0.05 152)` | Text on solid success |
 | `--success-subtle` | `oklch(0.95 0.04 152)` | `oklch(0.29 0.055 152)` | Badge and icon-chip tint |
@@ -60,32 +60,32 @@ keep today's value.
 | `--info` | `oklch(0.5 0.11 228)` | `oklch(0.79 0.1 228)` | as above |
 | `--info-foreground` | `oklch(0.985 0.015 228)` | `oklch(0.2 0.04 232)` | |
 | `--info-subtle` | `oklch(0.95 0.03 228)` | `oklch(0.29 0.05 232)` | |
-| `--neutral` | `oklch(0.45 0.02 250)` | `oklch(0.78 0.012 250)` | as above |
-| `--neutral-foreground` | `oklch(0.985 0.003 250)` | `oklch(0.2 0.01 250)` | |
-| `--neutral-subtle` | `oklch(0.94 0.008 250)` | `oklch(0.29 0.012 250)` | |
+| `--neutral` | `oklch(0.45 0.012 286)` | `oklch(0.78 0.008 286)` | as above |
+| `--neutral-foreground` | `oklch(0.985 0.002 286)` | `oklch(0.2 0.006 286)` | |
+| `--neutral-subtle` | `oklch(0.94 0.004 286)` | `oklch(0.29 0.007 286)` | |
 | `--destructive` | `oklch(0.53 0.2 27)` (changed) | `oklch(0.76 0.14 22)` (changed) | Danger tone, delete actions |
 | `--destructive-foreground` | `oklch(0.985 0.01 27)` | `oklch(0.2 0.05 25)` | new |
 | `--destructive-subtle` | `oklch(0.955 0.025 25)` | `oklch(0.29 0.06 22)` | new |
-| `--brand-accent` | `oklch(0.42 0.14 262)` | `oklch(0.7 0.12 264)` | Second brand colour: selection, position, links (BR-DS-07) |
-| `--brand-accent-foreground` | `oklch(0.975 0.012 262)` | `oklch(0.18 0.04 264)` | Text on solid accent |
-| `--brand-accent-subtle` | `oklch(0.93 0.03 262)` | `oklch(0.31 0.08 264)` | Status-change flash only |
+| `--brand-accent` | `oklch(0.511 0.262 277)` | `oklch(0.68 0.155 277)` | Second brand colour: selection, position, links (BR-DS-07) |
+| `--brand-accent-foreground` | `oklch(0.98 0.008 277)` | `oklch(0.18 0.04 277)` | Text on solid accent |
+| `--brand-accent-subtle` | `oklch(0.94 0.025 277)` | `oklch(0.31 0.08 277)` | Status-change flash only |
 | `--chart-1` | `oklch(0.6 0.12 165)` | `oklch(0.86 0.14 165)` | Emerald |
 | `--chart-2` | `oklch(0.4 0.12 252)` | `oklch(0.58 0.12 252)` | Blue |
 | `--chart-3` | `oklch(0.5 0.105 70)` | `oklch(0.74 0.13 78)` | Amber |
 | `--chart-4` | `oklch(0.6 0.13 305)` | `oklch(0.78 0.13 305)` | Violet |
 | `--chart-5` | `oklch(0.4 0.15 10)` | `oklch(0.58 0.14 20)` | Rose |
-| `--sidebar` | `oklch(0.962 0.01 250)` | `oklch(0.2 0.014 250)` | Sidebar |
-| `--sidebar-foreground` | `oklch(0.3 0.02 250)` | `oklch(0.9 0.008 250)` | |
-| `--sidebar-muted` | `oklch(0.49 0.02 250)` | `oklch(0.7 0.015 250)` | Group labels (new) |
-| `--sidebar-primary` | `oklch(0.508 0.118 165.612)` | `oklch(0.696 0.17 162.48)` (kept) | Brand mark, active bar |
-| `--sidebar-accent` | `oklch(0.925 0.045 165)` | `oklch(0.3 0.05 165)` | Active item tint (from primary) |
-| `--sidebar-accent-foreground` | `oklch(0.36 0.09 166)` | `oklch(0.86 0.11 165)` | Active item text |
-| `--sidebar-border` | `oklch(0.9 0.01 250)` | `oklch(1 0 0 / 10%)` | |
+| `--sidebar` | `oklch(0.965 0.003 286)` | `oklch(0.2 0.006 286)` | Sidebar |
+| `--sidebar-foreground` | `oklch(0.3 0.008 286)` | `oklch(0.9 0.004 286)` | |
+| `--sidebar-muted` | `oklch(0.49 0.012 286)` | `oklch(0.7 0.01 286)` | Group labels (new) |
+| `--sidebar-primary`, `--sidebar-primary-foreground` | `oklch(0.21 0.006 286)`, `oklch(0.985 0 0)` | `oklch(0.92 0.004 286)`, `oklch(0.21 0.006 286)` | Brand mark, active bar; icon on the brand mark |
+| `--sidebar-accent` | `oklch(0.93 0.03 277)` | `oklch(0.3 0.07 277)` | Active item tint (from the accent) |
+| `--sidebar-accent-foreground` | `oklch(0.36 0.15 277)` | `oklch(0.86 0.06 277)` | Active item text |
+| `--sidebar-border` | `oklch(0.9 0.004 286)` | `oklch(1 0 0 / 10%)` | |
 
 Each tone is three tokens. Text or icon in the tone = `--<tone>` on `--<tone>-subtle` or on a card.
 Solid fill = `--<tone>` with `--<tone>-foreground`. Measured (OKLCH → sRGB, WCAG 2): lowest text
-pair 4.90 light, 4.93 dark; lowest field border or ring on its surface 3.01; lowest chart colour on
-card 3.72. Accent against info: ΔE 11.3 light, 11.4 dark (OKLab × 100). Chart colours differ from
+pair 4.96 light, 5.88 dark; lowest field border or ring on its surface 3.23; lowest chart colour on
+card 3.72. Accent against info: ΔE 20.7 light, 16.1 dark (OKLab × 100). Chart colours differ from
 each other by ΔE ≥ 11.6 light and ≥ 15.0 dark, also under simulated red-green colour blindness.
 
 **Where colour carries weight** (BR-DS-26). Exactly these seven places, plus status tones (BR-DS-03),
@@ -111,21 +111,26 @@ to the browser default today. Load Geist Mono with `next/font/google` (`variable
 
 | Role | Size / line | Weight | Where |
 |---|---|---|---|
-| Page title | 20 / 28 | 700 | `PageHeader`, `DetailHeader` (the only `h1`) |
-| Section title | 15 / 22 | 700 | Card and dialog titles, empty state |
-| Body | 13 / 20 | 400 | Forms, descriptions |
+| Page title | 24 / 32 (v1: 20 / 28) | 700 | `PageHeader`, `DetailHeader` (the only `h1`) |
+| Section title | 16 / 24 (v1: 15 / 22) | 700 | Card and dialog titles, empty state |
+| Body | 14 / 20 (v1: 13 / 20) | 400 | Forms, descriptions, fields, menus, sidebar items, breadcrumbs |
 | Table cell | density token | 400 | `DataTable` |
-| Label | 12 / 16 | 600 | Column heads, field labels, stat labels, buttons |
-| Badge | 11 / 20 | 600 | `StatusBadge` (today 10 px) |
-| Stat value | 26 / 34 | 700 | `StatCard` |
+| Label | 13 / 18 (v1: 12 / 16) | 600 | Column heads, field labels, stat labels |
+| Badge | 12 / 20 (v1: 11 / 20) | 600 | `StatusBadge` |
+| Stat value | 28 / 36 (v1: 26 / 34) | 700 | `StatCard` |
 | Document number | 0.92 em | 500 | mono, in tables and headers |
 
 | Density | Row height | Table text | Set by |
 |---|---|---|---|
-| comfortable (default) | 36 px | 13 px | `data-density` on `<html>` |
-| compact (today's size) | 30 px | 12 px | user switch, kept in `localStorage` |
+| comfortable (default) | 44 px (v1: 36) | 14 px (v1: 13) | `data-density` on `<html>` |
+| compact (v1's comfortable) | 36 px (v1: 30) | 13 px (v1: 12) | user switch, kept in `localStorage` |
 
-Radius stays `--radius: 0.625rem`. Badges are pills. Icons: Tabler, 16 px, stroke 1.75.
+| Control (v2) | Height | Text |
+|---|---|---|
+| Button, input, select, filter chip | 36 px; small 32 px; large 40 px (v1 code: 28 / 24 / 32) | 14 px; buttons weight 600 |
+| Sidebar item; table header row | 36 px; 44 px | 14 px; Label role |
+
+Radius stays `--radius: 0.625rem`. Badges are pills. Icons: Tabler, 16 px, stroke 1.75. v2: cards and dialogs have 24 px padding (v1 code: 16), cards carry `shadow-xs`, table cells 12 px side padding.
 
 ## Tokens — motion
 Five duration tokens (plain custom properties in `:root`) and one easing token (in `@theme`, so the
@@ -256,7 +261,7 @@ Each is a focused UI piece (props in, callbacks out, no data fetching, no permis
 | `DetailHeader` | `docNo`, `title?`, `status: ReactNode`, `meta?: {label, value}[]`, `actions?`, `backHref`, `backLabel` | Mono document number + `StatusBadge` on one line; meta as label/value pairs; back link; same band and action rules as `PageHeader` |
 | `DocumentFlow` | `steps: {label, docNo?, href?, status?: ReactNode, state: "done"\|"current"\|"todo"}[]` | Shows the PR → PO → GRN (→ invoice) chain; the current step's label row is a solid `--brand-accent` strip with `--brand-accent-foreground` text and the step has `aria-current="step"`; `todo` is dashed with plain text; steps with `href` are links; wraps on narrow screens |
 | `FilterBar` | `quick?: {key, label, count?}[]`, `value`, `onChange`, `children?` (extra filters), `onReset?` | Selected quick filter = solid `--brand-accent` fill with `--brand-accent-foreground` text; counts in tabular numbers; state lives in the URL (nuqs) in the view, not here; "Reset" shows only when a filter is active |
-| `StatCard` | `label`, `value: number \| string`, `tone?: "neutral"\|"warning"\|"info"\|"success"\|"danger"`, `icon?`, `hint?`, `href?`, `loading?`, `error?`, `onRetry?`, `countUp?: boolean` | Left edge and icon chip in the tone (never accent); value 26 px tabular; count-up per the motion rules; whole card is a link when `href` is set |
+| `StatCard` | `label`, `value: number \| string`, `tone?: "neutral"\|"warning"\|"info"\|"success"\|"danger"`, `icon?`, `hint?`, `href?`, `loading?`, `error?`, `onRetry?`, `countUp?: boolean` | Left edge and icon chip in the tone (never accent); value 28 px tabular; count-up per the motion rules; whole card is a link when `href` is set |
 | `EmptyState` | `icon?`, `title`, `description?`, `action?: ReactNode` | Centred in the table or card area; title says what is missing; at most one action; no illustration |
 | `ErrorState` | `title?`, `message`, `onRetry?` | Shows the server message in plain words and a "Try again" button when `onRetry` is given; danger tone for the icon only |
 | `Pagination` | `page`, `pageSize`, `total`, `onPageChange`, `onPageSizeChange?` | "1 to 25 of 41"; previous / next / page numbers; current page = solid `--brand-accent` fill; hidden when `total <= pageSize`; replaces `common/DataTablePagination.tsx` in the views that adopt it |
@@ -283,13 +288,13 @@ renders with no gap and no disabled ghost — BR-DS-27):
 ## Shell
 | Part | Change |
 |---|---|
-| Sidebar header | Brand mark (emerald square with icon) + "DiecastOS"; the "Role: …" text moves to the user menu |
+| Sidebar header | Brand mark (graphite square with icon) + "DiecastOS"; the "Role: …" text moves to the user menu |
 | Sidebar items | Every item gets a Tabler icon; group labels in `--sidebar-muted`; active item per weight place 1 and `aria-current="page"`; items the user has no permission for are not rendered (today's behaviour) |
 | Sidebar fold | Folds to icons only (52 px); labels become tooltips; state kept in `localStorage` |
-| Top bar (new, 44 px) | Fold button (named "Fold sidebar" / "Unfold sidebar"), breadcrumbs, search box (visible stub, disabled, hint "/"), user menu |
+| Top bar (52 px; v1: 44) | Fold button (named "Fold sidebar" / "Unfold sidebar"), breadcrumbs, search box (visible stub, disabled, hint "/"), user menu |
 | Breadcrumbs | Defined once, here: `nav` named "Breadcrumb" with an `ol`, built from the route (group / list / document number); earlier items are links, the last is text with `aria-current="page"`. No other component draws breadcrumbs |
 | User menu | Avatar with initials (accent fill); menu holds name, role, light/dark switch, density switch, logout |
-| Content area | `max-w` none for list pages, 20 px padding; page background `--background`, tables and cards on `--card` |
+| Content area | `max-w` none for list pages, 24 px padding (v1: 20); page background `--background`, tables and cards on `--card` |
 | Dark mode | `next-themes` stays; default follows the system |
 
 Icons by route: Home `IconLayoutDashboard` · Requisitions `IconFileText` · Approvals `IconChecklist`
@@ -309,7 +314,7 @@ until plan 3.6–3.9 lands a human does the same steps) · **screenshot** (light
 | BR-DS-03 | A status has one label, one tone and one icon, taken from `status-tone.ts`. | PO `dispatched` on the PO list and PO detail → blue "Dispatched" with the arrow icon on both | script |
 | BR-DS-04 | An unknown or missing status renders a neutral "Unknown" badge and never throws. | Server sends `on_hold` (not in the map) → grey "Unknown", page still renders | script |
 | BR-DS-05 | Colour is never the only signal: a badge always carries its text label and its tone icon; `closed` tone is also an outline. | Greyscale screenshot → "Pending approval" (clock) and "Dispatched" (arrow) still differ | screenshot |
-| BR-DS-06 | `--primary` is used only as the solid fill of the main action and for the active-menu bar and brand mark; at most one primary button per page header or dialog. | Page header with "Export" and "New purchase order" → only the second is solid emerald | screenshot |
+| BR-DS-06 | `--primary` is used only as the solid fill of the main action and for the active-menu bar and brand mark; at most one primary button per page header or dialog. | Page header with "Export" and "New purchase order" → only the second is solid graphite (near-white in dark mode) | screenshot |
 | BR-DS-07 | `--brand-accent` marks selection, position and links only: selected filter chip and current page number (solid fill with `--brand-accent-foreground`), current step, avatar, link text, weight places 2–4. It is never a status tone and never a `StatCard` tone. | A view uses accent for "Dispatched" → review finding | screenshot |
 | BR-DS-08 | Danger tone is used only for destructive actions, refused or late statuses and error messages. | "Cancel order" confirm button → danger; "Export" → never | human |
 | BR-DS-09 | Motion exists only in the eight allow-list places, only with the motion tokens, `--ease-standard` and the allowed class spellings. | A card gets `transition-all duration-500 ease-out` → standards check reports three findings | script |
@@ -319,11 +324,11 @@ until plan 3.6–3.9 lands a human does the same steps) · **screenshot** (light
 | BR-DS-13 | Count-up runs only on `StatCard`, once per mount, at most 600 ms, numbers only, never on refetch, tables or forms. | Card mounts with 23 → counts to 23 once; query refetch returns 24 → value swaps with no animation | Playwright |
 | BR-DS-14 | The skeleton sweep runs only while data is loading and stops when data, empty or error state shows. | Query resolves after 800 ms → sweep stops, rows render | Playwright |
 | BR-DS-15 | Every adopted screen works in light and dark; no element keeps a light-mode colour in dark mode. | PO list in dark → badges use dark subtle tints, not bright pastel | screenshot |
-| BR-DS-16 | Default table density is comfortable; the user's choice is kept per browser and applies to every `DataTable`. | Given the user picked Compact, when they reload or open GRN, then rows are 30 px | Playwright |
+| BR-DS-16 | Default table density is comfortable; the user's choice is kept per browser and applies to every `DataTable`. | Given the user picked Compact, when they reload or open GRN, then rows are 36 px (v1: 30; default 44) | Playwright |
 | BR-DS-17 | An adopted list view is `PageHeader` + `FilterBar` + `DataTable` + `Pagination`, with `EmptyState`, `ErrorState` and skeleton rows for its three non-data states. | PO list with no orders → "No purchase orders yet" + "New purchase order", not an empty table | screenshot |
 | BR-DS-18 | Shared components and adopted views format dates, money and quantities only through `format.ts`. | PO total 48200000 paise → `₹4,82,000.00`; null date → `–` | script |
 | BR-DS-19 | Document numbers use the mono font; numeric columns are right-aligned with tabular numbers. | Qty and Value columns line up digit under digit | screenshot |
-| BR-DS-20 | Every interactive element shows a solid 2 px ring with a 2 px offset on keyboard focus, in `--ring` (in the sidebar `--sidebar-ring`); no blurred or half-transparent ring. | Tab through the PO list → each link, chip and button shows the same blue ring | Playwright |
+| BR-DS-20 | Every interactive element shows a solid 2 px ring with a 2 px offset on keyboard focus, in `--ring` (in the sidebar `--sidebar-ring`); no blurred or half-transparent ring. | Tab through the PO list → each link, chip and button shows the same indigo ring | Playwright |
 | BR-DS-21 | Every sidebar item has a Tabler icon; the active item is shown by tint, bold text and bar together. | On `/purchase-orders` → only "Purchase orders" is tinted | screenshot |
 | BR-DS-22 | Each page has exactly one `h1` (from `PageHeader` or `DetailHeader`) and one breadcrumb trail, in the top bar, that matches the route. | PO detail → "Purchase / Purchase orders / PO-2026-0187" | Playwright |
 | BR-DS-23 | Toasts: a success toast closes by itself after 4 s; an error toast stays until the user closes it; at most three toasts show at once, a fourth removes the oldest. Enter and exit motion as "Tokens — motion" (row 2). | PO approved → "PO approved" toast gone after 4 s; save fails → error toast stays until closed; four quick saves → three toasts visible | Playwright |
@@ -331,7 +336,8 @@ until plan 3.6–3.9 lands a human does the same steps) · **screenshot** (light
 | BR-DS-25 | Adoption changes look only: no route, permission, API call, validation or business rule changes in the same commit. | Commit that adopts `StatusBadge` in PO also changes a PO action rule → rejected | human |
 | BR-DS-26 | Colour carries weight only in the seven places of "Where colour carries weight", status tones (BR-DS-03), selection and position (BR-DS-07) and the brand mark (BR-DS-06); no gradients, no coloured page background, no coloured card fill. | A dashboard card gets a blue background → review finding | screenshot |
 | BR-DS-27 | An element the user has no permission for is not rendered: no disabled ghost, no gap. Shared components take no permission input; the view decides with the existing permission checks. | User without PO create permission opens the PO list → no "New purchase order" button, header keeps its height | Playwright |
-
+| BR-DS-28 | Text and control sizes come only from the tables in "Tokens — type, density, shape": no text under 12 px (12 px only in the badge) and no button (icon-only included), field or select under 32 px high, anywhere under `frontend/src/`, `ui/**` included. | A dialog button gets `h-7 text-xs` → standards check reports it | script |
+| BR-DS-29 | A form field has one look: its label above it in the Label role, the field 36 px high. The floating-label field is not used. | Supplier form → "GST number" label sits above a 36 px field, same as the PO form | script |
 
 ## Adoption order
 One commit per step; each step leaves every page working.
@@ -361,10 +367,11 @@ Same rules as "Adoption order": one commit per step, each step leaves every page
 | 15 | same | employee directory and setup |
 | 16 | Move the remaining date and money call sites (about 27 in 20 files) to `format.ts` (BR-DS-18) | any left after steps 8–15 |
 | 17 | Switch the `raw-palette` and `motion` standards checks from report to blocking, in the commit where their count is 0 (BR-DS-01, 09; api-standards BR-STD-30, 32) | none |
+| 18 | v2 colours and sizes: colour and density tokens in `globals.css`, `ui/**` (button incl. icon sizes, input, select, dropdown-menu, pagination, sidebar, card, dialog, table), `PageHeader`, top bar (BR-DS-16, 28); new `size` and `field-look` checks in `scripts/standards-rules.ts` + `standards-check.ts`; then label-above fields replace `ui/floating-label.tsx` (BR-DS-29) | every screen shifts size and colour; 15 form files; `preview.html`, the two owner pictures, `design/screens.md` and the `design-system` skill redone |
 
 ## Not now
 - Home dashboard content and the approvals count badge in the sidebar (needs count queries; pilot feature).
-- Touch density mode (44 px rows, 14 px text) and shop-floor screens: after the first tablet trial.
+- Shop-floor screens and 44 px touch size for buttons and fields: after the first tablet trial.
 - What the top-bar search finds. Print and PDF layouts. Phone layout. Login and public landing page.
 - A charts library and real charts. Logo design. Languages other than English.
 - The `design-system` skill, `ui-ux-designer` and `design-reviewer` agents, Playwright smoke (plan 3.6–3.9).
@@ -390,3 +397,4 @@ Built in epic `epic/design-system` (PRs #101 foundation, #102 shell, #103 purcha
 - 2026-11-18 v1 — frozen. Owner answered 6 cards and confirmed 5 choices; spec and design reviews passed in round 2
 - 2026-11-18 v1 — built (epic design-system). Choices made during the build: assumptions A-46 to A-57 (all info). Decision D-024 (e2e locally before push).
 - 2026-11-19 — change after freeze, approved by Arun in chat: BR-DS-23 toast timing moved from "Not now" to rules (#105). New "Roll-out" section (steps 8–17) moves from "Not now" to in scope: roll-out to the other modules and badge-map removal (#104), the remaining `format.ts` call sites (#106), and blocking standards checks after the roll-out (#91). No other rule id added.
+- 2026-11-20 v2 — change after freeze, approved by Arun in chat (Card 1 "A graphite", Card 2 "Size A (14 px)"; D-026, D-027). Bigger look: type, density and control sizes one step up, top bar 52 px, 24 px padding, card shadow; BR-DS-16 edited, BR-DS-28 and BR-DS-29 new, roll-out step 18. New colours, owner chose "graphite and indigo" on 2026-11-20 (D-026): graphite primary, indigo accent and focus ring, greys moved to hue 286; status tones and chart colours unchanged; all 86 contrast pairs pass. Tests to redo: BR-DS-16 in `frontend/e2e/design-system-shell.spec.ts` (36 / 30 px rows); new tests for BR-DS-28, 29 in `frontend/tests/scripts/standards-rules.test.ts`; BR-DS-02 `frontend/tests/scripts/contrast-check.test.ts` re-run only. OWNER.md wording follows the new colours (Card 3 "indigo tint").

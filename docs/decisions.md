@@ -156,3 +156,12 @@ If a decision is reversed, add a new entry that references the old one — don't
 ### D-025 — design-system skill turns on the design-reviewer (2026-11-18, owner)
 - **Decision:** `frontend/.claude/skills/design-system/SKILL.md` is written (plan step 3.6), so the design-reviewer is active (PROTOCOL → Efficiency). In `/feature` Phase 3 it runs right after test-runner, not in parallel (same ports and test DB), on the screens the dev reports list; it sets gates `design` and `screenshots`. Without `@axe-core/playwright` it checks accessibility with Playwright's accessibility snapshot and notes "axe not installed".
 - **Why:** the owner asked for design and screenshot gates on every build now that the tokens and components exist.
+
+### D-026 — Design system v2 colours: graphite and indigo (2026-11-20, owner)
+- **Decision:** the emerald primary and steel-blue accent are replaced by a graphite primary and one indigo accent on neutral greys (hue 286). Status tones and chart colours stay. Values: `docs/specs/design-system/spec.md` → "Tokens — colour" (v2).
+- **Why:** the owner asked for a sleek, modern, minimalist look and to "change the color scheme completely", and picked "A graphite" from three drawn directions. A green main button also competed with the green "approved" status. Required by BR-DS-24 before any token value changes.
+
+### D-027 — Design system v2 sizes: one step up (2026-11-20, owner)
+- **Decision:** 14 px text, 36 px buttons and fields, 44 px table rows, 24 px bold page titles, 24 px card padding; "Compact" gives 13 px text and 36 px rows. This replaces the 13 px / 36 px answer of 2026-11-18. Values: `docs/specs/design-system/spec.md` → "Tokens — type, density, shape" (v2).
+- **Why:** the owner found the app too small ("a little zoomed in") and picked "Size A (14 px)" from a drawn comparison of today, A and B. Most controls were 12 px text in 28 px boxes.
+
