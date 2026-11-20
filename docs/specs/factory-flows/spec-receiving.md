@@ -7,7 +7,7 @@ index: spec.md
 
 # Factory flows — Receive goods from the goods-receipt screen
 
-> Part of `spec.md` (example data and shared rules BR-FF-01..08 are there). Rules BR-FF-60..73.
+> Part of `spec.md` (example data and shared rules BR-FF-01..09 are there). Rules BR-FF-60..73.
 > Benchmark: SAP "Copy To" from the PO into the goods receipt, ERPNext Create → Receipt from the PO
 > with the source link, many receipts per PO (research Q2, Q4). All frozen GRN rules stay: challan
 > required and unique per supplier (BR-GRN-05), server date (BR-GRN-08), whole numbers for pieces

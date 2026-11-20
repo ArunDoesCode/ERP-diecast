@@ -7,7 +7,7 @@ index: spec.md
 
 # Factory flows — Home (work queues)
 
-> Part of `spec.md` (example data and shared rules BR-FF-01..08 are there). Rules BR-FF-10..33.
+> Part of `spec.md` (example data and shared rules BR-FF-01..09 are there). Rules BR-FF-10..34.
 > Benchmark: Odoo activity counts Late / Today / Future per user (research Q1); ERPNext workspace
 > shortcuts open lists. Adapted: count tiles per key, each opening its list already filtered.
 
@@ -27,6 +27,7 @@ index: spec.md
 | BR-FF-31 | The plant head has no separate screen: their Home is the same page and shows every tile their keys allow. | O (owner seed keys) → tiles 20–30 all shown |
 | BR-FF-32 | Counts are re-read when Home is opened or regains focus, and are at most 60 seconds old while it stays open. | Home open; B creates a PO in another tab; within 60 s tile 25 goes 0 → 1 |
 | BR-FF-33 | Home has no money totals in tiles; it shows counts only. | Tile "Orders to send 2" shows no ₹ value |
+| BR-FF-34 | A tile shows only when the user holds both the tile's key and the key of the list or picker it opens; with the seed roles this hides no tile. | A custom role with `po.manage` but no `pr.manage` → no tile 23 (its target is the PR list); seed `back_office` → tile 23 shown |
 
 ## Tiles
 Each tile row is one rule: key, what it counts, where it opens. Counts use only existing data.
@@ -38,7 +39,7 @@ Each tile row is one rule: key, what it counts, where it opens. Counts use only 
 | BR-FF-23 | Requisitions to order | `po.manage` | PRs `approved` / `partial_ordered` with at least one `pending` line | earliest required-by date of pending lines (no date = Later) | PR list, filter "To order" |
 | BR-FF-24 | Orders to send | `po.manage` | POs in `approved` (not yet sent) | expected delivery date | PO list, filter "Approved" |
 | BR-FF-25 | My draft orders | `po.manage` | POs in `draft` created by me (incl. sent back) | — | PO list, filter "Mine · Draft" |
-| BR-FF-26 | Orders late | `po.manage` | overdue POs as BR-PO-19, with open qty per BR-FF-09 (goods pending QA are not open) and today per BR-FF-08; the PO list "Late" filter uses the same predicate | — (all late) | PO list, filter "Late" |
+| BR-FF-26 | Orders late | `po.manage` | one named predicate "Late" = frozen BR-PO-19 unchanged (open qty there = ordered − received, so goods pending QA still count as open), with today per BR-FF-08; the PO list "Late" filter and strip count use this same predicate | — (all late) | PO list, filter "Late" |
 | BR-FF-27 | Goods expected | `grn.edit_draft` | POs `dispatched` / `partial_received` with open qty (BR-FF-09) on any line | due date (revised, else expected) | Receive goods picker (BR-FF-61) |
 | BR-FF-28 | Receipts to inspect | `grn.qa_decide` | GRNs with at least one line whose QA status is `pending` | received date (before today = Late) | GRN list, filter "QA pending" |
 | BR-FF-29 | Job-work due back | `sco.view` | open job-work challans not fully settled, by the existing due status | existing due status (overdue = Late) | Challan list, filter "Open" |
@@ -53,7 +54,7 @@ Examples (given → then), one per tile:
 | BR-FF-23 | PR-2026-11-3 approved, line 1 on PO-2026-11-1, line 2 pending → counted; when line 2 is on a PO too → not counted |
 | BR-FF-24 | PO-2026-11-1 approved → 1; after "Send to supplier" → 0 |
 | BR-FF-25 | B's PO sent back by O → B's tile 1; O's tile 25 → 0 |
-| BR-FF-26 | PO-2026-11-1 dispatched, due 2026-11-19, 400 kg open → 1; remaining 400 kg arrive (pending QA) → 0 |
+| BR-FF-26 | PO-2026-11-1 dispatched, due 2026-11-19, 600 kg accepted, 400 kg not received → 1; remaining 400 kg arrive (pending QA) → still 1; Q accepts them → 0 (PO fully received) |
 | BR-FF-27 | PO-2026-11-1 dispatched, due 25-11, 1000 kg open → "1 later"; after GRN-2026-11-4 (600 kg, QA pending) still 1 (400 kg open) |
 | BR-FF-28 | GRN-2026-11-4 line pending QA, received 19-11 → "1 late"; Q accepts → 0 |
 | BR-FF-29 | Challan JWC/26-27/5 overdue, 50 pcs unsettled → "1 late" |
@@ -61,4 +62,4 @@ Examples (given → then), one per tile:
 
 ## Choices made in this part (moved to `assumptions.md`)
 Tile set and order, Late/Today/Later split, 60 s refresh, no money on Home: A-01..A-04. Open quantity
-A-23, below reorder A-25, split tile component A-28.
+A-23, below reorder A-25, split tile component A-28. Late predicate A-54, tile needs both keys A-58.

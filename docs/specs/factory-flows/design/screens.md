@@ -5,10 +5,11 @@
 > screens), 44 px rows, 52 px top bar, label above field (BR-DS-28, 29). Not restated here.
 > Fields: "Source" = route in `api.md` (new routes and additive fields); existing fields follow the frozen module maps.
 > Exceptions to the v2 patterns, owner-requested (brief: "detail pages with a side panel"): Approvals preview beside the
-> list, two-pane detail pages. Rows per page on every list: 25 / 50 / 100 (shared `PAGE_SIZE_OPTIONS`), default 50.
+> list, two-pane detail pages. Every two-pane page (screens 2, 4, 5, 7, 8, 11, 12) falls back to one column below 1100 px
+> (side panel under the main column; on screen 2 the preview opens as its own page). Rows per page on every list: 25 / 50 / 100 (shared `PAGE_SIZE_OPTIONS`), default 50. `Pagination` is hidden when total ≤ the chosen page size (so one short page shows no footer).
 > Pictures: **wireframes, not screenshots** (v2 components are not on this branch). Each is a plain HTML file
 > plus a 1440×900 light PNG in `screens/` (built with v2 tokens). Dark: `home-dark`, `po-detail-dark`.
-> In list pictures the row list is cut at 6 rows. Status colours = v2 status map; none invented.
+> In list pictures the row list is cut at 6 rows, and the paging footer is not drawn (it is hidden when total ≤ the chosen page size, see above). Status colours = v2 status map; none invented.
 > Shell on every screen: sidebar in BR-FF-100 order (only entries the user holds a key for), 52 px top bar
 > with the one breadcrumb trail, menu badge on Approvals (BR-FF-85: hidden at 0, "99+" above 99).
 
@@ -39,10 +40,10 @@ document number is the row's link (row click is mouse only, BR-FF-110); focus ri
 ### 1. Home
 - **Purpose:** anyone signed in sees the work waiting for them and opens it in one click.
 - **Pattern:** dashboard. `PageHeader` + grid of tiles, 4 per row at 1440, 3 at 1024, 2 on a tablet in portrait.
-- **Fields (tile):** label · count · hint · optional Late / Today / Later split (new `split` prop on `StatCard`: up to three chips in existing danger / warning / neutral tones, built in this feature). Source: `GET /api/home/getcounts`
+- **Fields (tile):** label · count · hint · optional Late / Today / Later split (new `split` prop on `StatCard`: up to three chips in existing danger / warning / neutral tones, built in this feature; needs owner yes, BR-DS-24, listed in OWNER "Decided for you"). Links: the tile body is one link; each chip is a sibling link next to it, never inside it (no nested links; tab order: body, then chips). Source: `GET /api/home/getcounts`
   (`tiles[]`: `key`, `count`, `late`/`today`/`later`, `tone` (danger / waiting / moving / neutral, server-decided), `hint {kind, date?, n?}` (absent at count 0; wording is the UI's), `error`; tile absent = no key, BR-FF-11; `data.today` IST). Count = integer; hint dates `formatDate`. No ₹ (BR-FF-33).
   Order BR-FF-13 (plant head: "Waiting for my approval" first). Tone of the left edge: warning = waiting on me,
-  info = moving, danger when any row is late, neutral otherwise. Never accent (BR-DS-07).
+  info = moving, **danger whenever late > 0** (e.g. Goods expected and Receipts to inspect in the picture), neutral otherwise. Never accent (BR-DS-07).
 - **Actions:** tile body → target list filtered (BR-FF-12); "N late" chip → same list, Late only (BR-FF-15);
   failed count → "–" + "Try again" (BR-FF-19). Keys per tile: BR-FF-20..30; "Waiting for my approval" needs none.
 - **States:** loading = skeleton value per tile · empty (nothing waiting anywhere, BR-FF-17) = one `EmptyState`
@@ -53,18 +54,18 @@ document number is the row's link (row click is mouse only, BR-FF-110); focus ri
 
 ### 2. Approvals inbox + preview
 - **Purpose:** an approver reads and decides pending requests without leaving the list.
-- **Pattern:** list on the left, preview pane on the right (40 %). Below 1100 px the preview opens as the page
+- **Pattern:** list on the left, preview pane on the right (40 %). A quick-filter strip above the list: **All / Requisition / Order / Job work** with counts (`FilterBar`, BR-DS-17; one type per document, so groups do not overlap and All = their sum; counts equal rows after click, BR-FF-02). The selected row uses the neutral selected-row tone (`bg-muted`), not accent. Below 1100 px the preview opens as the page
   under the list (Back returns to the list).
 - **Fields (row):** document number (link) · type (Requisition / Order / Job work) · requester · amount
-  `formatMoney` · level "x of N" · waiting since `formatDateTime`. Oldest first (BR-FF-80). Source: `GET /api/approval/getMyPendingApprovals`
+  `formatMoney` · level "x of N" (row) · waiting since `formatDateTime`. Oldest first (BR-FF-80). Source: `GET /api/approval/getMyPendingApprovals`
   (existing; adds `docNumber`, `requesterName`, `amountPaise`; default sort `requestedAt` asc; BR-APR-52). **Preview** source: `GET /api/approval/getDocumentView/:docType/:docId` (`request` level x of N + who acts, `trail`, `canAct`, header + lines + totals): number + `StatusBadge approval` · requester, date, type, requester's
-  note · lines (item, qty + unit, rate, amount) · total · level and who acts · approval trail with notes · "Note (required)" box.
+  note · lines (item, qty + unit, rate, amount) · total · level "x of N" and who acts, shown as the **role label** ("Back office"), never the raw role key · approval trail with notes · "Note (required)" box.
 - **Actions:** Approve (primary), Send back, Reject · `approval act` (frozen, current approver only, BR-APR-33) ·
   note required (BR-APR-37), error at the box, no dialog for Approve / Send back; **Reject confirms** in a dialog that
   names the effect (BR-FF-87) · "Open full page ›" (read-only for approvers without `pr.manage` / `po.manage`,
   BR-FF-53, 83). After acting: row leaves, next row opens (BR-FF-82); "already handled" message (BR-FF-84).
 - **States:** empty = "Nothing is waiting for your approval" (BR-FF-86) · loading = 8 skeleton rows, preview skeleton ·
-  error = `ErrorState` + Try again · preview load fails = `ErrorState` inside the pane · no permission = any signed-in
+  error = `ErrorState` + Try again · preview load fails = `ErrorState` inside the pane · a row the viewer may not read = the pane shows "You do not have access to this document" and no data (SEC-06) · no permission = any signed-in
   user may open; other people's lists need `approval.view_others_pending` (BR-FF-89).
 - **Permissions:** any signed-in; rates and amounts show because the user is in the chain (BR-FF-53).
 - **Picture:** `screens/approvals.png` (wireframe, not a screenshot).
@@ -74,9 +75,9 @@ document number is the row's link (row click is mouse only, BR-FF-110); focus ri
 - **Pattern:** list. `PageHeader` + summary strip (`FilterBar` quick chips with counts) + `DataTable` + `Pagination`.
 - **Fields:** number · date · type · requester · lines · estimate · earliest required-by · status
   (`StatusBadge pr`) (BR-FF-106). Source: `GET /api/pr/getprs` (new rows `requestedByName`, `lineCount`, `earliestRequiredBy`, `sentBack`; sort adds `estimatedAmountPaise`). Strip counts: `meta.statusCounts`; filters `mine`, `toOrder`, `bucket`. Strip groups: All, Draft, In approval, To order, Ordered,
-  Closed; counts equal the rows after click (BR-FF-02, 109). Estimate hidden when no `pr.manage` (BR-FF-06).
+  Closed; counts equal the rows after click (BR-FF-02, 109). Estimate hidden when no `pr.manage` (BR-FF-06). Footer hidden when total ≤ page size.
 - **Actions:** "New requisition" (primary) · `pr.manage` · page `…/new` · no dialog (BR-FF-111). Chip click sets /
-  clears filter (URL state). Late required-by date in danger text with icon.
+  clears filter (URL state). Late required-by date in danger text **with the ▲ icon** (never colour alone), as in screen 6.
 - **States:** empty no filter = "No requisitions yet" + New requisition · empty with filter = "Nothing matches
   these filters" + Reset · loading = 8 skeleton rows · error = `ErrorState` + Try again · no permission = guard.
 - **Permissions:** open list `pr.manage`; New button same key.
@@ -84,7 +85,7 @@ document number is the row's link (row click is mouse only, BR-FF-110); focus ri
 
 ### 4. Requisition page
 - **Purpose:** read one requisition, see its orders, take the next step.
-- **Pattern:** detail, two panes. `DetailHeader` + `DocumentFlow` + main column (lines) + side panel (BR-FF-50).
+- **Pattern:** detail, two panes. `DetailHeader` (number, status badge, meta, actions) + `DocumentFlow` (PR → PO → GRN; a step the viewer cannot open is plain text) + main column (lines) + side panel (BR-FF-50).
 - **Fields:** header: number, status, requester, date, type, estimate. Lines: item, qty, unit, estimate, required-by,
   line status (`prLine`), "On order" = PO number link (BR-FF-43). Side panel: Totals (lines + estimate), Approvals
   (live level x of N + trail with notes), Linked documents (POs, both ways, BR-FF-42), History (BR-FF-54). Source: body
@@ -105,8 +106,8 @@ document number is the row's link (row click is mouse only, BR-FF-110); focus ri
 ### 5. Requisition form
 - **Purpose:** raise or edit a requisition on a full page.
 - **Pattern:** form, two panes: details + lines on the left, Summary panel on the right (lines, estimate).
-- **Fields:** type, required-by, notes; lines: item (search select), qty + unit (right-aligned, whole numbers for
-  pieces), estimate rate, computed estimate. Source: frozen `POST /api/pr/createpr`, `PATCH /api/pr/updatepr`, then `POST /api/approval/submitRequest`; nothing new in `api.md`.
+- **Fields:** type, required-by, notes; lines: item (search select), qty with the unit shown inside the field ("1,000 kg", right-aligned, whole numbers for
+  pieces), estimate rate with ₹ inside the field, computed estimate. No separate Unit column. Source: frozen `POST /api/pr/createpr`, `PATCH /api/pr/updatepr`, then `POST /api/approval/submitRequest`; nothing new in `api.md`.
 - **Actions:** Cancel · Save draft · **Save and submit** (primary, creator only, BR-FF-46, 47) · `pr.manage` · create
   then submit (BR-FF-05). Failed save: stays, error at field (BR-FF-56); refused submit: draft saved, page opens with
   reason (BR-FF-57). Leaving with changes: "Leave without saving?" dialog (BR-FF-112). Running = "Saving…".
@@ -126,7 +127,7 @@ document number is the row's link (row click is mouse only, BR-FF-110); focus ri
 
 ### 7. Order page
 - **Purpose:** read one order, receive against it, follow its chain.
-- **Pattern:** detail, two panes (BR-FF-103).
+- **Pattern:** detail, two panes (BR-FF-103). `DetailHeader` + `DocumentFlow` as screen 4.
 - **Fields:** header: number, status, supplier, date, expected, created by. Lines: item, ordered, received, **open**
   (bold), rate, GST, amount (BR-FF-43). Side panel: Totals (subtotal, GST, total, received %), Approvals, Linked
   documents (From PR, Receipts with QA status), History (sent, reminders, confirmation, delay, cancel / close with
@@ -142,7 +143,7 @@ document number is the row's link (row click is mouse only, BR-FF-110); focus ri
 ### 8. Order form
 - **Purpose:** create or edit an order on a full page (from a requisition, or blank).
 - **Pattern:** form, two panes: details + lines left; Totals and "From PR" panel right.
-- **Fields:** supplier, expected delivery, notes; lines: item, qty + unit, rate (₹ right-aligned), GST, amount.
+- **Fields:** supplier, expected delivery, notes; lines: item, qty with the unit inside the field, rate with ₹ inside the field (right-aligned), GST, amount. No separate Unit column.
   Source: frozen `POST /api/po/createpo` (one call per supplier), `PATCH /api/po/updatepo`, then `submitRequest`. "From PR-…" = `getpanel/po/:id` `linked[]`.
 - **Actions:** Cancel · Save draft · **Save and submit** (primary, creator only) · `po.manage` · BR-FF-46, 47, 56, 57, 112.
 - **States:** as screen 5. **Permissions:** `po.manage`.
@@ -152,8 +153,15 @@ document number is the row's link (row click is mouse only, BR-FF-110); focus ri
 - **Purpose:** see receipts and their QA state; the store keeper starts receiving.
 - **Pattern:** list with summary strip.
 - **Fields:** number · date · PO number (link only with `po.manage` or approver read, BR-FF-03) · supplier ·
-  challan · lines · QA status (`StatusBadge grnQa`) · status (`grn`) (BR-FF-108). Never money. Strip: All, Draft,
+  challan · lines · QA status (`StatusBadge grnQa`, map below) · status (`grn`) (BR-FF-108). Never money. Strip: All, Draft,
   QA pending, Done, Rejected. Source: `GET /api/grn/getgrns` (new rows `supplierName`, `lineCount`, `qaSummary`; filter `bucket`; `meta.statusCounts`).
+- **QA column map** (`qaSummary` of the receipt's lines; the rule is in `../spec.md`, DES-002; waived counts as passed):
+  | qaSummary | Badge | Tone |
+  |---|---|---|
+  | any line pending | Pending | warning |
+  | all passed / waived | Passed | success |
+  | all failed | Failed | danger |
+  | some failed, none pending (mixed) | Partly accepted | warning (new `grnQa` entry in `status-tone.ts`, existing tone and the same icon as the `grn` "Partly accepted") |
 - **Actions:** **Receive goods** (primary, `grn.edit_draft`, large 40 px) → screen 10 (BR-FF-60).
 - **States:** empty = "No goods receipts yet" + Receive goods (if key) · others as screen 3.
 - **Permissions:** `grn.view`; button `grn.edit_draft`.
@@ -161,7 +169,7 @@ document number is the row's link (row click is mouse only, BR-FF-110); focus ri
 
 ### 10. Receive goods: pick an order
 - **Purpose:** the store keeper finds the delivery's order fast. Tablet use.
-- **Pattern:** list, shop floor: 64 px rows, 40 px buttons, search box 40 px.
+- **Pattern:** list, shop floor: normal 44 px rows, v2 "large" 40 px controls (Receive buttons, search box, chips). No exception to the v2 size table.
 - **Fields:** order number · supplier · due (late = danger + "N days late", today = warning) · "Waiting for" item +
   open qty + unit for every line (BR-FF-61). **No rates or amounts** (BR-FF-62). Search by PO number or supplier
   (BR-FF-63). Chips All / Late / Today. Source: `GET /api/grn/getreceivablepos` (`grn.edit_draft`; rows `poNumber`, `supplierName`, `dueDate`, `isLate`, `lines[]` with `itemName`, `uom`, `openQty`; `q`, `bucket`, sort `dueDate`).
@@ -189,7 +197,7 @@ document number is the row's link (row click is mouse only, BR-FF-110); focus ri
 
 ### 12. Goods-receipt page
 - **Purpose:** read a receipt, see its QA state, inspect.
-- **Pattern:** detail, two panes. No Approvals block (BR-FF-52).
+- **Pattern:** detail, two panes. `DetailHeader` + `DocumentFlow` as screen 4: a step the viewer cannot open (Requisition and Order for a viewer without `pr.manage` / `po.manage`, BR-FF-03) is plain text, as in the picture. No Approvals block (BR-FF-52).
 - **Fields:** header: number, status, supplier, order, challan, received date. Lines: item, arrived, accepted,
   rejected, QA status (`grnQa`), per-line Inspect. Side panel: Totals (arrived / accepted / rejected, no money,
   BR-FF-51), Linked documents (order as text when the viewer cannot open it, BR-FF-03, 55), History (QA, bypass,
@@ -200,5 +208,6 @@ document number is the row's link (row click is mouse only, BR-FF-110); focus ri
 - **Picture:** `screens/grn-detail.png` (wireframe, not a screenshot).
 
 ## Choices made
+Moved to `../assumptions.md` (A-27..A-38; pre-freeze round 1: A-64, A-68..A-79).
 | Question | Choice | Source |
 |---|---|---|

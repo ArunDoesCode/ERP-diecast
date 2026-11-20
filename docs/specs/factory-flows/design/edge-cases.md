@@ -7,7 +7,7 @@
 
 Source: **benchmark** (what ERPNext / Odoo / SAP do) · **owner** (an answered card) ·
 **invariant** (money in paise, stock only through the ledger, permission + audit on state changes) ·
-**designer** (question from solution- / ui-ux-designer, decided by benchmark or an existing rule).
+**designer** (question from solution- / ui-ux-designer or a pre-freeze reviewer, decided by benchmark or an existing rule).
 
 | # | Case | What the system does | Source | Rule |
 |---|---|---|---|---|
@@ -28,7 +28,7 @@ Source: **benchmark** (what ERPNext / Odoo / SAP do) · **owner** (an answered c
 | E-15 | Reject from preview | Confirm names the document effect decided by frozen rules | invariant (frozen BR-APR-43) | BR-FF-87 |
 | E-16 | 600 kg arrived, QA pending: what is open? | Open = ordered − accepted − pending-QA arrivals = 400 | designer (data.md point 1; frozen BR-GRN-27) | BR-FF-09 |
 | E-17 | QA rejects a receipt | Rejected qty counts as open again; PO back in "Goods expected" | designer | BR-FF-09 |
-| E-18 | Goods at the gate, due date passed | Not counted as late while the arrived qty covers the open balance | designer | BR-FF-26 |
+| E-18 | Goods at the gate, due date passed | Order stays "Late" (frozen BR-PO-19 counts only accepted qty) until QA accepts; the receive screens show 400 kg open | designer (pre-freeze r1 SPEC-01) | BR-FF-26, BR-FF-09 |
 | E-19 | Delay has no who / when stored | Delay shown pinned above History with date and reason, no name or time | designer (data.md point 2) | BR-FF-54 |
 | E-20 | Stock exactly at reorder level, or reorder level 0 | At level → counted; level 0 → not counted; tile equals stock list flag | designer (data.md point 3) | BR-FF-30 |
 | E-21 | Menu order across groups | Eight work screens in one "General" group so the order holds; Employee directory, Setup in "Admin" | designer (decided by ERPNext sidebar categories) | BR-FF-100 |
@@ -36,10 +36,10 @@ Source: **benchmark** (what ERPNext / Odoo / SAP do) · **owner** (an answered c
 | E-23 | Narrow screen (≤ 1100 px) | Side panel under lines; approvals preview as its own page | designer | BR-FF-103, BR-FF-81 |
 | E-24 | Several GRN lines pending QA | Primary Inspect = first pending line; each pending line has its own Inspect | designer | BR-FF-44 |
 | E-25 | Sent-back draft | Reviewer's note in a strip above the lines until resubmitted | designer (BR-APR-54) | BR-FF-90 |
-| E-26 | List with fewer rows than one page | Paging controls hidden; sizes 25 / 50 / 100 everywhere | designer | BR-FF-105 |
+| E-26 | List with fewer rows than one page | Paging controls hidden when total ≤ the chosen page size; sizes 25 / 50 / 100 everywhere | designer | BR-FF-105 |
 | E-27 | Two people click Create PO on the same requisition | Second gets "Already on another order"; page reloads | invariant | BR-FF-59 |
 | E-28 | One supplier's PO refused in a multi-supplier Create PO | Others stay made; message names the failed supplier | invariant | BR-FF-58 |
-| E-29 | Pending line has no default supplier | Create PO asks for a supplier for that line first | benchmark (ERPNext supplier per PO) | BR-FF-49 |
+| E-29 | Pending line has no default supplier | Create PO asks for a supplier for that line first, in one dialog, before any PO is made | benchmark (ERPNext supplier per PO) | BR-FF-49, BR-FF-91 |
 | E-30 | Save works, submit refused (no eligible approver) | Draft stays saved; page opens with the reason | benchmark (ERPNext save then submit) | BR-FF-57 |
 | E-31 | Save fails | Nothing submitted; form keeps what was typed, error at the field | invariant | BR-FF-56 |
 | E-32 | Someone else edits a draft | No "Save and submit"; only the creator submits | invariant (frozen approval rule) | BR-FF-47 |
@@ -62,9 +62,24 @@ Source: **benchmark** (what ERPNext / Odoo / SAP do) · **owner** (an answered c
 | E-49 | Job-work order waiting for approval | Previewed the same way with its lines and total | invariant | BR-FF-88 |
 | E-50 | Inactive item below reorder | Not counted | invariant | BR-FF-30 |
 | E-51 | Leaving a form with unsaved changes | "Leave without saving?" | benchmark (ERPNext "Not saved") | BR-FF-112 |
-| E-52 | Document with 35 lines / long history | All lines shown (up to 200); history newest 200 events | benchmark (standard) | BR-FF-104, BR-FF-54 |
+| E-52 | Document with 35 lines / long history | All lines shown (max 500 per document, frozen BR-STD-33); history newest 200 events + "Older events hidden" | benchmark (standard) | BR-FF-104, BR-FF-54 |
 | E-53 | Menu edited in Setup → Screens, then app update | Admin's edits kept; default written once | invariant | BR-FF-101 |
 | E-54 | Old bookmarks `/landing`, `/purchase-orders/tracking` | Redirect to `/home`, `/purchase-orders` | benchmark (standard) | BR-FF-102, BR-FF-41 |
 | E-55 | Any action from a new page | Only frozen endpoints write; no new stock, money or status path; audit as frozen | invariant | BR-FF-05 |
+| E-56 | Line with 0 or missing suggested rate at Create PO | Dialog asks its rate before any PO; empty refused | invariant (frozen BR-PO-03, 25) | BR-FF-92 |
+| E-57 | Item last ordered on a cancelled PO, or from a now-inactive supplier, or two POs at the same time | Cancelled / inactive skipped; same time → higher PO id; none left → dialog | benchmark (ERPNext Item Defaults supplier, blank = user picks) | BR-FF-91 |
+| E-58 | Level-2 approver opens the document before level 1 decides | Access message (not on the current step, no trail row) | invariant (permission) | BR-FF-53 |
+| E-59 | Approver of an earlier, sent-back request opens the resubmitted one | Access message unless on the current step of the new request | invariant (permission) | BR-FF-53 |
+| E-60 | Requester without the document key opens it after the decision | Access message; while pending → read-only | invariant (permission) | BR-FF-93 |
+| E-61 | Approval-path reader looks at PO History | Supplier messages by name, who, when; no note text | invariant (permission) | BR-FF-94 |
+| E-62 | Admin views another employee's inbox | Rows shown, amount "–" (not sent) | invariant (permission) | BR-FF-77 |
+| E-63 | Preview of a row the viewer cannot read | Access message in the pane, no data, no buttons | designer (pre-freeze r1 SEC-06) | BR-FF-78 |
+| E-64 | Draft GRN deleted | Its arrived qty counts as open again | designer (pre-freeze r1 SPEC-10) | BR-FF-09 |
+| E-65 | Receipt with one line failed and one passed | QA status "Partly accepted"; waived counts as passed | designer (pre-freeze r1 DES-002) | BR-FF-115 |
+| E-66 | Custom role holds a tile key but not its list's key | Tile hidden | designer (pre-freeze r1 SPEC-05) | BR-FF-34 |
+| E-67 | Admin renamed a menu entry before the update | Rename and its place kept; only untouched rows move | designer (pre-freeze r1 SPEC-07) | BR-FF-101 |
+| E-68 | Reject a job-work order from the preview | Confirm says it is rejected for good; a new one must be raised | invariant (frozen BR-SCO-06) | BR-FF-87 |
+| E-69 | Approver without `sco.view` previews a pending SCO | Lines and total shown read-only; after the decision → access message | invariant (permission) | BR-FF-83, BR-FF-53 |
+| E-70 | User closes the Create PO supplier / rate dialog | No PO made | invariant | BR-FF-49 |
 
-Counts: benchmark 19 · owner 3 · invariant 22 · designer 11 = 55.
+Counts: benchmark 20 · owner 3 · invariant 31 · designer 16 = 70.

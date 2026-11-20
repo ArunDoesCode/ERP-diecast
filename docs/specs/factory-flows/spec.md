@@ -36,11 +36,11 @@ Example data used in every part:
 ## Parts
 | Part | File | Covers | BR range |
 |---|---|---|---|
-| Home | `spec-home.md` | Role home, work-queue tiles, counts | BR-FF-10..33 |
-| Documents | `spec-documents.md` | PR / PO / GRN pages, links both ways, next-step buttons, side panel, Save and submit, Create PO | BR-FF-40..59, 90 |
+| Home | `spec-home.md` | Role home, work-queue tiles, counts | BR-FF-10..34 |
+| Documents | `spec-documents.md` | PR / PO / GRN pages, links both ways, next-step buttons, side panel, Save and submit, Create PO | BR-FF-40..59, 90..94 |
 | Receiving | `spec-receiving.md` | "Receive goods" from the goods-receipt screen, PO picker, receive form | BR-FF-60..73 |
-| Approvals | `spec-approvals.md` | Inbox columns, preview, act from preview, menu count | BR-FF-80..89 |
-| Layout | `spec-layout.md` | Menu order, page layout, lists, summary strip, full-page forms | BR-FF-100..113 |
+| Approvals | `spec-approvals.md` | Inbox columns, preview, act from preview, menu count | BR-FF-77..89 |
+| Layout | `spec-layout.md` | Menu order, page layout, lists, summary strip, full-page forms | BR-FF-100..115 |
 
 ## Who can do what
 No new permission keys. Every tile, button and page is gated by an existing key (`backend/src/lib/permissions.ts`).
@@ -52,8 +52,8 @@ No new permission keys. Every tile, button and page is gated by an existing key 
 | Receive goods, PO picker (no prices), Goods expected tile | `grn.edit_draft` | ow, bo, fs |
 | Receipts to inspect tile, Inspect button | `grn.qa_decide` | ow, bo, qa |
 | open GRN pages and list | `grn.view` | ow, bo, fs, qa, dd |
-| read a PR / PO page while its approval is pending (read-only, with amounts) | approval read rule (BR-APR-51) + request pending (BR-FF-53) | any approver in the chain, `approval.view_all` |
-| Job-work due tile | `sco.view` | ow, bo, fs, qa |
+| read a PR / PO page or a PR / PO / SCO preview while its approval is pending (read-only, with amounts) | approval read rule BR-FF-53 (current step, own trail row on this request, or requester BR-FF-93); `approval.view_all` any time | per document, no seed role by itself |
+| Job-work due tile; SCO amounts (frozen `getscodetails`) | `sco.view` | ow, bo, fs, qa |
 | Stock below reorder tile | `inventory.view` | ow, bo, fs |
 | set menu labels / order later | `setup.roles.manage` (Setup → Screens) | super-admin |
 
@@ -77,16 +77,19 @@ Document flow with the next step each page offers (full table: `spec-documents.m
 | BR-FF-03 | A link to a document the viewer may not open is shown as plain text (number + status), not as a link. | Q opens GRN-2026-11-4; side panel shows "PO-2026-11-1 · Partly received" as text, no link |
 | BR-FF-04 | Opening a document URL without access shows "You do not have access to this document" and none of its data; an id that does not exist shows "Document not found" with a link back to its list. | Q opens `/purchase-orders/1` → access message, no supplier or amount in the response; `/purchase-orders/999999` → not found |
 | BR-FF-05 | Nothing in this feature posts stock, changes money or moves a status except through the existing frozen endpoints with their rules; every new endpoint is read-only. | "Save and submit" = existing create + existing submit; no new write route in `design/api.md` |
-| BR-FF-06 | Rates, amounts and totals are shown only to holders of `pr.manage` (PR), `po.manage` (PO), or an approver who may read the request (BR-FF-53); receive-only and QA-only users never get them from any endpoint. | S (fs) opens the PO picker → item, qty, dates; response has no rate or total fields |
+| BR-FF-06 | Rates, amounts and totals are shown only to holders of `pr.manage` (PR), `po.manage` (PO), `sco.view` (SCO, as the frozen `getscodetails` already returns them), or a caller who passes the approval read rule (BR-FF-53, BR-FF-93); everyone else never gets them from any endpoint. | S (fs) opens the PO picker → item, qty, dates; response has no rate or total fields; die designer (no `sco.view`) previews nothing of an SCO unless BR-FF-53 lets them |
 | BR-FF-07 | After any action, the document on screen, the list behind it, the Home counts and the menu badge show the new state without a manual reload. | B approves PR-2026-11-3 from the inbox → badge 3 → 2, Home tile "Waiting for my approval" 3 → 2 |
 | BR-FF-08 | "Today", "late" and due dates use the plant's calendar day in IST. | Due 2026-11-20, time 23:50 IST → "Today", not late |
-| BR-FF-09 | Open quantity of a PO line = ordered − accepted (the line's received qty, frozen BR-GRN-27) − arrived on GRN lines still pending QA; rejected goods count as open again. Every tile, list, page, picker and warning in this feature uses this one definition. | PO-2026-11-1 1000 kg, GRN-2026-11-4 600 kg pending QA → open 400; Q rejects the 600 → open 1000; Q accepts → open 400 |
+| BR-FF-09 | Open quantity of a PO line = ordered − accepted (the line's received qty, frozen BR-GRN-27) − arrived on GRN lines that still exist and are pending QA; rejected goods and lines of a deleted draft GRN count as open again. It is used for display and receiving only (open-qty columns, Goods expected tile, receive picker, receive form, over-receipt warning); "Late" is never computed from it (BR-FF-26). | PO-2026-11-1 1000 kg, GRN-2026-11-4 600 kg pending QA → open 400; Q rejects the 600 → open 1000; Q accepts → open 400; GRN-2026-11-4 still draft and deleted → open 1000 |
 
 ## Security
 Sensitive data:
 | Data | Who may see it | Who may change it |
 |---|---|---|
-| PR estimate, PO rates / GST / totals | `pr.manage` / `po.manage` holders, approvers in the chain (read-only) | unchanged (frozen PR / PO rules) |
+| PR estimate, PO rates / GST / totals | `pr.manage` / `po.manage` holders; callers passing BR-FF-53 / 93 (read-only, only while pending) | unchanged (frozen PR / PO rules) |
+| SCO rates / GST / totals | `sco.view` holders (frozen `getscodetails`, unchanged); in the new document view only callers passing BR-FF-53 / 93 or holding `sco.view`; otherwise hidden | unchanged (frozen SCO rules) |
+| Amount on an inbox row | the caller, on their own list only; never on another employee's list (BR-FF-77, BR-FF-89) | — |
+| PO supplier-communication notes | `po.manage` holders; approval-path readers see the event name only (BR-FF-94) | unchanged |
 | PO lines for receiving (item, ordered / received / open qty, due date) | `grn.edit_draft` holders | — (read-only) |
 | Other people's pending approvals | `approval.view_others_pending` only (BR-APR-52) | — |
 
@@ -97,6 +100,11 @@ Abuse cases:
 | QA inspector | open a PO page by typing its URL | BR-FF-04 |
 | approver after deciding | keep editing the PR through the preview | BR-FF-53 (read-only), frozen PR edit rules |
 | approver without `pr.manage` / `po.manage` | keep reading prices of a PR / PO after its approval is decided, by URL or the read endpoints | BR-FF-53 (only while pending), BR-FF-04 |
+| level-2 approver, or anyone else in the chain | read a document before it reaches their step | BR-FF-53 (current step or own trail row on this request only) |
+| requester without the document key | read their own PR / PO / SCO after it is decided | BR-FF-93 (only while pending) |
+| approval-path reader | read supplier messages on the PO or other docs' amounts in the panel | BR-FF-94 |
+| admin viewing another employee's inbox | read amounts through that list | BR-FF-77 (no amount on another employee's list) |
+| any user | preview a row they may not read | BR-FF-78 |
 | approver | approve a document without the lines or totals on screen | BR-FF-81 (act buttons only after every line and the total are shown) |
 | approver | approve without a note from the preview | BR-FF-82, frozen BR-APR-37 |
 | QA inspector / store keeper | read PO amounts through a GRN side panel or linked-document block | BR-FF-55, BR-FF-06 |
@@ -112,14 +120,15 @@ Audit: no new audit rows. Every action that writes already writes its trail unde
 Full list: `design/edge-cases.md`. Every row there names a rule in this file or a part file.
 | Source | Count |
 |---|---|
-| benchmark | 19 |
+| benchmark | 20 |
 | owner | 3 |
-| invariant | 22 |
-| designer | 11 |
-| total | 55 |
+| invariant | 31 |
+| designer | 16 |
+| total | 70 |
 
 ## Not now
 - Notifications, global search by document number (brief: later round).
+- A full SCO page (SCO is only previewed in the inbox, BR-FF-88).
 - BOM, sale order, production; die shot counts; ingot chemistry / heat checks at receipt.
 - Over-receipt tolerance changes, close / short-close / return rules, "keep open or close balance"
   question at a short receipt (frozen PO / GRN rules stay as they are).
@@ -149,3 +158,9 @@ in moring once completed" and "make sure u reasearch other erp's and take decisi
   read only while pending (BR-FF-53); preview shows every line before acting (BR-FF-81); delay history
   (BR-FF-54); below reorder = existing flag (BR-FF-30); menu groups (BR-FF-100); v2 exceptions
   (BR-FF-113); sent-back note (BR-FF-90); edge cases and assumptions written.
+- 2026-11-20 v0 — pre-freeze round 1: "Late" stays frozen BR-PO-19, BR-FF-09 display only (BR-FF-26, 09);
+  default supplier BR-FF-91; rate dialog BR-FF-92; one approval read rule BR-FF-53 + requester BR-FF-93 +
+  panel limits BR-FF-94; inbox amounts BR-FF-77, unreadable preview BR-FF-78, inbox strip BR-FF-79; SCO in
+  BR-FF-06, 83, 87; tile needs both keys BR-FF-34; menu migration guard BR-FF-101; lines max 500 and history
+  cap BR-FF-104, 54; strip-group table BR-FF-109; QA status BR-FF-115; 40 px shop-floor size BR-FF-114;
+  BR-FF-113 cites the v2 text. Edge cases E-56..E-70; assumptions A-54..A-82.

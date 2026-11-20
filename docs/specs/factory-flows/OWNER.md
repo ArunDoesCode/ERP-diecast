@@ -12,8 +12,7 @@ Requisitions, orders and receipts get real pages that offer the next step; store
 ## 2. What the user will be able to do
 - Home counts the work waiting for you (late / today / later); one click opens exactly those rows.
 - Each requisition, order and receipt has its own page (lines, totals, approvals, links, history) and offers the next step.
-- Store keepers start a receipt from Goods receipts and never see prices; approvers decide from a preview.
-- Lists show 50 rows with a count strip on top; create and edit forms are full pages.
+- Store keepers start a receipt from Goods receipts, never see prices; approvers decide from a preview; lists show 50 rows.
 > Example: S asks for ADC12 1000 kg + die lube 20 L (₹2,51,000); B approves. Create PO drafts PO-2026-11-1:
 > 1000 kg × ₹245 + 18 % GST = ₹2,89,100. 600 kg arrive (challan CH-11); Home still expects 400 kg.
 
@@ -78,18 +77,21 @@ All pre-approved in chat on 2026-11-20 ("take ur own decision and record them");
 - Dated tiles split into late (red), today (orange) and later (grey), by Indian date (Odoo).
 - Pages show only the buttons you may use, one main button for the next step (ERPNext).
 - "Save and submit" sits beside "Save draft"; if submit is refused, the draft stays saved (ERPNext).
-- An approver without buying rights reads the document, prices included, only while it waits for approval (SAP, ERPNext).
+- An approver without buying rights reads the document, prices included, only while it waits at their step or after they acted on it; the requester likewise only while it waits (SAP, ERPNext).
 - Store keepers see orders to receive with items, quantities and dates, never prices (SAP; stricter).
 - Approvers can decide from the preview, which shows every line, price and total first, with a note (SAP; stricter).
 - Menu order: Home, Approvals, Requisitions, Orders, Goods receipts, Job work, Inventory, Suppliers, then admin (ERPNext).
+- The new menu order is applied once and skips any menu entry an admin already renamed or moved (standard).
+- Create PO takes each line's supplier from its last order and asks for supplier or rate when missing (ERPNext).
+- Nobody sees amounts on another person's approval list; approval-only readers never see supplier message text (stricter).
 - Lists show 50 rows a page, with 25 or 100 to choose (Odoo 80, ERPNext 20).
-- Goods waiting for inspection count as arrived: the order shows 400 kg open, not 1000, and is not late (SAP, ERPNext).
+- Goods waiting for inspection count as arrived when receiving (400 kg left, not 1000), but the order stays late until they pass (SAP; our order rule).
 - A receipt with several lines waiting for inspection has an Inspect button on each line (ERPNext).
-- Receiving screens use bigger buttons and rows for tablets at the gate (our choice; products silent).
+- Receiving screens use bigger buttons and boxes for tablets at the gate; rows stay normal height (our choice).
+- Home tiles get a late / today / later chip row, a new look for the shared tile used across the app (our choice).
 - The receive form asks challan, vehicle, driver and quantity; heat number stays on the receipt edit (SAP).
 
-Everything else: 55 edge cases decided by ERP benchmark, 40 technical choices logged. No reading needed.
+Everything else: 70 edge cases decided by ERP benchmark, 63 technical choices logged. No reading needed.
 
 ## 6. Not included
-- Notifications, search by number, deputy approvers, over-receipt limit changes, "close the balance" at receipt.
-- Heat / chemistry checks, BOM, sale order, production, die shots, per-user Home and saved list views.
+- Notifications, global search by document number, deputy approvers, over-receipt limit changes, "close the balance" at receipt; heat checks, BOM, sale order, production, per-user Home.
