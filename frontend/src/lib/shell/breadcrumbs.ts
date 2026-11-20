@@ -13,6 +13,7 @@ export type BreadcrumbOptions = {
 
 const LIST_LABELS: Record<string, string> = {
 	landing: "Home",
+	home: "Home",
 	"purchase-requisitions": "Purchase requisitions",
 	approvals: "Approvals",
 	"purchase-orders": "Purchase orders",

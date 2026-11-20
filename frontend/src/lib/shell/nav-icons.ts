@@ -14,6 +14,7 @@ import {
 
 const ICONS: Record<string, Icon> = {
 	landing: IconLayoutDashboard,
+	home: IconLayoutDashboard,
 	"purchase-requisitions": IconFileText,
 	approvals: IconChecklist,
 	"purchase-orders": IconShoppingCart,

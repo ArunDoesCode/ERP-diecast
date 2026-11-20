@@ -32,7 +32,7 @@ import {
 import { useAuthSessionStore } from "@/lib/store/auth-session-store";
 
 // Screens with no permission key: open to every signed-in user (BR-AUTH-15).
-const ALWAYS_ALLOWED_PATHS = ["/landing", "/approvals"];
+const ALWAYS_ALLOWED_PATHS = ["/home", "/landing", "/approvals"];
 
 function isPathAllowed(pathname: string, allowedPaths: string[]) {
 	const path = normalizeAllowedPath(pathname);
@@ -77,7 +77,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 			...ALWAYS_ALLOWED_PATHS,
 			...screens.map((screen) => screen.path),
 		];
-		if (!isPathAllowed(pathname, allowed)) router.replace("/landing");
+		if (!isPathAllowed(pathname, allowed)) router.replace("/home");
 	}, [sessionReady, screens, pathname, router]);
 
 	const changeFolded = (next: boolean) => {

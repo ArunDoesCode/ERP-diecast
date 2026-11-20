@@ -1,5 +1,6 @@
-import LandingView from "@/components/views/landing/LandingView";
+import { redirect } from "next/navigation";
 
+// BR-FF-102: /landing is the old address of Home.
 export default function LandingPage() {
-	return <LandingView />;
+	redirect("/home");
 }

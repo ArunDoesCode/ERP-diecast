@@ -7,7 +7,7 @@ import {
 import { useEffect, useState } from "react";
 
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
-import { PAGE_SIZE_OPTIONS } from "@/lib/pagination";
+import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from "@/lib/pagination";
 import { type PRType, prTypeValues } from "@/types/purchase-requisitions";
 
 export type POQueueSearchField = "prNumber" | "type";
@@ -23,7 +23,7 @@ export function usePOQueueControls() {
 	);
 	const [pageSizeRaw, setPageSizeRaw] = useQueryState(
 		"pageSize",
-		parseAsInteger.withDefault(10),
+		parseAsInteger.withDefault(DEFAULT_PAGE_SIZE),
 	);
 	const [searchField, setSearchFieldRaw] = useQueryState(
 		"field",
@@ -48,7 +48,9 @@ export function usePOQueueControls() {
 
 	// A hand-edited URL (?page=-3, ?pageSize=7) falls back to the defaults.
 	const page = pageRaw >= 1 ? pageRaw : 1;
-	const pageSize = PAGE_SIZE_OPTIONS.includes(pageSizeRaw) ? pageSizeRaw : 10;
+	const pageSize = PAGE_SIZE_OPTIONS.includes(pageSizeRaw)
+		? pageSizeRaw
+		: DEFAULT_PAGE_SIZE;
 
 	// Typing stays local so every keystroke is not a URL write; the debounced value
 	// is what the query and the URL use.
