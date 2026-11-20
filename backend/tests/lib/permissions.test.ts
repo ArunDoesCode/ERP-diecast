@@ -99,8 +99,10 @@ describe("BR-AUTH-06 permission catalog defined in code", () => {
     }
   });
 
-  test("BR-AUTH-06 landing and approvals screens need no key; setup needs setup.roles.manage", () => {
-    expect(SCREENS.landing.permission).toBeNull();
+  test("BR-AUTH-06 home (BR-FF-100, BR-FF-102) and approvals screens need no key; setup needs setup.roles.manage", () => {
+    expect(SCREENS.home.permission).toBeNull();
+    expect(SCREENS.home.path).toBe("/home");
+    expect("landing" in SCREENS).toBe(false);
     expect(SCREENS.approvals.permission).toBeNull();
     expect(SCREENS.setup.permission).toBe("setup.roles.manage");
     expect(SCREENS["employee-directory"].permission).toBe(
