@@ -1,8 +1,8 @@
 ---
 module: factory-flows
-status: draft            # draft | frozen (set only by /freeze; change requests keep it frozen)
-version: 0
-frozen_on:
+status: frozen           # draft | frozen (set only by /freeze; change requests keep it frozen)
+version: 1
+frozen_on: 2026-11-20
 owner: Arun
 depends_on: [design-system (v2, PR #111), purchase-requisition, purchase-order, grn, approval, auth-setup, subcontracting, inventory]
 brief: docs/briefs/factory-flows.md
@@ -164,3 +164,5 @@ in moring once completed" and "make sure u reasearch other erp's and take decisi
   BR-FF-06, 83, 87; tile needs both keys BR-FF-34; menu migration guard BR-FF-101; lines max 500 and history
   cap BR-FF-104, 54; strip-group table BR-FF-109; QA status BR-FF-115; 40 px shop-floor size BR-FF-114;
   BR-FF-113 cites the v2 text. Edge cases E-56..E-70; assumptions A-54..A-82.
+- 2026-11-20 v0 — pre-freeze review rounds 1–2 (spec, security, performance, code, design): SEC-01..07, CR-01..10, PERF-01..08, SPEC-01..18, DES-001..011 fixed; BR-PO-19 left unchanged (Late); approval BR-APR-52 response narrowed (BR-FF-77, CR v3 in approval.md).
+- 2026-11-20 v1 — frozen. OWNER.md approved on the owner's behalf (owner pre-approved recommended options in chat, 2026-11-20: "automate that sessions take ur own decision and record them and run whatever parallel subagents u want ... ill do a complete merge in moring once completed"; "dont want for my review ill review the decicsion u take tonight"); cards 1–3 = A and all 19 confirm rows = yes, each with a benchmark (research → Decision benchmarks). For the owner's morning review.

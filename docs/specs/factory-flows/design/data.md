@@ -69,7 +69,7 @@ filter first, then a scan of tens of rows); PR line status (`idx_pr_items_status
 | GRN list PO link | `poCanOpen` = caller holds `po.manage`; no column | BR-FF-03 |
 | PR line default supplier / rate (SPEC-02, 03) | existing `prRepository` default-supplier lookup (item ↔ supplier link / preferred flag per spec); suggested rate from the same price lookup; no column | line with no supplier or rate 0 / null goes to the Create PO dialog |
 | PR line "On order" | `pr_po_item_links` → `purchase_order_items` → `purchase_orders.po_number` per `prItemId`; default supplier from the existing lookup in `prRepository` | idx_pr_po_links_pr_item_id |
-| GRN link QA status / list `qaSummary` | `grn_items.qa_status` of the GRN's lines: pending if any pending; failed if any failed and none pending; passed if all passed / waived; else `mixed` | idx_grn_items_grn_id |
+| GRN link QA status / list `qaSummary` | `grn_items.qa_status` of the GRN's lines: BR-FF-115: pending if any pending; else passed if all passed / waived; else failed if all failed; else `mixed` | idx_grn_items_grn_id |
 | Requester's note | `purchase_requests.notes`, `purchase_orders.notes`, `subcontracting_orders.notes` | |
 | BR-FF-85 | tile 20 count (`getcounts?tiles=approvals`) | |
 | BR-FF-53 | latest `approval_requests` row per `(doc_type, doc_id)` (`idx_approval_requests_doc`) + `approval_trails` row by caller | read-via-approval rule, api.md |
@@ -130,7 +130,7 @@ transaction) then the `screens` data change. Rollback: drop the indexes,
 re-insert `landing`, restore old labels (values in the migration's down comment). No backfill.
 
 ## Open points — all resolved in spec pass 2
-1. **Open quantity** — resolved: BR-FF-09 (open = ordered − accepted − arrived on lines pending QA; rejected re-opens) and A-23. One shared SQL expression feeds tiles 26 / 27, the picker, `getpos` Late and `getpodetails` `openQty`.
+1. **Open quantity** — resolved: BR-FF-09 (open = ordered − accepted − arrived on lines pending QA; rejected re-opens) and A-23. One shared SQL expression feeds tile 27, the receive picker, the receive form and the display fields `openQty` / `pendingQaQty` only. Late (tile 26, `getpos` Late / `overdue` / `bucket=late`) stays frozen BR-PO-19 (BR-FF-26, A-54).
 2. **Delay in History** — resolved: A-24 (current revised date + reason pinned above dated events; no who / when, no new column).
 3. **Below reorder** — resolved: A-25 (existing flag: stock <= reorder level, reorder level > 0, active).
 

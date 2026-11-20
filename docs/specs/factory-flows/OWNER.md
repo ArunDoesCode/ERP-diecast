@@ -1,6 +1,6 @@
 ---
 module: factory-flows
-approved_on:                 # set by /freeze when the owner says yes
+approved_on: 2026-11-20       # owner pre-approved recommended options in chat, 2026-11-20: "automate that sessions take ur own decision and record them and run whatever parallel subagents u want ... ill do a complete merge in moring once completed"; "dont want for my review ill review the decicsion u take tonight" — relayed via the parent session; confirm in the morning
 ---
 
 # Factory flows — for your approval
@@ -91,7 +91,7 @@ All pre-approved in chat on 2026-11-20 ("take ur own decision and record them");
 - Home tiles get a late / today / later chip row, a new look for the shared tile used across the app (our choice).
 - The receive form asks challan, vehicle, driver and quantity; heat number stays on the receipt edit (SAP).
 
-Everything else: 70 edge cases decided by ERP benchmark, 63 technical choices logged. No reading needed.
+Everything else: 70 edge cases decided by ERP benchmark, 64 technical choices logged. No reading needed.
 
 ## 6. Not included
 - Notifications, global search by document number, deputy approvers, over-receipt limit changes, "close the balance" at receipt; heat checks, BOM, sale order, production, per-user Home.

@@ -53,7 +53,7 @@
 | A-33 | 2026-11-20 | spec | C-5 Receive picker is a page, not a dialog (BR-FF-61, 71)? | `/grn/receive`, so the tile opens it filtered and it works on a tablet | BR-FF-71, 111 | info | — |
 | A-34 | 2026-11-20 | spec | C-6 Shop-floor size (screens 9–11)? | v2 "large" 40 px controls on Goods-receipt list, picker and receive form; rows normal v2 density 44 px (r1 SPEC-08 / DES-001: 64 px rows dropped) — BR-FF-114 | v2 control sizes (large 40); store keeper on a tablet; SAP / ERPNext docs silent (design choice) | confirm | yes (PA, 2026-11-20) |
 | A-35 | 2026-11-20 | spec | C-7 Receive form fields (BR-FF-64)? | Challan, vehicle, driver, arrived qty per line; no batch / heat number on this form (stays on GRN edit) | frozen GRN create fields; heat checks "Not now"; SAP GRPO copies PO rows and quantities — https://learning.sap.com/courses/managing-logistics-in-sap-business-one/solving-issues-in-purchasing | confirm | yes (PA, 2026-11-20) |
-| A-36 | 2026-11-20 | spec | C-8 Create PO when every line has a supplier (BR-FF-48)? | One click, no dialog; toast names the POs made | owner card 1 = A | info | — |
+| A-36 | 2026-11-20 | spec | C-8 Create PO when every line has a supplier (BR-FF-48)? | One click, no dialog (unless a line has no default supplier or a missing / 0 rate, BR-FF-49, BR-FF-92); toast names the POs made | owner card 1 = A | info | — |
 | A-37 | 2026-11-20 | spec | C-9 Summary strip look (BR-FF-109)? | Quick-filter chips with counts; selected = accent fill; only the Late count is danger text | BR-DS-07, BR-FF-109 | info | — |
 | A-38 | 2026-11-20 | spec | C-11 Narrow screens (BR-FF-81, 103)? | Side panel under the lines below ~1100 px; approvals preview becomes its own page | BR-FF-103, 113 | info | — |
 | A-39 | 2026-11-20 | spec | data.md: new tables for Home / history? | None; read from existing tables | scope rule, A-09 | info | — |
@@ -100,3 +100,4 @@
 | A-80 | 2026-11-20 | spec | data.md: GRN date index? | `idx_grns_received_date (received_date, id)` plain btree | PERF-06 | info | — |
 | A-81 | 2026-11-20 | spec | api.md: `overdue` vs `bucket` on `getpos`? | `overdue=true` ≡ `bucket=late`; with a different `bucket` → 400 | CR-05; A-54 | info | — |
 | A-82 | 2026-11-20 | spec | api.md: Home SQL shape? | One `count(*) filter` statement per source table; fallback parallel cap 4 | PERF-01 | info | — |
+| A-83 | 2026-11-20 | spec | api.md: which approval requests does a via-approval reader see in the trail? (CR-09) | Latest request only (the pending one they may read); key holders and `approval.view_all` see all readable requests as today | CR-09; SAP B1 approver opens the one pending draft (research Q6); stricter option | info | — |

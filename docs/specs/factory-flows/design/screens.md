@@ -95,7 +95,7 @@ document number is the row's link (row click is mouse only, BR-FF-110); focus ri
   partly ordered, a pending line, `po.manage`; BR-FF-48) · Edit, Cancel in "More" (frozen rules, Cancel confirms in
   a dialog) · Approve / Reject / Send back when I am the current approver (BR-FF-44, 53).
   **Create PO**: one click makes one draft PO per supplier; no dialog unless a pending line has no default
-  supplier, then a dialog "Supplier for die lube" per such line (BR-FF-49) · result: one PO → opens it, several →
+  supplier or a missing / 0 suggested rate (BR-FF-92), then a dialog "Supplier for die lube" per such line (BR-FF-49) · result: one PO → opens it, several →
   stays here, success toast "2 draft orders made" + both in Linked documents; partial failure keeps the made ones
   and names the failed supplier (BR-FF-58); 409 → page reloads (BR-FF-59).
 - **States:** loading = skeleton header + lines + panel · not found = BR-FF-04 text + link to list · error =

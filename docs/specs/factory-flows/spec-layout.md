@@ -1,7 +1,7 @@
 ---
 module: factory-flows
 part: layout
-status: draft
+status: frozen
 index: spec.md
 ---
 
