@@ -9,6 +9,7 @@ import {
 import { toast } from "sonner";
 
 import { ApiClientError } from "@/lib/api/client";
+import { homeKeys } from "@/lib/api/home/queries";
 import { prErrorMessage } from "@/lib/api/purchase-requisitions/error-messages";
 import type {
 	ApprovalActionInput,
@@ -132,6 +133,7 @@ export function useSubmitApprovalRequestMutation() {
 				queryClient.invalidateQueries({
 					queryKey: approvalKeys.myPending(),
 				}),
+				queryClient.invalidateQueries({ queryKey: homeKeys.all }),
 				queryClient.invalidateQueries({
 					queryKey: approvalKeys.currentByDoc(
 						variables.docType,
@@ -181,6 +183,7 @@ export function useActOnApprovalRequestMutation() {
 					queryKey: approvalKeys.requestTrail(variables.id),
 				}),
 				queryClient.invalidateQueries({ queryKey: approvalKeys.myPending() }),
+				queryClient.invalidateQueries({ queryKey: homeKeys.all }),
 				queryClient.invalidateQueries({
 					queryKey: ["approval", "document-view"],
 				}),

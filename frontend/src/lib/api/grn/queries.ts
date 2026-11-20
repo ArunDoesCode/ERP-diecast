@@ -87,6 +87,7 @@ export function useCreateGrnMutation() {
 			}
 
 			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: ["home"] }),
 				queryClient.invalidateQueries({ queryKey: grnKeys.list() }),
 				queryClient.invalidateQueries({ queryKey: grnKeys.receivable() }),
 				...(result.data.grn.poId != null
@@ -156,6 +157,7 @@ function invalidateGrnAndPO(
 	poId: number,
 ) {
 	return Promise.all([
+		queryClient.invalidateQueries({ queryKey: ["home"] }),
 		queryClient.invalidateQueries({ queryKey: grnKeys.list() }),
 		queryClient.invalidateQueries({ queryKey: grnKeys.detail(grnId) }),
 		queryClient.invalidateQueries({ queryKey: documentKeys.all }),

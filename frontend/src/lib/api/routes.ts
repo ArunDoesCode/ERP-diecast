@@ -183,6 +183,9 @@ export const API_ROUTES = {
 		challanDetail: (challanId: number) =>
 			`${API_Header.sco}/challans/${challanId}`,
 	},
+	home: {
+		getCounts: "/home/getcounts",
+	},
 	company: {
 		settings: `${API_Header.company}/settings`,
 		settingsHistory: `${API_Header.company}/settings/history`,

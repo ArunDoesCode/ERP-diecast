@@ -18,6 +18,7 @@ import {
 	SidebarRail,
 } from "@/components/ui/sidebar";
 import { useMeQuery } from "@/lib/api/auth/queries";
+import { useApprovalsBadgeCount } from "@/lib/api/home/queries";
 import { normalizeAllowedPath } from "@/lib/path-utils";
 import { getNavIcon } from "@/lib/shell/nav-icons";
 import { useAuthSessionStore } from "@/lib/store/auth-session-store";
@@ -32,6 +33,12 @@ export function NavSidebar() {
 	// through the httpOnly cookie first, and a failed refresh sends the user to /login
 	// (refresh-token.ts), so a page that makes no other API call still checks the session.
 	useMeQuery(true);
+
+	// BR-FF-85: pending-approvals badge on the Approvals entry.
+	const hasApprovals = screens.some(
+		(s) => normalizeAllowedPath(s.path) === "/approvals",
+	);
+	const approvalsCount = useApprovalsBadgeCount(hasApprovals);
 
 	// #51: sort and group only when the screens change, not on every render.
 	const sidebarGroups = useMemo(() => {
@@ -111,6 +118,13 @@ export function NavSidebar() {
 													>
 														<NavIcon />
 														<span>{page.title}</span>
+														{page.path === "/approvals" &&
+															approvalsCount > 0 && (
+																<span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-warning-subtle px-1.5 text-xs font-semibold text-warning tabular-nums group-data-[collapsible=icon]:hidden">
+																	{approvalsCount > 99 ? "99+" : approvalsCount}
+																	<span className="sr-only"> waiting</span>
+																</span>
+															)}
 													</Link>
 												</SidebarMenuButton>
 											</SidebarMenuItem>
