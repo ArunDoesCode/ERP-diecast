@@ -223,7 +223,7 @@ function ItemEditorForm({ mode, item, onDone }: ItemEditorFormProps) {
 						name="sku"
 						render={({ field }) => (
 							<FormItem className="min-h-19 gap-1.5">
-								<Label htmlFor="item-sku">SKU</Label>
+								<FormLabel htmlFor="item-sku">SKU</FormLabel>
 								<FormControl>
 									<Input {...field} id="item-sku" />
 								</FormControl>
@@ -237,7 +237,7 @@ function ItemEditorForm({ mode, item, onDone }: ItemEditorFormProps) {
 						name="name"
 						render={({ field }) => (
 							<FormItem className="min-h-19 gap-1.5">
-								<Label htmlFor="item-name">Item name</Label>
+								<FormLabel htmlFor="item-name">Item name</FormLabel>
 								<FormControl>
 									<Input {...field} id="item-name" />
 								</FormControl>
@@ -307,7 +307,9 @@ function ItemEditorForm({ mode, item, onDone }: ItemEditorFormProps) {
 						name="standardRate"
 						render={({ field }) => (
 							<FormItem className="min-h-19 gap-1.5">
-								<Label htmlFor="item-standard-rate">Standard rate (₹)</Label>
+								<FormLabel htmlFor="item-standard-rate">
+									Standard rate (₹)
+								</FormLabel>
 								<FormControl>
 									<Input
 										id="item-standard-rate"
@@ -336,9 +338,9 @@ function ItemEditorForm({ mode, item, onDone }: ItemEditorFormProps) {
 						name="reorderLevel"
 						render={({ field }) => (
 							<FormItem className="min-h-19 gap-1.5">
-								<Label htmlFor="item-reorder-level">
+								<FormLabel htmlFor="item-reorder-level">
 									Reorder level (optional)
-								</Label>
+								</FormLabel>
 								<FormControl>
 									<Input
 										id="item-reorder-level"
@@ -387,7 +389,9 @@ function ItemEditorForm({ mode, item, onDone }: ItemEditorFormProps) {
 							name="hsnCode"
 							render={({ field }) => (
 								<FormItem className="col-span-2 min-h-19 gap-1.5">
-									<Label htmlFor="item-hsn-code">HSN code (optional)</Label>
+									<FormLabel htmlFor="item-hsn-code">
+										HSN code (optional)
+									</FormLabel>
 									<FormControl>
 										<Input
 											id="item-hsn-code"
@@ -410,7 +414,9 @@ function ItemEditorForm({ mode, item, onDone }: ItemEditorFormProps) {
 						name="description"
 						render={({ field }) => (
 							<FormItem className="col-span-2 min-h-19 gap-1.5">
-								<Label htmlFor="item-description">Description (optional)</Label>
+								<FormLabel htmlFor="item-description">
+									Description (optional)
+								</FormLabel>
 								<FormControl>
 									<Input
 										id="item-description"

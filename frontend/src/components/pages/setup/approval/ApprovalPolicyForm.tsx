@@ -99,7 +99,9 @@ export function ApprovalPolicyForm({
 									name="name"
 									render={({ field }) => (
 										<FormItem className="min-h-19 gap-1.5">
-											<Label htmlFor="approval-policy-name">Policy name</Label>
+											<FormLabel htmlFor="approval-policy-name">
+												Policy name
+											</FormLabel>
 											<FormControl>
 												<Input id="approval-policy-name" {...field} />
 											</FormControl>
@@ -130,7 +132,9 @@ export function ApprovalPolicyForm({
 								name="priority"
 								render={({ field }) => (
 									<FormItem className="min-h-19 gap-1.5">
-										<Label htmlFor="approval-policy-priority">Priority</Label>
+										<FormLabel htmlFor="approval-policy-priority">
+											Priority
+										</FormLabel>
 										<FormControl>
 											<Input
 												id="approval-policy-priority"
@@ -230,9 +234,9 @@ export function ApprovalPolicyForm({
 								name="minAmountPaise"
 								render={({ field }) => (
 									<FormItem className="min-h-19 gap-1.5">
-										<Label htmlFor="approval-policy-min-amount">
+										<FormLabel htmlFor="approval-policy-min-amount">
 											Min amount (₹)
-										</Label>
+										</FormLabel>
 										<FormControl>
 											<Input
 												id="approval-policy-min-amount"
@@ -252,9 +256,9 @@ export function ApprovalPolicyForm({
 								name="maxAmountPaise"
 								render={({ field }) => (
 									<FormItem className="min-h-19 gap-1.5">
-										<Label htmlFor="approval-policy-max-amount">
+										<FormLabel htmlFor="approval-policy-max-amount">
 											Max amount (₹)
-										</Label>
+										</FormLabel>
 										<FormControl>
 											<Input
 												id="approval-policy-max-amount"

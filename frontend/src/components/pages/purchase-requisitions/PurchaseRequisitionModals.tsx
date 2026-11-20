@@ -358,10 +358,10 @@ export function CreatePurchaseRequisitionModal({
 														control={form.control}
 														name={`items.${index}.requestedQty`}
 														render={({ field }) => (
-															<FormItem>
-																<Label htmlFor={`create-item-qty-${index}`}>
+															<FormItem className="gap-1.5">
+																<FormLabel htmlFor={`create-item-qty-${index}`}>
 																	Qty
-																</Label>
+																</FormLabel>
 																<FormControl>
 																	<Input
 																		id={`create-item-qty-${index}`}
@@ -751,7 +751,7 @@ export function EditPurchaseRequisitionModal({
 
 												{canLinkMachine ? (
 													<FormItem className="min-h-19 content-start gap-1.5">
-														<Label htmlFor="pr-machine-id">Machine id</Label>
+														<Label htmlFor="pr-machine-id">Machine</Label>
 														<FormControl>
 															<Input
 																id="pr-machine-id"
@@ -864,10 +864,12 @@ export function EditPurchaseRequisitionModal({
 																control={form.control}
 																name={`items.${index}.requestedQty`}
 																render={({ field }) => (
-																	<FormItem>
-																		<Label htmlFor={`edit-item-qty-${index}`}>
+																	<FormItem className="gap-1.5">
+																		<FormLabel
+																			htmlFor={`edit-item-qty-${index}`}
+																		>
 																			Qty
-																		</Label>
+																		</FormLabel>
 																		<FormControl>
 																			<Input
 																				id={`edit-item-qty-${index}`}

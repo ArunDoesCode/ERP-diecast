@@ -251,7 +251,7 @@ function LocationEditorForm({
 					name="name"
 					render={({ field }) => (
 						<FormItem className="min-h-19 mt-2 gap-1.5">
-							<Label htmlFor="location-name">Location name</Label>
+							<FormLabel htmlFor="location-name">Location name</FormLabel>
 							<FormControl>
 								<Input {...field} id="location-name" />
 							</FormControl>

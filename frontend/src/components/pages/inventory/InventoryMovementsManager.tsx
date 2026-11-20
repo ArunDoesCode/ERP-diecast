@@ -320,9 +320,9 @@ function MovementCreateForm({ onDone }: MovementCreateFormProps) {
 					name="quantity"
 					render={({ field }) => (
 						<FormItem className="min-h-19 gap-1.5">
-							<Label htmlFor="movement-quantity">
+							<FormLabel htmlFor="movement-quantity">
 								{isOpening ? "Opening quantity" : "Counted quantity"}
-							</Label>
+							</FormLabel>
 							<FormControl>
 								<Input
 									id="movement-quantity"
@@ -352,11 +352,11 @@ function MovementCreateForm({ onDone }: MovementCreateFormProps) {
 					name="unitCost"
 					render={({ field }) => (
 						<FormItem className="min-h-19 gap-1.5">
-							<Label htmlFor="movement-unit-cost">
+							<FormLabel htmlFor="movement-unit-cost">
 								{isOpening
 									? "Rate per unit (₹)"
 									: "Cost per unit (₹) - needed if counted is more than balance"}
-							</Label>
+							</FormLabel>
 							<FormControl>
 								<Input
 									id="movement-unit-cost"
@@ -386,9 +386,9 @@ function MovementCreateForm({ onDone }: MovementCreateFormProps) {
 					name="batchNumber"
 					render={({ field }) => (
 						<FormItem className="min-h-19 gap-1.5">
-							<Label htmlFor="movement-batch-number">
+							<FormLabel htmlFor="movement-batch-number">
 								Batch number (optional)
-							</Label>
+							</FormLabel>
 							<FormControl>
 								<Input
 									id="movement-batch-number"
@@ -411,7 +411,7 @@ function MovementCreateForm({ onDone }: MovementCreateFormProps) {
 					name="reason"
 					render={({ field }) => (
 						<FormItem className="min-h-19 gap-1.5">
-							<Label htmlFor="movement-reason">Reason</Label>
+							<FormLabel htmlFor="movement-reason">Reason</FormLabel>
 							<FormControl>
 								<Input
 									id="movement-reason"

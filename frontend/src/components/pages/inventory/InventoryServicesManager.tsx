@@ -162,7 +162,7 @@ function ServiceEditorForm({ mode, service, onDone }: ServiceEditorFormProps) {
 						name="code"
 						render={({ field }) => (
 							<FormItem className="min-h-19 mt-2 gap-1.5">
-								<Label htmlFor="service-code">Code</Label>
+								<FormLabel htmlFor="service-code">Code</FormLabel>
 								<FormControl>
 									<Input {...field} id="service-code" />
 								</FormControl>
@@ -176,7 +176,7 @@ function ServiceEditorForm({ mode, service, onDone }: ServiceEditorFormProps) {
 						name="name"
 						render={({ field }) => (
 							<FormItem className="min-h-19 mt-2 gap-1.5">
-								<Label htmlFor="service-name">Service name</Label>
+								<FormLabel htmlFor="service-name">Service name</FormLabel>
 								<FormControl>
 									<Input {...field} id="service-name" />
 								</FormControl>
@@ -190,7 +190,7 @@ function ServiceEditorForm({ mode, service, onDone }: ServiceEditorFormProps) {
 						name="defaultUom"
 						render={({ field }) => (
 							<FormItem className="min-h-19 gap-1.5">
-								<Label htmlFor="service-uom">Default UOM</Label>
+								<FormLabel htmlFor="service-uom">Default UOM</FormLabel>
 								<FormControl>
 									<Input {...field} id="service-uom" />
 								</FormControl>
@@ -204,9 +204,9 @@ function ServiceEditorForm({ mode, service, onDone }: ServiceEditorFormProps) {
 						name="sacCode"
 						render={({ field }) => (
 							<FormItem className="min-h-19 gap-1.5">
-								<Label htmlFor="service-sac">
+								<FormLabel htmlFor="service-sac">
 									SAC code (6 digits, starts 99)
-								</Label>
+								</FormLabel>
 								<FormControl>
 									<Input
 										id="service-sac"
@@ -231,9 +231,9 @@ function ServiceEditorForm({ mode, service, onDone }: ServiceEditorFormProps) {
 						name="description"
 						render={({ field }) => (
 							<FormItem className="min-h-19 gap-1.5">
-								<Label htmlFor="service-description">
+								<FormLabel htmlFor="service-description">
 									Description (optional)
-								</Label>
+								</FormLabel>
 								<FormControl>
 									<Input
 										id="service-description"

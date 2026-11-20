@@ -118,7 +118,7 @@ export function EmployeeForm({
 					name="name"
 					render={({ field }) => (
 						<FormItem className="min-h-19 mt-2 gap-1.5">
-							<Label htmlFor="name">Name</Label>
+							<FormLabel htmlFor="name">Name</FormLabel>
 							<FormControl>
 								<Input {...field} id="name" />
 							</FormControl>
@@ -132,7 +132,7 @@ export function EmployeeForm({
 					name="phone"
 					render={({ field }) => (
 						<FormItem className="min-h-19 gap-1.5">
-							<Label htmlFor="phone">Phone</Label>
+							<FormLabel htmlFor="phone">Phone</FormLabel>
 							<FormControl>
 								<Input {...field} id="phone" />
 							</FormControl>
@@ -146,7 +146,7 @@ export function EmployeeForm({
 					name="dailyRatePaise"
 					render={({ field }) => (
 						<FormItem className="min-h-19 gap-1.5">
-							<Label htmlFor="dailyRatePaise">Daily Rate (paise)</Label>
+							<FormLabel htmlFor="dailyRatePaise">Daily Rate (paise)</FormLabel>
 							<FormControl>
 								<Input
 									id="dailyRatePaise"
@@ -228,7 +228,7 @@ export function EmployeeForm({
 							name="email"
 							render={({ field }) => (
 								<FormItem className="min-h-19 gap-1.5">
-									<Label htmlFor="email">Email</Label>
+									<FormLabel htmlFor="email">Email</FormLabel>
 									<FormControl>
 										<Input {...field} id="email" type="email" />
 									</FormControl>
@@ -242,7 +242,7 @@ export function EmployeeForm({
 							name="password"
 							render={({ field }) => (
 								<FormItem className="min-h-19 gap-1.5">
-									<Label htmlFor="password">Password</Label>
+									<FormLabel htmlFor="password">Password</FormLabel>
 									<FormControl>
 										<Input {...field} id="password" type="password" />
 									</FormControl>

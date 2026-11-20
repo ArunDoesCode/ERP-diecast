@@ -129,7 +129,9 @@ export function SupplierMasterModal({
 											name="name"
 											render={({ field }) => (
 												<FormItem className="min-h-19 content-start gap-1.5">
-													<Label htmlFor="supplier-name">Supplier name</Label>
+													<FormLabel htmlFor="supplier-name">
+														Supplier name
+													</FormLabel>
 													<FormControl>
 														<Input
 															{...field}
@@ -184,9 +186,9 @@ export function SupplierMasterModal({
 											name="gstNumber"
 											render={({ field }) => (
 												<FormItem className="min-h-19 content-start gap-1.5">
-													<Label htmlFor="supplier-gst">
+													<FormLabel htmlFor="supplier-gst">
 														GST number (optional)
-													</Label>
+													</FormLabel>
 													<FormControl>
 														<Input
 															{...field}
@@ -231,9 +233,9 @@ export function SupplierMasterModal({
 											name="panNumber"
 											render={({ field }) => (
 												<FormItem className="min-h-19 content-start gap-1.5">
-													<Label htmlFor="supplier-pan">
+													<FormLabel htmlFor="supplier-pan">
 														PAN number (optional, filled from GST)
-													</Label>
+													</FormLabel>
 													<FormControl>
 														<Input
 															{...field}
@@ -262,9 +264,9 @@ export function SupplierMasterModal({
 											name="contactPerson"
 											render={({ field }) => (
 												<FormItem className="min-h-19 content-start gap-1.5">
-													<Label htmlFor="supplier-contact">
+													<FormLabel htmlFor="supplier-contact">
 														Contact person (optional)
-													</Label>
+													</FormLabel>
 													<FormControl>
 														<Input
 															{...field}
@@ -282,9 +284,9 @@ export function SupplierMasterModal({
 											name="phone"
 											render={({ field }) => (
 												<FormItem className="min-h-19 content-start gap-1.5">
-													<Label htmlFor="supplier-phone">
+													<FormLabel htmlFor="supplier-phone">
 														Phone (optional)
-													</Label>
+													</FormLabel>
 													<FormControl>
 														<Input
 															{...field}
@@ -302,9 +304,9 @@ export function SupplierMasterModal({
 											name="email"
 											render={({ field }) => (
 												<FormItem className="min-h-19 content-start gap-1.5">
-													<Label htmlFor="supplier-email">
+													<FormLabel htmlFor="supplier-email">
 														Email (optional)
-													</Label>
+													</FormLabel>
 													<FormControl>
 														<Input
 															{...field}
@@ -323,9 +325,9 @@ export function SupplierMasterModal({
 											name="address"
 											render={({ field }) => (
 												<FormItem className="min-h-19 content-start gap-1.5">
-													<Label htmlFor="supplier-address">
+													<FormLabel htmlFor="supplier-address">
 														Address (optional)
-													</Label>
+													</FormLabel>
 													<FormControl>
 														<Input
 															{...field}
@@ -351,9 +353,9 @@ export function SupplierMasterModal({
 											name="defaultPaymentTermsDays"
 											render={({ field }) => (
 												<FormItem className="min-h-19 content-start gap-1.5">
-													<Label htmlFor="supplier-payment">
+													<FormLabel htmlFor="supplier-payment">
 														Default payment terms (days, 0-365)
-													</Label>
+													</FormLabel>
 													<FormControl>
 														<Input
 															id="supplier-payment"

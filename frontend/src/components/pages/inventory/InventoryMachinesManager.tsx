@@ -186,7 +186,7 @@ function MachineEditorForm({ mode, machine, onDone }: MachineEditorFormProps) {
 					name="name"
 					render={({ field }) => (
 						<FormItem className="min-h-19 mt-2 gap-1.5">
-							<Label htmlFor="machine-name">Machine name</Label>
+							<FormLabel htmlFor="machine-name">Machine name</FormLabel>
 							<FormControl>
 								<Input {...field} id="machine-name" />
 							</FormControl>
@@ -200,7 +200,7 @@ function MachineEditorForm({ mode, machine, onDone }: MachineEditorFormProps) {
 					name="code"
 					render={({ field }) => (
 						<FormItem className="min-h-19 gap-1.5">
-							<Label htmlFor="machine-code">Machine code</Label>
+							<FormLabel htmlFor="machine-code">Machine code</FormLabel>
 							<FormControl>
 								<Input {...field} id="machine-code" />
 							</FormControl>
@@ -214,7 +214,7 @@ function MachineEditorForm({ mode, machine, onDone }: MachineEditorFormProps) {
 					name="type"
 					render={({ field }) => (
 						<FormItem className="min-h-19 gap-1.5">
-							<Label htmlFor="machine-type">Machine type</Label>
+							<FormLabel htmlFor="machine-type">Machine type</FormLabel>
 							<FormControl>
 								<Input
 									id="machine-type"
@@ -267,9 +267,9 @@ function MachineEditorForm({ mode, machine, onDone }: MachineEditorFormProps) {
 					name="lastMaintenanceAt"
 					render={({ field }) => (
 						<FormItem className="min-h-19 gap-1.5">
-							<Label htmlFor="machine-last-maintenance">
+							<FormLabel htmlFor="machine-last-maintenance">
 								Last maintenance date
-							</Label>
+							</FormLabel>
 							<FormControl>
 								<Input
 									id="machine-last-maintenance"

@@ -8,7 +8,7 @@ description: "Use when writing a form, adding validation, using shadcn component
 ## Owns
 
 - shadcn form wiring (RHF + Zod + `Form`, `FormField`, `FormItem`, `FormControl`, `FormMessage`)
-- floating-label inputs via `FloatingLabelInput` from `@/components/ui/floating-label` (this repo's default text field — replaces separate `FormLabel` + `Input`)
+- the field look (BR-DS-29): label above the field — `FormLabel` (inside `FormField`) or `Label` (outside a form context), always with `htmlFor` = the input `id` — then a 36 px `Input`
 - consistent field height: every `FormItem` uses `className="min-h-19"` so inline `FormMessage` errors don't shift layout
 - Zod schema source and type inference
 - Toast placement — mutation hook, not form component
@@ -28,7 +28,7 @@ description: "Use when writing a form, adding validation, using shadcn component
 | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | Zod schemas                      | From `@/types/[feature].ts` — never inline, never redefined in the component.                                                 |
 | `isPending`                      | From `useMutation` — no separate `useState` for loading.                                                                      |
-| Text fields                      | `FloatingLabelInput` (`id` + `label` props) — not raw `Input` + `FormLabel`.                                                  |
+| Text fields                      | Label above a 36 px `Input`; `FormLabel`/`Label` with `htmlFor` = input `id`. No floating labels.                              |
 | Field spacing                    | Each `FormItem` gets `className="min-h-19"` to reserve space for `FormMessage`.                                               |
 | Toasts                           | In the mutation's `onSuccess`/`onError` (in `lib/api/[feature]/queries.ts`) — not in the form component.                      |
 | Response contract                | API may return HTTP 200 with `{ success: false, message }`; check `result.success` in `onSuccess` and toast `result.message`. |
@@ -52,7 +52,7 @@ as the reference. See the `shadcn` skill for the general component workflow.
 - [ ] Mutation from `lib/api/[feature]/queries.ts` — `const loginMutation = useLoginMutation()`
 - [ ] Submit button `disabled={mutation.isPending}` with a pending label (e.g. `"Signing in..."`)
 - [ ] Every `FormItem` has `className="min-h-19"` to reserve space for `FormMessage`
-- [ ] Text fields use `FloatingLabelInput` (`id` + `label`) — not raw `Input` + `FormLabel`
+- [ ] Text fields: label above (`FormLabel` in a `FormField`, `Label` elsewhere) with `htmlFor` = the `Input` `id`; no floating labels
 - [ ] `FormMessage` under every `FormField` for inline Zod errors
 - [ ] No inline `useState` mirroring form field values — RHF owns field state
 
@@ -72,9 +72,10 @@ import {
   FormControl,
   FormField,
   FormItem,
+  FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { FloatingLabelInput } from "@/components/ui/floating-label";
+import { Input } from "@/components/ui/input";
 import { useLoginMutation } from "@/lib/api/auth/queries";
 import { type LoginInput, loginSchema } from "@/types/auth";
 
@@ -98,14 +99,10 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
           control={form.control}
           name="email"
           render={({ field }) => (
-            <FormItem className="min-h-19">
+            <FormItem className="min-h-19 gap-1.5">
+              <FormLabel htmlFor="email">Email</FormLabel>
               <FormControl>
-                <FloatingLabelInput
-                  {...field}
-                  id="email"
-                  label="Email"
-                  type="email"
-                />
+                <Input {...field} id="email" type="email" />
               </FormControl>
               <FormMessage />
             </FormItem>

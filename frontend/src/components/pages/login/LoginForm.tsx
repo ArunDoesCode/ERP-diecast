@@ -9,10 +9,10 @@ import {
 	FormControl,
 	FormField,
 	FormItem,
+	FormLabel,
 	FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useLoginMutation } from "@/lib/api/auth/queries";
 import { type LoginInput, loginSchema } from "@/types/auth";
 
@@ -36,7 +36,7 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
 					name="email"
 					render={({ field }) => (
 						<FormItem className="min-h-19 content-start gap-1.5">
-							<Label htmlFor="email">Email</Label>
+							<FormLabel htmlFor="email">Email</FormLabel>
 							<FormControl>
 								<Input {...field} id="email" type="email" />
 							</FormControl>
@@ -50,7 +50,7 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
 					name="password"
 					render={({ field }) => (
 						<FormItem className="min-h-19 content-start gap-1.5">
-							<Label htmlFor="password">Password</Label>
+							<FormLabel htmlFor="password">Password</FormLabel>
 							<FormControl>
 								<Input {...field} id="password" type="password" />
 							</FormControl>

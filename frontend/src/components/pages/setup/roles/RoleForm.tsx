@@ -10,10 +10,10 @@ import {
 	FormControl,
 	FormField,
 	FormItem,
+	FormLabel,
 	FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
 	useCreateRoleMutation,
 	useUpdateRoleMutation,
@@ -75,7 +75,7 @@ export function RoleForm({
 					name="name"
 					render={({ field }) => (
 						<FormItem className="min-h-19 gap-1.5">
-							<Label htmlFor="name">Name</Label>
+							<FormLabel htmlFor="name">Name</FormLabel>
 							<FormControl>
 								<Input {...field} id="name" disabled={isSystem} />
 							</FormControl>

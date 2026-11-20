@@ -429,7 +429,9 @@ export function SupplierOfferingsDialog({
 									name="supplierSku"
 									render={({ field }) => (
 										<FormItem className="min-h-19 content-start gap-1.5">
-											<Label htmlFor="supplier-item-sku">Supplier SKU</Label>
+											<FormLabel htmlFor="supplier-item-sku">
+												Supplier SKU
+											</FormLabel>
 											<FormControl>
 												<Input
 													{...field}
@@ -447,9 +449,9 @@ export function SupplierOfferingsDialog({
 									name="supplierUnitPriceRupees"
 									render={({ field }) => (
 										<FormItem className="min-h-19 content-start gap-1.5">
-											<Label htmlFor="supplier-item-price">
+											<FormLabel htmlFor="supplier-item-price">
 												Unit price (₹ per unit)
-											</Label>
+											</FormLabel>
 											<FormControl>
 												<Input
 													{...field}
@@ -485,9 +487,9 @@ export function SupplierOfferingsDialog({
 									name="leadTimeDays"
 									render={({ field }) => (
 										<FormItem className="min-h-19 content-start gap-1.5">
-											<Label htmlFor="supplier-item-lead">
+											<FormLabel htmlFor="supplier-item-lead">
 												Lead time days (0-365)
-											</Label>
+											</FormLabel>
 											<FormControl>
 												<Input
 													id="supplier-item-lead"
@@ -511,9 +513,9 @@ export function SupplierOfferingsDialog({
 									name="qty"
 									render={({ field }) => (
 										<FormItem className="min-h-19 content-start gap-1.5">
-											<Label htmlFor="supplier-item-qty">
+											<FormLabel htmlFor="supplier-item-qty">
 												Qty capacity (0 = no limit)
-											</Label>
+											</FormLabel>
 											<FormControl>
 												<Input
 													id="supplier-item-qty"
@@ -537,7 +539,7 @@ export function SupplierOfferingsDialog({
 									name="uom"
 									render={({ field }) => (
 										<FormItem className="min-h-19 content-start gap-1.5">
-											<Label htmlFor="supplier-item-uom">UOM</Label>
+											<FormLabel htmlFor="supplier-item-uom">UOM</FormLabel>
 											<FormControl>
 												<Input
 													{...field}
@@ -618,9 +620,9 @@ export function SupplierOfferingsDialog({
 									name="serviceUnitPriceRupees"
 									render={({ field }) => (
 										<FormItem className="min-h-19 content-start gap-1.5">
-											<Label htmlFor="supplier-service-price">
+											<FormLabel htmlFor="supplier-service-price">
 												Service rate (₹)
-											</Label>
+											</FormLabel>
 											<FormControl>
 												<Input
 													{...field}
@@ -658,9 +660,9 @@ export function SupplierOfferingsDialog({
 									name="leadTimeDays"
 									render={({ field }) => (
 										<FormItem className="min-h-19 content-start gap-1.5">
-											<Label htmlFor="supplier-service-lead">
+											<FormLabel htmlFor="supplier-service-lead">
 												Lead time days (0-365)
-											</Label>
+											</FormLabel>
 											<FormControl>
 												<Input
 													id="supplier-service-lead"

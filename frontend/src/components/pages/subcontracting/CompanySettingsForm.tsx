@@ -9,10 +9,10 @@ import {
 	FormControl,
 	FormField,
 	FormItem,
+	FormLabel,
 	FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useSaveCompanySettingsMutation } from "@/lib/api/subcontracting/queries";
 import {
 	type CompanySettings,
@@ -48,7 +48,7 @@ export function CompanySettingsForm({
 					name="name"
 					render={({ field }) => (
 						<FormItem className="min-h-19 gap-1.5">
-							<Label htmlFor="company-name">Company name</Label>
+							<FormLabel htmlFor="company-name">Company name</FormLabel>
 							<FormControl>
 								<Input {...field} id="company-name" />
 							</FormControl>
@@ -61,7 +61,7 @@ export function CompanySettingsForm({
 					name="address"
 					render={({ field }) => (
 						<FormItem className="min-h-19 gap-1.5">
-							<Label htmlFor="company-address">Address</Label>
+							<FormLabel htmlFor="company-address">Address</FormLabel>
 							<FormControl>
 								<Input {...field} id="company-address" />
 							</FormControl>
@@ -75,7 +75,7 @@ export function CompanySettingsForm({
 						name="gstin"
 						render={({ field }) => (
 							<FormItem className="min-h-19 gap-1.5">
-								<Label htmlFor="company-gstin">GSTIN</Label>
+								<FormLabel htmlFor="company-gstin">GSTIN</FormLabel>
 								<FormControl>
 									<Input {...field} id="company-gstin" maxLength={15} />
 								</FormControl>
@@ -88,7 +88,7 @@ export function CompanySettingsForm({
 						name="stateCode"
 						render={({ field }) => (
 							<FormItem className="min-h-19 gap-1.5">
-								<Label htmlFor="company-state-code">State code</Label>
+								<FormLabel htmlFor="company-state-code">State code</FormLabel>
 								<FormControl>
 									<Input {...field} id="company-state-code" maxLength={2} />
 								</FormControl>
