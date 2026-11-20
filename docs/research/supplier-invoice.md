@@ -116,3 +116,6 @@ products: [ERPNext, Odoo, SAP Business One, Zoho Books, Busy]
 | 6 | Supplier credit notes needed in v1? | yes / no | Scope |
 
 ## Follow-ups
+- 2026-11-20 (spec-analyst, card 4): SAP B1 duplicate vendor ref no. — Document Settings per document can warn or
+  block release (community: https://archive.sap.com/discussions/thread/3756725); a cancelled A/P invoice's ref can be
+  reused (SAP KB https://userapps.support.sap.com/sap/support/knowledge/en/3262546). Older B1 warns only.
