@@ -119,3 +119,5 @@ No product page read gave a permission model for delivery. ERPNext lists Draft/T
 
 ## Follow-ups
 - E-way bill validity is 1 day per **200 km** (not 100 km) since 1 Jan 2021, Notification 94/2020-CT; spec uses 200 km. Sources: [Rule 138(10), Indian Kanoon](https://future.indiankanoon.org/doc/61402723/) · [ClearTax](https://cleartax.in/s/gst-eway-bill-validity-distance) (retrieved 2026-11-20).
+- ERPNext grants Submit and Cancel as separate rights per role in the Role Permissions Manager (used for
+  card 6, owner-only cancel). [ERPNext role based permissions](https://docs.frappe.io/erpnext/user/manual/en/role-based-permissions) (search summary, 2026-11-20).
