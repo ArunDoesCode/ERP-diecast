@@ -84,7 +84,7 @@ export function PurchaseRequisitionsView() {
 				header: "PR no.",
 				cell: ({ row }) => (
 					<Link
-						href={`/purchase-requisitions/${row.original.id}/edit`}
+						href={`/purchase-requisitions/${row.original.id}`}
 						className="cursor-pointer font-mono text-brand-accent hover:underline"
 					>
 						{formatDocNo(row.original.prNumber)}

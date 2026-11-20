@@ -243,8 +243,8 @@ export function PurchaseRequisitionFormView(props: Props) {
 				// handled by the mutation's error toast
 			}
 		}
-		// The PR page arrives with sub-feature 3; until then the list.
-		router.push(LIST_HREF);
+		// BR-FF-46, 57: the saved requisition's own page (shows a refusal reason too).
+		router.push(`${LIST_HREF}/${savedId}`);
 	}
 
 	function onWithdraw() {

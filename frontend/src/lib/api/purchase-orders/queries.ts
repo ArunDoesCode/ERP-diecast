@@ -176,6 +176,7 @@ function invalidatePOAndPR(
 		queryClient.invalidateQueries({
 			queryKey: purchaseOrderKeys.communications(poId),
 		}),
+		queryClient.invalidateQueries({ queryKey: ["document"] }),
 		queryClient.invalidateQueries({ queryKey: ["approval", "pending"] }),
 		queryClient.invalidateQueries({ queryKey: ["approval", "history"] }),
 		queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.cards() }),

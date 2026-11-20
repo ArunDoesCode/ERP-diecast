@@ -49,7 +49,7 @@ const columns: DataTableColumnDef<PurchaseRequisition>[] = [
 		header: "PR no.",
 		cell: ({ row }) => (
 			<Link
-				href={`/purchase-orders/${row.original.id}`}
+				href={`/purchase-requisitions/${row.original.id}`}
 				className="font-mono text-brand-accent hover:underline"
 			>
 				{formatDocNo(row.original.prNumber)}
