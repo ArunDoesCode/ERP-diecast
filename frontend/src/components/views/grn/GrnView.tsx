@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useGrnTrackingControls } from "@/components/views/grn/use-grn-tracking-controls";
+import { useCan } from "@/hooks/use-can";
 import { useGrnsQuery } from "@/lib/api/grn/queries";
 import { formatDate, formatDocNo } from "@/lib/format";
 import { getStatusTone } from "@/lib/status-tone";
@@ -81,6 +82,7 @@ const columns: DataTableColumnDef<GrnListRow>[] = [
 ];
 
 export function GrnView() {
+	const canReceive = useCan("grn.edit_draft");
 	const {
 		filtersActive,
 		onPageSizeChange,
@@ -144,6 +146,13 @@ export function GrnView() {
 			icon={IconFileOff}
 			title="No goods receipts yet"
 			description="A GRN shows up here when goods are received against a dispatched purchase order."
+			action={
+				canReceive ? (
+					<Button asChild size="lg">
+						<Link href="/grn/receive">Receive goods</Link>
+					</Button>
+				) : undefined
+			}
 		/>
 	);
 
@@ -152,6 +161,13 @@ export function GrnView() {
 			<PageHeader
 				title="Goods receipt notes"
 				description="Track goods received against dispatched purchase orders."
+				actions={
+					canReceive ? (
+						<Button asChild size="lg">
+							<Link href="/grn/receive">Receive goods</Link>
+						</Button>
+					) : undefined
+				}
 			/>
 
 			<FilterBar

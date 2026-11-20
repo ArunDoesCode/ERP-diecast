@@ -16,6 +16,8 @@ import type {
 	GrnUpdateResult,
 } from "@/types/grn";
 
+import type { ReceivableParams, ReceivableResult } from "./receivable-types";
+
 function toQueryString(params?: Record<string, unknown>) {
 	if (!params) return "";
 
@@ -86,5 +88,11 @@ export function correctGrnLine(
 	return api.post<GrnCorrectionResult, GrnCorrectionPayload>(
 		API_ROUTES.grn.correction(grnId, lineId),
 		payload,
+	);
+}
+
+export function getReceivablePos(params?: ReceivableParams) {
+	return api.get<ReceivableResult>(
+		`${API_ROUTES.grn.receivable}${toQueryString(params)}`,
 	);
 }

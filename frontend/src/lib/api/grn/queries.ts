@@ -27,13 +27,19 @@ import {
 	deleteGrn,
 	getGrnById,
 	getGrns,
+	getReceivablePos,
 	updateGrn,
 } from "./fetchers";
+import type { ReceivableParams } from "./receivable-types";
 
 export const grnKeys = {
 	list: (params?: GrnListParams) =>
 		params ? (["grn", "list", params] as const) : (["grn", "list"] as const),
 	detail: (grnId: number) => ["grn", "detail", grnId] as const,
+	receivable: (params?: ReceivableParams) =>
+		params
+			? (["grn", "receivable", params] as const)
+			: (["grn", "receivable"] as const),
 };
 
 function errorMessage(error: unknown, fallback: string) {
@@ -45,6 +51,18 @@ export function useGrnsQuery(params: GrnListParams) {
 		queryKey: grnKeys.list(params),
 		queryFn: () => getGrns(params),
 		placeholderData: keepPreviousData,
+	});
+}
+
+export function useReceivablePosQuery(
+	params: ReceivableParams,
+	enabled = true,
+) {
+	return useQuery({
+		queryKey: grnKeys.receivable(params),
+		queryFn: () => getReceivablePos(params),
+		placeholderData: keepPreviousData,
+		enabled,
 	});
 }
 
@@ -69,6 +87,7 @@ export function useCreateGrnMutation() {
 
 			await Promise.all([
 				queryClient.invalidateQueries({ queryKey: grnKeys.list() }),
+				queryClient.invalidateQueries({ queryKey: grnKeys.receivable() }),
 				...(result.data.grn.poId != null
 					? [
 							queryClient.invalidateQueries({

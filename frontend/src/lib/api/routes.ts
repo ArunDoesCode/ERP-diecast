@@ -148,6 +148,7 @@ export const API_ROUTES = {
 		list: `${API_Header.grn}/getgrns`,
 		detail: (grnId: number) => `${API_Header.grn}/getgrndetails/${grnId}`,
 		create: `${API_Header.grn}/creategrn`,
+		receivable: `${API_Header.grn}/getreceivablepos`,
 		update: `${API_Header.grn}/updategrn`,
 		remove: (grnId: number) => `${API_Header.grn}/deletegrn/${grnId}`,
 		qaDecision: (grnId: number, lineId: number) =>
