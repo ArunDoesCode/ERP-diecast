@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   bigint,
   boolean,
@@ -69,6 +70,10 @@ export const purchaseRequests = pgTable(
   },
   (table) => ({
     statusIdx: index("idx_purchase_requests_status").on(table.status),
+    requestedByStatusIdx: index("idx_purchase_requests_requested_by_status").on(
+      table.requestedBy,
+      table.status,
+    ),
     // List `q` search (ilike %q%, #54): pg_trgm GIN indexes
     prNumberTrgm: index("idx_purchase_requests_pr_number_trgm").using(
       "gin",
@@ -197,6 +202,10 @@ export const purchaseOrders = pgTable(
   },
   (table) => ({
     statusIdx: index("idx_purchase_orders_status").on(table.status),
+    createdByStatusIdx: index("idx_purchase_orders_created_by_status").on(
+      table.createdBy,
+      table.status,
+    ),
     supplierIdx: index("idx_purchase_orders_supplier_id").on(table.supplierId),
     // List `q` search (ilike %q%, #54): pg_trgm GIN indexes
     poNumberTrgm: index("idx_purchase_orders_po_number_trgm").using(
@@ -534,6 +543,10 @@ export const grns = pgTable(
   },
   (table) => ({
     statusIdIdx: index("idx_grns_status_id").on(table.status, table.id),
+    receivedDateIdx: index("idx_grns_received_date").on(
+      table.receivedDate,
+      table.id,
+    ),
     // BR-GRN-05: same challan from the same supplier only once (deleted GRNs are gone).
     supplierChallanUq: uniqueIndex("uq_grns_supplier_challan").on(
       table.supplierId,
@@ -583,6 +596,9 @@ export const grnItems = pgTable(
   },
   (table) => ({
     grnIdIdx: index("idx_grn_items_grn_id").on(table.grnId),
+    pendingGrnIdx: index("idx_grn_items_pending_grn")
+      .on(table.grnId)
+      .where(sql`${table.qaStatus} = 'pending'`),
     poItemIdIdx: index("idx_grn_items_po_item_id").on(table.poItemId),
   }),
 );
