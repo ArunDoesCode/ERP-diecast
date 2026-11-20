@@ -9,7 +9,6 @@ import { CancelPoAlert } from "@/components/pages/purchase-orders/CancelPoAlert"
 import { ClosePoAlert } from "@/components/pages/purchase-orders/ClosePoAlert";
 import { ConfirmPoDialog } from "@/components/pages/purchase-orders/ConfirmPoDialog";
 import { DelayPoDialog } from "@/components/pages/purchase-orders/DelayPoDialog";
-import { EditPOModal } from "@/components/pages/purchase-orders/EditPOModal";
 import { LogPoCommunicationDialog } from "@/components/pages/purchase-orders/LogPoCommunicationDialog";
 import { MarkPoInvoicedDialog } from "@/components/pages/purchase-orders/MarkPoInvoicedDialog";
 import {
@@ -70,8 +69,7 @@ type Dialog =
 	| "invoice"
 	| "close"
 	| "shortClose"
-	| "cancel"
-	| "edit";
+	| "cancel";
 
 function PageSkeleton() {
 	return (
@@ -136,8 +134,8 @@ export function PurchaseOrderPageView({ poId }: { poId: number }) {
 	const canSend = po.status === "approved" && canManagePo;
 	const canReceiveGoods = inTransit && hasOpenQty && canReceive;
 	const menu: { key: Dialog; label: string; destructive?: boolean }[] = [];
+	const canEdit = canManagePo && po.status === "draft";
 	if (canManagePo) {
-		if (po.status === "draft") menu.push({ key: "edit", label: "Edit" });
 		if (inTransit) {
 			menu.push(
 				{ key: "reminder", label: "Send reminder" },
@@ -219,7 +217,7 @@ export function PurchaseOrderPageView({ poId }: { poId: number }) {
 					<Link href={`/grn/new?po=${po.id}`}>Receive goods</Link>
 				</Button>
 			) : null}
-			{menu.length > 0 ? (
+			{menu.length > 0 || canEdit ? (
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
 						<Button
@@ -232,6 +230,11 @@ export function PurchaseOrderPageView({ poId }: { poId: number }) {
 						</Button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent align="end">
+						{canEdit ? (
+							<DropdownMenuItem asChild>
+								<Link href={`${LIST_HREF}/${po.id}/edit`}>Edit</Link>
+							</DropdownMenuItem>
+						) : null}
 						{menu.map((item) => (
 							<DropdownMenuItem
 								key={item.key}
@@ -418,14 +421,6 @@ export function PurchaseOrderPageView({ poId }: { poId: number }) {
 					poNumber={po.poNumber}
 					{...dialogProps("cancel")}
 					onCancelled={closeDialog}
-				/>
-			) : null}
-			{dialog === "edit" ? (
-				<EditPOModal
-					poId={po.id}
-					pendingLines={[]}
-					{...dialogProps("edit")}
-					onSaved={closeDialog}
 				/>
 			) : null}
 		</div>

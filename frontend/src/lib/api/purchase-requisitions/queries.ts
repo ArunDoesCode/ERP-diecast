@@ -61,7 +61,13 @@ export function usePurchaseRequisitionDetailQuery(
 	});
 }
 
-export function useCreatePurchaseRequisitionMutation() {
+/**
+ * `quietSuccess.current = true` skips the "saved" toast: "Save and submit" shows one toast
+ * (the submit one), not two.
+ */
+export function useCreatePurchaseRequisitionMutation(quietSuccess?: {
+	current: boolean;
+}) {
 	const queryClient = useQueryClient();
 
 	return useMutation({
@@ -75,7 +81,7 @@ export function useCreatePurchaseRequisitionMutation() {
 			await queryClient.invalidateQueries({
 				queryKey: purchaseRequisitionKeys.cards(),
 			});
-			toast.success(result.message || "PR created");
+			if (!quietSuccess?.current) toast.success(result.message || "PR created");
 		},
 		onError: (error) => {
 			toast.error(errorMessage(error, "Failed to create PR"));
@@ -83,7 +89,9 @@ export function useCreatePurchaseRequisitionMutation() {
 	});
 }
 
-export function useUpdatePurchaseRequisitionMutation() {
+export function useUpdatePurchaseRequisitionMutation(quietSuccess?: {
+	current: boolean;
+}) {
 	const queryClient = useQueryClient();
 
 	return useMutation({
@@ -103,7 +111,7 @@ export function useUpdatePurchaseRequisitionMutation() {
 					queryKey: purchaseRequisitionKeys.detail(variables.prId),
 				}),
 			]);
-			toast.success(result.message || "PR updated");
+			if (!quietSuccess?.current) toast.success(result.message || "PR updated");
 		},
 		onError: (error) => {
 			toast.error(errorMessage(error, "Failed to update PR"));

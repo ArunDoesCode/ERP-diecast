@@ -69,8 +69,10 @@ export function PurchaseRequisitionFormView(props: Props) {
 		prId,
 		props.mode === "edit",
 	);
-	const createMutation = useCreatePurchaseRequisitionMutation();
-	const updateMutation = useUpdatePurchaseRequisitionMutation();
+	// "Save and submit" shows one toast (the submit one), not a save toast too.
+	const quietSave = useRef(false);
+	const createMutation = useCreatePurchaseRequisitionMutation(quietSave);
+	const updateMutation = useUpdatePurchaseRequisitionMutation(quietSave);
 	const submitMutation = useSubmitApprovalRequestMutation();
 	const withdrawMutation = useActOnApprovalRequestMutation();
 
@@ -180,6 +182,7 @@ export function PurchaseRequisitionFormView(props: Props) {
 		const values = form.getValues();
 		setServerError(null);
 		setSaving(action);
+		quietSave.current = action === "submit";
 
 		let savedId: number;
 		try {

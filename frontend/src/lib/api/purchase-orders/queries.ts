@@ -167,6 +167,88 @@ export function useCreatePurchaseOrderMutation() {
 	});
 }
 
+export type PoDraftGroup = {
+	supplierId: number;
+	supplierName: string;
+	lines: Array<{ prItemId: number; unitPricePaise: number }>;
+};
+
+export type PoDraftOutcome =
+	| {
+			ok: true;
+			supplierName: string;
+			po: { id: number; poNumber: string };
+	  }
+	| { ok: false; supplierName: string; message: string; conflict: boolean };
+
+/**
+ * Create PO from a requisition (BR-FF-48, 58, 59): one createpo call per supplier, in
+ * parallel. A refused supplier does not stop the others; the result lists every outcome.
+ * No toasts here: the caller words the message from the outcomes.
+ */
+export function useCreateDraftPosMutation() {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: async (variables: {
+			prId: number;
+			groups: PoDraftGroup[];
+		}): Promise<PoDraftOutcome[]> =>
+			Promise.all(
+				variables.groups.map(async (group): Promise<PoDraftOutcome> => {
+					try {
+						const result = await createPurchaseOrder({
+							supplierId: group.supplierId,
+							lines: group.lines,
+						});
+						if (!result.success) {
+							return {
+								ok: false,
+								supplierName: group.supplierName,
+								message: result.message || "Could not create the order",
+								conflict: false,
+							};
+						}
+						return {
+							ok: true,
+							supplierName: group.supplierName,
+							po: {
+								id: result.data.po.id,
+								poNumber: result.data.po.poNumber,
+							},
+						};
+					} catch (error) {
+						const conflict =
+							error instanceof ApiClientError &&
+							(error.status === 409 ||
+								error.code === "PO_LINE_ALREADY_DRAFTED");
+						return {
+							ok: false,
+							supplierName: group.supplierName,
+							message: conflict
+								? "Already on another order"
+								: errorMessage(error, "Could not create the order"),
+							conflict,
+						};
+					}
+				}),
+			),
+		onSettled: async (_outcomes, _error, variables) => {
+			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.cards() }),
+				queryClient.invalidateQueries({
+					queryKey: purchaseRequisitionKeys.cards(),
+				}),
+				queryClient.invalidateQueries({
+					queryKey: purchaseRequisitionKeys.detail(variables.prId),
+				}),
+				queryClient.invalidateQueries({ queryKey: ["document"] }),
+				queryClient.invalidateQueries({ queryKey: ["approval"] }),
+			]);
+		},
+	});
+}
+
 function invalidatePOAndPR(
 	queryClient: ReturnType<typeof useQueryClient>,
 	poId: number,
@@ -200,7 +282,10 @@ function invalidatePOAndPR(
 	]);
 }
 
-export function useUpdatePurchaseOrderMutation() {
+/** `quietSuccess.current = true` skips the "updated" toast (Save and submit shows one toast). */
+export function useUpdatePurchaseOrderMutation(quietSuccess?: {
+	current: boolean;
+}) {
 	const queryClient = useQueryClient();
 
 	return useMutation({
@@ -217,7 +302,9 @@ export function useUpdatePurchaseOrderMutation() {
 				variables.payload.poId,
 				variables.prId,
 			);
-			toast.success(result.message || `${result.data.po.poNumber} updated`);
+			if (!quietSuccess?.current) {
+				toast.success(result.message || `${result.data.po.poNumber} updated`);
+			}
 		},
 		onError: (error) => {
 			toast.error(errorMessage(error, "Failed to update PO"));
