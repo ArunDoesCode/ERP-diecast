@@ -5,18 +5,18 @@ import type {
 } from "@/types/purchase-orders";
 import type { PaginationMeta } from "@/types/purchase-requisitions";
 
-// Contract step 2: GET /api/po/getpos. New fields are optional until the backend fills them.
+// Contract step 2: GET /api/po/getpos.
 export type PoBucket = "late" | "today" | "later";
 
 export type PoListRowV2 = PurchaseOrder & {
-	lineCount?: number;
+	lineCount: number;
 	/** 0..100, accepted / ordered by quantity. */
-	receivedPct?: number;
+	receivedPct: number;
 };
 
 export type PoListMeta = PaginationMeta & {
-	statusCounts?: Partial<StatusCounts<POStatus>>;
-	lateCount?: number;
+	statusCounts: Partial<StatusCounts<POStatus>>;
+	lateCount: number;
 };
 
 export type PoListResultV2 = {

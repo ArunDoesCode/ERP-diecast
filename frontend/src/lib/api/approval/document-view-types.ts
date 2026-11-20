@@ -9,12 +9,11 @@ import type { ScoDetailPayload } from "@/types/subcontracting";
 
 /**
  * Inbox row: the existing summary plus the fields getMyPendingApprovals adds (BR-FF-80).
- * `docSummary` stays as a fallback until the backend sends the flat fields.
+ * The backend sends the flat fields; the nested `docSummary` is gone.
  */
 export type ApprovalInboxRow = Omit<ApprovalRequestSummary, "docSummary"> & {
-	docSummary?: ApprovalRequestSummary["docSummary"];
-	docNumber?: string;
-	requesterName?: string | null;
+	docNumber: string;
+	requesterName: string | null;
 	/** Absent when the list belongs to another employee (BR-FF-77, 89). */
 	amountPaise?: number | null;
 };
@@ -23,7 +22,7 @@ export type ApprovalInboxResponse = {
 	success: true;
 	data: ApprovalInboxRow[];
 	meta: PaginationMeta & {
-		typeCounts?: { pr: number; po: number; sco: number };
+		typeCounts: { pr: number; po: number; sco: number };
 	};
 };
 

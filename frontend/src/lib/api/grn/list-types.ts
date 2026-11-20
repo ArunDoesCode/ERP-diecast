@@ -1,16 +1,16 @@
 import type { GrnListParams, GrnListRow, GrnQaStatus } from "@/types/grn";
 import type { PaginationMeta } from "@/types/purchase-requisitions";
 
-// Contract step 2: GET /api/grn/getgrns. New fields are optional until the backend fills them.
+// Contract step 2: GET /api/grn/getgrns.
 export type GrnBucket = "late" | "today" | "later";
 export type GrnQaSummary = "pending" | "passed" | "failed" | "mixed";
 
 export type GrnListRowV2 = GrnListRow & {
-	supplierName?: string | null;
-	lineCount?: number;
-	qaSummary?: GrnQaSummary;
+	supplierName: string | null;
+	lineCount: number;
+	qaSummary: GrnQaSummary;
 	/** Caller holds po.manage: the PO number may be a link (BR-FF-03). */
-	poCanOpen?: boolean;
+	poCanOpen: boolean;
 };
 
 export type GrnListQuery = Omit<GrnListParams, "status" | "qaStatus"> & {
@@ -21,7 +21,7 @@ export type GrnListQuery = Omit<GrnListParams, "status" | "qaStatus"> & {
 };
 
 export type GrnListMeta = PaginationMeta & {
-	statusCounts?: Record<string, number>;
+	statusCounts: Record<string, number>;
 };
 
 export type GrnListResultV2 = {

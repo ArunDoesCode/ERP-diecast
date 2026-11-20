@@ -1,4 +1,5 @@
 import { api } from "@/lib/api/client";
+import type { PoListResultV2 } from "@/lib/api/purchase-orders/list-types";
 import { API_ROUTES } from "@/lib/api/routes";
 import type {
 	ClosePoPayload,
@@ -15,7 +16,6 @@ import type {
 	POCreateResult,
 	PODelayResult,
 	POInvoiceResult,
-	POListResult,
 	POSendResult,
 	POShortCloseResult,
 	POUpdatePayload,
@@ -44,7 +44,7 @@ function toQueryString(params?: Record<string, unknown>) {
 }
 
 export function getPurchaseOrders(params?: PurchaseOrderListParams) {
-	return api.get<POListResult>(
+	return api.get<PoListResultV2>(
 		`${API_ROUTES.purchaseOrders.list}${toQueryString(params)}`,
 	);
 }

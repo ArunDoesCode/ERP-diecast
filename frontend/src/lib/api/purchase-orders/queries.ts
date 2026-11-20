@@ -221,7 +221,9 @@ export function useCreateDraftPosMutation() {
 						const conflict =
 							error instanceof ApiClientError &&
 							(error.status === 409 ||
-								error.code === "PO_LINE_ALREADY_DRAFTED");
+								error.code === "PO_LINE_ALREADY_DRAFTED" ||
+								// Sequential case: frozen BR-PO-01 answers 400 (A-87). A schema 400 is not a conflict.
+								(error.status === 400 && error.code !== "VALIDATION_ERROR"));
 						return {
 							ok: false,
 							supplierName: group.supplierName,

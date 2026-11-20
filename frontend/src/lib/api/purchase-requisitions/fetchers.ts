@@ -1,8 +1,8 @@
 import { api } from "@/lib/api/client";
+import type { PrListResultV2 } from "@/lib/api/purchase-requisitions/list-types";
 import { API_ROUTES } from "@/lib/api/routes";
 import type {
 	ApiResult,
-	PaginatedResponse,
 	PRCreatePayload,
 	PRDeletePayload,
 	PRDeleteResult,
@@ -28,7 +28,7 @@ function toQueryString(params?: Record<string, unknown>) {
 export function getPurchaseRequisitions(
 	params?: PurchaseRequisitionListParams,
 ) {
-	return api.get<PaginatedResponse<PurchaseRequisition>>(
+	return api.get<PrListResultV2>(
 		`${API_ROUTES.purchaseRequisitions.list}${toQueryString(params)}`,
 	);
 }

@@ -4,20 +4,20 @@ import type {
 	PurchaseRequisition,
 } from "@/types/purchase-requisitions";
 
-// Contract step 2: GET /api/pr/getprs. New fields are optional until the backend fills them.
+// Contract step 2: GET /api/pr/getprs.
 export type PrBucket = "late" | "today" | "later";
 
 export type PrListRowV2 = PurchaseRequisition & {
-	requestedByName?: string | null;
-	lineCount?: number;
+	requestedByName: string | null;
+	lineCount: number;
 	/** YYYY-MM-DD of the earliest pending line, or null. */
-	earliestRequiredBy?: string | null;
-	sentBack?: boolean;
+	earliestRequiredBy: string | null;
+	sentBack: boolean;
 };
 
 export type PrListMeta = PaginationMeta & {
-	statusCounts?: Partial<Record<PRStatus, number>>;
-	toOrderCount?: number;
+	statusCounts: Partial<Record<PRStatus, number>>;
+	toOrderCount: number;
 };
 
 export type PrListResultV2 = {

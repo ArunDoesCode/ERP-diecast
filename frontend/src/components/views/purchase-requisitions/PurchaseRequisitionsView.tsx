@@ -36,7 +36,6 @@ import { usePRListControls } from "@/components/views/purchase-requisitions/use-
 import { useCan } from "@/hooks/use-can";
 import type {
 	PrListQuery,
-	PrListResultV2,
 	PrListRowV2,
 	PrListSortField,
 } from "@/lib/api/purchase-requisitions/list-types";
@@ -165,7 +164,6 @@ export function PurchaseRequisitionsView() {
 
 	const canManage = useCan("pr.manage");
 
-	// The shared query hook is typed for the old filters; the request carries the new ones.
 	const params: PrListQuery = {
 		page,
 		pageSize,
@@ -177,12 +175,8 @@ export function PurchaseRequisitionsView() {
 		sortBy,
 		sortDir,
 	};
-	const requisitionsQuery = usePurchaseRequisitionsQuery(
-		params as unknown as Parameters<typeof usePurchaseRequisitionsQuery>[0],
-	);
-	const result = requisitionsQuery.data as unknown as
-		| PrListResultV2
-		| undefined;
+	const requisitionsQuery = usePurchaseRequisitionsQuery(params);
+	const result = requisitionsQuery.data;
 
 	const requisitions = useMemo(() => result?.data ?? [], [result]);
 	const total = result?.meta.total ?? 0;

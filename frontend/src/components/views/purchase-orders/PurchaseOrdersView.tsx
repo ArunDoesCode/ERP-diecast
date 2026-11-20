@@ -37,7 +37,6 @@ import {
 } from "@/components/views/purchase-orders/use-po-list-controls";
 import type {
 	PoListQuery,
-	PoListResultV2,
 	PoListRowV2,
 	PoListSortField,
 } from "@/lib/api/purchase-orders/list-types";
@@ -156,7 +155,6 @@ export function PurchaseOrdersView() {
 		status,
 	} = usePOListControls();
 
-	// The shared query hook is typed for the old filters; the request carries the new ones.
 	const params: PoListQuery = {
 		page,
 		pageSize,
@@ -167,10 +165,8 @@ export function PurchaseOrdersView() {
 		sortBy,
 		sortDir,
 	};
-	const poQuery = usePurchaseOrdersQuery(
-		params as unknown as Parameters<typeof usePurchaseOrdersQuery>[0],
-	);
-	const result = poQuery.data as unknown as PoListResultV2 | undefined;
+	const poQuery = usePurchaseOrdersQuery(params);
+	const result = poQuery.data;
 
 	const orders = useMemo(() => result?.data ?? [], [result]);
 	const total = result?.meta.total ?? 0;

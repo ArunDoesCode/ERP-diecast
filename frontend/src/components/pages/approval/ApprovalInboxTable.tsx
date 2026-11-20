@@ -19,11 +19,11 @@ import type { ApprovalInboxRow } from "@/lib/api/approval/document-view-types";
 import { formatDateTime, formatDocNo, formatMoney } from "@/lib/format";
 
 export function inboxRowNumber(row: ApprovalInboxRow) {
-	return row.docNumber ?? row.docSummary?.docNumber ?? "";
+	return row.docNumber;
 }
 
 export function inboxRowAmount(row: ApprovalInboxRow) {
-	return row.amountPaise ?? row.docSummary?.amountPaise ?? null;
+	return row.amountPaise ?? null;
 }
 
 type ApprovalInboxTableProps = {
