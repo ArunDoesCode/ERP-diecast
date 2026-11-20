@@ -64,6 +64,8 @@ export const API_ROUTES = {
 			`${API_Header.approval}/getRequestTrail/${id}`,
 		actOnRequest: (id: number) => `${API_Header.approval}/actOnRequest/${id}`,
 		getMyPendingApprovals: `${API_Header.approval}/getMyPendingApprovals`,
+		getDocumentView: (docType: string, docId: number) =>
+			`${API_Header.approval}/getDocumentView/${docType}/${docId}`,
 		getApprovalHistory: (docType: string, docId: number) =>
 			`${API_Header.approval}/getApprovalHistory/${docType}/${docId}`,
 		getCurrentApprovalByDoc: (docType: string, docId: number) =>

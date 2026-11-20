@@ -23,6 +23,7 @@ import type {
 import {
 	actOnApprovalRequest,
 	createApprovalPolicy,
+	getApprovalDocumentView,
 	getApprovalHistory,
 	getApprovalPolicies,
 	getApprovalPolicyDetails,
@@ -48,6 +49,8 @@ export const approvalKeys = {
 			: (["approval", "pending"] as const),
 	history: (docType: ApprovalDocType, docId: number) =>
 		["approval", "history", docType, docId] as const,
+	documentView: (docType: ApprovalDocType, docId: number) =>
+		["approval", "document-view", docType, docId] as const,
 	currentByDoc: (docType: ApprovalDocType, docId: number) =>
 		["approval", "current-by-doc", docType, docId] as const,
 };
@@ -179,6 +182,9 @@ export function useActOnApprovalRequestMutation() {
 				}),
 				queryClient.invalidateQueries({ queryKey: approvalKeys.myPending() }),
 				queryClient.invalidateQueries({
+					queryKey: ["approval", "document-view"],
+				}),
+				queryClient.invalidateQueries({
 					queryKey: ["approval", "current-by-doc"],
 				}),
 				queryClient.invalidateQueries({ queryKey: ["approval", "history"] }),
@@ -209,6 +215,21 @@ export function useMyPendingApprovalsQuery(params?: ApprovalMyPendingParams) {
 		queryKey: approvalKeys.myPending(params),
 		queryFn: () => getMyPendingApprovals(params),
 		placeholderData: params ? keepPreviousData : undefined,
+	});
+}
+
+/** Read-only document + open request + trail for the inbox preview (BR-FF-81). */
+export function useApprovalDocumentViewQuery(
+	docType?: ApprovalDocType,
+	docId?: number,
+) {
+	return useQuery({
+		queryKey: approvalKeys.documentView(docType ?? "pr", docId ?? 0),
+		queryFn: () => getApprovalDocumentView(docType ?? "pr", docId ?? 0),
+		enabled: Boolean(docType && docId),
+		// 4xx (no access, not found) is a final answer; do not retry it.
+		retry: (count, error) =>
+			!(error instanceof ApiClientError && error.status < 500) && count < 2,
 	});
 }
 

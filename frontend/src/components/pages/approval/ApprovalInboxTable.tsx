@@ -1,12 +1,8 @@
 "use client";
 
-import {
-	IconArrowBackUp,
-	IconCheck,
-	IconInbox,
-	IconX,
-} from "@tabler/icons-react";
+import { IconInbox } from "@tabler/icons-react";
 import { useTable } from "@tanstack/react-table";
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { useMemo } from "react";
 import { DataTable } from "@/components/common/DataTable";
@@ -14,140 +10,108 @@ import {
 	type DataTableColumnDef,
 	dataTableFeatures,
 } from "@/components/common/data-table-features";
+import {
+	DOC_TYPE_LABEL,
+	roleLabel,
+} from "@/components/pages/approval/approval-labels";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { Button } from "@/components/ui/button";
+import type { ApprovalInboxRow } from "@/lib/api/approval/document-view-types";
 import { formatDateTime, formatDocNo, formatMoney } from "@/lib/format";
-import type {
-	ApprovalRequestAction,
-	ApprovalRequestSummary,
-} from "@/types/approval";
 
-export type PendingApprovalAction = Extract<
-	ApprovalRequestAction,
-	"approve" | "reject" | "sent_back" | "withdraw"
->;
+export function inboxRowNumber(row: ApprovalInboxRow) {
+	return row.docNumber ?? row.docSummary?.docNumber ?? "";
+}
 
-const ACTION_CONFIG: Record<
-	PendingApprovalAction,
-	{
-		label: string;
-		icon: typeof IconCheck;
-		variant: "default" | "destructive" | "outline";
-	}
-> = {
-	approve: { label: "Approve", icon: IconCheck, variant: "outline" },
-	reject: { label: "Reject", icon: IconX, variant: "destructive" },
-	sent_back: { label: "Send back", icon: IconArrowBackUp, variant: "outline" },
-	withdraw: { label: "Withdraw", icon: IconArrowBackUp, variant: "outline" },
-};
+export function inboxRowAmount(row: ApprovalInboxRow) {
+	return row.amountPaise ?? row.docSummary?.amountPaise ?? null;
+}
 
 type ApprovalInboxTableProps = {
-	approvals: ApprovalRequestSummary[];
+	approvals: ApprovalInboxRow[];
 	isLoading: boolean;
-	actingRequest: { id: number; action: PendingApprovalAction } | null;
-	isActing: boolean;
-	currentUserId: number;
-	onAction: (
-		request: ApprovalRequestSummary,
-		action: PendingApprovalAction,
-	) => void;
+	selectedId: number | null;
+	/** Wide screens: select the row. Narrow screens: link to the preview page. */
+	splitView: boolean;
+	onSelect: (row: ApprovalInboxRow) => void;
 	errorState?: ReactNode;
 };
 
 export function ApprovalInboxTable({
 	approvals,
 	isLoading,
-	actingRequest,
-	isActing,
-	currentUserId,
-	onAction,
+	selectedId,
+	splitView,
+	onSelect,
 	errorState,
 }: ApprovalInboxTableProps) {
-	const columns = useMemo<DataTableColumnDef<ApprovalRequestSummary>[]>(
-		() => [
+	// Amount column only when the API sends it (BR-FF-77).
+	const showAmount = approvals.some((row) => inboxRowAmount(row) !== null);
+
+	const columns = useMemo<DataTableColumnDef<ApprovalInboxRow>[]>(() => {
+		const cols: DataTableColumnDef<ApprovalInboxRow>[] = [
 			{
 				id: "docNumber",
 				header: "Document",
-				cell: ({ row }) => (
-					<span className="font-mono text-brand-accent">
-						{formatDocNo(row.original.docSummary.docNumber)}
-					</span>
-				),
+				cell: ({ row }) => {
+					const r = row.original;
+					const label = formatDocNo(inboxRowNumber(r));
+					const className = "font-mono text-brand-accent hover:underline";
+					return splitView ? (
+						<button
+							type="button"
+							className={className}
+							aria-current={r.id === selectedId ? "true" : undefined}
+							onClick={() => onSelect(r)}
+						>
+							{label}
+						</button>
+					) : (
+						<Link
+							href={`/approvals/${r.docType}/${r.docId}`}
+							className={className}
+						>
+							{label}
+						</Link>
+					);
+				},
 			},
 			{
 				id: "docType",
 				header: "Type",
-				cell: ({ row }) => row.original.docType.toUpperCase(),
+				cell: ({ row }) => DOC_TYPE_LABEL[row.original.docType],
 			},
 			{
-				id: "policy",
-				header: "Policy",
-				cell: ({ row }) =>
-					row.original.policyName || `Policy #${row.original.policyId}`,
+				id: "requester",
+				header: "Requester",
+				cell: ({ row }) => row.original.requesterName || "–",
 			},
-			{
-				id: "supplier",
-				header: "Supplier",
-				cell: ({ row }) => row.original.docSummary.supplierName || "–",
-			},
-			{
+		];
+		if (showAmount) {
+			cols.push({
 				id: "amount",
 				header: "Amount",
 				meta: { numeric: true },
-				cell: ({ row }) => formatMoney(row.original.docSummary.amountPaise),
-			},
+				cell: ({ row }) => formatMoney(inboxRowAmount(row.original)),
+			});
+		}
+		cols.push(
 			{
 				id: "level",
 				header: "Level",
-				cell: ({ row }) =>
-					`${row.original.currentLevel} of ${row.original.totalLevels}`,
+				cell: ({ row }) => {
+					const r = row.original;
+					const role = roleLabel(r.currentApproverRole);
+					return `${r.currentLevel} of ${r.totalLevels}${role ? ` · ${role}` : ""}`;
+				},
 			},
 			{
 				id: "requestedAt",
-				header: "Requested",
+				header: "Waiting since",
 				cell: ({ row }) => formatDateTime(row.original.requestedAt),
 			},
-			{
-				id: "actions",
-				header: "Actions",
-				cell: ({ row }) => {
-					const approval = row.original;
-					return (
-						<div className="flex flex-wrap gap-2">
-							{(Object.keys(ACTION_CONFIG) as PendingApprovalAction[])
-								// Withdraw is for the requester only (BR-APR-39).
-								.filter(
-									(action) =>
-										action !== "withdraw" ||
-										approval.requestedBy === currentUserId,
-								)
-								.map((action) => {
-									const config = ACTION_CONFIG[action];
-									const Icon = config.icon;
-									const isThisAction =
-										actingRequest?.id === approval.id &&
-										actingRequest.action === action;
-									return (
-										<Button
-											key={action}
-											type="button"
-											size="sm"
-											variant={config.variant}
-											disabled={isActing}
-											onClick={() => onAction(approval, action)}
-										>
-											<Icon className="size-3.5" />
-											{isThisAction ? `${config.label}…` : config.label}
-										</Button>
-									);
-								})}
-						</div>
-					);
-				},
-			},
-		],
-		[actingRequest, isActing, currentUserId, onAction],
-	);
+		);
+		return cols;
+	}, [showAmount, splitView, selectedId, onSelect]);
 
 	const table = useTable({
 		features: dataTableFeatures,
@@ -163,10 +127,11 @@ export function ApprovalInboxTable({
 			isLoading={isLoading}
 			hidePagination
 			errorState={errorState}
+			rowClassName={(row) => (row.id === selectedId ? "bg-muted" : undefined)}
 			emptyState={
 				<EmptyState
 					icon={IconInbox}
-					title="Nothing waiting for your approval"
+					title="Nothing is waiting for your approval"
 					description="Requests assigned to you show up here."
 				/>
 			}

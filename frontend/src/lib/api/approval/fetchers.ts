@@ -13,11 +13,14 @@ import type {
 	ApprovalPolicyUpdateInput,
 	ApprovalRequest,
 	ApprovalRequestDetails,
-	ApprovalRequestSummary,
 	ApprovalSubmitRequestInput,
 	ApprovalTrailEntry,
 	PaginatedResponse,
 } from "@/types/approval";
+import type {
+	ApprovalDocumentView,
+	ApprovalInboxResponse,
+} from "./document-view-types";
 
 type Ok<T> = { success: true; data: T; message?: string };
 
@@ -74,7 +77,7 @@ export const actOnApprovalRequest = (id: number, input: ApprovalActionInput) =>
 	);
 
 export const getMyPendingApprovals = (params?: ApprovalMyPendingParams) =>
-	api.get<PaginatedResponse<ApprovalRequestSummary>>(
+	api.get<ApprovalInboxResponse>(
 		`${API_ROUTES.approval.getMyPendingApprovals}${toQueryString(params)}`,
 	);
 
@@ -84,6 +87,14 @@ export const getCurrentApprovalByDoc = (
 ) =>
 	api.get<Ok<ApprovalCurrentByDocResponse>>(
 		API_ROUTES.approval.getCurrentApprovalByDoc(docType, docId),
+	);
+
+export const getApprovalDocumentView = (
+	docType: ApprovalDocType,
+	docId: number,
+) =>
+	api.get<Ok<ApprovalDocumentView>>(
+		API_ROUTES.approval.getDocumentView(docType, docId),
 	);
 
 export const getApprovalHistory = (docType: ApprovalDocType, docId: number) =>
