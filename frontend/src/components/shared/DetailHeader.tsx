@@ -33,7 +33,7 @@ export function DetailHeader({
 		<header className="flex flex-col gap-3" aria-busy={loading || undefined}>
 			<Link
 				href={backHref}
-				className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+				className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
 			>
 				<IconArrowLeft size={14} aria-hidden="true" />
 				Back to {backLabel}
@@ -74,7 +74,7 @@ export function DetailHeader({
 				<dl className="flex flex-wrap gap-x-6 gap-y-1 text-[13px]">
 					{metaItems.map((m) => (
 						<div key={m.label} className="flex gap-1.5">
-							<dt className="text-xs font-semibold text-muted-foreground">
+							<dt className="text-[13px] leading-[18px] font-semibold text-muted-foreground">
 								{m.label}
 							</dt>
 							<dd className="tabular-nums">{m.value}</dd>

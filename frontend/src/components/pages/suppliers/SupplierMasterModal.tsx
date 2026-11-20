@@ -99,7 +99,7 @@ export function SupplierMasterModal({
 							>
 								<section className="space-y-4">
 									<div className="flex items-center justify-between gap-2">
-										<h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+										<h3 className="text-[13px] leading-[18px] font-semibold uppercase tracking-wide text-muted-foreground">
 											Identity
 										</h3>
 										<FormField
@@ -107,7 +107,7 @@ export function SupplierMasterModal({
 											name="isActive"
 											render={({ field }) => (
 												<FormItem className="flex flex-row items-center gap-2 space-y-0">
-													<FormLabel className="text-xs text-muted-foreground">
+													<FormLabel className="text-muted-foreground">
 														Active
 													</FormLabel>
 													<FormControl>
@@ -146,7 +146,7 @@ export function SupplierMasterModal({
 											name="type"
 											render={({ field }) => (
 												<FormItem>
-													<FormLabel className="text-xs text-muted-foreground">
+													<FormLabel className="text-muted-foreground">
 														Supplier type
 													</FormLabel>
 													<FormControl>
@@ -174,7 +174,7 @@ export function SupplierMasterModal({
 								</section>
 
 								<section className="space-y-4">
-									<h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+									<h3 className="text-[13px] leading-[18px] font-semibold uppercase tracking-wide text-muted-foreground">
 										Compliance
 									</h3>
 									<div className="grid grid-cols-1 gap-x-4 gap-y-5 sm:grid-cols-2">
@@ -248,7 +248,7 @@ export function SupplierMasterModal({
 								</section>
 
 								<section className="space-y-4">
-									<h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+									<h3 className="text-[13px] leading-[18px] font-semibold uppercase tracking-wide text-muted-foreground">
 										Contact
 									</h3>
 									<div className="grid grid-cols-1 gap-x-4 gap-y-5 sm:grid-cols-2">
@@ -329,7 +329,7 @@ export function SupplierMasterModal({
 								</section>
 
 								<section className="space-y-4">
-									<h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+									<h3 className="text-[13px] leading-[18px] font-semibold uppercase tracking-wide text-muted-foreground">
 										Terms
 									</h3>
 									<div className="grid grid-cols-1 gap-x-4 gap-y-5 sm:grid-cols-2">

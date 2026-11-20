@@ -69,7 +69,7 @@ export function ChallanDetailView({ challanId }: { challanId: number }) {
 				</Button>
 			</div>
 
-			<div className="mx-auto w-full max-w-3xl space-y-5 rounded-md border bg-background p-6 text-xs print:max-w-none print:border-0 print:p-0">
+			<div className="mx-auto w-full max-w-3xl space-y-5 rounded-md border bg-background p-6 text-sm print:max-w-none print:border-0 print:p-0">
 				<div className="flex items-start justify-between gap-4">
 					<div className="space-y-1">
 						<h1 className="font-heading text-base font-medium">

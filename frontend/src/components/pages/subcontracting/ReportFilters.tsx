@@ -49,7 +49,9 @@ export function VendorFilter({
 
 	return (
 		<div className="w-full sm:w-64">
-			<span className="mb-1 block text-xs font-medium">Vendor</span>
+			<span className="mb-1 block text-[13px] leading-[18px] font-semibold">
+				Vendor
+			</span>
 			<SearchableSelect
 				value={value ? String(value) : ALL_VENDORS}
 				options={options}

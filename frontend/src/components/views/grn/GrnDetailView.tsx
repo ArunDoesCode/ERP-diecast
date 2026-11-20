@@ -187,7 +187,7 @@ function GrnDeliveryDetails({ grn }: { grn: Grn }) {
 		<dl className="flex flex-wrap gap-x-6 gap-y-1 text-[13px]">
 			{rows.map((row) => (
 				<div key={row.label} className="flex gap-1.5">
-					<dt className="text-xs font-semibold text-muted-foreground">
+					<dt className="text-[13px] leading-[18px] font-semibold text-muted-foreground">
 						{row.label}
 					</dt>
 					<dd>{row.value}</dd>

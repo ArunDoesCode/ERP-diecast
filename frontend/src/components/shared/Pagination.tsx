@@ -23,7 +23,7 @@ export type PaginationProps = {
 };
 
 const ARROW =
-	"inline-flex size-8 items-center justify-center rounded-md border border-border text-xs hover:bg-muted aria-disabled:pointer-events-none aria-disabled:opacity-50";
+	"inline-flex size-8 items-center justify-center rounded-md border border-border text-sm hover:bg-muted aria-disabled:pointer-events-none aria-disabled:opacity-50";
 
 export function Pagination({
 	page,
@@ -46,7 +46,7 @@ export function Pagination({
 
 	return (
 		<div className="flex flex-col items-center justify-between gap-3 py-2 sm:flex-row">
-			<div className="flex items-center gap-3 text-xs text-muted-foreground">
+			<div className="flex items-center gap-3 text-sm text-muted-foreground">
 				<span className="tabular-nums">
 					{formatPageRange(page, pageSize, total)}
 				</span>
@@ -87,7 +87,7 @@ export function Pagination({
 								// biome-ignore lint/suspicious/noArrayIndexKey: gaps are positional
 								key={`gap-${i}`}
 								aria-hidden="true"
-								className="px-1 text-xs text-muted-foreground"
+								className="px-1 text-sm text-muted-foreground"
 							>
 								…
 							</span>

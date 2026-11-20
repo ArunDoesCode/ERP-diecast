@@ -72,7 +72,7 @@ export function ScoSettlementCard({
 							))}
 						</TableBody>
 					</Table>
-					<div className="grid grid-cols-3 gap-3 text-xs">
+					<div className="grid grid-cols-3 gap-3 text-sm">
 						<div>
 							<p className="text-muted-foreground">Charge (ex GST)</p>
 							<p className="font-medium">
@@ -101,7 +101,7 @@ export function ScoSettlementCard({
 				</CardHeader>
 				<CardContent>
 					{rows.length === 0 ? (
-						<p className="text-xs text-muted-foreground">
+						<p className="text-sm text-muted-foreground">
 							No challans to settle yet.
 						</p>
 					) : (

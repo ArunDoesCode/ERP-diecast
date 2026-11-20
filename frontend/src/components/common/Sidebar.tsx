@@ -76,7 +76,7 @@ export function NavSidebar() {
 					<SidebarGroup>
 						<SidebarGroupLabel>Navigation</SidebarGroupLabel>
 						<SidebarGroupContent>
-							<p className="px-2 py-1 text-xs text-muted-foreground">
+							<p className="px-2 py-1 text-sm text-muted-foreground">
 								Loading...
 							</p>
 						</SidebarGroupContent>
@@ -124,7 +124,7 @@ export function NavSidebar() {
 					<SidebarGroup>
 						<SidebarGroupLabel>Navigation</SidebarGroupLabel>
 						<SidebarGroupContent>
-							<p className="px-2 py-1 text-xs text-muted-foreground">
+							<p className="px-2 py-1 text-sm text-muted-foreground">
 								No allowed pages found.
 							</p>
 						</SidebarGroupContent>

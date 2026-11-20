@@ -36,17 +36,17 @@ export function ApprovalHistoryPanel({
 			{query.isLoading ? (
 				<Skeleton className="h-10 w-full" />
 			) : query.isError ? (
-				<p className="text-xs text-destructive">
+				<p className="text-sm text-destructive">
 					Could not load approval history.
 				</p>
 			) : history.length === 0 ? (
-				<p className="text-xs text-muted-foreground">
+				<p className="text-sm text-muted-foreground">
 					Not submitted for approval yet.
 				</p>
 			) : (
 				<ul className="space-y-3">
 					{history.map((request, index) => (
-						<li key={request.id} className="rounded-md border p-3 text-xs">
+						<li key={request.id} className="rounded-md border p-3 text-sm">
 							<div className="flex flex-wrap items-center gap-2">
 								<StatusBadge doc="approval" status={request.status} />
 								<span className="text-muted-foreground">

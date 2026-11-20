@@ -81,17 +81,17 @@ export function GrnLinesTable({
 												{item.itemSku}
 											</span>
 											{item.batchNumber ? (
-												<span className="text-xs text-muted-foreground">
+												<span className="text-sm text-muted-foreground">
 													Batch/heat: {item.batchNumber}
 												</span>
 											) : null}
 											{item.isQaBypassed ? (
-												<span className="text-xs text-muted-foreground">
+												<span className="text-sm text-muted-foreground">
 													QA bypassed: {item.qaBypassReason ?? "-"}
 												</span>
 											) : null}
 											{item.overReceiptReason ? (
-												<span className="text-xs text-warning">
+												<span className="text-sm text-warning">
 													Over-receipt +{item.overReceiptExcessQty ?? 0}:{" "}
 													{item.overReceiptReason}
 												</span>
@@ -104,7 +104,7 @@ export function GrnLinesTable({
 									<TableCell>
 										{item.netAcceptedQty}
 										{item.correctedQty > 0 ? (
-											<span className="block text-xs text-muted-foreground">
+											<span className="block text-sm text-muted-foreground">
 												{item.correctedQty} corrected
 											</span>
 										) : null}

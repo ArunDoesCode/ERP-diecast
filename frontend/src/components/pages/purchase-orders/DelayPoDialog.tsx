@@ -91,7 +91,7 @@ export function DelayPoDialog({
 					<div>
 						<label
 							htmlFor="po-delay-revised-delivery-date"
-							className="mb-1 block text-xs font-medium"
+							className="mb-1 block text-[13px] leading-[18px] font-semibold"
 						>
 							Revised delivery date
 						</label>
@@ -106,7 +106,7 @@ export function DelayPoDialog({
 					<div>
 						<label
 							htmlFor="po-delay-reason"
-							className="mb-1 block text-xs font-medium"
+							className="mb-1 block text-[13px] leading-[18px] font-semibold"
 						>
 							Delay reason
 						</label>

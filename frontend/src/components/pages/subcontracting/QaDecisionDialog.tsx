@@ -139,7 +139,7 @@ export function QaDecisionDialog({
 					</div>
 				</div>
 				{error ? (
-					<p role="alert" className="text-xs text-destructive">
+					<p role="alert" className="text-sm text-destructive">
 						{error}
 					</p>
 				) : null}

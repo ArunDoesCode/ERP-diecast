@@ -70,7 +70,7 @@ function RolesChecklist({
 
 	return (
 		<div className="flex flex-col gap-3">
-			<p className="text-xs text-muted-foreground">
+			<p className="text-sm text-muted-foreground">
 				Ticking a role gives it the permission that opens this screen.
 			</p>
 			{roles.map((role) => {

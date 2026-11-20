@@ -48,7 +48,7 @@ export function TopBar({
 					placeholder="Search"
 					className="pr-7"
 				/>
-				<kbd className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 rounded border px-1 text-xs text-muted-foreground">
+				<kbd className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 rounded border px-1 text-sm text-muted-foreground">
 					/
 				</kbd>
 			</div>

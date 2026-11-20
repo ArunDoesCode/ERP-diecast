@@ -275,7 +275,7 @@ export function SupplierBatchEditDialog({
 											aria-label={`Active for ${row.name}`}
 										/>
 									</TableCell>
-									<TableCell className="text-xs text-destructive">
+									<TableCell className="text-sm text-destructive">
 										{failures.get(row.id) ?? ""}
 									</TableCell>
 								</TableRow>

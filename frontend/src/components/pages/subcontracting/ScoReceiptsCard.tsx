@@ -52,7 +52,7 @@ function ReceiptDetail({
 	if (query.isLoading) return <Skeleton className="h-16" />;
 	if (!query.data?.success) {
 		return (
-			<p className="text-xs text-muted-foreground">
+			<p className="text-sm text-muted-foreground">
 				{query.data?.message ?? "Receipt not found."}
 			</p>
 		);
@@ -79,7 +79,7 @@ function ReceiptDetail({
 							<TableCell>
 								{line.finishedItemSku} · {line.finishedItemName}
 								{line.qaNotes ? (
-									<span className="block text-xs text-muted-foreground">
+									<span className="block text-sm text-muted-foreground">
 										{line.qaNotes}
 									</span>
 								) : null}
@@ -111,13 +111,15 @@ function ReceiptDetail({
 				</TableBody>
 			</Table>
 			<div>
-				<p className="mb-1 text-xs font-medium">Challans settled</p>
+				<p className="mb-1 text-[13px] leading-[18px] font-semibold">
+					Challans settled
+				</p>
 				{settlements.length === 0 ? (
-					<p className="text-xs text-muted-foreground">
+					<p className="text-sm text-muted-foreground">
 						No challan settled by this receipt.
 					</p>
 				) : (
-					<ul className="space-y-0.5 text-xs">
+					<ul className="space-y-0.5 text-sm">
 						{settlements.map((row) => (
 							<li key={row.id}>
 								{row.challanNumber}: {row.qty}{" "}
@@ -154,12 +156,12 @@ export function ScoReceiptsCard({
 				{query.isLoading ? (
 					<Skeleton className="h-16" />
 				) : receipts.length === 0 ? (
-					<p className="text-xs text-muted-foreground">No receipts yet.</p>
+					<p className="text-sm text-muted-foreground">No receipts yet.</p>
 				) : (
 					<div className="space-y-3">
 						{receipts.map((receipt) => (
 							<div key={receipt.id} className="rounded-md border p-3">
-								<div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+								<div className="flex flex-wrap items-center justify-between gap-2 text-sm">
 									<div className="space-y-0.5">
 										<p className="font-medium">
 											{receipt.grnNumber} · vendor challan{" "}

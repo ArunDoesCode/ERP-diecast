@@ -265,7 +265,7 @@ export function EditPOModal({
 						<div className="max-h-[70vh] space-y-5 overflow-y-auto px-6 py-5">
 							<div className="grid gap-3 md:grid-cols-[1fr_10rem_1fr]">
 								<div>
-									<span className="mb-1 block text-xs font-medium">
+									<span className="mb-1 block text-[13px] leading-[18px] font-semibold">
 										Supplier
 									</span>
 									<div className="flex h-9 items-center rounded-md border bg-muted px-3 text-sm text-muted-foreground">
@@ -275,7 +275,7 @@ export function EditPOModal({
 								<div>
 									<label
 										htmlFor="po-edit-payment-terms-days"
-										className="mb-1 block text-xs font-medium"
+										className="mb-1 block text-[13px] leading-[18px] font-semibold"
 									>
 										Terms
 									</label>
@@ -292,7 +292,7 @@ export function EditPOModal({
 								<div>
 									<label
 										htmlFor="po-edit-expected-delivery-date"
-										className="mb-1 block text-xs font-medium"
+										className="mb-1 block text-[13px] leading-[18px] font-semibold"
 									>
 										Delivery date
 									</label>
@@ -317,7 +317,7 @@ export function EditPOModal({
 											<span className="font-medium">
 												{item.itemName ?? "-"}
 											</span>
-											<p className="text-xs text-muted-foreground">
+											<p className="text-sm text-muted-foreground">
 												{item.qty} {item.uom ?? ""}
 											</p>
 										</div>
@@ -369,7 +369,7 @@ export function EditPOModal({
 									</div>
 								))}
 								{activeItems.length === 0 ? (
-									<p className="rounded-md border border-dashed p-3 text-center text-xs text-muted-foreground">
+									<p className="rounded-md border border-dashed p-3 text-center text-sm text-muted-foreground">
 										{pendingLines.length > 0
 											? "All lines removed — add a line below or discard this PO instead."
 											: "All lines removed — this PO has no lines left. Discard it from the linked PR's detail page."}
@@ -388,7 +388,7 @@ export function EditPOModal({
 												<span className="font-medium">
 													{line.itemName ?? "-"}
 												</span>
-												<p className="text-xs text-muted-foreground">
+												<p className="text-sm text-muted-foreground">
 													{line.requestedQty} {line.uom ?? ""}
 												</p>
 											</div>
@@ -462,7 +462,7 @@ export function EditPOModal({
 								<div>
 									<label
 										htmlFor="po-edit-delivery-terms"
-										className="mb-1 block text-xs font-medium"
+										className="mb-1 block text-[13px] leading-[18px] font-semibold"
 									>
 										Delivery terms
 									</label>
@@ -476,7 +476,7 @@ export function EditPOModal({
 								<div>
 									<label
 										htmlFor="po-edit-notes"
-										className="mb-1 block text-xs font-medium"
+										className="mb-1 block text-[13px] leading-[18px] font-semibold"
 									>
 										Notes
 									</label>

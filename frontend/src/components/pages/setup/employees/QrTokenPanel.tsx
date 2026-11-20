@@ -17,7 +17,7 @@ export function QrTokenPanel({ mode, employeeId, qrToken }: QrTokenPanelProps) {
 
 	if (mode === "create" || !employeeId) {
 		return (
-			<p className="text-xs/relaxed text-muted-foreground">
+			<p className="text-sm/relaxed text-muted-foreground">
 				Save the employee first, then generate a QR token from the Edit sheet.
 			</p>
 		);
@@ -52,7 +52,7 @@ export function QrTokenPanel({ mode, employeeId, qrToken }: QrTokenPanelProps) {
 
 			{token && !generateQrMutation.isPending && (
 				<div className="flex flex-col gap-2">
-					<code className="block break-all rounded-md border border-border bg-muted px-2 py-1.5 text-xs/relaxed">
+					<code className="block break-all rounded-md border border-border bg-muted px-2 py-1.5 text-sm/relaxed">
 						{token}
 					</code>
 					<Button

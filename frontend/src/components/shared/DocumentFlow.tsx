@@ -43,7 +43,7 @@ export function DocumentFlow({
 					<button
 						type="button"
 						onClick={onRetry}
-						className="rounded-md border border-input px-2 py-1 text-xs font-semibold text-foreground hover:bg-muted"
+						className="rounded-md border border-input px-2 py-1 text-sm font-semibold text-foreground hover:bg-muted"
 					>
 						Try again
 					</button>
@@ -82,7 +82,7 @@ export function DocumentFlow({
 						>
 							<span
 								className={cn(
-									"px-3 py-1 text-xs font-semibold",
+									"px-3 py-1 text-sm font-semibold",
 									step.state === "current"
 										? "bg-brand-accent text-brand-accent-foreground"
 										: "text-muted-foreground",

@@ -63,7 +63,7 @@ export function GrnCorrectionAlert({
 					<div>
 						<label
 							htmlFor="grn-correction-qty"
-							className="mb-1 block text-xs font-medium"
+							className="mb-1 block text-[13px] leading-[18px] font-semibold"
 						>
 							Correction qty
 						</label>
@@ -79,7 +79,7 @@ export function GrnCorrectionAlert({
 					</div>
 					<label
 						htmlFor="grn-correction-reason"
-						className="block text-xs font-medium"
+						className="block text-[13px] leading-[18px] font-semibold"
 					>
 						Reason
 					</label>

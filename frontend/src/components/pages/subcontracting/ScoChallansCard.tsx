@@ -28,7 +28,7 @@ export function ScoChallansCard({ scoId }: { scoId: number }) {
 				{query.isLoading ? (
 					<Skeleton className="h-16" />
 				) : challans.length === 0 ? (
-					<p className="text-xs text-muted-foreground">
+					<p className="text-sm text-muted-foreground">
 						No material issued yet.
 					</p>
 				) : (

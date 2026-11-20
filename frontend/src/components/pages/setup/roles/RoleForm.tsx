@@ -88,7 +88,7 @@ export function RoleForm({
 				/>
 
 				{isSystem && (
-					<p className="text-xs/relaxed text-muted-foreground">
+					<p className="text-sm/relaxed text-muted-foreground">
 						Protected by system. Core roles cannot be renamed.
 					</p>
 				)}

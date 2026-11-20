@@ -130,7 +130,7 @@ export function CreateGrnModal({
 								<div>
 									<label
 										htmlFor="grn-create-challan-no"
-										className="mb-1 block text-xs font-medium"
+										className="mb-1 block text-[13px] leading-[18px] font-semibold"
 									>
 										Challan no *
 									</label>
@@ -144,7 +144,7 @@ export function CreateGrnModal({
 								<div>
 									<label
 										htmlFor="grn-create-challan-date"
-										className="mb-1 block text-xs font-medium"
+										className="mb-1 block text-[13px] leading-[18px] font-semibold"
 									>
 										Challan date
 									</label>
@@ -158,7 +158,7 @@ export function CreateGrnModal({
 								<div>
 									<label
 										htmlFor="grn-create-vehicle-no"
-										className="mb-1 block text-xs font-medium"
+										className="mb-1 block text-[13px] leading-[18px] font-semibold"
 									>
 										Vehicle no
 									</label>
@@ -171,7 +171,7 @@ export function CreateGrnModal({
 								<div>
 									<label
 										htmlFor="grn-create-driver-name"
-										className="mb-1 block text-xs font-medium"
+										className="mb-1 block text-[13px] leading-[18px] font-semibold"
 									>
 										Driver name
 									</label>
@@ -184,7 +184,7 @@ export function CreateGrnModal({
 								<div>
 									<label
 										htmlFor="grn-create-driver-phone"
-										className="mb-1 block text-xs font-medium"
+										className="mb-1 block text-[13px] leading-[18px] font-semibold"
 									>
 										Driver phone
 									</label>
@@ -199,7 +199,7 @@ export function CreateGrnModal({
 							<div>
 								<label
 									htmlFor="grn-create-remarks"
-									className="mb-1 block text-xs font-medium"
+									className="mb-1 block text-[13px] leading-[18px] font-semibold"
 								>
 									Remarks
 								</label>
@@ -221,12 +221,12 @@ export function CreateGrnModal({
 											<span className="font-medium">
 												{item.itemName ?? "-"}
 											</span>
-											<p className="text-xs text-muted-foreground">
+											<p className="text-sm text-muted-foreground">
 												{item.itemSku ?? "-"}
 											</p>
 										</div>
-										<div className="text-xs text-muted-foreground">
-											<p className="text-xs font-medium tracking-wide text-muted-foreground/70 uppercase">
+										<div className="text-sm text-muted-foreground">
+											<p className="text-[13px] leading-[18px] font-semibold tracking-wide text-muted-foreground/70 uppercase">
 												Remaining
 											</p>
 											<p>
@@ -236,7 +236,7 @@ export function CreateGrnModal({
 										<div>
 											<label
 												htmlFor={`grn-create-arrived-qty-${item.id}`}
-												className="mb-1 block text-xs font-medium tracking-wide text-muted-foreground/70 uppercase"
+												className="mb-1 block text-[13px] leading-[18px] font-semibold tracking-wide text-muted-foreground/70 uppercase"
 											>
 												Arrived qty
 											</label>
@@ -258,7 +258,7 @@ export function CreateGrnModal({
 										<div>
 											<label
 												htmlFor={`grn-create-batch-${item.id}`}
-												className="mb-1 block text-xs font-medium tracking-wide text-muted-foreground/70 uppercase"
+												className="mb-1 block text-[13px] leading-[18px] font-semibold tracking-wide text-muted-foreground/70 uppercase"
 											>
 												Batch / heat no
 											</label>
@@ -276,7 +276,7 @@ export function CreateGrnModal({
 									</div>
 								))}
 								{remainingLines.length === 0 ? (
-									<p className="rounded-md border border-dashed p-3 text-center text-xs text-muted-foreground">
+									<p className="rounded-md border border-dashed p-3 text-center text-sm text-muted-foreground">
 										All lines on this PO have already been fully received.
 									</p>
 								) : null}

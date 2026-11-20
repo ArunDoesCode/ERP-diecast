@@ -126,7 +126,7 @@ export function StatCard({
 				</span>
 			)}
 			<span className="flex min-w-0 flex-col gap-0.5">
-				<span className="text-xs leading-4 font-semibold text-muted-foreground">
+				<span className="text-[13px] leading-[18px] font-semibold text-muted-foreground">
 					{label}
 				</span>
 				{loading ? (
@@ -140,7 +140,7 @@ export function StatCard({
 							<button
 								type="button"
 								onClick={onRetry}
-								className="inline-flex w-fit items-center gap-1 text-xs font-semibold text-brand-accent underline-offset-4 hover:underline"
+								className="inline-flex w-fit items-center gap-1 text-sm font-semibold text-brand-accent underline-offset-4 hover:underline"
 							>
 								<IconRefresh size={12} stroke={2} aria-hidden="true" />
 								Try again
@@ -159,9 +159,7 @@ export function StatCard({
 					</>
 				)}
 				{hint && !loading && (
-					<span className="text-xs leading-4 text-muted-foreground">
-						{hint}
-					</span>
+					<span className="text-sm text-muted-foreground">{hint}</span>
 				)}
 			</span>
 		</>

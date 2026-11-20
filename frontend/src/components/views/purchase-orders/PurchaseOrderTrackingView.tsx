@@ -142,7 +142,7 @@ export function PurchaseOrderTrackingView() {
 					</SelectContent>
 				</Select>
 
-				<div className="flex items-center gap-2 text-xs text-muted-foreground">
+				<div className="flex items-center gap-2 text-sm text-muted-foreground">
 					<span>Asc</span>
 					<Switch
 						checked={sortDir === "desc"}
@@ -151,7 +151,7 @@ export function PurchaseOrderTrackingView() {
 					/>
 					<span>Dsc</span>
 				</div>
-				<div className="flex items-center gap-2 text-xs text-muted-foreground">
+				<div className="flex items-center gap-2 text-sm text-muted-foreground">
 					<Switch
 						checked={overdueOnly}
 						onCheckedChange={onOverdueToggle}

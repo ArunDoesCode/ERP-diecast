@@ -50,11 +50,11 @@ export function UserMenu({
 				<button
 					type="button"
 					aria-label={name}
-					className="flex items-center gap-2 rounded-md p-1 text-xs hover:bg-accent"
+					className="flex items-center gap-2 rounded-md p-1 text-sm hover:bg-accent"
 				>
 					<span
 						aria-hidden="true"
-						className="flex size-8 items-center justify-center rounded-full bg-brand-accent text-xs font-semibold text-brand-accent-foreground"
+						className="flex size-8 items-center justify-center rounded-full bg-brand-accent text-sm font-semibold text-brand-accent-foreground"
 					>
 						{initialsOf(name)}
 					</span>
@@ -63,8 +63,8 @@ export function UserMenu({
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align="end" className="w-56">
 				<DropdownMenuLabel className="flex flex-col gap-0.5">
-					<span className="text-xs font-semibold">{name}</span>
-					<span className="text-xs font-normal text-muted-foreground">
+					<span className="text-sm font-semibold">{name}</span>
+					<span className="text-sm font-normal text-muted-foreground">
 						Role: {role}
 					</span>
 				</DropdownMenuLabel>
