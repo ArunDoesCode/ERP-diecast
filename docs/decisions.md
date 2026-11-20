@@ -165,3 +165,7 @@ If a decision is reversed, add a new entry that references the old one — don't
 - **Decision:** 14 px text, 36 px buttons and fields, 44 px table rows, 24 px bold page titles, 24 px card padding; "Compact" gives 13 px text and 36 px rows. This replaces the 13 px / 36 px answer of 2026-11-18. Values: `docs/specs/design-system/spec.md` → "Tokens — type, density, shape" (v2).
 - **Why:** the owner found the app too small ("a little zoomed in") and picked "Size A (14 px)" from a drawn comparison of today, A and B. Most controls were 12 px text in 28 px boxes.
 
+
+### D-040 — factory-flows decided and frozen overnight on the owner's behalf (2026-11-20, factory-flows v1)
+- **Decision:** every card and "please confirm" line in `docs/specs/factory-flows/OWNER.md` took the recommended option (cards 1–3 = A; 19 confirm rows = yes), each backed by an ERPNext / Odoo / SAP B1 benchmark (stricter one when they disagree, `docs/research/factory-flows.md` → Decision benchmarks), and the spec was frozen without a live OWNER.md approval. Owner's words, relayed by the parent session: owner pre-approved recommended options in chat, 2026-11-20: "automate that sessions take ur own decision and record them and run whatever parallel subagents u want ... ill do a complete merge in moring once completed"; "dont want for my review ill review the decicsion u take tonight".
+- **Why:** the owner went to bed and asked for the build to run to hand-over overnight; he reviews all decisions in the morning. Any "no" becomes a change request (`/freeze factory-flows` change path).
