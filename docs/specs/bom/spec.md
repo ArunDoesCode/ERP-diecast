@@ -176,3 +176,4 @@ Must be empty at freeze. Each one ends as an owner card in `OWNER.md` or a row i
   "first revision" / "no changes" wording; BR-BOM-18 service returns `no_bom`; BR-BOM-24 "Open draft", no
   button without `bom.manage`.
 - 2026-11-20 v1 — frozen; OWNER.md approved on the owner's delegation (D-028): owner pre-approved recommended options in chat, 2026-11-20: "take ur own decision and record them and run whatever parallel subagents u want to complete a complete scm module according to my plan, ill do a complete merge in moring once completed"
+- 2026-11-20 v1 — doc fix after freeze: validation 400s carry no `VALIDATION_ERROR` code (Zod 400 has none; service uses `BAD_REQUEST`). No rule change.

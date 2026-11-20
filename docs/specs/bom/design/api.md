@@ -45,7 +45,7 @@ cross-checked (shot ≥ net × cavities). Sending the other kind's block → 400
 ### `POST /api/bom`
 - **Request:** `{ partId: int, kind, ...BomDraftInput fields optional }`
 - **Response 201:** `{ id, status, version }`.
-- **Errors:** 400 `VALIDATION_ERROR` (BR-BOM-01, 03, 04, 07, 08; part inactive / not pcs-set / casting on `set`) ·
+- **Errors:** 400 validation (Zod: no code; service: `BAD_REQUEST`) (BR-BOM-01, 03, 04, 07, 08; part inactive / not pcs-set / casting on `set`) ·
   400 `BOM_LOOP`, `BOM_TOO_DEEP` (BR-BOM-10; `details.path`) · 401 · 403 · 404 `NOT_FOUND` (part, item) ·
   409 `BOM_ALREADY_EXISTS` (part already has a revision; use start revision, BR-BOM-14).
 
@@ -75,7 +75,7 @@ cross-checked (shot ≥ net × cavities). Sending the other kind's block → 400
 ### `POST /api/bom/:id/retire`
 - **Request:** `{ reason: string, trimmed, 3–500 }`. **Response 200:** `{ id, status: 'retired', version }`.
   The retire dialog's affected-BOMs list IS `GET /api/bom/items/:itemId/where-used` with `:itemId` = the part's item id (reuse, BR-BOM-16, CR-003).
-- **Errors:** 400 `VALIDATION_ERROR` (reason missing or outside 3–500, CR-005) · 404 · 409 `BOM_NOT_ACTIVE`.
+- **Errors:** 400 validation (Zod: no code; service: `BAD_REQUEST`) (reason missing or outside 3–500, CR-005) · 404 · 409 `BOM_NOT_ACTIVE`.
 
 ### `GET /api/bom/needs`  (the shared calculation, BR-BOM-18)
 - **Query:** `partId: int` · `qty: int 1–1,000,000` · `levels: 'all' | '1'` (default `all`).
@@ -89,7 +89,7 @@ cross-checked (shot ≥ net × cavities). Sending the other kind's block → 400
   `jobWorkerId`, `serviceId`, `sendQty`, `returnQty` (the send : return ratio) and `jobWorkLossPct`.
   `rows` is the one row shape for both the HTTP response and the service result (CR-006); it also carries `hasActiveBom: boolean` so the service reports a per-line "no active BOM" flag, not only the web 409 `NO_ACTIVE_BOM` for the root. For a part with no active revision the service returns `{ partId, status: 'no_bom' }` for that line and does not throw; this endpoint alone maps a `no_bom` root to 409 `NO_ACTIVE_BOM`. Hook for sale order is per level: `netNeedLevel(nodes[]) → qty[]` (one call per level, PERF-03).
   `qty` is rounded up: whole for pcs/set, 3 decimals for kg/ltr/m. Reads no stock, writes nothing, no prices.
-- **Errors:** 400 `VALIDATION_ERROR` (qty bounds) · 400 `BOM_LOOP`, `BOM_TOO_DEEP`, `BOM_TOO_LARGE` (BR-BOM-10, 18) · 404 part · 409 `NO_ACTIVE_BOM` (part has no active revision).
+- **Errors:** 400 validation (Zod: no code; service: `BAD_REQUEST`) (qty bounds) · 400 `BOM_LOOP`, `BOM_TOO_DEEP`, `BOM_TOO_LARGE` (BR-BOM-10, 18) · 404 part · 409 `NO_ACTIVE_BOM` (part has no active revision).
 - **Backend service, not HTTP, is what sale order calls** (no internal HTTP): `bomNeedsService.computeBomNeeds(executor, { partId, qty, options })` (full walk) and `bomNeedsService.expandBomLevel(executor, { items: [{ partId, qty }] })` (one level, batch of one or many parts, one query; output fields in `data.md`: node has `partId`, `kind`, job-work worker / service / ratio / loss %; each child has `inactive`); this endpoint is a thin controller over `computeBomNeeds` / `expandBomLevel`. Options `onLoop: 'throw'|'flag'` and `netNeed` as in `data.md`. Sale order's own routes need `so.explode`, not `bom.view`; the service does no permission check, the controller does.
 
 ### `GET /api/bom/items/:itemId/where-used`
