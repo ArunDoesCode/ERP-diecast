@@ -127,7 +127,7 @@ export function SearchableSelect({
 									<span className="flex flex-col">
 										<span>{option.label}</span>
 										{option.secondaryLabel ? (
-											<span className="text-[11px] text-muted-foreground">
+											<span className="text-xs text-muted-foreground">
 												{option.secondaryLabel}
 											</span>
 										) : null}

@@ -13,6 +13,8 @@
  *                        nor carries a `// no-invalidate: <reason>` comment
  *   raw-palette          raw Tailwind palette class (bg-emerald-100 ...) or hex colour outside
  *                        src/components/ui/** (hex: also globals.css exempt)
+ *   size                 text under 12 px (text-xs outside the badge too) and button / input /
+ *                        select under 32 px high (BR-DS-28), src/components/ui/** included
  *   motion               motion outside the allowed spellings and places (spec design-system,
  *                        BR-DS-09), src/components/ui/** included; see scripts/standards-rules.ts
  */
@@ -22,6 +24,7 @@ import { fileURLToPath } from "node:url";
 import {
 	checkMotion,
 	checkPalette,
+	checkSize,
 	type Finding,
 	maskComments,
 } from "./standards-rules";
@@ -161,6 +164,10 @@ function runPalette() {
 	for (const f of files) findings.push(...checkPalette(f.rel, f.raw));
 }
 
+function runSize() {
+	for (const f of files) findings.push(...checkSize(f.rel, f.raw));
+}
+
 // ─── (c) motion outside the allow-list ──────────────────────────────────────
 
 function runMotion() {
@@ -193,8 +200,9 @@ function runMotion() {
 checkMutations();
 runPalette();
 runMotion();
+runSize();
 
-const RULES = ["mutation-invalidate", "raw-palette", "motion"];
+const RULES = ["mutation-invalidate", "raw-palette", "motion", "size"];
 
 console.log(
 	`frontend standards-check (${strictAll ? "strict" : strict ? `strict: ${[...strictRules].join(",")}` : "report"} mode) - ${findings.length} finding(s)\n`,

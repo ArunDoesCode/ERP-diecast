@@ -79,7 +79,7 @@ function ReceiptDetail({
 							<TableCell>
 								{line.finishedItemSku} · {line.finishedItemName}
 								{line.qaNotes ? (
-									<span className="block text-[11px] text-muted-foreground">
+									<span className="block text-xs text-muted-foreground">
 										{line.qaNotes}
 									</span>
 								) : null}

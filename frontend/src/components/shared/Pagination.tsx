@@ -23,7 +23,7 @@ export type PaginationProps = {
 };
 
 const ARROW =
-	"inline-flex size-7 items-center justify-center rounded-md border border-border text-xs hover:bg-muted aria-disabled:pointer-events-none aria-disabled:opacity-50";
+	"inline-flex size-8 items-center justify-center rounded-md border border-border text-xs hover:bg-muted aria-disabled:pointer-events-none aria-disabled:opacity-50";
 
 export function Pagination({
 	page,

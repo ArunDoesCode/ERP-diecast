@@ -96,6 +96,66 @@ export function checkPalette(path: string, source: string): Finding[] {
 	return found;
 }
 
+/** Files where 12 px text (text-xs) is allowed: the badge. */
+const BADGE_FILES = new Set([
+	"src/components/shared/StatusBadge.tsx",
+	"src/components/ui/badge.tsx",
+]);
+
+/** Text under 12 px, or text-xs (12 px, badge only). Prefix variants (md:, dark:) are matched too. */
+const SMALL_TEXT =
+	/(?<![\w-])text-(?:\[(\d+(?:\.\d+)?)(px|rem)\]|xs(?![\w-]))/g;
+/** Control height class under 32 px: h-/size-/min-h- 5, 6, 7 or an arbitrary value below 32 px. */
+const SMALL_CONTROL =
+	/(?<![\w-])(?:min-h|h|size)-(?:[567](?![\w.-])|\[(\d+(?:\.\d+)?)(px|rem)\])/g;
+/** A line that styles a button, input, select (or a file that is one). */
+const CONTROL_WORD = /<(?:button|input|select|Button|Input|Select\w*)\b/;
+const CONTROL_FILE = /\/(?:button|input|select|toggle|pagination)\.tsx$/;
+
+function toPx(value: string, unit: string): number {
+	return unit === "rem" ? Number(value) * 16 : Number(value);
+}
+
+/**
+ * BR-DS-28. Flags text under 12 px (and text-xs outside the badge) and button / input / select
+ * heights under 32 px, everywhere under src/ including ui/**.
+ */
+export function checkSize(path: string, source: string): Finding[] {
+	const found: Finding[] = [];
+	const badgeOk = BADGE_FILES.has(path);
+	const wholeFile = CONTROL_FILE.test(path);
+	maskComments(source)
+		.split("\n")
+		.forEach((text, i) => {
+			const add = (message: string) =>
+				found.push({ file: path, line: i + 1, rule: "size", message });
+			const small = new Set<string>();
+			for (const m of text.matchAll(SMALL_TEXT)) {
+				if (m[1] === undefined) {
+					if (!badgeOk) small.add(m[0]);
+				} else if (toPx(m[1], m[2] ?? "px") < 12) small.add(m[0]);
+			}
+			if (small.size > 0) {
+				add(
+					`text ${[...small].join(", ")} - body and labels are 12 px at least (12 px badge only), use text-sm or the type role`,
+				);
+			}
+			if (wholeFile || CONTROL_WORD.test(text)) {
+				const low = new Set<string>();
+				for (const m of text.matchAll(SMALL_CONTROL)) {
+					if (m[1] === undefined || toPx(m[1], m[2] ?? "px") < 32)
+						low.add(m[0]);
+				}
+				if (low.size > 0) {
+					add(
+						`control height ${[...low].join(", ")} - buttons, inputs and selects are 32 px at least (h-8, h-9, h-10)`,
+					);
+				}
+			}
+		});
+	return found;
+}
+
 /** A motion class: transition, ease-*, delay-*, duration-*, animate-*, or a motion.* call. */
 const MOTION =
 	/(?<![\w.$-])(?:transition(?![\w-]|\s*:)|(?:transition|ease|delay|duration|animate)-[\w[\]().%/,-]+|(?:fade|zoom|slide)-(?:in|out)(?:-[\w[\]().%/,-]+)?)|(?<![\w.$])motion\.\w+/g;

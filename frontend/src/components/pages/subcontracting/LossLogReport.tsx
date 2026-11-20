@@ -120,7 +120,7 @@ export function LossLogReport() {
 										<TableCell>
 											{row.itemSku} · {row.itemName}
 											{row.batchNumber ? (
-												<span className="block text-[11px] text-muted-foreground">
+												<span className="block text-xs text-muted-foreground">
 													Batch {row.batchNumber}
 												</span>
 											) : null}

@@ -1387,14 +1387,14 @@ function CreatePOLine({
 			</div>
 
 			<div className="text-xs text-muted-foreground">
-				<p className="text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase">
+				<p className="text-xs font-medium tracking-wide text-muted-foreground/70 uppercase">
 					Item rate
 				</p>
 				<p>{formatMoney(line.estRatePaise)}</p>
 			</div>
 
 			<div className="text-xs text-muted-foreground">
-				<p className="text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase">
+				<p className="text-xs font-medium tracking-wide text-muted-foreground/70 uppercase">
 					Last rate
 				</p>
 				<p>
@@ -1411,7 +1411,7 @@ function CreatePOLine({
 			<div>
 				<label
 					htmlFor={`po-create-line-rate-${line.id}`}
-					className="mb-1 block text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase"
+					className="mb-1 block text-xs font-medium tracking-wide text-muted-foreground/70 uppercase"
 				>
 					Negotiated rate
 				</label>
@@ -1432,7 +1432,7 @@ function CreatePOLine({
 			<div>
 				<Label
 					htmlFor={`po-create-line-gst-${line.id}`}
-					className="mb-1 block text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase"
+					className="mb-1 block text-xs font-medium tracking-wide text-muted-foreground/70 uppercase"
 				>
 					GST %
 				</Label>
@@ -1454,7 +1454,7 @@ function CreatePOLine({
 			</div>
 
 			<div className="text-right font-medium tabular-nums">
-				<p className="text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase">
+				<p className="text-xs font-medium tracking-wide text-muted-foreground/70 uppercase">
 					Total
 				</p>
 				{formatMoney(Math.round(Number(value || 0) * 100 * line.requestedQty))}

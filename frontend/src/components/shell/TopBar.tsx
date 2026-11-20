@@ -30,7 +30,7 @@ export function TopBar({
 				aria-label={foldLabel}
 				title={foldLabel}
 				onClick={onToggleSidebar}
-				className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+				className="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
 			>
 				<IconLayoutSidebar className="size-4" />
 			</button>
@@ -48,7 +48,7 @@ export function TopBar({
 					placeholder="Search"
 					className="pr-7"
 				/>
-				<kbd className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 rounded border px-1 text-[10px] text-muted-foreground">
+				<kbd className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 rounded border px-1 text-xs text-muted-foreground">
 					/
 				</kbd>
 			</div>

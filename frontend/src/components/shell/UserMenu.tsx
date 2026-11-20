@@ -54,7 +54,7 @@ export function UserMenu({
 				>
 					<span
 						aria-hidden="true"
-						className="flex size-6 items-center justify-center rounded-full bg-brand-accent text-[11px] font-semibold text-brand-accent-foreground"
+						className="flex size-8 items-center justify-center rounded-full bg-brand-accent text-xs font-semibold text-brand-accent-foreground"
 					>
 						{initialsOf(name)}
 					</span>

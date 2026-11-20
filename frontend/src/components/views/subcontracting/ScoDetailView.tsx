@@ -232,7 +232,7 @@ export function ScoDetailView({ scoId }: { scoId: number }) {
 									<TableCell>
 										{line.rawItemSku} · {line.rawItemName}
 										{line.rawItemBatch ? (
-											<span className="block text-[11px] text-muted-foreground">
+											<span className="block text-xs text-muted-foreground">
 												Batch {line.rawItemBatch}
 											</span>
 										) : null}

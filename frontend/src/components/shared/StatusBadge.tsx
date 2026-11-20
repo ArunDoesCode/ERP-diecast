@@ -21,7 +21,7 @@ export function StatusBadge({ doc, status, className }: StatusBadgeProps) {
 	return (
 		<span
 			className={cn(
-				"inline-flex h-5 w-fit shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 text-[11px] leading-5 font-semibold",
+				"inline-flex h-5 w-fit shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 text-xs leading-5 font-semibold",
 				TONE_CLASS[tone],
 				className,
 			)}

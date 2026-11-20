@@ -62,7 +62,7 @@ export function NavSidebar() {
 		<Sidebar variant="inset" collapsible="icon">
 			<SidebarHeader>
 				<div className="flex items-center gap-2 px-1 py-1.5">
-					<span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
+					<span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
 						<IconBuildingFactory2 className="size-4" />
 					</span>
 					<span className="truncate text-sm font-semibold group-data-[collapsible=icon]:hidden">

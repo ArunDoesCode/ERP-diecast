@@ -224,7 +224,7 @@ export function EditGrnModal({
 											</p>
 										</div>
 										<div className="text-xs text-muted-foreground">
-											<p className="text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase">
+											<p className="text-xs font-medium tracking-wide text-muted-foreground/70 uppercase">
 												Ordered
 											</p>
 											<p>{item.orderedQty}</p>
@@ -232,7 +232,7 @@ export function EditGrnModal({
 										<div>
 											<label
 												htmlFor={`grn-edit-arrived-qty-${item.id}`}
-												className="mb-1 block text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase"
+												className="mb-1 block text-xs font-medium tracking-wide text-muted-foreground/70 uppercase"
 											>
 												Arrived qty
 											</label>
@@ -253,7 +253,7 @@ export function EditGrnModal({
 										<div>
 											<label
 												htmlFor={`grn-edit-batch-${item.id}`}
-												className="mb-1 block text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase"
+												className="mb-1 block text-xs font-medium tracking-wide text-muted-foreground/70 uppercase"
 											>
 												Batch / heat no
 											</label>

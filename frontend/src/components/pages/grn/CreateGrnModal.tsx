@@ -226,7 +226,7 @@ export function CreateGrnModal({
 											</p>
 										</div>
 										<div className="text-xs text-muted-foreground">
-											<p className="text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase">
+											<p className="text-xs font-medium tracking-wide text-muted-foreground/70 uppercase">
 												Remaining
 											</p>
 											<p>
@@ -236,7 +236,7 @@ export function CreateGrnModal({
 										<div>
 											<label
 												htmlFor={`grn-create-arrived-qty-${item.id}`}
-												className="mb-1 block text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase"
+												className="mb-1 block text-xs font-medium tracking-wide text-muted-foreground/70 uppercase"
 											>
 												Arrived qty
 											</label>
@@ -258,7 +258,7 @@ export function CreateGrnModal({
 										<div>
 											<label
 												htmlFor={`grn-create-batch-${item.id}`}
-												className="mb-1 block text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase"
+												className="mb-1 block text-xs font-medium tracking-wide text-muted-foreground/70 uppercase"
 											>
 												Batch / heat no
 											</label>
