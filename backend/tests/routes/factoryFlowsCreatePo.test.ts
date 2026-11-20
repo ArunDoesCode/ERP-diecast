@@ -393,7 +393,7 @@ describe("BR-FF-58 one supplier refused, the others stay made", () => {
 });
 
 describe("BR-FF-59 a line put on another PO meanwhile", () => {
-  test("BR-FF-59 creating a PO for a line that is already on a PO -> 409", async () => {
+  test("BR-FF-59 creating a PO for a line that is already on a PO (not concurrent) -> 400", async () => {
     const item = await mkItem();
     const pr = await mkApprovedPr([item]);
     const body = {
@@ -401,7 +401,7 @@ describe("BR-FF-59 a line put on another PO meanwhile", () => {
       lines: [{ prItemId: pr.lineIds[0], unitPricePaise: 100 }],
     };
     expect((await call("POST", "/api/po/createpo", body)).status).toBe(201);
-    expect((await call("POST", "/api/po/createpo", body)).status).toBe(409);
+    expect((await call("POST", "/api/po/createpo", body)).status).toBe(400);
   });
 
   test("BR-FF-59 two buyers clicking Create PO at once: exactly one 201 and one 409, one PO holds the line", async () => {

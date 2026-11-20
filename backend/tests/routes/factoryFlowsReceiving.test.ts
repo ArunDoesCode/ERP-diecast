@@ -433,8 +433,9 @@ describe("BR-FF-63 narrowing and poId", () => {
 describe("BR-FF-06 / BR-FF-62 no prices", () => {
   test("BR-FF-06 rows and lines carry no rate, GST, line value or total", async () => {
     const po = await mkPo("dispatched", [{ qty: 1000 }]);
-    const r = await list("fs");
+    const r = await list("fs", `pageSize=100&poId=${po.id}`);
     const row = rowFor(r.json.data, po.id);
+    expect(row).toBeDefined();
     const keys: string[] = [];
     const walk = (v: unknown) => {
       if (Array.isArray(v)) v.forEach(walk);
