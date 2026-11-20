@@ -165,3 +165,11 @@ If a decision is reversed, add a new entry that references the old one — don't
 - **Decision:** 14 px text, 36 px buttons and fields, 44 px table rows, 24 px bold page titles, 24 px card padding; "Compact" gives 13 px text and 36 px rows. This replaces the 13 px / 36 px answer of 2026-11-18. Values: `docs/specs/design-system/spec.md` → "Tokens — type, density, shape" (v2).
 - **Why:** the owner found the app too small ("a little zoomed in") and picked "Size A (14 px)" from a drawn comparison of today, A and B. Most controls were 12 px text in 28 px boxes.
 
+
+### D-028 — Overnight SCM build: agents take the recommended option on every card (2026-11-20, owner)
+- **Decision:** for bom, sale-order, reorder, purchase-returns, supplier-invoice, rfq, stock-transfer, supplier-rating and dispatch, every OWNER.md card and every "Decided for you — please confirm" line takes the recommended option; each card records "Your answer: A (owner pre-approved recommended options in chat, 2026-11-20)". Every choice cites ERPNext / Odoo / SAP B1 (stricter wins). Specs are frozen on this approval and built in the order above; anything the owner disagrees with in the morning becomes a change request.
+- **Why:** owner, chat 2026-11-20: "take ur own decision and record them and run whatever parallel subagents u want to complete a complete scm module according to my plan, ill do a complete merge in moring once completed"; "including bom explosion and other features"; "make sure u reasearch other erp's and take decision and build"; "follow best ui ux standards, and flows and test completely, run as many parallel agents as possible".
+
+### D-029 — New detail pages are two-pane (2026-11-20, owner)
+- **Decision:** detail pages of the nine SCM modules use two panes (document left, money / history / next step right), lists are full-page, forms are full-page with labels above fields, and each document offers its next step. This overrides the design-system skill's one-column detail default for these screens; design-reviewer accepts it.
+- **Why:** owner standards relayed 2026-11-20 ("follow best ui ux standards, and flows").
