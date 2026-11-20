@@ -40,7 +40,7 @@ document number is the row's link (row click is mouse only, BR-FF-110); focus ri
 - **Purpose:** anyone signed in sees the work waiting for them and opens it in one click.
 - **Pattern:** dashboard. `PageHeader` + grid of tiles, 4 per row at 1440, 3 at 1024, 2 on a tablet in portrait.
 - **Fields (tile):** label · count · hint · optional Late / Today / Later split (new `split` prop on `StatCard`: up to three chips in existing danger / warning / neutral tones, built in this feature). Source: `GET /api/home/getcounts`
-  (`tiles[]`: `key`, `count`, `late`/`today`/`later`, `oldestSince` tile 20, `sentBackCount` tile 21, `error`; tile absent = no key, BR-FF-11; `data.today` IST). Count = integer; hint dates `formatDate`. No ₹ (BR-FF-33).
+  (`tiles[]`: `key`, `count`, `late`/`today`/`later`, `tone` (danger / waiting / moving / neutral, server-decided), `hint {kind, date?, n?}` (absent at count 0; wording is the UI's), `error`; tile absent = no key, BR-FF-11; `data.today` IST). Count = integer; hint dates `formatDate`. No ₹ (BR-FF-33).
   Order BR-FF-13 (plant head: "Waiting for my approval" first). Tone of the left edge: warning = waiting on me,
   info = moving, danger when any row is late, neutral otherwise. Never accent (BR-DS-07).
 - **Actions:** tile body → target list filtered (BR-FF-12); "N late" chip → same list, Late only (BR-FF-15);

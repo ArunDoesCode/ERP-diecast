@@ -44,7 +44,9 @@ would be a new write route (BR-FF-05).
 ### `GET /api/home/getcounts`
 - **Query:** `tiles` optional csv of tile keys (retry one tile, BR-FF-19; max 11, enum).
 - **Response 200:** `{ success, data: { today: "YYYY-MM-DD" (IST), tiles: Tile[] } }`,
-  `Tile = { key, count (int >= 0), late?, today?, later? (ints, only dated tiles, sum = count), oldestSince? (ISO, tile 20 only), sentBackCount? (tile 21), error?: true }`.
+  `Tile = { key, count (int >= 0), tone: "waiting"|"moving"|"neutral"|"danger", late?, today?, later? (ints, only dated tiles, sum = count), hint?: { kind, date?: ISO, n?: int }, error?: true }`.
+  `hint` per tile (UI formats the text): `approvals` oldest waiting `{kind:oldest_since,date}`; `my_prs_draft` `{kind:sent_back,n}`; `my_prs_pending` `{kind:oldest_since,date}`; `prs_to_order` `{kind:earliest_required,date}` (none when no date); `pos_to_send` / `goods_expected` `{kind:earliest_due,date}`; `my_pos_draft` `{kind:sent_back,n}`; `pos_late` `{kind:oldest_due,date}`; `grns_to_inspect` `{kind:oldest_received,date}`; `jobwork_due` `{kind:earliest_due,date}`; `stock_low` `{kind:items,n}`. `hint` absent at count 0.
+  `tone` (server-decided, one rule): `danger` if `late > 0`; else `waiting` for `approvals`, `my_prs_draft`, `my_pos_draft`, `prs_to_order`, `pos_to_send`, `grns_to_inspect` (work waiting on me) with count > 0; `moving` for `my_prs_pending`, `goods_expected`, `jobwork_due` with count > 0; else `neutral`. This replaces the earlier `oldestSince` / `sentBackCount` fields.
   Tile keys: `approvals, my_prs_draft, my_prs_pending, prs_to_order, pos_to_send, my_pos_draft, pos_late, goods_expected, grns_to_inspect, jobwork_due, stock_low` (= tiles 20..30, BR-FF-13 order).
   A tile the caller has no key for is **absent**, not zero (BR-FF-11). A failed tile is `{ key, error: true }`; HTTP stays 200.
 - No money fields (BR-FF-33). Every `count` uses the same predicate and `today` as the list filter it opens (BR-FF-02).
@@ -52,6 +54,7 @@ would be a new write route (BR-FF-05).
 
 ### `GET /api/grn/getreceivablepos`
 - **Query (pagination contract):** `page` (1), `pageSize` (default 10, max 100), `sortBy` ∈ `dueDate, poNumber, supplierName` (default `dueDate` asc, tiebreak `id`), `sortDir`, `q` (string max 100; PO number or supplier name, trigram, BR-FF-63), `poId` (int > 0; used by the receive form, BR-FF-68), `bucket` ∈ `late|today|later` (BR-FF-71, 14).
+- **Response:** `{ success, data, meta: { …pagination, today: "YYYY-MM-DD" (IST) } }` — `meta.today` is the picker's "today" (the page never uses the browser clock, BR-FF-08).
 - **Rows:** `{ poId, poNumber, supplierId, supplierName, status, dueDate, isLate, lines: [{ poItemId, itemId, sku, itemName, uom, orderedQty, receivedQty, pendingQaQty, openQty }] }`. Only lines with `openQty > 0`. Quantities 3 decimals (whole for pcs / set).
 - **Never returned:** `unitPricePaise`, `gstPercent`, line value, tax, totals (BR-FF-62, 06). Repository selects named columns only.
 - **Filter:** PO status `dispatched` / `partial_received` and at least one line `openQty > 0` (open qty definition: `data.md` Open point 1).
@@ -59,7 +62,8 @@ would be a new write route (BR-FF-05).
 
 ### `GET /api/approval/getDocumentView/:docType/:docId`
 - **Path:** `docType` ∈ `pr|po|sco`; `docId` int > 0.
-- **Response 200:** same `data` shape as `getprdetails` / `getpodetails` / `getscodetails` for that type (header, lines with rates and amounts, totals), plus `request` (current open request, level x of N, who can act now), `trail` (rows with notes, oldest first), `canAct` (caller is the current approver and has not approved a level).
+- **Response 200:** same `data` shape as `getprdetails` / `getpodetails` / `getscodetails` for that type (header, lines with rates and amounts, totals), with `requesterNote` = the document's own `notes` field (PR `notes`, PO `notes`, SCO `notes`; string or null, max 2000), plus `request` (current open request, level x of N, who can act now), `trail` (rows with notes, oldest first), `canAct` (caller is the current approver and has not approved a level).
+- **Pending check (BR-FF-53):** a caller who reads only through the approval rule (lacks `pr.manage` / `po.manage` for pr / po; lacks `sco.view` for sco) gets 200 only while the document's approval request is `pending_approval` **and** the caller is its current approver or already approved a level of it (`canAct` may be false). After the request is decided, withdrawn or cancelled → 403 `FORBIDDEN`. Holders of the document key and `approval.view_all` are not limited by this check.
 - Read-only: no mutation route is reachable from it; acting goes through `actOnRequest`.
 - **Errors:** 400 bad docType · 401 · 403 not allowed to read the request (BR-APR-51; body carries no document data, BR-FF-04) · 404 no such document.
 
@@ -68,9 +72,10 @@ would be a new write route (BR-FF-05).
 - **Response 200:** `{ totals, approvals, linked, history }`.
   - `totals` — pr: `{ lineCount, estimatedAmountPaise }`; po: `{ subtotalPaise, taxAmountPaise, totalAmountPaise, receivedPct (0–100, by qty) }`; grn: `{ arrivedQty, acceptedQty|null, rejectedQty|null, uom }` per unit, **no money**. Money keys present only if the caller may see them (BR-FF-06).
   - `approvals` — pr, po only: live state + full trail; `null` for grn (BR-FF-52).
-  - `linked[]` — `{ docType, id, number, status, canOpen }`; `canOpen = false` → shown as text (BR-FF-03); no amounts for a GRN viewer (BR-FF-55). Cancelled / closed links stay.
+  - `linked[]` — `{ docType, id, number, status, qaStatus?, canOpen }`; `qaStatus` (`pending|passed|failed|waived|mixed`, derived from the GRN's lines) only on `grn` items; `canOpen = false` → shown as text (BR-FF-03); no amounts for a GRN viewer (BR-FF-55). Cancelled / closed links stay.
   - `history[]` — `{ at, byName, event, note? }` newest first, built from the sources in `data.md`; capped at 200 events.
-- **Errors:** 400 · 401 · 403 (no doc key and no read rule, BR-FF-04) · 404.
+- **Pending check (BR-FF-53):** for pr / po, a caller without the document key passes only while the approval request is `pending_approval` and they are its current approver or already approved a level (same rule as `getDocumentView`); otherwise 403. A caller with the key or `approval.view_all` is unaffected. `grn` always needs `grn.view`.
+- **Errors:** 400 · 401 · 403 (no doc key and no read rule or request no longer pending, BR-FF-04, 53) · 404.
 
 ## Lists
 All follow the pagination contract (`page` 1, `pageSize` 10 default / 100 max, whitelist `sortBy`, PK tiebreak, `{ success, data, meta }`). The UI sends `pageSize` 25 / 50 / 100 (BR-FF-105), default 50.
@@ -79,10 +84,11 @@ New list: `getreceivablepos` (above). `getcounts`, `getDocumentView`, `getpanel`
 ## Additive changes to existing routes (owner module spec named; no breaking change, defaults keep today's behaviour)
 | Route | Add | Owner spec | Rules |
 |---|---|---|---|
-| `GET /api/pr/getprs` | filters `mine` (bool), `toOrder` (bool: approved / partial_ordered with a pending line), `bucket` (late/today/later, on earliest pending required-by, used with `toOrder`); rows `requestedByName`, `lineCount`, `earliestRequiredBy`, `sentBack` (bool); sort adds `estimatedAmountPaise`; `meta.statusCounts` already there | purchase-requisition | BR-FF-12, 21..23, 106, 109 |
-| `GET /api/po/getpos` | filters `mine`, `bucket` (on due date, any status filter); rows `lineCount`, `receivedPct`; `meta.lateCount`; `overdue` switches to IST day (BR-FF-08); sort adds `dueDate`, `totalAmountPaise` | purchase-order | BR-FF-24..26, 107, 109 |
-| `GET /api/po/getpodetails/:id` | each line adds `pendingQaQty`, `openQty` | purchase-order | BR-FF-43 |
-| `GET /api/grn/getgrns` | filter `bucket` (received date; late = before today, with `qaStatus=pending`); rows `supplierName`, `lineCount`, `qaSummary`; `meta.statusCounts`; never money | grn | BR-FF-28, 108, 109 |
+| `GET /api/pr/getprs` | filters `mine` (bool), `toOrder` (bool: approved / partial_ordered with a pending line), `bucket` (late/today/later, on earliest pending required-by, used with `toOrder`); rows `requestedByName`, `lineCount`, `earliestRequiredBy`, `sentBack` (bool); sort adds `estimatedAmountPaise`; `meta.statusCounts` already there; new `meta.toOrderCount` = rows `toOrder=true` would return under the same other filters (the "To order" chip, BR-FF-02) | purchase-requisition | BR-FF-12, 21..23, 106, 109 |
+| `GET /api/po/getpos` | filters `mine`, `bucket` (on due date, any status filter); rows `lineCount`, `receivedPct`; `meta.statusCounts` (per status, like PR: chips Draft = `draft`, In approval = `pending_approval`, To send = `approved`, Open = `dispatched` + `partial_received`, summed by the page) and `meta.lateCount` (open qty per BR-FF-09); `overdue` (Late) switches to IST day (BR-FF-08) and BR-FF-09 open quantity (goods pending QA are not open); sort adds `dueDate`, `totalAmountPaise` | purchase-order | BR-FF-24..26, 107, 109 |
+| `GET /api/pr/getprdetails/:id` | each item adds `onPoNumber` + `onPoId` (PO the line is on via `pr_po_item_links`, else null; for the "On order" link, BR-FF-43) and keeps `defaultSupplierId` / `defaultSupplierName` for every `pending` line (null if none, BR-FF-49); both already join the same data | purchase-requisition | BR-FF-43, 48, 49 |
+| `GET /api/po/getpodetails/:id` | each line adds `pendingQaQty`, `openQty` (BR-FF-09) | purchase-order | BR-FF-43 |
+| `GET /api/grn/getgrns` | filter `bucket` (received date; late = before today, with `qaStatus=pending`); rows `supplierName`, `lineCount`, `qaSummary`, `poCanOpen` (caller holds `po.manage`, else the PO number is plain text, BR-FF-03); `meta.statusCounts`; never money | grn | BR-FF-28, 108, 109 |
 | `GET /api/sco/challans/open` | filter `bucket` (on `returnDueDate`; `late` equals `dueStatus=overdue`) | subcontracting | BR-FF-14, 29 |
 | `GET /api/approval/getMyPendingApprovals` | rows `docNumber`, `requesterName`, `amountPaise`; default sort `requestedAt` asc | approval | BR-FF-80 |
 | `GET /api/asset/inventory/stock` | none (filter exists) | inventory | BR-FF-30 |

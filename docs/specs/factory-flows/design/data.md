@@ -30,8 +30,8 @@ three indexes. Ids are `serial` integers, timestamps are `timestamp` (no zone), 
 - **Existing installs (BR-FF-101):** one migration (a) inserts `home`, (b) sets label / sort_order /
   menu_group of the nine existing keys to the table, (c) deletes `landing` (`home` has no key, so no
   `role_permissions` rows move). Runs once; later Setup → Screens edits are kept by sync.
-- `menu_group` is set to one group ("General") for the eight work screens because the sidebar groups by
-  `menu_group` and would otherwise split the order of BR-FF-100 (Subcontracting, Inventory, Suppliers).
+- `menu_group` (A-26): the eight work screens are "General"; Employee directory and Setup are "Admin". The sidebar
+  groups by `menu_group`, so this keeps the BR-FF-100 order.
 
 ### Indexes (new) — all on tables owned by other specs, listed in "Changes to other modules"
 | Index | Table | Query that needs it |
@@ -53,7 +53,7 @@ filter first, then a scan of tens of rows); PR line status (`idx_pr_items_status
 | BR-FF-21, 22, 18 | `purchase_requests.requested_by, status`; "Sent back" = latest `approval_requests.status = require_more_info` for the PR (docType pr, max id) | draft PR whose last request was sent back |
 | BR-FF-23 | `purchase_requests.status in (approved, partial_ordered)` + `purchase_request_items.status = pending`; split by `min(expected_date)` of pending lines | no date = Later |
 | BR-FF-24, 25, 26 | `purchase_orders.status`, `created_by`; late = BR-PO-19 predicate | one shared SQL predicate for list and tile (BR-FF-02) |
-| BR-FF-27, 61 | PO status `dispatched` / `partial_received`; open qty per line, due = `coalesce(revised_delivery_date, expected_delivery_date)` | open qty definition: see Open point 1 |
+| BR-FF-27, 61, 09 | PO status `dispatched` / `partial_received`; open qty per line, due = `coalesce(revised_delivery_date, expected_delivery_date)` | open = `qty − received_qty − sum(grn_items.received_qty where qa_status = 'pending')` |
 | BR-FF-28 | `grn_items.qa_status = pending`; date = `grns.received_date` | |
 | BR-FF-29 | `sco_challans` + lines not settled (existing `challans/open` rule); due = `return_due_date` | |
 | BR-FF-30 | `item_master.is_active`, `reorder_level`, `current_stock` | same predicate as the stock list `belowReorder` flag |
@@ -62,6 +62,13 @@ filter first, then a scan of tens of rows); PR line status (`idx_pr_items_status
 | BR-FF-50..52 | totals: `purchase_requests.estimated_amount_paise`, `purchase_orders.*_paise`, `grn_items.received/accepted/rejected_qty`; approvals: `approval_requests` + trails | GRN has no Approvals block |
 | BR-FF-54 | see History sources below | |
 | BR-FF-106..109 | list rows + `meta.statusCounts` from the existing list queries | |
+| Home tile hints + tone | per-tile `min` / `max` of the date columns the tile already reads (`approval_requests.requested_at`, `expected_date`, due date, `received_date`) and the count of sent-back drafts; `tone` derived in the service from count / late | no new column |
+| PR list "To order" chip | `meta.toOrderCount` = `count(*)` of the BR-FF-23 predicate under the other filters | same predicate as `toOrder=true` |
+| PO list chips | `meta.statusCounts` = `group by status` over the filtered set; Late = BR-FF-09 predicate | |
+| GRN list PO link | `poCanOpen` = caller holds `po.manage`; no column | BR-FF-03 |
+| PR line "On order" | `pr_po_item_links` → `purchase_order_items` → `purchase_orders.po_number` per `prItemId`; default supplier from the existing lookup in `prRepository` | idx_pr_po_links_pr_item_id |
+| GRN link QA status | `grn_items.qa_status` of the linked GRN's lines (all equal → that value, else `mixed`) | idx_grn_items_grn_id |
+| Requester's note | `purchase_requests.notes`, `purchase_orders.notes`, `subcontracting_orders.notes` | |
 | BR-FF-85 | tile 20 count | |
 | BR-FF-104..105, 111..112 | no data (screen rules) | |
 
@@ -75,7 +82,7 @@ filter first, then a scan of tens of rows); PR line status (`idx_pr_items_status
 | PO | created | `purchase_orders.created_by · created_at` |
 | PO | sent, reminder, escalation, confirmation | `po_communications.sent_by · sent_at · type · note` |
 | PO | invoiced, closed (+ note, short-closed) | `invoiced_by / _at`, `closed_by / _at / close_note` |
-| PO | delay | `revised_delivery_date`, `delay_reason` only — **no who / when stored** (Open point 2) |
+| PO | delay | `revised_delivery_date`, `delay_reason` only, pinned above dated events, no who / when (A-24) |
 | GRN | created | `grns.created_by · received_date` |
 | GRN | QA accepted / rejected | `qa_tests.tested_by · tested_at · status · notes` |
 | GRN | bypass | `grn_items.qa_bypassed_by / _at / qa_bypass_reason` |
@@ -107,7 +114,7 @@ a column whitelist in its repository query, not by stripping fields afterwards.
 |---|---|---|
 | auth-setup (`docs/specs/auth-setup.md`) | data migration on `screens` + `SCREENS` defaults (above) | BR-FF-100..102 |
 | purchase-requisition | index `idx_purchase_requests_requested_by_status` | BR-FF-21, 22 |
-| purchase-order | index `idx_purchase_orders_created_by_status`; late predicate uses IST day | BR-FF-25, 08 |
+| purchase-order | index `idx_purchase_orders_created_by_status`; PO list Late filter (`overdue`) uses BR-FF-09 open quantity (goods at the gate pending QA no longer count as late) and the IST day | BR-FF-25, 26, 09, 08 |
 | grn | partial index `idx_grn_items_pending_grn` | BR-FF-28 |
 
 ## Migration notes
@@ -115,15 +122,10 @@ One drizzle migration: 3 plain `create index` (tables are small; `concurrently` 
 transaction) then the `screens` data change. Rollback: drop the indexes,
 re-insert `landing`, restore old labels (values in the migration's down comment). No backfill.
 
-## Open points (returned to spec-analyst, not decided here)
-1. **Open quantity.** Frozen BR-GRN-27 adds to `purchase_order_items.received_qty` only at QA accept. So
-   after GRN-2026-11-4 (600 kg arrived, QA pending) the PO line still reads received 0. BR-FF-27's example
-   ("still 1, 400 kg open") and BR-FF-66 ("counting every earlier receipt") need 400. Design assumes
-   **open = ordered − accepted (received_qty) − arrived on lines still `pending` QA**, so a rejected line
-   re-opens and a pending one does not double-count. BR-FF-43 / BR-FF-26 say "ordered − received" — pick one.
-2. **Delay history.** BR-FF-54 lists "delay" with who and when; the PO stores only revised date + reason.
-3. **Below reorder.** BR-FF-30 says "below"; the existing stock flag is `stock <= reorder level` and needs
-   `reorder_level > 0`. Design reuses the existing flag so the tile equals the list (BR-FF-02).
+## Open points — all resolved in spec pass 2
+1. **Open quantity** — resolved: BR-FF-09 (open = ordered − accepted − arrived on lines pending QA; rejected re-opens) and A-23. One shared SQL expression feeds tiles 26 / 27, the picker, `getpos` Late and `getpodetails` `openQty`.
+2. **Delay in History** — resolved: A-24 (current revised date + reason pinned above dated events; no who / when, no new column).
+3. **Below reorder** — resolved: A-25 (existing flag: stock <= reorder level, reorder level > 0, active).
 
 ## Choices made
 Moved to `../assumptions.md` (A-26, A-39..A-44).
