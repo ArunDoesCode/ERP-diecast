@@ -133,7 +133,7 @@ export function SortableHead<T extends string>({
 				type="button"
 				variant="ghost"
 				size="sm"
-				className="-ml-2 h-7 px-2"
+				className="-ml-2 h-8 px-2"
 				onClick={() => onSort(field)}
 			>
 				{label}
