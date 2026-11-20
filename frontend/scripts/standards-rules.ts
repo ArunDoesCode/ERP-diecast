@@ -190,6 +190,31 @@ export function checkSize(path: string, source: string): Finding[] {
 	return found.sort((x, y) => x.line - y.line);
 }
 
+/** The retired floating-label field: its components and its module. */
+const FLOATING_FIELD = /\bFloating(?:LabelInput|Label|Input)\b|floating-label/;
+
+/**
+ * BR-DS-29. A form field has one look (label above, 36 px); flags any use of the retired
+ * floating-label field (component names or the import path). Comments are ignored.
+ */
+export function checkFieldLook(path: string, source: string): Finding[] {
+	const found: Finding[] = [];
+	maskComments(source)
+		.split("\n")
+		.forEach((text, i) => {
+			const m = FLOATING_FIELD.exec(text);
+			if (m) {
+				found.push({
+					file: path,
+					line: i + 1,
+					rule: "field-look",
+					message: `${m[0]} - the floating-label field is retired, use <Label htmlFor> above an Input / Select (36 px)`,
+				});
+			}
+		});
+	return found;
+}
+
 /** A motion class: transition, ease-*, delay-*, duration-*, animate-*, or a motion.* call. */
 const MOTION =
 	/(?<![\w.$-])(?:transition(?![\w-]|\s*:)|(?:transition|ease|delay|duration|animate)-[\w[\]().%/,-]+|(?:fade|zoom|slide)-(?:in|out)(?:-[\w[\]().%/,-]+)?)|(?<![\w.$])motion\.\w+/g;
