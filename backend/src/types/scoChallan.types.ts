@@ -85,17 +85,27 @@ export const challanIdParamSchema = z.object({
 });
 
 // Open = at least one line with settledQty < qty. Default order: soonest due first.
-export const openChallanListQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(10),
-  sortBy: z
-    .enum(["id", "challanNumber", "challanDate", "returnDueDate"])
-    .default("returnDueDate"),
-  sortDir: z.enum(["asc", "desc"]).default("asc"),
-  vendorId: z.coerce.number().int().positive().optional(),
-  scoId: z.coerce.number().int().positive().optional(),
-  dueStatus: challanDueStatusSchema.optional(),
-});
+export const openChallanListQuerySchema = z
+  .object({
+    page: z.coerce.number().int().min(1).default(1),
+    pageSize: z.coerce.number().int().min(1).max(100).default(10),
+    sortBy: z
+      .enum(["id", "challanNumber", "challanDate", "returnDueDate"])
+      .default("returnDueDate"),
+    sortDir: z.enum(["asc", "desc"]).default("asc"),
+    vendorId: z.coerce.number().int().positive().optional(),
+    scoId: z.coerce.number().int().positive().optional(),
+    dueStatus: challanDueStatusSchema.optional(),
+    // BR-FF-14, 29: returnDueDate bucket; late = dueStatus overdue (CR-05).
+    bucket: z.enum(["late", "today", "later"]).optional(),
+  })
+  .refine(
+    (q) =>
+      q.bucket !== "late" ||
+      q.dueStatus === undefined ||
+      q.dueStatus === "overdue",
+    { message: "bucket=late requires dueStatus=overdue", path: ["bucket"] },
+  );
 export type openChallanListQuerySchemaType = z.infer<
   typeof openChallanListQuerySchema
 >;

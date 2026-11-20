@@ -8,7 +8,11 @@ import {
   requireAuth,
   requirePermission,
 } from "../lib/auth-middleware";
-import { paginatedResponse, successResponse } from "../lib/response-schemas";
+import {
+  paginatedResponse,
+  paginationMetaSchema,
+  successResponse,
+} from "../lib/response-schemas";
 import { register } from "../lib/route-registry";
 import type { AppEnv } from "../lib/types";
 import {
@@ -23,7 +27,9 @@ import {
   approvalRequestSchema,
   approvalTrailEntrySchema,
   createApprovalPolicySchema,
+  myPendingApprovalRowSchema,
   myPendingApprovalsQuerySchema,
+  myPendingTypeCountsSchema,
   submitApprovalRequestSchema,
   updateApprovalPolicySchema,
 } from "../types/approval.types";
@@ -177,7 +183,15 @@ register({
     "List approval requests currently pending on the caller (or, for super-admin, another employee).",
   auth: { type: "any-authenticated" },
   request: { query: myPendingApprovalsQuerySchema },
-  responses: { "200": paginatedResponse(approvalRequestListItemSchema) },
+  // BR-FF-80: rows carry flat docNumber / requesterName / amountPaise;
+  // meta.typeCounts = per-type counts with every filter except docType.
+  responses: {
+    "200": paginatedResponse(myPendingApprovalRowSchema).extend({
+      meta: paginationMetaSchema.extend({
+        typeCounts: myPendingTypeCountsSchema.optional(),
+      }),
+    }),
+  },
   pagination: {
     sortableFields: ["requestedAt", "docType", "status"],
     searchable: false,

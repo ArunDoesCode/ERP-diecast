@@ -1,9 +1,14 @@
 import { Hono } from "hono";
+import { z } from "zod";
 
 import { grnController } from "../controller/grnController";
 import { asyncHandler } from "../lib/async-handler";
 import { requirePermission } from "../lib/auth-middleware";
-import { paginatedResponse, successResponse } from "../lib/response-schemas";
+import {
+  paginatedResponse,
+  paginationMetaSchema,
+  successResponse,
+} from "../lib/response-schemas";
 import { register } from "../lib/route-registry";
 import type { AppEnv } from "../lib/types";
 import { assetInventoryMovementSchema } from "../types/asset.types";
@@ -40,7 +45,14 @@ register({
   summary: "List GRNs, paginated. Filterable by poId/status/qaStatus.",
   auth: { type: "permission", key: "grn.view" },
   request: { query: grnListQuerySchema },
-  responses: { "200": paginatedResponse(grnListRowSchema) },
+  // BR-FF-28: meta.statusCounts per GRN status for the same filters.
+  responses: {
+    "200": paginatedResponse(grnListRowSchema).extend({
+      meta: paginationMetaSchema.extend({
+        statusCounts: z.record(z.string(), z.number().int().min(0)).optional(),
+      }),
+    }),
+  },
   pagination: {
     sortableFields: ["id", "grnNumber", "status", "receivedDate"],
     searchable: true,

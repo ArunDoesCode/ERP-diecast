@@ -368,6 +368,27 @@ export type approvalActionRequestSchemaType = z.infer<
   typeof approvalActionRequestSchema
 >;
 
+// getMyPendingApprovals row (BR-FF-80, A-62): flat display fields. `docSummary`
+// stays optional until the handler is switched over, then it is dropped.
+// `amountPaise` is omitted when the target employee is not the caller.
+export const myPendingApprovalRowSchema = approvalRequestSchema.extend({
+  policyName: z.string(),
+  docNumber: z.string().optional(),
+  requesterName: z.string().optional(),
+  amountPaise: z.number().int().optional(),
+  docSummary: approvalDocSummarySchema.optional(),
+});
+export type myPendingApprovalRowSchemaType = z.infer<
+  typeof myPendingApprovalRowSchema
+>;
+
+// meta.typeCounts: all filters except docType, counted server-side.
+export const myPendingTypeCountsSchema = z.object({
+  pr: z.number().int().min(0),
+  po: z.number().int().min(0),
+  sco: z.number().int().min(0),
+});
+
 export const myPendingApprovalsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(10),

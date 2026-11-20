@@ -360,7 +360,12 @@
             "page": "integer.nonnegative.required",
             "pageSize": "integer.nonnegative.required",
             "total": "integer.nonnegative.required",
-            "totalPages": "integer.nonnegative.required"
+            "totalPages": "integer.nonnegative.required",
+            "typeCounts": {
+              "pr": "integer.nonnegative.required",
+              "po": "integer.nonnegative.required",
+              "sco": "integer.nonnegative.required"
+            }
           }
         }
       },
@@ -1479,7 +1484,8 @@
           "poId": "integer.positive.optional",
           "status": "enum:draft,pending_qa,accepted,rejected,partial_accepted.optional",
           "qaStatus": "enum:pending,passed,failed,waived.optional",
-          "q": "string.optional"
+          "q": "string.optional",
+          "bucket": "enum:late,today,later.optional"
         }
       },
       "responses": {
@@ -1490,7 +1496,8 @@
             "page": "integer.nonnegative.required",
             "pageSize": "integer.nonnegative.required",
             "total": "integer.nonnegative.required",
-            "totalPages": "integer.nonnegative.required"
+            "totalPages": "integer.nonnegative.required",
+            "statusCounts": {}
           }
         }
       },
@@ -1901,12 +1908,14 @@
         "query": {
           "page": "integer.nonnegative.required",
           "pageSize": "integer.nonnegative.required",
-          "sortBy": "enum:id,poNumber,status,createdAt.optional",
+          "sortBy": "enum:id,poNumber,status,createdAt,dueDate,totalAmountPaise.optional",
           "sortDir": "enum:asc,desc.required",
           "status": "array<enum:draft,pending_approval,approved,dispatched,partial_received,fully_received,invoiced,closed,cancelled>.optional",
           "supplierId": "integer.positive.optional",
           "q": "string.optional",
-          "overdue": "unrepresentable.required"
+          "overdue": "unrepresentable.required",
+          "mine": "unrepresentable.required",
+          "bucket": "enum:late,today,later.optional"
         }
       },
       "responses": {
@@ -1918,7 +1927,8 @@
             "pageSize": "integer.nonnegative.required",
             "total": "integer.nonnegative.required",
             "totalPages": "integer.nonnegative.required",
-            "statusCounts": {}
+            "statusCounts": {},
+            "lateCount": "integer.nonnegative.optional"
           }
         }
       },
@@ -1927,7 +1937,9 @@
           "id",
           "poNumber",
           "status",
-          "createdAt"
+          "createdAt",
+          "dueDate",
+          "totalAmountPaise"
         ],
         "searchable": true
       }
@@ -2666,11 +2678,14 @@
         "query": {
           "page": "integer.nonnegative.required",
           "pageSize": "integer.nonnegative.required",
-          "sortBy": "enum:id,prNumber,type,status,createdAt.optional",
+          "sortBy": "enum:id,prNumber,type,status,createdAt,estimatedAmountPaise.optional",
           "sortDir": "enum:asc,desc.required",
           "status": "array<enum:draft,pending_approval,approved,rejected,partial_ordered,fully_ordered,cancelled>.optional",
           "type": "enum:sale_order,stock_reorder,maintenance,tooling,subcontracting,misc.optional",
-          "q": "string.optional"
+          "q": "string.optional",
+          "mine": "unrepresentable.required",
+          "toOrder": "unrepresentable.required",
+          "bucket": "enum:late,today,later.optional"
         }
       },
       "responses": {
@@ -2682,7 +2697,8 @@
             "pageSize": "integer.nonnegative.required",
             "total": "integer.nonnegative.required",
             "totalPages": "integer.nonnegative.required",
-            "statusCounts": {}
+            "statusCounts": {},
+            "toOrderCount": "integer.nonnegative.optional"
           }
         }
       },
@@ -2692,7 +2708,8 @@
           "prNumber",
           "type",
           "status",
-          "createdAt"
+          "createdAt",
+          "estimatedAmountPaise"
         ],
         "searchable": true
       }
@@ -3344,7 +3361,8 @@
           "sortDir": "enum:asc,desc.required",
           "vendorId": "integer.positive.optional",
           "scoId": "integer.positive.optional",
-          "dueStatus": "enum:ok,warning,overdue.optional"
+          "dueStatus": "enum:ok,warning,overdue.optional",
+          "bucket": "enum:late,today,later.optional"
         }
       },
       "responses": {

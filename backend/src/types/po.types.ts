@@ -44,6 +44,18 @@ export const poResponseSchema = poSchema.extend({
 });
 export type poResponseSchemaType = z.infer<typeof poResponseSchema>;
 
+// GET /po/getpos row: the PO plus list display fields (BR-FF-24..26, 107, 109).
+// Optional until the handler fills them.
+export const poListRowSchema = poResponseSchema.extend({
+  lineCount: z.number().int().min(0).optional(),
+  /** Received share of ordered qty, whole percent 0..100. */
+  receivedPct: z.number().int().min(0).max(100).optional(),
+});
+export type poListRowSchemaType = z.infer<typeof poListRowSchema>;
+
+export const poBucketSchema = z.enum(["late", "today", "later"]);
+export type poBucketSchemaType = z.infer<typeof poBucketSchema>;
+
 // Per-line GST fields (BR-PO-04).
 export const poItemGstSchema = z.object({
   gstPercent: gstPercentSchema,
@@ -73,6 +85,11 @@ export const poItemDetailSchema = poItemSchema
     itemCategory: z.string(),
     prItemId: z.number().int().nullable(),
     prNumber: z.string().nullable(),
+    // Contract step 2 (BR-FF-09, 43): optional until implemented.
+    /** Qty on GRN lines whose QA is still pending. */
+    pendingQaQty: z.number().optional(),
+    /** Ordered - received - pending QA, never below 0. */
+    openQty: z.number().optional(),
   });
 export type poItemDetailSchemaType = z.infer<typeof poItemDetailSchema>;
 
@@ -188,7 +205,16 @@ export const poListQuerySchema = z
   .object({
     page: z.coerce.number().int().min(1).default(1),
     pageSize: z.coerce.number().int().min(1).max(100).default(10),
-    sortBy: z.enum(["id", "poNumber", "status", "createdAt"]).optional(),
+    sortBy: z
+      .enum([
+        "id",
+        "poNumber",
+        "status",
+        "createdAt",
+        "dueDate",
+        "totalAmountPaise",
+      ])
+      .optional(),
     sortDir: z.enum(["asc", "desc"]).default("asc"),
     // Comma-separated list of statuses, e.g. "draft,approved".
     status: z
@@ -212,8 +238,21 @@ export const poListQuerySchema = z
       .enum(["true", "false"])
       .optional()
       .transform((value) => value === "true"),
+    // BR-FF-24..26, 107: "my POs" and the due-date bucket (any status filter).
+    mine: z
+      .enum(["true", "false"])
+      .optional()
+      .transform((value) =>
+        value === undefined ? undefined : value === "true",
+      ),
+    bucket: poBucketSchema.optional(),
   })
-  .strict();
+  .strict()
+  // `overdue=true` is the same as `bucket=late`; a different bucket is a 400.
+  .refine((q) => !q.overdue || q.bucket === undefined || q.bucket === "late", {
+    message: "overdue=true conflicts with bucket",
+    path: ["bucket"],
+  });
 
 export type poListQuerySchemaType = z.infer<typeof poListQuerySchema>;
 

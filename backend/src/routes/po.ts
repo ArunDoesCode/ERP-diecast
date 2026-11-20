@@ -23,6 +23,7 @@ import {
   poCommunicationSchema,
   poDetailsSchema,
   poListQuerySchema,
+  poListRowSchema,
   poResponseSchema,
   poStatusSchema,
   poUpdateResultSchema,
@@ -52,14 +53,23 @@ register({
   request: { query: poListQuerySchema },
   // BR-PO-26: meta.statusCounts = rows per status for the same search.
   responses: {
-    "200": paginatedResponse(poResponseSchema).extend({
+    "200": paginatedResponse(poListRowSchema).extend({
       meta: paginationMetaSchema.extend({
         statusCounts: z.record(poStatusSchema, z.number().int().min(0)),
+        // BR-FF-24..26, 107: rows the Late filter returns (one BR-PO-19 predicate).
+        lateCount: z.number().int().min(0).optional(),
       }),
     }),
   },
   pagination: {
-    sortableFields: ["id", "poNumber", "status", "createdAt"],
+    sortableFields: [
+      "id",
+      "poNumber",
+      "status",
+      "createdAt",
+      "dueDate",
+      "totalAmountPaise",
+    ],
     searchable: true,
   },
 });

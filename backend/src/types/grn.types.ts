@@ -43,8 +43,23 @@ export const grnSchema = createSelectSchema(grns);
 export type grnSchemaType = z.infer<typeof grnSchema>;
 
 // GET /grn/getgrns row: the header plus its PO's number (BR-GRN-45).
+export const grnQaSummarySchema = z.enum([
+  "pending",
+  "passed",
+  "failed",
+  "mixed",
+]);
+export type grnQaSummarySchemaType = z.infer<typeof grnQaSummarySchema>;
+
 export const grnListRowSchema = grnSchema.extend({
   poNumber: z.string().nullable(),
+  // Contract step 2 (BR-FF-28, 108, 109, 115): optional until implemented.
+  supplierName: z.string().nullable().optional(),
+  lineCount: z.number().int().min(0).optional(),
+  /** pending if any line pending; passed (passed/waived); failed; else mixed. */
+  qaSummary: grnQaSummarySchema.optional(),
+  /** Caller holds po.manage; else the PO number is plain text (BR-FF-03). */
+  poCanOpen: z.boolean().optional(),
 });
 export type grnListRowSchemaType = z.infer<typeof grnListRowSchema>;
 
@@ -220,8 +235,18 @@ export const grnListQuerySchema = z
     status: grnStatusSchema.optional(),
     qaStatus: grnQaStatusSchema.optional(),
     q: searchTermSchema,
+    // BR-FF-28, 108: received-date bucket (late = before IST today).
+    bucket: z.enum(["late", "today", "later"]).optional(),
   })
-  .strict();
+  .strict()
+  // CR-05: bucket=late implies qaStatus=pending; any other qaStatus is a 400.
+  .refine(
+    (q) =>
+      q.bucket !== "late" ||
+      q.qaStatus === undefined ||
+      q.qaStatus === "pending",
+    { message: "bucket=late requires qaStatus=pending", path: ["bucket"] },
+  );
 export type grnListQuerySchemaType = z.infer<typeof grnListQuerySchema>;
 
 // GET /grn/getreceivablepos (BR-FF-61..64, 66, 70..72). Receive picker + form.
