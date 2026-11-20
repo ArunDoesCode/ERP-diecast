@@ -373,10 +373,9 @@ export type approvalActionRequestSchemaType = z.infer<
 // `amountPaise` is omitted when the target employee is not the caller.
 export const myPendingApprovalRowSchema = approvalRequestSchema.extend({
   policyName: z.string(),
-  docNumber: z.string().optional(),
-  requesterName: z.string().optional(),
+  docNumber: z.string(),
+  requesterName: z.string(),
   amountPaise: z.number().int().optional(),
-  docSummary: approvalDocSummarySchema.optional(),
 });
 export type myPendingApprovalRowSchemaType = z.infer<
   typeof myPendingApprovalRowSchema
@@ -426,7 +425,9 @@ export type approvalDocumentViewParamSchemaType = z.infer<
 
 const approvalDocumentViewExtras = {
   requesterNote: z.string().max(2000).nullable(),
-  request: approvalRequestListItemSchema.nullable(),
+  request: approvalRequestListItemSchema
+    .extend({ requesterName: z.string() })
+    .nullable(),
   trail: z.array(approvalTrailEntrySchema),
   canAct: z.boolean(),
 };

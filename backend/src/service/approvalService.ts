@@ -28,6 +28,9 @@ import type {
   submitApprovalRequestSchemaType,
   updateApprovalPolicySchemaType,
 } from "../types/approval.types";
+import { poService } from "./poService";
+import { prService } from "./prService";
+import { scoService } from "./scoService";
 
 // BR-APR-24 (v2): permission key needed to submit each document type.
 const SUBMIT_KEYS: Record<
@@ -128,6 +131,49 @@ function canSubmitForApproval(status: string) {
   return status === "draft";
 }
 
+export const DOC_ACCESS_DENIED_MESSAGE =
+  "You are not allowed to view this document";
+
+const DOC_READ_KEYS: Record<"pr" | "po" | "sco", PermissionKey> = {
+  pr: "pr.manage",
+  po: "po.manage",
+  sco: "sco.view",
+};
+
+export type DocReadAccess = {
+  /** key = doc key or approval.view_all; via_approval = read-via-approval rule. */
+  mode: "key" | "via_approval";
+  /** Latest request of the document (set on the via_approval path). */
+  latest?: NonNullable<ApprovalRequestRow>;
+};
+
+/**
+ * The one read rule for pr / po / sco documents (BR-FF-53, 93). Runs before
+ * any document lookup; the same 403 body whether or not the id exists.
+ * `docKey` lets the caller (the panel) pass its own key (po/pr; never grn).
+ */
+export async function resolveDocReadAccess(
+  docType: "pr" | "po" | "sco",
+  docId: number,
+  actor: ActorContext,
+): Promise<DocReadAccess> {
+  if (
+    can(actor.actor, DOC_READ_KEYS[docType]) ||
+    can(actor.actor, "approval.view_all")
+  ) {
+    return { mode: "key" };
+  }
+  const latest = await approvalRepository.findLatestApprovalByDoc(
+    docType,
+    docId,
+  );
+  if (!latest) {
+    throw new ForbiddenError(DOC_ACCESS_DENIED_MESSAGE);
+  }
+  await assertCanReadRequest(latest, actor, { viaApprovalOnly: true });
+  return { mode: "via_approval", latest };
+}
+
 export type AssertCanReadRequestOptions = {
   /**
    * Read-via-approval rule (BR-FF-53): also require the request to be
@@ -143,8 +189,30 @@ export async function assertCanReadRequest(
   options: AssertCanReadRequestOptions = {},
 ) {
   if (options.viaApprovalOnly) {
-    // Contract stub: the pending + current-step / trail branch lands in the implement step.
-    throw new AppError("Not implemented", 501, "NOT_IMPLEMENTED");
+    // BR-FF-53, 93: one body for every refusal, so nothing leaks about the id.
+    const deny = () => new ForbiddenError(DOC_ACCESS_DENIED_MESSAGE);
+    if (request.status !== "pending_approval") {
+      throw deny();
+    }
+    if (!actor.actor.isActive) {
+      throw deny();
+    }
+    if (request.requestedBy === actor.actorId) {
+      return;
+    }
+    const onCurrentStep =
+      request.currentApproverEmployeeId === actor.actorId ||
+      (request.currentApproverRole !== null &&
+        request.currentApproverRole === actor.actor.roleName);
+    if (onCurrentStep) {
+      return;
+    }
+    if (
+      await approvalRepository.hasEmployeeTrailRow(request.id, actor.actorId)
+    ) {
+      return;
+    }
+    throw deny();
   }
 
   if (can(actor.actor, "approval.view_all")) {
@@ -232,12 +300,75 @@ async function assertEligibleActorForCurrentStep(
 }
 
 export const approvalService = {
-  // Contract stub (BR-FF-53, 81, 83, 88). Access check runs before any lookup.
+  // BR-FF-53, 81, 83, 88. The access check runs before any document lookup (CR-09).
   async getDocumentView(
-    _params: approvalDocumentViewParamSchemaType,
-    _actor: ActorContext,
+    params: approvalDocumentViewParamSchemaType,
+    actor: ActorContext,
   ): Promise<approvalDocumentViewSchemaType> {
-    throw new AppError("Not implemented", 501, "NOT_IMPLEMENTED");
+    const { docType, docId } = params;
+    const access = await resolveDocReadAccess(docType, docId, actor);
+
+    // 404 only after access passed.
+    let body:
+      | { kind: "pr"; data: Awaited<ReturnType<typeof prService.getDetails>> }
+      | { kind: "po"; data: Awaited<ReturnType<typeof poService.getDetails>> }
+      | {
+          kind: "sco";
+          data: Awaited<ReturnType<typeof scoService.getDetails>>;
+        };
+    if (docType === "pr") {
+      body = { kind: "pr", data: await prService.getDetails(docId) };
+    } else if (docType === "po") {
+      body = { kind: "po", data: await poService.getDetails(docId) };
+    } else {
+      body = { kind: "sco", data: await scoService.getDetails(docId) };
+    }
+    const requesterNote =
+      body.kind === "pr"
+        ? body.data.pr.notes
+        : body.kind === "po"
+          ? body.data.po.notes
+          : body.data.sco.notes;
+
+    const history = await approvalRepository.listRequestsWithTrailByDoc(
+      docType,
+      docId,
+    );
+    // Key holders see every request's trail; a via-approval reader only the
+    // latest (pending) request's trail.
+    const trailSource =
+      access.mode === "via_approval" && access.latest
+        ? history.filter((item) => item.id === access.latest?.id)
+        : history;
+    const trail = trailSource
+      .flatMap((item) => item.trail)
+      .sort(
+        (a, b) => a.actionAt.getTime() - b.actionAt.getTime() || a.id - b.id,
+      );
+
+    const open = history.find((item) => item.status === "pending_approval");
+    let request = null;
+    let canAct = false;
+    if (open) {
+      const requesterName =
+        (await approvalRepository.findEmployeeNameById(open.requestedBy)) ?? "";
+      request = { ...open, requesterName };
+      const onStep =
+        open.currentApproverEmployeeId === actor.actorId ||
+        (open.currentApproverRole !== null &&
+          open.currentApproverRole === actor.actor.roleName);
+      canAct =
+        onStep &&
+        !(await approvalRepository.hasEmployeeApproved(open.id, actor.actorId));
+    }
+
+    return {
+      ...body.data,
+      requesterNote: requesterNote ?? null,
+      request,
+      trail,
+      canAct,
+    } as approvalDocumentViewSchemaType;
   },
 
   async getPolicies(query: approvalPolicyListQuerySchemaType) {
@@ -945,19 +1076,24 @@ export const approvalService = {
       throw new NotFoundError("Employee not found or inactive");
     }
 
-    const { rows, total } = await approvalRepository.listPendingRequests({
-      actorRole: targetEmployee.roleName,
-      employeeId: targetEmployeeId,
-      page: query.page,
-      pageSize: query.pageSize,
-      sortDir: query.sortDir,
-      ...(query.sortBy !== undefined ? { sortBy: query.sortBy } : {}),
-      ...(query.docType !== undefined ? { docType: query.docType } : {}),
-    });
+    const { rows, total, typeCounts } =
+      await approvalRepository.listPendingRequests({
+        includeAmount: targetEmployeeId === actor.actorId,
+        actorRole: targetEmployee.roleName,
+        employeeId: targetEmployeeId,
+        page: query.page,
+        pageSize: query.pageSize,
+        sortDir: query.sortDir,
+        ...(query.sortBy !== undefined ? { sortBy: query.sortBy } : {}),
+        ...(query.docType !== undefined ? { docType: query.docType } : {}),
+      });
 
     return {
       data: rows,
-      meta: toPaginatedMeta(query.page, query.pageSize, total),
+      meta: {
+        ...toPaginatedMeta(query.page, query.pageSize, total),
+        typeCounts,
+      },
     };
   },
 
