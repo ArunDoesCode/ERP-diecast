@@ -222,14 +222,14 @@ export function ItemRowsTable({
 			</div>
 
 			{!readOnly ? null : (
-				<p className="text-xs text-muted-foreground">
+				<p className="text-sm text-muted-foreground">
 					This PR is no longer draft. All fields are read-only.
 				</p>
 			)}
 
 			{/* Explains why the only row can't be removed. */}
 			{!readOnly && rows.length === 1 ? (
-				<p className="text-xs text-muted-foreground">Minimum 1 row required.</p>
+				<p className="text-sm text-muted-foreground">Minimum 1 row required.</p>
 			) : null}
 		</div>
 	);

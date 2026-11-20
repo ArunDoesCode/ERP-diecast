@@ -1,5 +1,5 @@
 /**
- * docs/specs/design-system/spec.md (v1): BR-DS-02. Text pairs >= 4.5:1; field borders, focus
+ * docs/specs/design-system/spec.md (v2): BR-DS-02. Text pairs >= 4.5:1; field borders, focus
  * rings and chart colours >= 3:1; light and dark.
  */
 import { describe, expect, test } from "bun:test";
@@ -164,10 +164,10 @@ describe("BR-DS-02 the real globals.css", () => {
 			],
 			[
 				"neutral",
-				{ l: 0.45, c: 0.02, h: 250 },
-				{ l: 0.94, c: 0.008, h: 250 },
-				{ l: 0.78, c: 0.012, h: 250 },
-				{ l: 0.29, c: 0.012, h: 250 },
+				{ l: 0.45, c: 0.012, h: 286 },
+				{ l: 0.94, c: 0.004, h: 286 },
+				{ l: 0.78, c: 0.008, h: 286 },
+				{ l: 0.29, c: 0.007, h: 286 },
 			],
 			[
 				"danger",
@@ -200,8 +200,8 @@ describe("BR-DS-02 the real globals.css", () => {
 		const pairs = getPairs();
 		const ui = pairs.filter((p) => p.kind === "ui");
 		const wants: Array<[string, Oklch, Oklch]> = [
-			["input", { l: 0.64, c: 0.015, h: 250 }, { l: 0.56, c: 0.02, h: 250 }],
-			["ring", { l: 0.55, c: 0.12, h: 262 }, { l: 0.72, c: 0.1, h: 262 }],
+			["input", { l: 0.64, c: 0.01, h: 286 }, { l: 0.56, c: 0.012, h: 286 }],
+			["ring", { l: 0.511, c: 0.262, h: 277 }, { l: 0.68, c: 0.155, h: 277 }],
 			["chart-1", { l: 0.6, c: 0.12, h: 165 }, { l: 0.86, c: 0.14, h: 165 }],
 			["chart-2", { l: 0.4, c: 0.12, h: 252 }, { l: 0.58, c: 0.12, h: 252 }],
 			["chart-3", { l: 0.5, c: 0.105, h: 70 }, { l: 0.74, c: 0.13, h: 78 }],
@@ -255,8 +255,8 @@ describe("BR-DS-02 the real globals.css", () => {
 
 	test("BR-DS-02 a token edit that weakens the light field border below 3:1 is rejected", () => {
 		const edited = CSS.replace(
-			/--input:\s*oklch\(0\.64 0\.015 250\)/,
-			"--input: oklch(0.9 0.015 250)",
+			/--input:\s*oklch\(0\.64 0\.01 286\)/,
+			"--input: oklch(0.9 0.01 286)",
 		);
 		expect(edited).not.toBe(CSS);
 		const failing = checkContrast(readTokenPairs(edited)).filter(

@@ -156,7 +156,7 @@ export function InventoryStockManager() {
 					row.original.locations.length === 0 ? (
 						"—"
 					) : (
-						<ul className="text-xs">
+						<ul className="text-sm">
 							{row.original.locations.map((location) => (
 								<li key={location.locationId}>
 									{location.locationName}: {location.balance} {row.original.uom}

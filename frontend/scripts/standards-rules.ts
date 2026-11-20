@@ -96,6 +96,100 @@ export function checkPalette(path: string, source: string): Finding[] {
 	return found;
 }
 
+/** Files where 12 px text (text-xs) is allowed: the badge. */
+const BADGE_FILES = new Set([
+	"src/components/shared/StatusBadge.tsx",
+	"src/components/ui/badge.tsx",
+]);
+
+/** Text under 12 px, or text-xs (12 px, badge only). Prefix variants (md:, dark:) are matched too. */
+const SMALL_TEXT =
+	/(?<![\w-])text-(?:\[(\d+(?:\.\d+)?)(px|rem)\]|xs(?![\w-]))/g;
+/** Control height class under 32 px: h-/size-/min-h- 0-7 (also .5 steps, px) or an arbitrary value below 32 px. */
+const SMALL_CONTROL =
+	/(?<![\w-])(?:min-h|h|size)-(?:(?:[0-7](?:\.5)?|px)(?![\w.-])|\[(\d+(?:\.\d+)?)(px|rem)\])/g;
+/** Start of a button, input or select JSX opening tag (a file that is one is checked whole). */
+const CONTROL_TAG =
+	/<(?:button|input|select|Button|Input|Select\w*)(?![\w.-])/g;
+const CONTROL_FILE = /\/(?:button|input|select|toggle|pagination)\.tsx$/;
+
+/** End offset of the JSX opening tag that starts at `start` (skips quotes and `{...}` blocks). */
+function tagEnd(src: string, start: number): number {
+	let depth = 0;
+	let quote = "";
+	for (let i = start; i < src.length; i++) {
+		const c = src[i];
+		if (quote) {
+			if (c === quote) quote = "";
+		} else if (c === '"' || (depth > 0 && (c === "'" || c === "`"))) quote = c;
+		else if (c === "{") depth++;
+		else if (c === "}") depth--;
+		else if (c === ">" && depth === 0 && src[i - 1] !== "=") return i;
+	}
+	return src.length;
+}
+
+function toPx(value: string, unit: string): number {
+	return unit === "rem" ? Number(value) * 16 : Number(value);
+}
+
+/**
+ * BR-DS-28. Flags text under 12 px (and text-xs outside the badge) and button / input / select
+ * heights under 32 px, everywhere under src/ including ui/**.
+ */
+export function checkSize(path: string, source: string): Finding[] {
+	const found: Finding[] = [];
+	const badgeOk = BADGE_FILES.has(path);
+	const masked = maskComments(source);
+	const lineAt = (offset: number) => {
+		let n = 1;
+		for (let i = 0; i < offset; i++) if (masked[i] === "\n") n++;
+		return n;
+	};
+	masked.split("\n").forEach((text, i) => {
+		const small = new Set<string>();
+		for (const m of text.matchAll(SMALL_TEXT)) {
+			if (m[1] === undefined) {
+				if (!badgeOk) small.add(m[0]);
+			} else if (toPx(m[1], m[2] ?? "px") < 12) small.add(m[0]);
+		}
+		if (small.size > 0) {
+			found.push({
+				file: path,
+				line: i + 1,
+				rule: "size",
+				message: `text ${[...small].join(", ")} - body and labels are 12 px at least (12 px badge only), use text-sm or the type role`,
+			});
+		}
+	});
+	const ranges: Array<[number, number]> = CONTROL_FILE.test(path)
+		? [[0, masked.length]]
+		: [...masked.matchAll(CONTROL_TAG)].map((m) => {
+				const start = m.index ?? 0;
+				return [start, tagEnd(masked, start)];
+			});
+	const seen = new Set<number>();
+	const whole = CONTROL_FILE.test(path);
+	for (const [from, to] of ranges) {
+		const part = masked.slice(from, to);
+		for (const m of part.matchAll(SMALL_CONTROL)) {
+			if (m[1] !== undefined && toPx(m[1], m[2] ?? "px") >= 32) continue;
+			// whole control files hold icon sizes (size-4) and separators (h-px) too: only heights count there
+			if (whole && (m[0].startsWith("size-") || m[0] === "h-px")) continue;
+			const offset = from + (m.index ?? 0);
+			if (seen.has(offset)) continue;
+			seen.add(offset);
+			found.push({
+				file: path,
+				line: lineAt(offset),
+				rule: "size",
+				message: `control height ${m[0]} - buttons, inputs and selects are 32 px at least (h-8, h-9, h-10)`,
+			});
+		}
+	}
+	return found.sort((x, y) => x.line - y.line);
+}
+
 /** A motion class: transition, ease-*, delay-*, duration-*, animate-*, or a motion.* call. */
 const MOTION =
 	/(?<![\w.$-])(?:transition(?![\w-]|\s*:)|(?:transition|ease|delay|duration|animate)-[\w[\]().%/,-]+|(?:fade|zoom|slide)-(?:in|out)(?:-[\w[\]().%/,-]+)?)|(?<![\w.$])motion\.\w+/g;

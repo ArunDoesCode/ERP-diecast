@@ -62,7 +62,7 @@ export function NavSidebar() {
 		<Sidebar variant="inset" collapsible="icon">
 			<SidebarHeader>
 				<div className="flex items-center gap-2 px-1 py-1.5">
-					<span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
+					<span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
 						<IconBuildingFactory2 className="size-4" />
 					</span>
 					<span className="truncate text-sm font-semibold group-data-[collapsible=icon]:hidden">
@@ -76,7 +76,7 @@ export function NavSidebar() {
 					<SidebarGroup>
 						<SidebarGroupLabel>Navigation</SidebarGroupLabel>
 						<SidebarGroupContent>
-							<p className="px-2 py-1 text-xs text-muted-foreground">
+							<p className="px-2 py-1 text-sm text-muted-foreground">
 								Loading...
 							</p>
 						</SidebarGroupContent>
@@ -124,7 +124,7 @@ export function NavSidebar() {
 					<SidebarGroup>
 						<SidebarGroupLabel>Navigation</SidebarGroupLabel>
 						<SidebarGroupContent>
-							<p className="px-2 py-1 text-xs text-muted-foreground">
+							<p className="px-2 py-1 text-sm text-muted-foreground">
 								No allowed pages found.
 							</p>
 						</SidebarGroupContent>

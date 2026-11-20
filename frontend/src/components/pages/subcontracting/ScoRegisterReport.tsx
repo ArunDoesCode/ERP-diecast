@@ -67,7 +67,9 @@ export function ScoRegisterReport() {
 		<div className="flex flex-col gap-4">
 			<div className="flex flex-wrap items-end gap-3">
 				<div>
-					<span className="mb-1 block text-xs font-medium">Status</span>
+					<span className="mb-1 block text-[13px] leading-[18px] font-semibold">
+						Status
+					</span>
 					<Select
 						value={status}
 						onValueChange={(value) => {

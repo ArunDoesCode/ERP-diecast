@@ -195,7 +195,7 @@ export function EnterReceiptDialog({
 								key={line.id}
 								className="grid gap-2 rounded-md border p-3 sm:grid-cols-[1fr_8rem_8rem]"
 							>
-								<div className="text-xs">
+								<div className="text-sm">
 									<p className="font-medium">
 										{line.finishedItemSku} · {line.finishedItemName}
 									</p>
@@ -244,7 +244,7 @@ export function EnterReceiptDialog({
 				</div>
 
 				{error ? (
-					<p role="alert" className="text-xs text-destructive">
+					<p role="alert" className="text-sm text-destructive">
 						{error}
 					</p>
 				) : null}

@@ -32,13 +32,13 @@ export function PoDetailPanel({ poId }: { poId: number }) {
 	if (detailQuery.isLoading) return <Skeleton className="h-24 w-full" />;
 	if (!detail) {
 		return (
-			<p className="text-xs text-destructive">Could not load the PO details.</p>
+			<p className="text-sm text-destructive">Could not load the PO details.</p>
 		);
 	}
 	const { po, items } = detail;
 
 	return (
-		<div className="space-y-4 rounded-md border p-3 text-xs">
+		<div className="space-y-4 rounded-md border p-3 text-sm">
 			<div className="grid gap-1 text-muted-foreground sm:grid-cols-3">
 				<span>
 					Payment terms:{" "}

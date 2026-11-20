@@ -106,7 +106,7 @@ export function SearchableSelect({
 							<Skeleton className="h-8 w-full" />
 						</div>
 					) : options.length === 0 ? (
-						<p className="px-2 py-1 text-xs text-muted-foreground">
+						<p className="px-2 py-1 text-sm text-muted-foreground">
 							{emptyText}
 						</p>
 					) : (
@@ -118,7 +118,7 @@ export function SearchableSelect({
 								<button
 									key={option.value}
 									type="button"
-									className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-xs hover:bg-accent"
+									className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent"
 									onClick={() => {
 										onValueChange(option.value);
 										setOpen(false);
@@ -127,7 +127,7 @@ export function SearchableSelect({
 									<span className="flex flex-col">
 										<span>{option.label}</span>
 										{option.secondaryLabel ? (
-											<span className="text-[11px] text-muted-foreground">
+											<span className="text-sm text-muted-foreground">
 												{option.secondaryLabel}
 											</span>
 										) : null}

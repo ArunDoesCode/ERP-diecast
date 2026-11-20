@@ -230,7 +230,7 @@ export function PurchaseOrderDetailView({ prId }: { prId: number }) {
 							<div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
 								<div>
 									<CardTitle>PR lines</CardTitle>
-									<p className="text-xs text-muted-foreground">
+									<p className="text-sm text-muted-foreground">
 										{pendingLines(lines).length} pending line
 										{pendingLines(lines).length === 1 ? "" : "s"}.
 									</p>
@@ -261,7 +261,7 @@ export function PurchaseOrderDetailView({ prId }: { prId: number }) {
 
 							{canManagePO ? (
 								<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-									<p className="text-xs text-muted-foreground">
+									<p className="text-sm text-muted-foreground">
 										{selectedLineIds.size} selected
 									</p>
 									<Button
@@ -511,7 +511,7 @@ function LinkedPOs({
 			</CardHeader>
 			<CardContent>
 				{linkedPos.length === 0 ? (
-					<p className="py-4 text-center text-xs text-muted-foreground">
+					<p className="py-4 text-center text-sm text-muted-foreground">
 						No POs created from this PR yet.
 					</p>
 				) : (
@@ -521,7 +521,7 @@ function LinkedPOs({
 								<StatusFlashRow
 									as="div"
 									flashKey={flashKeys[po.id]}
-									className="flex flex-col gap-2 rounded-md border p-3 text-xs sm:flex-row sm:items-center sm:justify-between"
+									className="flex flex-col gap-2 rounded-md border p-3 text-sm sm:flex-row sm:items-center sm:justify-between"
 								>
 									<div className="flex flex-wrap items-center gap-2">
 										<span className="font-mono font-medium">{po.poNumber}</span>
@@ -1175,7 +1175,9 @@ function CreatePOModal({
 				<div className="max-h-[70vh] space-y-5 overflow-y-auto px-6 py-5">
 					<div className="grid gap-3 md:grid-cols-[1fr_10rem_1fr]">
 						<div>
-							<span className="mb-1 block text-xs font-medium">Supplier</span>
+							<span className="mb-1 block text-[13px] leading-[18px] font-semibold">
+								Supplier
+							</span>
 							<SearchableSelect
 								value={supplierId ? String(supplierId) : undefined}
 								options={supplierOptions}
@@ -1191,7 +1193,7 @@ function CreatePOModal({
 						<div>
 							<label
 								htmlFor="po-create-payment-terms-days"
-								className="mb-1 block text-xs font-medium"
+								className="mb-1 block text-[13px] leading-[18px] font-semibold"
 							>
 								Terms
 							</label>
@@ -1207,7 +1209,7 @@ function CreatePOModal({
 						<div>
 							<label
 								htmlFor="po-create-expected-delivery-date"
-								className="mb-1 block text-xs font-medium"
+								className="mb-1 block text-[13px] leading-[18px] font-semibold"
 							>
 								Delivery date (needed before sending)
 							</label>
@@ -1223,14 +1225,14 @@ function CreatePOModal({
 					</div>
 
 					{!supplierId && defaultSupplierCount > 1 ? (
-						<p className="rounded-md border border-border bg-warning-subtle px-3 py-2 text-xs text-warning">
+						<p className="rounded-md border border-border bg-warning-subtle px-3 py-2 text-sm text-warning">
 							Selected lines have {defaultSupplierCount} default suppliers. Pick
 							one supplier for this PO, or create separate POs.
 						</p>
 					) : null}
 
 					{defaultSupplierMismatchCount > 0 ? (
-						<p className="rounded-md border border-border bg-warning-subtle px-3 py-2 text-xs text-warning">
+						<p className="rounded-md border border-border bg-warning-subtle px-3 py-2 text-sm text-warning">
 							{defaultSupplierMismatchCount} selected line
 							{defaultSupplierMismatchCount === 1 ? "" : "s"} default to another
 							supplier.
@@ -1260,7 +1262,7 @@ function CreatePOModal({
 						<div>
 							<label
 								htmlFor="po-create-delivery-terms"
-								className="mb-1 block text-xs font-medium"
+								className="mb-1 block text-[13px] leading-[18px] font-semibold"
 							>
 								Delivery terms
 							</label>
@@ -1274,7 +1276,7 @@ function CreatePOModal({
 						<div>
 							<label
 								htmlFor="po-create-notes"
-								className="mb-1 block text-xs font-medium"
+								className="mb-1 block text-[13px] leading-[18px] font-semibold"
 							>
 								Notes
 							</label>
@@ -1381,20 +1383,20 @@ function CreatePOLine({
 						</Badge>
 					) : null}
 				</div>
-				<p className="text-xs text-muted-foreground">
+				<p className="text-sm text-muted-foreground">
 					{line.requestedQty} {line.uom ?? ""}
 				</p>
 			</div>
 
-			<div className="text-xs text-muted-foreground">
-				<p className="text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase">
+			<div className="text-sm text-muted-foreground">
+				<p className="text-[13px] leading-[18px] font-semibold tracking-wide text-muted-foreground/70 uppercase">
 					Item rate
 				</p>
 				<p>{formatMoney(line.estRatePaise)}</p>
 			</div>
 
-			<div className="text-xs text-muted-foreground">
-				<p className="text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase">
+			<div className="text-sm text-muted-foreground">
+				<p className="text-[13px] leading-[18px] font-semibold tracking-wide text-muted-foreground/70 uppercase">
 					Last rate
 				</p>
 				<p>
@@ -1411,7 +1413,7 @@ function CreatePOLine({
 			<div>
 				<label
 					htmlFor={`po-create-line-rate-${line.id}`}
-					className="mb-1 block text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase"
+					className="mb-1 block text-[13px] leading-[18px] font-semibold tracking-wide text-muted-foreground/70 uppercase"
 				>
 					Negotiated rate
 				</label>
@@ -1432,7 +1434,7 @@ function CreatePOLine({
 			<div>
 				<Label
 					htmlFor={`po-create-line-gst-${line.id}`}
-					className="mb-1 block text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase"
+					className="mb-1 block text-[13px] leading-[18px] font-semibold tracking-wide text-muted-foreground/70 uppercase"
 				>
 					GST %
 				</Label>
@@ -1454,7 +1456,7 @@ function CreatePOLine({
 			</div>
 
 			<div className="text-right font-medium tabular-nums">
-				<p className="text-[10px] font-medium tracking-wide text-muted-foreground/70 uppercase">
+				<p className="text-[13px] leading-[18px] font-semibold tracking-wide text-muted-foreground/70 uppercase">
 					Total
 				</p>
 				{formatMoney(Math.round(Number(value || 0) * 100 * line.requestedQty))}

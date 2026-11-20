@@ -364,7 +364,7 @@ function ItemEditorForm({ mode, item, onDone }: ItemEditorFormProps) {
 					{mode === "edit" && item ? (
 						<div className="col-span-2 grid grid-cols-2 gap-3 text-sm">
 							<div>
-								<p className="text-xs font-medium text-muted-foreground">
+								<p className="text-[13px] leading-[18px] font-semibold text-muted-foreground">
 									Current stock (read-only)
 								</p>
 								<p>
@@ -372,7 +372,7 @@ function ItemEditorForm({ mode, item, onDone }: ItemEditorFormProps) {
 								</p>
 							</div>
 							<div>
-								<p className="text-xs font-medium text-muted-foreground">
+								<p className="text-[13px] leading-[18px] font-semibold text-muted-foreground">
 									Average cost (read-only)
 								</p>
 								<p>{formatMoney(item.averageCostPaise)}</p>

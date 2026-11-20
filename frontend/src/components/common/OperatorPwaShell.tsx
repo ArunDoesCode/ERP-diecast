@@ -5,7 +5,7 @@ export function OperatorPwaShell() {
 		<main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col justify-center p-4 sm:p-6">
 			<Card>
 				<CardHeader>
-					<p className="text-xs uppercase tracking-wide text-muted-foreground">
+					<p className="text-[13px] leading-[18px] font-semibold uppercase tracking-wide text-muted-foreground">
 						Production & Shop Floor
 					</p>
 					<CardTitle className="text-2xl">Operator PWA</CardTitle>

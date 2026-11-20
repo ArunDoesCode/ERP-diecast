@@ -237,12 +237,12 @@ export function PurchaseOrderTrackingCards({
 										) : null}
 									</div>
 								</div>
-								<p className="text-xs text-muted-foreground">
+								<p className="text-sm text-muted-foreground">
 									{po.supplierName}
 								</p>
 							</CardHeader>
 
-							<CardContent className="space-y-3 text-xs text-muted-foreground">
+							<CardContent className="space-y-3 text-sm text-muted-foreground">
 								<div className="flex items-center justify-between gap-2">
 									<div className="flex items-center gap-1">
 										<IconCalendar className="size-3.5" />

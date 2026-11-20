@@ -16,7 +16,7 @@ export function ModulePageShell({ page }: ModulePageShellProps) {
 			<Card>
 				<CardHeader className="space-y-3">
 					{page.module ? (
-						<p className="text-xs uppercase tracking-wide text-muted-foreground">
+						<p className="text-[13px] leading-[18px] font-semibold uppercase tracking-wide text-muted-foreground">
 							{page.module}
 						</p>
 					) : null}
@@ -29,7 +29,7 @@ export function ModulePageShell({ page }: ModulePageShellProps) {
 							{page.roles.map((role) => (
 								<span
 									key={role}
-									className="rounded-md border border-border px-2 py-1 text-xs text-foreground"
+									className="rounded-md border border-border px-2 py-1 text-sm text-foreground"
 								>
 									{role}
 								</span>

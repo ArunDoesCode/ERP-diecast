@@ -1,5 +1,5 @@
 /**
- * docs/specs/design-system/spec.md (v1): BR-DS-06, BR-DS-16, BR-DS-21, BR-DS-22, BR-DS-26.
+ * docs/specs/design-system/spec.md (v2): BR-DS-06, BR-DS-16, BR-DS-21, BR-DS-22, BR-DS-26.
  * The PO-detail breadcrumb case (doc number) belongs to po-adoption (BR-DS-22 example) and lives in that e2e.
  * Runs against the `bun run try` stack (see e2e/README.md). Written by test-writer from the spec only.
  */
@@ -139,7 +139,7 @@ test.describe("BR-DS-16 table density", () => {
 		return (await row.boundingBox())?.height ?? 0;
 	};
 
-	test("BR-DS-16 default is comfortable: <html data-density> and 36 px rows", async ({
+	test("BR-DS-16 default is comfortable: <html data-density> and 44 px rows", async ({
 		page,
 	}) => {
 		await open(page, "/purchase-orders");
@@ -149,10 +149,10 @@ test.describe("BR-DS-16 table density", () => {
 			"data-density",
 			"comfortable",
 		);
-		expect(Math.round(await rowHeight(page))).toBe(36);
+		expect(Math.round(await rowHeight(page))).toBe(44);
 	});
 
-	test("BR-DS-16 a Compact choice from the user menu survives reload and shows 30 px rows", async ({
+	test("BR-DS-16 a Compact choice from the user menu survives reload and shows 36 px rows", async ({
 		page,
 	}) => {
 		await open(page, "/purchase-orders");
@@ -169,7 +169,7 @@ test.describe("BR-DS-16 table density", () => {
 			"data-density",
 			"compact",
 		);
-		expect(Math.round(await rowHeight(page))).toBe(30);
+		expect(Math.round(await rowHeight(page))).toBe(36);
 	});
 
 	test("BR-DS-16 the saved Compact choice applies to the GRN list too", async ({
@@ -184,7 +184,7 @@ test.describe("BR-DS-16 table density", () => {
 			"data-density",
 			"compact",
 		);
-		expect(Math.round(await rowHeight(page))).toBe(30);
+		expect(Math.round(await rowHeight(page))).toBe(36);
 	});
 });
 

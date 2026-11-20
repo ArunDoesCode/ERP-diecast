@@ -24,13 +24,13 @@ export function TopBar({
 }: TopBarProps) {
 	const foldLabel = sidebarFolded ? "Unfold sidebar" : "Fold sidebar";
 	return (
-		<header className="flex h-11 shrink-0 items-center gap-3 border-b bg-card px-3">
+		<header className="flex h-13 shrink-0 items-center gap-3 border-b bg-card px-3">
 			<button
 				type="button"
 				aria-label={foldLabel}
 				title={foldLabel}
 				onClick={onToggleSidebar}
-				className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+				className="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
 			>
 				<IconLayoutSidebar className="size-4" />
 			</button>
@@ -48,7 +48,7 @@ export function TopBar({
 					placeholder="Search"
 					className="pr-7"
 				/>
-				<kbd className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 rounded border px-1 text-[10px] text-muted-foreground">
+				<kbd className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 rounded border px-1 text-sm text-muted-foreground">
 					/
 				</kbd>
 			</div>

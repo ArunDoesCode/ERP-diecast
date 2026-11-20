@@ -164,7 +164,7 @@ export function IssueMaterialDialog({
 								key={line.id}
 								className="grid gap-2 rounded-md border p-3 sm:grid-cols-[1fr_7rem_9rem]"
 							>
-								<div className="text-xs">
+								<div className="text-sm">
 									<p className="font-medium">
 										{line.rawItemSku} · {line.rawItemName}
 									</p>
@@ -208,7 +208,7 @@ export function IssueMaterialDialog({
 				</div>
 
 				{error ? (
-					<p role="alert" className="text-xs text-destructive">
+					<p role="alert" className="text-sm text-destructive">
 						{error}
 					</p>
 				) : null}

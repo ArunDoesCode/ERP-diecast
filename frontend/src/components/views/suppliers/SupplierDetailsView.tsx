@@ -175,35 +175,49 @@ export function SupplierDetailsView({ supplierId }: SupplierDetailsViewProps) {
 				<CardContent>
 					<div className="grid grid-cols-1 gap-x-4 gap-y-5 sm:grid-cols-2 md:grid-cols-3">
 						<div>
-							<p className="text-xs text-muted-foreground">Supplier type</p>
+							<p className="text-[13px] leading-[18px] font-semibold text-muted-foreground">
+								Supplier type
+							</p>
 							<p className="text-sm">{renderValue(supplier.type)}</p>
 						</div>
 						<div>
-							<p className="text-xs text-muted-foreground">GST number</p>
+							<p className="text-[13px] leading-[18px] font-semibold text-muted-foreground">
+								GST number
+							</p>
 							<p className="text-sm">{renderValue(supplier.gstNumber)}</p>
 						</div>
 						<div>
-							<p className="text-xs text-muted-foreground">PAN number</p>
+							<p className="text-[13px] leading-[18px] font-semibold text-muted-foreground">
+								PAN number
+							</p>
 							<p className="text-sm">{renderValue(supplier.panNumber)}</p>
 						</div>
 						<div>
-							<p className="text-xs text-muted-foreground">Contact person</p>
+							<p className="text-[13px] leading-[18px] font-semibold text-muted-foreground">
+								Contact person
+							</p>
 							<p className="text-sm">{renderValue(supplier.contactPerson)}</p>
 						</div>
 						<div>
-							<p className="text-xs text-muted-foreground">Phone</p>
+							<p className="text-[13px] leading-[18px] font-semibold text-muted-foreground">
+								Phone
+							</p>
 							<p className="text-sm">{renderValue(supplier.phone)}</p>
 						</div>
 						<div>
-							<p className="text-xs text-muted-foreground">Email</p>
+							<p className="text-[13px] leading-[18px] font-semibold text-muted-foreground">
+								Email
+							</p>
 							<p className="text-sm">{renderValue(supplier.email)}</p>
 						</div>
 						<div className="sm:col-span-2 md:col-span-3">
-							<p className="text-xs text-muted-foreground">Address</p>
+							<p className="text-[13px] leading-[18px] font-semibold text-muted-foreground">
+								Address
+							</p>
 							<p className="text-sm">{renderValue(supplier.address)}</p>
 						</div>
 						<div>
-							<p className="text-xs text-muted-foreground">
+							<p className="text-[13px] leading-[18px] font-semibold text-muted-foreground">
 								Default payment terms
 							</p>
 							<p className="text-sm">

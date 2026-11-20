@@ -121,7 +121,7 @@ export function SupplierHistoryCard({ supplierId }: { supplierId: number }) {
 						>
 							Previous
 						</Button>
-						<span className="text-xs text-muted-foreground">
+						<span className="text-sm text-muted-foreground">
 							Page {meta.page} of {meta.totalPages}
 						</span>
 						<Button

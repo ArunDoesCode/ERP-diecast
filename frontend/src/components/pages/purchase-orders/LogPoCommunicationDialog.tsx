@@ -185,7 +185,7 @@ export function LogPoCommunicationDialog({
 					{missingExpectedDate ? (
 						<p
 							role="alert"
-							className="rounded-md border border-warning/30 bg-warning-subtle px-3 py-2 text-xs text-warning"
+							className="rounded-md border border-warning/30 bg-warning-subtle px-3 py-2 text-sm text-warning"
 						>
 							This PO has no expected delivery date, so it cannot be sent.
 						</p>
@@ -193,7 +193,7 @@ export function LogPoCommunicationDialog({
 					<div>
 						<label
 							htmlFor="po-log-communication-channel"
-							className="mb-1 block text-xs font-medium"
+							className="mb-1 block text-[13px] leading-[18px] font-semibold"
 						>
 							Channel
 						</label>
@@ -223,7 +223,7 @@ export function LogPoCommunicationDialog({
 						<div>
 							<label
 								htmlFor="po-log-communication-email"
-								className="mb-1 block text-xs font-medium"
+								className="mb-1 block text-[13px] leading-[18px] font-semibold"
 							>
 								Supplier email
 							</label>
@@ -240,7 +240,7 @@ export function LogPoCommunicationDialog({
 					<div>
 						<label
 							htmlFor="po-log-communication-note"
-							className="mb-1 block text-xs font-medium"
+							className="mb-1 block text-[13px] leading-[18px] font-semibold"
 						>
 							Note
 						</label>

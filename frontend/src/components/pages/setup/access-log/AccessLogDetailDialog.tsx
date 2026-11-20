@@ -26,8 +26,10 @@ function formatRecord(value: unknown) {
 function RecordBlock({ label, value }: { label: string; value: unknown }) {
 	return (
 		<div className="flex min-w-0 flex-col gap-1">
-			<span className="text-xs font-medium text-muted-foreground">{label}</span>
-			<pre className="max-h-80 overflow-auto rounded-md border border-border bg-muted p-3 font-mono text-xs whitespace-pre-wrap break-all">
+			<span className="text-[13px] leading-[18px] font-semibold text-muted-foreground">
+				{label}
+			</span>
+			<pre className="max-h-80 overflow-auto rounded-md border border-border bg-muted p-3 font-mono text-sm whitespace-pre-wrap break-all">
 				{formatRecord(value)}
 			</pre>
 		</div>

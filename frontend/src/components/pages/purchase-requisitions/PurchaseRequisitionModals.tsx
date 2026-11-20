@@ -265,7 +265,7 @@ export function CreatePurchaseRequisitionModal({
 											/>
 										) : null}
 
-										<div className="rounded-md border border-dashed p-3 text-xs text-muted-foreground md:col-span-2">
+										<div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground md:col-span-2">
 											Sale order: coming soon.
 										</div>
 
@@ -687,7 +687,7 @@ export function EditPurchaseRequisitionModal({
 											<p>PR: {pr.prNumber}</p>
 											<p>Estimate: {formatMoney(pr.estimatedAmountPaise)}</p>
 											{detail.items.some((item) => item.noCostHistory) ? (
-												<p className="text-xs">
+												<p className="text-sm">
 													Estimate uses standard rate for:{" "}
 													{detail.items
 														.filter((item) => item.noCostHistory)
@@ -759,7 +759,7 @@ export function EditPurchaseRequisitionModal({
 													</FormItem>
 												) : null}
 
-												<div className="rounded-md border border-dashed p-3 text-xs text-muted-foreground md:col-span-2">
+												<div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground md:col-span-2">
 													Sale order: coming soon.
 												</div>
 
@@ -949,7 +949,7 @@ export function EditPurchaseRequisitionModal({
 											Cancel PR
 										</Button>
 										{cancelBlockedReason ? (
-											<p className="text-xs text-muted-foreground">
+											<p className="text-sm text-muted-foreground">
 												{cancelBlockedReason}
 											</p>
 										) : null}

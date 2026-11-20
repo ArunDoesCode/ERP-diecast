@@ -291,7 +291,9 @@ export function ScoForm({ existing }: ScoFormProps) {
 				</CardHeader>
 				<CardContent className="grid gap-4 md:grid-cols-2">
 					<div>
-						<span className="mb-1 block text-xs font-medium">Vendor</span>
+						<span className="mb-1 block text-[13px] leading-[18px] font-semibold">
+							Vendor
+						</span>
 						{existing ? (
 							<p className="flex h-9 items-center text-sm">
 								{existing.sco.vendorName}
@@ -325,7 +327,7 @@ export function ScoForm({ existing }: ScoFormProps) {
 						onChange={(event) => setProjectRef(event.target.value)}
 					/>
 					<div>
-						<Label htmlFor="sco-notes" className="mb-1 block text-xs">
+						<Label htmlFor="sco-notes" className="mb-1 block">
 							Notes (optional)
 						</Label>
 						<Textarea
@@ -370,7 +372,9 @@ export function ScoForm({ existing }: ScoFormProps) {
 						return (
 							<div key={line.key} className="space-y-3 rounded-lg border p-4">
 								<div className="flex items-center justify-between">
-									<span className="text-xs font-medium">Line {index + 1}</span>
+									<span className="text-[13px] leading-[18px] font-semibold">
+										Line {index + 1}
+									</span>
 									{lines.length > 1 ? (
 										<Button
 											type="button"
@@ -389,7 +393,7 @@ export function ScoForm({ existing }: ScoFormProps) {
 								</div>
 								<div className="grid gap-3 md:grid-cols-3">
 									<div>
-										<span className="mb-1 block text-xs font-medium">
+										<span className="mb-1 block text-[13px] leading-[18px] font-semibold">
 											Raw item (sent)
 										</span>
 										<ScoItemPicker
@@ -406,7 +410,7 @@ export function ScoForm({ existing }: ScoFormProps) {
 										/>
 									</div>
 									<div>
-										<span className="mb-1 block text-xs font-medium">
+										<span className="mb-1 block text-[13px] leading-[18px] font-semibold">
 											Finished item (returned)
 										</span>
 										<ScoItemPicker
@@ -425,7 +429,7 @@ export function ScoForm({ existing }: ScoFormProps) {
 									<div>
 										<Label
 											htmlFor={`sco-service-${line.key}`}
-											className="mb-1 block text-xs"
+											className="mb-1 block"
 										>
 											Service
 										</Label>
@@ -495,7 +499,7 @@ export function ScoForm({ existing }: ScoFormProps) {
 									<div>
 										<Label
 											htmlFor={`sco-gst-${line.key}`}
-											className="mb-1 block text-xs"
+											className="mb-1 block"
 										>
 											GST %
 										</Label>
@@ -530,7 +534,7 @@ export function ScoForm({ existing }: ScoFormProps) {
 									/>
 								</div>
 								{error ? (
-									<p className="text-xs text-destructive">{error}</p>
+									<p className="text-sm text-destructive">{error}</p>
 								) : null}
 							</div>
 						);
@@ -547,7 +551,7 @@ export function ScoForm({ existing }: ScoFormProps) {
 			</div>
 
 			{showErrors && headerError ? (
-				<p className="text-xs text-destructive">{headerError}</p>
+				<p className="text-sm text-destructive">{headerError}</p>
 			) : null}
 
 			<div className="flex justify-end gap-2">

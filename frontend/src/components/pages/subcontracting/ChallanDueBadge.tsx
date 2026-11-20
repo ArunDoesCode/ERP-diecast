@@ -11,11 +11,11 @@ export function ChallanDueBadge({
 	return (
 		<span className="inline-flex flex-wrap items-center gap-2">
 			<StatusBadge doc="challanDue" status={challan.dueStatus} />
-			<span className="text-xs text-muted-foreground">
+			<span className="text-sm text-muted-foreground">
 				{formatDaysLeft(challan.daysLeft)}
 			</span>
 			{overdue ? (
-				<span className="text-xs text-destructive">
+				<span className="text-sm text-destructive">
 					Deemed supply, tell accounts
 				</span>
 			) : null}

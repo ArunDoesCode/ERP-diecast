@@ -187,7 +187,7 @@ export function EmployeeForm({
 								</SelectContent>
 							</Select>
 							{mode === "edit" && (
-								<p className="text-xs text-muted-foreground">
+								<p className="text-sm text-muted-foreground">
 									Use "Change role" in the employee list to change the role.
 								</p>
 							)}

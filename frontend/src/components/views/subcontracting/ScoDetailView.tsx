@@ -167,7 +167,7 @@ export function ScoDetailView({ scoId }: { scoId: number }) {
 				<CardHeader>
 					<CardTitle>Summary</CardTitle>
 				</CardHeader>
-				<CardContent className="grid gap-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
+				<CardContent className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
 					<Field
 						label="Expected return"
 						value={formatDate(sco.expectedReturnDate)}
@@ -232,7 +232,7 @@ export function ScoDetailView({ scoId }: { scoId: number }) {
 									<TableCell>
 										{line.rawItemSku} · {line.rawItemName}
 										{line.rawItemBatch ? (
-											<span className="block text-[11px] text-muted-foreground">
+											<span className="block text-sm text-muted-foreground">
 												Batch {line.rawItemBatch}
 											</span>
 										) : null}

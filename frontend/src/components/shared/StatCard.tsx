@@ -126,21 +126,21 @@ export function StatCard({
 				</span>
 			)}
 			<span className="flex min-w-0 flex-col gap-0.5">
-				<span className="text-xs leading-4 font-semibold text-muted-foreground">
+				<span className="text-[13px] leading-[18px] font-semibold text-muted-foreground">
 					{label}
 				</span>
 				{loading ? (
-					<Skeleton className="h-[34px] w-16" aria-hidden="true" />
+					<Skeleton className="h-9 w-16" aria-hidden="true" />
 				) : error ? (
 					<>
-						<span className="text-[26px] leading-[34px] font-bold tabular-nums">
+						<span className="text-[28px] leading-9 font-bold tabular-nums">
 							–
 						</span>
 						{onRetry && (
 							<button
 								type="button"
 								onClick={onRetry}
-								className="inline-flex w-fit items-center gap-1 text-xs font-semibold text-brand-accent underline-offset-4 hover:underline"
+								className="inline-flex w-fit items-center gap-1 text-sm font-semibold text-brand-accent underline-offset-4 hover:underline"
 							>
 								<IconRefresh size={12} stroke={2} aria-hidden="true" />
 								Try again
@@ -150,7 +150,7 @@ export function StatCard({
 				) : (
 					<>
 						<span
-							className="text-[26px] leading-[34px] font-bold tabular-nums"
+							className="text-[28px] leading-9 font-bold tabular-nums"
 							aria-hidden={countUp ? "true" : undefined}
 						>
 							{shownText}
@@ -159,9 +159,7 @@ export function StatCard({
 					</>
 				)}
 				{hint && !loading && (
-					<span className="text-xs leading-4 text-muted-foreground">
-						{hint}
-					</span>
+					<span className="text-sm text-muted-foreground">{hint}</span>
 				)}
 			</span>
 		</>

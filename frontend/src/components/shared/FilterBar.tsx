@@ -41,7 +41,7 @@ export function FilterBar({
 							aria-pressed={selected}
 							onClick={() => onChange(q.key)}
 							className={cn(
-								"inline-flex h-7 flex-row-reverse items-center gap-1.5 rounded-full border px-3 text-xs font-medium",
+								"inline-flex h-9 flex-row-reverse items-center gap-1.5 rounded-full border px-3.5 text-sm font-medium",
 								selected
 									? "border-brand-accent bg-brand-accent text-brand-accent-foreground"
 									: "border-border bg-card text-foreground hover:bg-muted",

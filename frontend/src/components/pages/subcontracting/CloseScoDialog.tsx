@@ -83,13 +83,13 @@ export function CloseScoDialog({
 
 				{hasLoss ? (
 					blockedByRole ? (
-						<p className="text-xs text-muted-foreground">
+						<p className="text-sm text-muted-foreground">
 							Material is still at the vendor. Closing writes it off as a loss,
 							so the owner (loss approval right) must close this order.
 						</p>
 					) : (
 						<div className="space-y-1">
-							<p className="text-xs text-muted-foreground">
+							<p className="text-sm text-muted-foreground">
 								This qty will be written off as a loss at issue cost. A reason
 								is required.
 							</p>
@@ -104,7 +104,7 @@ export function CloseScoDialog({
 						</div>
 					)
 				) : (
-					<p className="text-xs text-muted-foreground">
+					<p className="text-sm text-muted-foreground">
 						Nothing is left at the vendor, so no loss will be posted.
 					</p>
 				)}
