@@ -1,6 +1,12 @@
 "use client";
 
-import { IconFileOff, IconPlus, IconSearch } from "@tabler/icons-react";
+import {
+	IconAlertTriangle,
+	IconFileOff,
+	IconPlus,
+	IconSearch,
+	IconX,
+} from "@tabler/icons-react";
 import { useTable } from "@tanstack/react-table";
 import Link from "next/link";
 import { useMemo } from "react";
@@ -25,102 +31,207 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import type { PrGroup } from "@/components/views/purchase-requisitions/use-pr-list-controls";
 import { usePRListControls } from "@/components/views/purchase-requisitions/use-pr-list-controls";
 import { useCan } from "@/hooks/use-can";
+import type {
+	PrListQuery,
+	PrListResultV2,
+	PrListRowV2,
+	PrListSortField,
+} from "@/lib/api/purchase-requisitions/list-types";
 import { usePurchaseRequisitionsQuery } from "@/lib/api/purchase-requisitions/queries";
 import { formatDate, formatDocNo, formatMoney } from "@/lib/format";
-import { getStatusTone } from "@/lib/status-tone";
-import {
-	type PRStatus,
-	type PRType,
-	type PurchaseRequisition,
-	prStatusValues,
-	prTypeValues,
-} from "@/types/purchase-requisitions";
+
+const SORT_FIELDS: Array<{ label: string; value: PrListSortField }> = [
+	{ label: "Newest first", value: "createdAt" },
+	{ label: "PR number", value: "prNumber" },
+	{ label: "Type", value: "type" },
+	{ label: "Status", value: "status" },
+	{ label: "Estimate", value: "estimatedAmountPaise" },
+];
+
+const BUCKET_LABEL = { late: "Late", today: "Today", later: "Later" } as const;
+
+const IST_DAY = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" });
+const TYPE_LABEL: Record<string, string> = {
+	sale_order: "Sale order",
+	stock_reorder: "Stock reorder",
+	maintenance: "Maintenance",
+	tooling: "Tooling",
+	subcontracting: "Subcontracting",
+	misc: "Miscellaneous",
+};
+
+function makeColumns(canSeeEstimate: boolean, today: string) {
+	const columns: DataTableColumnDef<PrListRowV2>[] = [
+		{
+			accessorKey: "prNumber",
+			header: "PR no.",
+			cell: ({ row }) => (
+				<Link
+					href={`/purchase-requisitions/${row.original.id}`}
+					className="cursor-pointer font-mono text-brand-accent hover:underline"
+				>
+					{formatDocNo(row.original.prNumber)}
+				</Link>
+			),
+		},
+		{
+			accessorKey: "createdAt",
+			header: "Date",
+			cell: ({ row }) => formatDate(row.original.createdAt),
+		},
+		{
+			accessorKey: "type",
+			header: "Type",
+			cell: ({ row }) => TYPE_LABEL[row.original.type] ?? row.original.type,
+		},
+		{
+			id: "requester",
+			header: "Requester",
+			cell: ({ row }) => row.original.requestedByName ?? "–",
+		},
+		{
+			accessorKey: "lineCount",
+			header: "Lines",
+			meta: { numeric: true },
+			cell: ({ row }) => row.original.lineCount ?? "–",
+		},
+	];
+	if (canSeeEstimate) {
+		columns.push({
+			accessorKey: "estimatedAmountPaise",
+			header: "Estimate",
+			meta: { numeric: true },
+			cell: ({ row }) => formatMoney(row.original.estimatedAmountPaise),
+		});
+	}
+	columns.push(
+		{
+			id: "requiredBy",
+			header: "Required by",
+			cell: ({ row }) => {
+				const date = row.original.earliestRequiredBy;
+				if (!date) return "–";
+				const waiting =
+					row.original.status === "approved" ||
+					row.original.status === "partial_ordered";
+				const late = waiting && date < today;
+				return late ? (
+					<span className="inline-flex items-center gap-1 font-medium text-destructive">
+						<IconAlertTriangle className="size-3.5" aria-hidden="true" />
+						{formatDate(date)}
+						<span className="sr-only"> (late)</span>
+					</span>
+				) : (
+					formatDate(date)
+				);
+			},
+		},
+		{
+			accessorKey: "status",
+			header: "Status",
+			cell: ({ row }) => <StatusBadge doc="pr" status={row.original.status} />,
+		},
+	);
+	return columns;
+}
 
 export function PurchaseRequisitionsView() {
 	const {
+		bucket,
+		clearBucket,
+		clearMine,
 		filtersActive,
+		group,
+		mine,
+		onGroupChange,
 		onPageSizeChange,
-		onSearchChange,
+		onQChange,
+		onSortByChange,
 		onSortDirectionChange,
-		onStatusFilterChange,
-		onTypeFilterChange,
 		page,
 		pageSize,
 		q,
+		qInput,
 		resetFilters,
-		search,
 		setPage,
+		sortBy,
 		sortDir,
 		status,
-		statusFilter,
-		type,
-		typeFilter,
+		toOrder,
 	} = usePRListControls();
 
 	const canManage = useCan("pr.manage");
 
-	const requisitionsQuery = usePurchaseRequisitionsQuery({
+	// The shared query hook is typed for the old filters; the request carries the new ones.
+	const params: PrListQuery = {
 		page,
 		pageSize,
 		q,
 		status,
-		type,
-		sortBy: "createdAt",
+		mine: mine ? true : undefined,
+		toOrder,
+		bucket: bucket ?? undefined,
+		sortBy,
 		sortDir,
-	});
-
-	const requisitions = useMemo(
-		() => requisitionsQuery.data?.data ?? [],
-		[requisitionsQuery.data],
+	};
+	const requisitionsQuery = usePurchaseRequisitionsQuery(
+		params as unknown as Parameters<typeof usePurchaseRequisitionsQuery>[0],
 	);
-	const total = requisitionsQuery.data?.meta.total ?? 0;
+	const result = requisitionsQuery.data as unknown as
+		| PrListResultV2
+		| undefined;
 
-	const columns = useMemo<DataTableColumnDef<PurchaseRequisition>[]>(
-		() => [
-			{
-				accessorKey: "prNumber",
-				header: "PR no.",
-				cell: ({ row }) => (
-					<Link
-						href={`/purchase-requisitions/${row.original.id}`}
-						className="cursor-pointer font-mono text-brand-accent hover:underline"
-					>
-						{formatDocNo(row.original.prNumber)}
-					</Link>
-				),
-			},
-			{
-				accessorKey: "status",
-				header: "Status",
-				cell: ({ row }) => (
-					<StatusBadge doc="pr" status={row.original.status} />
-				),
-			},
-			{ accessorKey: "type", header: "Type" },
-			{
-				accessorKey: "notes",
-				header: "Notes",
-				cell: ({ row }) => (
-					<span className="line-clamp-1 max-w-xs text-muted-foreground">
-						{row.original.notes?.trim() || "–"}
-					</span>
-				),
-			},
-			{
-				accessorKey: "estimatedAmountPaise",
-				header: "Estimated value",
-				meta: { numeric: true },
-				cell: ({ row }) => formatMoney(row.original.estimatedAmountPaise),
-			},
-			{
-				accessorKey: "createdAt",
-				header: "Created",
-				cell: ({ row }) => formatDate(row.original.createdAt),
-			},
-		],
-		[],
+	const requisitions = useMemo(() => result?.data ?? [], [result]);
+	const total = result?.meta.total ?? 0;
+	const counts = result?.meta.statusCounts;
+	const toOrderCount = result?.meta.toOrderCount;
+
+	// BR-FF-109 groups; they add up to All. Ordered = approved / partly / fully
+	// ordered rows that are not still waiting for an order.
+	const n = (key: keyof NonNullable<typeof counts>) => counts?.[key] ?? 0;
+	const quick = [
+		{
+			key: "all",
+			label: "All",
+			count: counts
+				? Object.values(counts).reduce((sum, v) => sum + (v ?? 0), 0)
+				: undefined,
+		},
+		{ key: "draft", label: "Draft", count: counts ? n("draft") : undefined },
+		{
+			key: "in_approval",
+			label: "In approval",
+			count: counts ? n("pending_approval") : undefined,
+		},
+		{ key: "to_order", label: "To order", count: toOrderCount },
+		{
+			key: "ordered",
+			label: "Ordered",
+			count:
+				counts && toOrderCount !== undefined
+					? Math.max(
+							0,
+							n("approved") +
+								n("partial_ordered") +
+								n("fully_ordered") -
+								toOrderCount,
+						)
+					: undefined,
+		},
+		{
+			key: "closed",
+			label: "Closed",
+			count: counts ? n("rejected") + n("cancelled") : undefined,
+		},
+	];
+
+	const today = IST_DAY.format(new Date());
+	const columns = useMemo(
+		() => makeColumns(canManage, today),
+		[canManage, today],
 	);
 
 	const table = useTable({
@@ -131,17 +242,21 @@ export function PurchaseRequisitionsView() {
 		manualSorting: true,
 	});
 
+	const newButton = canManage ? (
+		<Button size="lg" asChild>
+			<Link href="/purchase-requisitions/new">
+				<IconPlus />
+				New requisition
+			</Link>
+		</Button>
+	) : undefined;
+
 	const emptyState = filtersActive ? (
 		<EmptyState
 			icon={IconFileOff}
 			title="Nothing matches these filters"
 			action={
-				<Button
-					type="button"
-					variant="outline"
-					size="sm"
-					onClick={resetFilters}
-				>
+				<Button type="button" variant="outline" onClick={resetFilters}>
 					Reset filters
 				</Button>
 			}
@@ -150,16 +265,7 @@ export function PurchaseRequisitionsView() {
 		<EmptyState
 			icon={IconFileOff}
 			title="No purchase requisitions yet"
-			action={
-				canManage ? (
-					<Button size="sm" asChild>
-						<Link href="/purchase-requisitions/new">
-							<IconPlus />
-							New requisition
-						</Link>
-					</Button>
-				) : undefined
-			}
+			action={newButton}
 		/>
 	);
 
@@ -168,82 +274,85 @@ export function PurchaseRequisitionsView() {
 			<PageHeader
 				title="Purchase requisitions"
 				description="Ask for items to be bought, and follow each request to its order."
-				actions={
-					canManage ? (
-						<Button size="sm" asChild>
-							<Link href="/purchase-requisitions/new">
-								<IconPlus />
-								New requisition
-							</Link>
-						</Button>
-					) : undefined
-				}
+				actions={newButton}
 			/>
 
 			<FilterBar
-				value="all"
-				onChange={() => {}}
+				quick={quick}
+				value={group ?? "all"}
+				onChange={(key) =>
+					onGroupChange(key === "all" ? null : (key as PrGroup))
+				}
 				onReset={resetFilters}
 				filtersActive={filtersActive}
 			>
-				<div className="relative w-52">
+				{mine ? (
+					<Button
+						type="button"
+						variant="outline"
+						className="h-10"
+						onClick={clearMine}
+						aria-label="Show everyone's requisitions"
+					>
+						Mine only
+						<IconX className="size-3.5" aria-hidden="true" />
+					</Button>
+				) : null}
+				{bucket ? (
+					<Button
+						type="button"
+						variant="outline"
+						className="h-10"
+						onClick={clearBucket}
+						aria-label={`Clear the ${bucket} filter`}
+					>
+						{BUCKET_LABEL[bucket]} only
+						<IconX className="size-3.5" aria-hidden="true" />
+					</Button>
+				) : null}
+
+				<div className="relative w-56">
 					<IconSearch
 						aria-hidden="true"
 						className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground"
 					/>
 					<Input
-						value={search}
-						onChange={(event) => onSearchChange(event.target.value)}
+						value={qInput}
+						onChange={(event) => onQChange(event.target.value)}
 						placeholder="Search PR number or notes"
 						aria-label="Search PR number or notes"
-						className="pl-7"
+						className="h-10 pl-7"
 					/>
 				</div>
 
-				<Select
-					value={statusFilter}
-					onValueChange={(value) =>
-						onStatusFilterChange(value as "all" | PRStatus)
-					}
-				>
-					<SelectTrigger className="w-44" aria-label="Status">
-						<SelectValue placeholder="Select status" />
-					</SelectTrigger>
-					<SelectContent>
-						<SelectItem value="all">All statuses</SelectItem>
-						{prStatusValues.map((value) => (
-							<SelectItem key={value} value={value}>
-								{getStatusTone("pr", value).label}
-							</SelectItem>
-						))}
-					</SelectContent>
-				</Select>
+				<div className="flex items-center gap-2">
+					<Select
+						value={sortBy}
+						onValueChange={(value) => onSortByChange(value as PrListSortField)}
+					>
+						<SelectTrigger className="h-10 w-40" aria-label="Sort by">
+							<SelectValue placeholder="Sort by" />
+						</SelectTrigger>
+						<SelectContent>
+							{SORT_FIELDS.filter(
+								(field) => canManage || field.value !== "estimatedAmountPaise",
+							).map((field) => (
+								<SelectItem key={field.value} value={field.value}>
+									{field.label}
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
 
-				<Select
-					value={typeFilter}
-					onValueChange={(value) => onTypeFilterChange(value as "all" | PRType)}
-				>
-					<SelectTrigger className="w-40" aria-label="Type">
-						<SelectValue placeholder="Select type" />
-					</SelectTrigger>
-					<SelectContent>
-						<SelectItem value="all">All types</SelectItem>
-						{prTypeValues.map((value) => (
-							<SelectItem key={value} value={value}>
-								{value}
-							</SelectItem>
-						))}
-					</SelectContent>
-				</Select>
-
-				<div className="flex items-center gap-2 text-sm text-muted-foreground">
-					<span>Asc</span>
-					<Switch
-						checked={sortDir === "desc"}
-						onCheckedChange={onSortDirectionChange}
-						aria-label="Toggle sort direction"
-					/>
-					<span>Dsc</span>
+					<div className="flex items-center gap-2 text-sm text-muted-foreground">
+						<span>Asc</span>
+						<Switch
+							checked={sortDir === "desc"}
+							onCheckedChange={onSortDirectionChange}
+							aria-label="Toggle sort direction"
+						/>
+						<span>Dsc</span>
+					</div>
 				</div>
 			</FilterBar>
 
