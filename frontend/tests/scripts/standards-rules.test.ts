@@ -3,7 +3,7 @@
  * Pure rule functions: paths are relative to frontend/ with "/" separators.
  */
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as rulesModule from "../../scripts/standards-rules";
@@ -397,4 +397,80 @@ describe("BR-DS-28 sizes only from the token tables", () => {
 			expect(rules(checkSize(VIEW, src))).toContain("size");
 		});
 	}
+});
+
+/**
+ * BR-DS-29: a form field has one look, label above, 36 px high; the floating-label field is not used.
+ * The spec names the check "field-look" but not the function: assumed `checkFieldLook(path, source)`
+ * returning findings with rule "field-look" (same shape as checkSize).
+ */
+const checkFieldLook = (path: string, source: string) => {
+	const fn = (rulesModule as unknown as { checkFieldLook?: Check })
+		.checkFieldLook;
+	if (!fn)
+		throw new Error("checkFieldLook is not exported from standards-rules.ts");
+	return fn(path, source);
+};
+const FORM = "src/components/pages/suppliers/SupplierMasterModal.tsx";
+
+describe("BR-DS-29 one field look, label above", () => {
+	test("BR-DS-29 flags the floating-label field (spec example: supplier form)", () => {
+		const src = `import { FloatingLabelInput } from "@/components/ui/floating-label";\nexport const X = () => <FloatingLabelInput label="GST number" />;\n`;
+		const f = checkFieldLook(FORM, src);
+		expect(f.length).toBeGreaterThanOrEqual(1);
+		expect(rules(f)).toContain("field-look");
+	});
+
+	for (const name of ["FloatingLabelInput", "FloatingInput", "FloatingLabel"]) {
+		test(`BR-DS-29 flags <${name}> in a view`, () => {
+			const src = `export const X = () => <${name} id="a" />;\n`;
+			expect(rules(checkFieldLook(VIEW, src))).toContain("field-look");
+		});
+	}
+
+	test("BR-DS-29 reports the line of the floating field", () => {
+		const src = `const a = 1;\nconst b = 2;\nexport const X = () => <FloatingLabelInput id="a" />;\n`;
+		const f = checkFieldLook(FORM, src);
+		expect(f[0]?.line).toBe(3);
+	});
+
+	test("BR-DS-29 flags the floating-label import in a shared component too", () => {
+		const src = `import { FloatingInput } from "../ui/floating-label";\nexport const X = FloatingInput;\n`;
+		expect(rules(checkFieldLook(SHARED, src))).toContain("field-look");
+	});
+
+	test("BR-DS-29 label-above field (Label + Input) is not flagged", () => {
+		const src = `export const X = () => (\n\t<div>\n\t\t<Label htmlFor="gst">GST number</Label>\n\t\t<Input id="gst" className="h-9" />\n\t</div>\n);\n`;
+		expect(checkFieldLook(FORM, src)).toEqual([]);
+	});
+
+	test("BR-DS-29 ignores floating-label words inside comments", () => {
+		const src = `// was FloatingLabelInput\n/* floating-label */\nexport const X = 1;\n`;
+		expect(checkFieldLook(FORM, src)).toEqual([]);
+	});
+});
+
+describe("BR-DS-29 the floating-label field is retired", () => {
+	const SRC = resolve(HERE, "../../src");
+	const walk = (dir: string): string[] =>
+		readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+			e.isDirectory()
+				? walk(resolve(dir, e.name))
+				: /\.(ts|tsx)$/.test(e.name)
+					? [resolve(dir, e.name)]
+					: [],
+		);
+
+	test("BR-DS-29 ui/floating-label.tsx no longer exists", () => {
+		expect(existsSync(resolve(SRC, "components/ui/floating-label.tsx"))).toBe(
+			false,
+		);
+	});
+
+	test("BR-DS-29 no file under src/ imports floating-label", () => {
+		const users = walk(SRC).filter((f) =>
+			/floating-label/.test(readFileSync(f, "utf8")),
+		);
+		expect(users).toEqual([]);
+	});
 });
