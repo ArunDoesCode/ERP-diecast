@@ -97,14 +97,6 @@ Page-level messages (BR-FF-57..59, 69, 72, 84) map from frozen codes: `APPROVAL_
 createpo 409 (lines already on another PO), `APPROVAL_NOT_PENDING` (409), challan clash 409, PO not receivable 400.
 
 ## Choices made
+Moved to `../assumptions.md` (A-45..A-53).
 | Question | Choice | Source |
 |---|---|---|
-| One Home endpoint or 11 calls | One `getcounts`, parallel queries, per-tile `error`, optional `tiles` filter for retry | one round trip per Home view and per badge refresh; BR-FF-19 |
-| Menu badge source | Same endpoint with `tiles=approvals` (BR-FF-85 equals tile 20) | one definition of the count |
-| Create PO on several suppliers | Client sends one `createpo` per supplier | BR-FF-05, A-08; no new write route |
-| Receive form data | `getreceivablepos?poId=` instead of a second route | one shape for picker and form |
-| Approver read access | New `getDocumentView` under `approval` rather than loosening `pr.manage` / `po.manage` on frozen routes | frozen PR / PO access rules stay |
-| Side panel | One `document/getpanel` for pr / po / grn | one place applies BR-FF-03 / 06 / 55 filtering |
-| Late / today / later | Shared `bucket` enum on every list that has a tile | one param, same IST rule |
-| Naming | lowercase `get…` for `home` / `grn`, camelCase under `approval` | follow each module's existing casing |
-| Quantity bounds | Quantities 0 < qty ≤ 9,999,999.999; strings: `q` ≤ 100 | existing PO / GRN schema limits |

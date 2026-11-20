@@ -17,7 +17,7 @@ index: spec.md
 | BR-FF-10 | Home is the page every signed-in user lands on after login and the first menu entry; it needs no key. | S logs in → Home, not the old empty Landing page |
 | BR-FF-11 | Home shows only the tiles whose key (table below) the user holds, and the counts endpoint returns only those tiles' counts. | Q (grn.view, grn.qa_decide, sco.view, sco.qa_decide) → tiles 20, 28, 29 only; response has no PO or PR counts |
 | BR-FF-12 | Clicking a tile opens its target list (or picker) already filtered to exactly the counted rows, in one click. | Click "Orders late 2" → PO list with filter "Late", 2 rows, filter chip visible and removable |
-| BR-FF-13 | Tiles appear in this order for everyone, skipping tiles the user lacks: 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30 (owner question 3 may move one tile to the front). | O (all keys) → "Waiting for my approval" first; S → 20, 21, 22, 27, 29, 30 |
+| BR-FF-13 | Tiles appear in this order for everyone, skipping tiles the user lacks: 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30; the plant head's first tile is "Waiting for my approval" (owner card 3 = A). | O (all keys) → "Waiting for my approval" first; S → 20, 21, 22, 27, 29, 30 |
 | BR-FF-14 | A tile whose rows have a due date splits its count into Late (red), Today (orange) and Later (neutral); late = due before today, today = due today (BR-FF-08). | Goods expected: PO due 18-11, PO due 20-11, PO due 25-11 → "1 late · 1 today · 1 later", total 3 |
 | BR-FF-15 | Clicking the Late part of a split tile opens the list filtered to the late rows only; clicking the tile body opens all its rows. | Click "1 late" → 1 row; click tile → 3 rows |
 | BR-FF-16 | A tile with count 0 shows "Nothing waiting" in muted style and still opens its list. | No GRN pending QA → tile "Receipts to inspect — Nothing waiting"; click → empty list with its empty-state text |
@@ -38,11 +38,11 @@ Each tile row is one rule: key, what it counts, where it opens. Counts use only 
 | BR-FF-23 | Requisitions to order | `po.manage` | PRs `approved` / `partial_ordered` with at least one `pending` line | earliest required-by date of pending lines (no date = Later) | PR list, filter "To order" |
 | BR-FF-24 | Orders to send | `po.manage` | POs in `approved` (not yet sent) | expected delivery date | PO list, filter "Approved" |
 | BR-FF-25 | My draft orders | `po.manage` | POs in `draft` created by me (incl. sent back) | — | PO list, filter "Mine · Draft" |
-| BR-FF-26 | Orders late | `po.manage` | overdue POs exactly as BR-PO-19 | — (all late) | PO list, filter "Late" |
-| BR-FF-27 | Goods expected | `grn.edit_draft` | POs `dispatched` / `partial_received` with open qty on any line | due date (revised, else expected) | Receive goods picker (BR-FF-61) |
+| BR-FF-26 | Orders late | `po.manage` | overdue POs as BR-PO-19, with open qty per BR-FF-09 (goods pending QA are not open) and today per BR-FF-08; the PO list "Late" filter uses the same predicate | — (all late) | PO list, filter "Late" |
+| BR-FF-27 | Goods expected | `grn.edit_draft` | POs `dispatched` / `partial_received` with open qty (BR-FF-09) on any line | due date (revised, else expected) | Receive goods picker (BR-FF-61) |
 | BR-FF-28 | Receipts to inspect | `grn.qa_decide` | GRNs with at least one line whose QA status is `pending` | received date (before today = Late) | GRN list, filter "QA pending" |
 | BR-FF-29 | Job-work due back | `sco.view` | open job-work challans not fully settled, by the existing due status | existing due status (overdue = Late) | Challan list, filter "Open" |
-| BR-FF-30 | Stock below reorder | `inventory.view` | active items with stock below their reorder level | — | Stock list, filter "Below reorder" |
+| BR-FF-30 | Stock below reorder | `inventory.view` | active items whose reorder level is above 0 and stock is at or below it — the existing stock-list "Below reorder" flag | — | Stock list, filter "Below reorder" |
 
 Examples (given → then), one per tile:
 | ID | Example |
@@ -53,11 +53,12 @@ Examples (given → then), one per tile:
 | BR-FF-23 | PR-2026-11-3 approved, line 1 on PO-2026-11-1, line 2 pending → counted; when line 2 is on a PO too → not counted |
 | BR-FF-24 | PO-2026-11-1 approved → 1; after "Send to supplier" → 0 |
 | BR-FF-25 | B's PO sent back by O → B's tile 1; O's tile 25 → 0 |
-| BR-FF-26 | PO-2026-11-1 dispatched, due 2026-11-19, 400 kg open → 1; fully received → 0 |
-| BR-FF-27 | PO-2026-11-1 dispatched, due 25-11, 1000 kg open → "1 later"; after GRN-2026-11-4 (600 kg) still 1 (400 kg open) |
+| BR-FF-26 | PO-2026-11-1 dispatched, due 2026-11-19, 400 kg open → 1; remaining 400 kg arrive (pending QA) → 0 |
+| BR-FF-27 | PO-2026-11-1 dispatched, due 25-11, 1000 kg open → "1 later"; after GRN-2026-11-4 (600 kg, QA pending) still 1 (400 kg open) |
 | BR-FF-28 | GRN-2026-11-4 line pending QA, received 19-11 → "1 late"; Q accepts → 0 |
 | BR-FF-29 | Challan JWC/26-27/5 overdue, 50 pcs unsettled → "1 late" |
-| BR-FF-30 | Die lube reorder 50 L, stock 20 L → 1; inactive item below reorder → not counted |
+| BR-FF-30 | Die lube reorder 50 L, stock 20 L → 1; stock exactly 50 L → 1; reorder level 0 → not counted; inactive item → not counted |
 
 ## Choices made in this part (moved to `assumptions.md`)
-Tile set and order, Late/Today/Later split, 60 s refresh, no money on Home: A-01..A-04.
+Tile set and order, Late/Today/Later split, 60 s refresh, no money on Home: A-01..A-04. Open quantity
+A-23, below reorder A-25, split tile component A-28.

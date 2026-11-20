@@ -126,12 +126,6 @@ re-insert `landing`, restore old labels (values in the migration's down comment)
    `reorder_level > 0`. Design reuses the existing flag so the tile equals the list (BR-FF-02).
 
 ## Choices made
+Moved to `../assumptions.md` (A-26, A-39..A-44).
 | Question | Choice | Source |
 |---|---|---|
-| New tables for Home / history? | None; read from existing tables | scope rule, A-09 |
-| Index on "mine" filters | Composite (owner, status) on PR and PO | convention: index for every list filter |
-| Partial index for QA pending | Partial on `grn_items(grn_id) where qa_status='pending'` | table is mostly non-pending after QA |
-| "Today" | IST day computed in the service; DB zone never used for tiles | BR-FF-08; `timestamp` columns hold no zone |
-| Menu group | One group for the eight work screens | sidebar groups by `menu_group` |
-| Existing-install default | One migration; sync keeps UI-owned fields | A-17, existing `syncCatalog` |
-| Money / quantity types | Keep existing (`bigint` paise, `doublePrecision` qty) | existing schema pattern |

@@ -37,10 +37,10 @@ Example data used in every part:
 | Part | File | Covers | BR range |
 |---|---|---|---|
 | Home | `spec-home.md` | Role home, work-queue tiles, counts | BR-FF-10..33 |
-| Documents | `spec-documents.md` | PR / PO / GRN pages, links both ways, next-step buttons, side panel, Save and submit, Create PO | BR-FF-40..59 |
+| Documents | `spec-documents.md` | PR / PO / GRN pages, links both ways, next-step buttons, side panel, Save and submit, Create PO | BR-FF-40..59, 90 |
 | Receiving | `spec-receiving.md` | "Receive goods" from the goods-receipt screen, PO picker, receive form | BR-FF-60..73 |
 | Approvals | `spec-approvals.md` | Inbox columns, preview, act from preview, menu count | BR-FF-80..89 |
-| Layout | `spec-layout.md` | Menu order, page layout, lists, summary strip, full-page forms | BR-FF-100..112 |
+| Layout | `spec-layout.md` | Menu order, page layout, lists, summary strip, full-page forms | BR-FF-100..113 |
 
 ## Who can do what
 No new permission keys. Every tile, button and page is gated by an existing key (`backend/src/lib/permissions.ts`).
@@ -52,7 +52,7 @@ No new permission keys. Every tile, button and page is gated by an existing key 
 | Receive goods, PO picker (no prices), Goods expected tile | `grn.edit_draft` | ow, bo, fs |
 | Receipts to inspect tile, Inspect button | `grn.qa_decide` | ow, bo, qa |
 | open GRN pages and list | `grn.view` | ow, bo, fs, qa, dd |
-| read a PR / PO page while in its approval chain (read-only, with amounts) | approval read rule (BR-APR-51) | any approver in the chain, `approval.view_all` |
+| read a PR / PO page while its approval is pending (read-only, with amounts) | approval read rule (BR-APR-51) + request pending (BR-FF-53) | any approver in the chain, `approval.view_all` |
 | Job-work due tile | `sco.view` | ow, bo, fs, qa |
 | Stock below reorder tile | `inventory.view` | ow, bo, fs |
 | set menu labels / order later | `setup.roles.manage` (Setup → Screens) | super-admin |
@@ -63,7 +63,7 @@ Document flow with the next step each page offers (full table: `spec-documents.m
 |---|---|---|---|
 | — | New requisition → Save and submit | PR pending approval (or approved if auto) | BR-FF-46 |
 | PR pending approval | approver acts from inbox preview | PR approved / draft (sent back) / rejected | BR-FF-82 |
-| PR approved / partly ordered | Create PO | draft PO(s) per supplier | BR-FF-48 |
+| PR approved / partly ordered | Create PO | one draft PO per supplier, never submitted or sent by itself | BR-FF-48 |
 | PO draft | Submit for approval | PO pending approval / approved | BR-FF-44 |
 | PO approved | Send to supplier | PO dispatched | BR-FF-44 |
 | PO dispatched / partly received | Receive goods (GRN screen or PO page) | new GRN page | BR-FF-60, 68 |
@@ -80,6 +80,7 @@ Document flow with the next step each page offers (full table: `spec-documents.m
 | BR-FF-06 | Rates, amounts and totals are shown only to holders of `pr.manage` (PR), `po.manage` (PO), or an approver who may read the request (BR-FF-53); receive-only and QA-only users never get them from any endpoint. | S (fs) opens the PO picker → item, qty, dates; response has no rate or total fields |
 | BR-FF-07 | After any action, the document on screen, the list behind it, the Home counts and the menu badge show the new state without a manual reload. | B approves PR-2026-11-3 from the inbox → badge 3 → 2, Home tile "Waiting for my approval" 3 → 2 |
 | BR-FF-08 | "Today", "late" and due dates use the plant's calendar day in IST. | Due 2026-11-20, time 23:50 IST → "Today", not late |
+| BR-FF-09 | Open quantity of a PO line = ordered − accepted (the line's received qty, frozen BR-GRN-27) − arrived on GRN lines still pending QA; rejected goods count as open again. Every tile, list, page, picker and warning in this feature uses this one definition. | PO-2026-11-1 1000 kg, GRN-2026-11-4 600 kg pending QA → open 400; Q rejects the 600 → open 1000; Q accepts → open 400 |
 
 ## Security
 Sensitive data:
@@ -95,19 +96,27 @@ Abuse cases:
 | store keeper (fs) | read PO prices through the receive picker or its endpoint | BR-FF-06, BR-FF-62 |
 | QA inspector | open a PO page by typing its URL | BR-FF-04 |
 | approver after deciding | keep editing the PR through the preview | BR-FF-53 (read-only), frozen PR edit rules |
+| approver without `pr.manage` / `po.manage` | keep reading prices of a PR / PO after its approval is decided, by URL or the read endpoints | BR-FF-53 (only while pending), BR-FF-04 |
+| approver | approve a document without the lines or totals on screen | BR-FF-81 (act buttons only after every line and the total are shown) |
+| approver | approve without a note from the preview | BR-FF-82, frozen BR-APR-37 |
+| QA inspector / store keeper | read PO amounts through a GRN side panel or linked-document block | BR-FF-55, BR-FF-06 |
 | any user | get counts for queues they have no key for by calling the counts endpoint | BR-FF-11 |
+| any user | call a hidden action (Create PO, Inspect, Receive) directly | BR-FF-45 (server refuses under frozen rules) |
 | requester | Save and submit someone else's draft | BR-FF-47 |
+| purchase officer | have Create PO send orders to suppliers without review | BR-FF-48 (drafts only, each sent by hand) |
 
 Audit: no new audit rows. Every action that writes already writes its trail under the frozen specs
 (approval trail, PO log, GRN QA rows, cancel fields).
 
 ## Edge cases
-Full list: `design/edge-cases.md` (written in pass 2). Every row there names a rule in a part file.
+Full list: `design/edge-cases.md`. Every row there names a rule in this file or a part file.
 | Source | Count |
 |---|---|
-| benchmark | pass 2 |
-| owner | pass 2 |
-| invariant | pass 2 |
+| benchmark | 19 |
+| owner | 3 |
+| invariant | 22 |
+| designer | 11 |
+| total | 55 |
 
 ## Not now
 - Notifications, global search by document number (brief: later round).
@@ -120,13 +129,23 @@ Full list: `design/edge-cases.md` (written in pass 2). Every row there names a r
 - A new document history table (history is read from existing records, BR-FF-50).
 
 ## Open questions
-Must be empty at freeze. Owner questions are returned to the coordinator; the draft uses the
-recommended option.
+Must be empty at freeze.
 | # | Question | Goes to |
 |---|---|---|
-| 1 | Requisition with lines for two suppliers: what does "Create PO" make? (draft: one draft PO per supplier, BR-FF-48) | owner card |
-| 2 | Receive form: arrived quantity box empty or pre-filled with the open quantity? (draft: empty + "Fill open quantity" button, BR-FF-64) | owner card |
-| 3 | What does the plant head see first on Home? (draft: Waiting for my approval, BR-FF-13) | owner card |
+
+## Owner answers (pre-approved)
+The owner pre-approved the recommended option of every card in chat on 2026-11-20: "automate that sessions
+take ur own decision and record them and run whatever parallel subagents u want ... ill do a complete merge
+in moring once completed" and "make sure u reasearch other erp's and take decision and build".
+| Card | Answer | Folded into | Benchmark |
+|---|---|---|---|
+| 1 Create PO with two suppliers | A — one draft PO per supplier, drafts only, never auto-sent | BR-FF-48 | ERPNext splits one request over several POs (https://docs.frappe.io/erpnext/user/manual/en/material-request); Odoo one RFQ per vendor (https://www.odoo.com/documentation/master/applications/inventory_and_mrp/purchase/manage_deals/calls_for_tenders.html) |
+| 2 Arrived box at receipt | A — empty + "Fill open quantity" | BR-FF-64 | stricter than SAP Copy To / ERPNext Create Receipt pre-fill (https://learning.sap.com/courses/managing-logistics-in-sap-business-one/solving-issues-in-purchasing) |
+| 3 Plant head's first tile | A — Waiting for my approval | BR-FF-13 | SAP puts pending approvals first (https://help.sap.com/saphelp_sbo92/helpdata/en/45/06da03d8696c30e10000000a114a6b/content.htm) |
 
 ## Changelog
 - 2026-11-20 v0 — draft (pass 1): index + five parts.
+- 2026-11-20 v0 — pass 2: cards 1–3 = A (pre-approved); BR-FF-09 open quantity (designer Q1); approver
+  read only while pending (BR-FF-53); preview shows every line before acting (BR-FF-81); delay history
+  (BR-FF-54); below reorder = existing flag (BR-FF-30); menu groups (BR-FF-100); v2 exceptions
+  (BR-FF-113); sent-back note (BR-FF-90); edge cases and assumptions written.

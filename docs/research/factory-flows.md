@@ -149,3 +149,8 @@ Read 2026-11-20. Docs silent on most UI-layout choices (6, 11, 12); marked "desi
 | 10 | Keep, if preview shows all lines, prices, totals | Products disagree: SAP decision report answers in the report list; ERPNext/Odoo act on the opened document. Stricter = approver sees everything first. https://help.sap.com/saphelp_sbo882/helpdata/en/45/06da6fd8696c30e10000000a114a6b/content.htm |
 | 11 | Keep | Design choice; no product documents menu order. |
 | 12 | Keep 50 | Odoo default 80, ERPNext default 20 saved per user (forum/third-party only, no official page). https://discuss.frappe.io/t/list-view-default-page-length/88123 |
+
+### Menu groups (spec-analyst, 2026-11-20)
+ERPNext Desk has "a persistent sidebar sorted into categories", each item a workspace; the page does not say
+whether the order is editable. https://docs.frappe.io/erpnext/user/manual/en/workspace (read 2026-11-20).
+Used for A-26: work screens in one group, admin screens in a second.
