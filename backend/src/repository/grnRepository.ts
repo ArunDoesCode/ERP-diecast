@@ -1,4 +1,18 @@
-import { and, asc, count, desc, eq, inArray, ne, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  exists,
+  gt,
+  gte,
+  inArray,
+  lt,
+  ne,
+  or,
+  sql,
+} from "drizzle-orm";
 
 import { db } from "../db/client";
 import {
@@ -17,10 +31,43 @@ import {
   purchaseRequests,
   qaTests,
 } from "../db/schemas/02_procurement-purchasing";
+import { supplierMaster } from "../db/schemas/02_procurement-suppliers";
 import { allocateDocumentSequence } from "../lib/document-number";
 import { NotFoundError } from "../lib/errors";
+import {
+  istDayKey,
+  istDayStartInstant,
+  istNextDayStartInstant,
+} from "../lib/ist-day";
 import { safeSearch } from "../lib/safe-search";
-import type { grnListQuerySchemaType } from "../types/grn.types";
+import type {
+  grnListQuerySchemaType,
+  receivablePosQuerySchemaType,
+} from "../types/grn.types";
+import { openQtySql, pendingQaQtySql, round3 } from "./openQty";
+
+const receivableDueSql = sql<Date | null>`coalesce(${purchaseOrders.revisedDeliveryDate}, ${purchaseOrders.expectedDeliveryDate})`;
+
+export type ReceivablePoRow = {
+  poId: number;
+  poNumber: string;
+  supplierId: number;
+  supplierName: string;
+  status: "dispatched" | "partial_received";
+  dueDate: string | null;
+  isLate: boolean;
+  lines: {
+    poItemId: number;
+    itemId: number;
+    sku: string;
+    itemName: string;
+    uom: string;
+    orderedQty: number;
+    receivedQty: number;
+    pendingQaQty: number;
+    openQty: number;
+  }[];
+};
 
 export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -107,6 +154,147 @@ export type UpdateGrnHeaderData = Partial<
 >;
 
 export const grnRepository = {
+  /** BR-FF-61..63, 70, 71: receivable POs paged in SQL, lines in one query. Named columns, no money. */
+  async listReceivablePos(params: receivablePosQuerySchemaType) {
+    const now = new Date();
+    const startToday = istDayStartInstant(now).toISOString();
+    const startTomorrow = istNextDayStartInstant(now).toISOString();
+    const hasOpenLine = exists(
+      db
+        .select({ one: sql`1` })
+        .from(purchaseOrderItems)
+        .where(
+          and(
+            eq(purchaseOrderItems.poId, purchaseOrders.id),
+            gt(openQtySql, sql`0`),
+          ),
+        ),
+    );
+    const bucketFilter =
+      params.bucket === "late"
+        ? lt(receivableDueSql, startToday)
+        : params.bucket === "today"
+          ? and(
+              gte(receivableDueSql, startToday),
+              lt(receivableDueSql, startTomorrow),
+            )
+          : params.bucket === "later"
+            ? // No due date counts as Later (BR-FF-23 convention).
+              or(
+                gte(receivableDueSql, startTomorrow),
+                sql`${receivableDueSql} is null`,
+              )
+            : undefined;
+    const where = and(
+      inArray(purchaseOrders.status, ["dispatched", "partial_received"]),
+      hasOpenLine,
+      params.poId ? eq(purchaseOrders.id, params.poId) : undefined,
+      safeSearch(params.q, purchaseOrders.poNumber, supplierMaster.name),
+      bucketFilter,
+    );
+
+    const [totalRow] = await db
+      .select({ total: count() })
+      .from(purchaseOrders)
+      .innerJoin(
+        supplierMaster,
+        eq(supplierMaster.id, purchaseOrders.supplierId),
+      )
+      .where(where);
+    const total = Number(totalRow?.total ?? 0);
+
+    const dir = params.sortDir === "desc" ? sql`desc` : sql`asc`;
+    const orderBy =
+      params.sortBy === "poNumber"
+        ? [sql`${purchaseOrders.poNumber} ${dir}`, asc(purchaseOrders.id)]
+        : params.sortBy === "supplierName"
+          ? [sql`${supplierMaster.name} ${dir}`, asc(purchaseOrders.id)]
+          : [
+              sql`${receivableDueSql} ${dir} nulls last`,
+              asc(purchaseOrders.id),
+            ];
+
+    const pos = await db
+      .select({
+        poId: purchaseOrders.id,
+        poNumber: purchaseOrders.poNumber,
+        supplierId: purchaseOrders.supplierId,
+        supplierName: supplierMaster.name,
+        status: purchaseOrders.status,
+        due: receivableDueSql,
+      })
+      .from(purchaseOrders)
+      .innerJoin(
+        supplierMaster,
+        eq(supplierMaster.id, purchaseOrders.supplierId),
+      )
+      .where(where)
+      .orderBy(...orderBy)
+      .limit(params.pageSize)
+      .offset((params.page - 1) * params.pageSize);
+
+    const lineRows = pos.length
+      ? await db
+          .select({
+            poId: purchaseOrderItems.poId,
+            poItemId: purchaseOrderItems.id,
+            itemId: purchaseOrderItems.itemId,
+            sku: itemMaster.sku,
+            itemName: itemMaster.name,
+            uom: sql<string>`coalesce(${purchaseOrderItems.uom}, ${itemMaster.uom})`,
+            orderedQty: purchaseOrderItems.qty,
+            receivedQty: sql<number>`coalesce(${purchaseOrderItems.receivedQty}, 0)`,
+            pendingQaQty: pendingQaQtySql,
+            openQty: openQtySql,
+          })
+          .from(purchaseOrderItems)
+          .innerJoin(itemMaster, eq(itemMaster.id, purchaseOrderItems.itemId))
+          .where(
+            and(
+              inArray(
+                purchaseOrderItems.poId,
+                pos.map((p) => p.poId),
+              ),
+              gt(openQtySql, sql`0`),
+            ),
+          )
+          .orderBy(asc(purchaseOrderItems.id))
+      : [];
+
+    const linesByPo = new Map<number, ReceivablePoRow["lines"]>();
+    for (const l of lineRows) {
+      const list = linesByPo.get(l.poId as number) ?? [];
+      list.push({
+        poItemId: l.poItemId,
+        itemId: l.itemId as number,
+        sku: l.sku,
+        itemName: l.itemName,
+        uom: l.uom,
+        orderedQty: round3(l.orderedQty),
+        receivedQty: round3(l.receivedQty),
+        pendingQaQty: round3(l.pendingQaQty),
+        openQty: round3(l.openQty),
+      });
+      linesByPo.set(l.poId as number, list);
+    }
+
+    const todayKey = istDayKey(now);
+    const rows: ReceivablePoRow[] = pos.map((p) => {
+      const dueDate = p.due ? istDayKey(new Date(p.due)) : null;
+      return {
+        poId: p.poId,
+        poNumber: p.poNumber,
+        supplierId: p.supplierId as number,
+        supplierName: p.supplierName,
+        status: p.status as ReceivablePoRow["status"],
+        dueDate,
+        isLate: dueDate !== null && dueDate < todayKey,
+        lines: linesByPo.get(p.poId) ?? [],
+      };
+    });
+    return { rows, total, today: todayKey };
+  },
+
   // Lets grnService compose grnItems/purchaseOrderItems/PO-rollup/GRN-header
   // writes in a single transaction after a QA action or bypass — the
   // transaction itself is opened here (repository-only DB access), the

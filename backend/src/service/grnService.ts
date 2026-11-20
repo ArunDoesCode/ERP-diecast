@@ -15,6 +15,7 @@ import {
   type grnCorrectionSchemaType,
   type grnListQuerySchemaType,
   type grnQaActionSchemaType,
+  type receivablePosQuerySchemaType,
   type updateGrnSchemaType,
   WHOLE_NUMBER_UNITS,
 } from "../types/grn.types";
@@ -255,6 +256,15 @@ async function lockGrnAndPo(
 }
 
 export const grnService = {
+  async listReceivablePos(params: receivablePosQuerySchemaType) {
+    const { rows, total, today } =
+      await grnRepository.listReceivablePos(params);
+    return {
+      data: rows,
+      meta: { ...toPaginatedMeta(params.page, params.pageSize, total), today },
+    };
+  },
+
   async getDetails(grnId: number) {
     const row = await grnRepository.getDetails(grnId);
     if (!row) {
