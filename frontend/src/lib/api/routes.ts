@@ -8,6 +8,7 @@ const API_Header = {
 	po: "/po",
 	grn: "/grn",
 	sco: "/sco",
+	bom: "/bom",
 	company: "/company",
 };
 export const API_ROUTES = {
@@ -154,6 +155,24 @@ export const API_ROUTES = {
 			`${API_Header.grn}/${grnId}/lines/${lineId}/bypass`,
 		correction: (grnId: number, lineId: number) =>
 			`${API_Header.grn}/${grnId}/lines/${lineId}/correction`,
+	},
+	bom: {
+		list: API_Header.bom,
+		create: API_Header.bom,
+		needs: `${API_Header.bom}/needs`,
+		detail: (bomId: number) => `${API_Header.bom}/${bomId}`,
+		update: (bomId: number) => `${API_Header.bom}/${bomId}`,
+		remove: (bomId: number) => `${API_Header.bom}/${bomId}`,
+		tree: (bomId: number) => `${API_Header.bom}/${bomId}/tree`,
+		changeSummary: (bomId: number) =>
+			`${API_Header.bom}/${bomId}/change-summary`,
+		release: (bomId: number) => `${API_Header.bom}/${bomId}/release`,
+		retire: (bomId: number) => `${API_Header.bom}/${bomId}/retire`,
+		whereUsed: (itemId: number) =>
+			`${API_Header.bom}/items/${itemId}/where-used`,
+		history: (partId: number) => `${API_Header.bom}/parts/${partId}/history`,
+		startRevision: (partId: number) =>
+			`${API_Header.bom}/parts/${partId}/revisions`,
 	},
 	subcontracting: {
 		list: `${API_Header.sco}/getscos`,

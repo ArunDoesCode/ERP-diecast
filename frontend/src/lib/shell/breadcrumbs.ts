@@ -20,6 +20,7 @@ const LIST_LABELS: Record<string, string> = {
 	grn: "Goods receipt",
 	inventory: "Inventory",
 	subcontracting: "Subcontracting",
+	bom: "Bills of materials",
 	"employee-directory": "Employee directory",
 	setup: "Setup",
 };

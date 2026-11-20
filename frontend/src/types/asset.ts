@@ -144,6 +144,7 @@ export const assetItemCategoryValues = [
 	"Spare Part",
 	"Tooling",
 	"Packing",
+	"Manufactured part",
 ] as const;
 
 export type AssetItemCategory = (typeof assetItemCategoryValues)[number];

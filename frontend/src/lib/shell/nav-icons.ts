@@ -8,6 +8,7 @@ import {
 	IconPackage,
 	IconSettings,
 	IconShoppingCart,
+	IconSitemap,
 	IconStack2,
 	IconUsers,
 } from "@tabler/icons-react";
@@ -21,6 +22,7 @@ const ICONS: Record<string, Icon> = {
 	grn: IconPackage,
 	inventory: IconStack2,
 	subcontracting: IconArrowsExchange,
+	bom: IconSitemap,
 	"employee-directory": IconId,
 	setup: IconSettings,
 };

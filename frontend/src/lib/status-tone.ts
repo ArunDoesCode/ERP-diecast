@@ -26,6 +26,8 @@ export type StatusDoc =
 	| "grn"
 	| "grnQa"
 	| "sco"
+	| "bom"
+	| "bomNode"
 	| "challanDue"
 	| "approval"
 	| "supplier"
@@ -116,6 +118,16 @@ const MAP: Record<StatusDoc, Record<string, Entry>> = Object.assign(
 			material_received: ["Material received", "success"],
 			closed: ["Closed", "closed"],
 			cancelled: ["Cancelled", "closed"],
+		}),
+		bom: table({
+			draft: ["Draft", "neutral"],
+			active: ["Active", "success"],
+			retired: ["Retired", "closed"],
+		}),
+		bomNode: table({
+			no_bom: ["No BOM", "neutral"],
+			inactive: ["Inactive", "closed"],
+			loop: ["Loop", "danger"],
 		}),
 		challanDue: table({
 			ok: ["On time", "success"],
