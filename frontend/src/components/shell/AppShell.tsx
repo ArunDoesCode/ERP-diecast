@@ -101,7 +101,6 @@ export function AppShell({ children }: { children: ReactNode }) {
 			<SidebarProvider
 				open={!folded}
 				onOpenChange={(open) => changeFolded(!open)}
-				style={{ "--sidebar-width-icon": "52px" } as React.CSSProperties}
 			>
 				<ShellFrame
 					pathname={pathname}
@@ -160,7 +159,7 @@ function ShellFrame({
 					onToggleSidebar={toggleSidebar}
 					user={user}
 				/>
-				<div className="p-5">{children}</div>
+				<div className="p-6">{children}</div>
 			</SidebarInset>
 		</>
 	);

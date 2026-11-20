@@ -130,10 +130,10 @@ export function StatCard({
 					{label}
 				</span>
 				{loading ? (
-					<Skeleton className="h-[34px] w-16" aria-hidden="true" />
+					<Skeleton className="h-9 w-16" aria-hidden="true" />
 				) : error ? (
 					<>
-						<span className="text-[26px] leading-[34px] font-bold tabular-nums">
+						<span className="text-[28px] leading-9 font-bold tabular-nums">
 							–
 						</span>
 						{onRetry && (
@@ -150,7 +150,7 @@ export function StatCard({
 				) : (
 					<>
 						<span
-							className="text-[26px] leading-[34px] font-bold tabular-nums"
+							className="text-[28px] leading-9 font-bold tabular-nums"
 							aria-hidden={countUp ? "true" : undefined}
 						>
 							{shownText}

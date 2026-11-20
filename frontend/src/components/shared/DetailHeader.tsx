@@ -42,10 +42,10 @@ export function DetailHeader({
 				<div className="min-w-0">
 					<div className="flex flex-wrap items-center gap-2">
 						{loading ? (
-							<Skeleton className="h-7 w-48" />
+							<Skeleton className="h-8 w-48" />
 						) : (
 							<>
-								<h1 className="font-mono text-xl leading-7 font-bold tabular-nums">
+								<h1 className="font-mono text-2xl leading-8 font-bold tabular-nums">
 									{docNo}
 								</h1>
 								{status}
