@@ -15,6 +15,7 @@
  *                        src/components/ui/** (hex: also globals.css exempt)
  *   size                 text under 12 px (text-xs outside the badge too) and button / input /
  *                        select under 32 px high (BR-DS-28), src/components/ui/** included
+ *   field-look           the retired floating-label field used anywhere (BR-DS-29)
  *   motion               motion outside the allowed spellings and places (spec design-system,
  *                        BR-DS-09), src/components/ui/** included; see scripts/standards-rules.ts
  */
@@ -22,6 +23,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+	checkFieldLook,
 	checkMotion,
 	checkPalette,
 	checkSize,
@@ -168,6 +170,10 @@ function runSize() {
 	for (const f of files) findings.push(...checkSize(f.rel, f.raw));
 }
 
+function runFieldLook() {
+	for (const f of files) findings.push(...checkFieldLook(f.rel, f.raw));
+}
+
 // ─── (c) motion outside the allow-list ──────────────────────────────────────
 
 function runMotion() {
@@ -201,8 +207,15 @@ checkMutations();
 runPalette();
 runMotion();
 runSize();
+runFieldLook();
 
-const RULES = ["mutation-invalidate", "raw-palette", "motion", "size"];
+const RULES = [
+	"mutation-invalidate",
+	"raw-palette",
+	"motion",
+	"size",
+	"field-look",
+];
 
 console.log(
 	`frontend standards-check (${strictAll ? "strict" : strict ? `strict: ${[...strictRules].join(",")}` : "report"} mode) - ${findings.length} finding(s)\n`,

@@ -13,14 +13,15 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { FloatingLabelInput } from "@/components/ui/floating-label";
 import {
 	Form,
 	FormControl,
 	FormField,
 	FormItem,
+	FormLabel,
 	FormMessage,
 } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 import { useMarkPoInvoicedMutation } from "@/lib/api/purchase-orders/queries";
 import {
 	type MarkPoInvoicedFormInput,
@@ -94,13 +95,12 @@ export function MarkPoInvoicedDialog({
 								control={form.control}
 								name="invoiceNumber"
 								render={({ field }) => (
-									<FormItem className="min-h-19">
+									<FormItem className="min-h-19 content-start gap-1.5">
+										<FormLabel htmlFor="invoiceNumber">
+											Invoice number
+										</FormLabel>
 										<FormControl>
-											<FloatingLabelInput
-												{...field}
-												id="invoiceNumber"
-												label="Invoice number"
-											/>
+											<Input {...field} id="invoiceNumber" />
 										</FormControl>
 										<FormMessage />
 									</FormItem>
@@ -111,14 +111,10 @@ export function MarkPoInvoicedDialog({
 								control={form.control}
 								name="invoiceDate"
 								render={({ field }) => (
-									<FormItem className="min-h-19">
+									<FormItem className="min-h-19 content-start gap-1.5">
+										<FormLabel htmlFor="invoiceDate">Invoice date</FormLabel>
 										<FormControl>
-											<FloatingLabelInput
-												{...field}
-												id="invoiceDate"
-												label="Invoice date"
-												type="date"
-											/>
+											<Input {...field} id="invoiceDate" type="date" />
 										</FormControl>
 										<FormMessage />
 									</FormItem>
@@ -129,13 +125,15 @@ export function MarkPoInvoicedDialog({
 								control={form.control}
 								name="billedAmountRupees"
 								render={({ field }) => (
-									<FormItem className="min-h-19">
+									<FormItem className="min-h-19 content-start gap-1.5">
+										<FormLabel htmlFor="billedAmountRupees">
+											Billed amount
+										</FormLabel>
 										<FormControl>
 											<div className="relative">
 												<IconCurrencyRupee className="pointer-events-none absolute top-1/2 left-3 z-10 size-3.5 -translate-y-1/2 text-muted-foreground" />
-												<FloatingLabelInput
+												<Input
 													id="billedAmountRupees"
-													label="Billed amount"
 													type="number"
 													min={0}
 													step="0.01"
@@ -159,14 +157,10 @@ export function MarkPoInvoicedDialog({
 								control={form.control}
 								name="dueDate"
 								render={({ field }) => (
-									<FormItem className="min-h-19">
+									<FormItem className="min-h-19 content-start gap-1.5">
+										<FormLabel htmlFor="dueDate">Due date (optional)</FormLabel>
 										<FormControl>
-											<FloatingLabelInput
-												{...field}
-												id="dueDate"
-												label="Due date (optional)"
-												type="date"
-											/>
+											<Input {...field} id="dueDate" type="date" />
 										</FormControl>
 										<FormMessage />
 									</FormItem>

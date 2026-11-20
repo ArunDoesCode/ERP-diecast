@@ -4,14 +4,15 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
-import { FloatingLabelInput } from "@/components/ui/floating-label";
 import {
 	Form,
 	FormControl,
 	FormField,
 	FormItem,
+	FormLabel,
 	FormMessage,
 } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 import { useLoginMutation } from "@/lib/api/auth/queries";
 import { type LoginInput, loginSchema } from "@/types/auth";
 
@@ -34,14 +35,10 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
 					control={form.control}
 					name="email"
 					render={({ field }) => (
-						<FormItem className="min-h-19">
+						<FormItem className="min-h-19 content-start gap-1.5">
+							<FormLabel htmlFor="email">Email</FormLabel>
 							<FormControl>
-								<FloatingLabelInput
-									{...field}
-									id="email"
-									label="Email"
-									type="email"
-								/>
+								<Input {...field} id="email" type="email" />
 							</FormControl>
 							<FormMessage />
 						</FormItem>
@@ -52,14 +49,10 @@ export function LoginForm({ onSuccess }: { onSuccess: () => void }) {
 					control={form.control}
 					name="password"
 					render={({ field }) => (
-						<FormItem className="min-h-19">
+						<FormItem className="min-h-19 content-start gap-1.5">
+							<FormLabel htmlFor="password">Password</FormLabel>
 							<FormControl>
-								<FloatingLabelInput
-									{...field}
-									id="password"
-									label="Password"
-									type="password"
-								/>
+								<Input {...field} id="password" type="password" />
 							</FormControl>
 							<FormMessage />
 						</FormItem>

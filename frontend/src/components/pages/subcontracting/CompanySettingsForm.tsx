@@ -4,14 +4,15 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
-import { FloatingLabelInput } from "@/components/ui/floating-label";
 import {
 	Form,
 	FormControl,
 	FormField,
 	FormItem,
+	FormLabel,
 	FormMessage,
 } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 import { useSaveCompanySettingsMutation } from "@/lib/api/subcontracting/queries";
 import {
 	type CompanySettings,
@@ -46,13 +47,10 @@ export function CompanySettingsForm({
 					control={form.control}
 					name="name"
 					render={({ field }) => (
-						<FormItem className="min-h-19">
+						<FormItem className="min-h-19 gap-1.5">
+							<FormLabel htmlFor="company-name">Company name</FormLabel>
 							<FormControl>
-								<FloatingLabelInput
-									{...field}
-									id="company-name"
-									label="Company name"
-								/>
+								<Input {...field} id="company-name" />
 							</FormControl>
 							<FormMessage />
 						</FormItem>
@@ -62,13 +60,10 @@ export function CompanySettingsForm({
 					control={form.control}
 					name="address"
 					render={({ field }) => (
-						<FormItem className="min-h-19">
+						<FormItem className="min-h-19 gap-1.5">
+							<FormLabel htmlFor="company-address">Address</FormLabel>
 							<FormControl>
-								<FloatingLabelInput
-									{...field}
-									id="company-address"
-									label="Address"
-								/>
+								<Input {...field} id="company-address" />
 							</FormControl>
 							<FormMessage />
 						</FormItem>
@@ -79,14 +74,10 @@ export function CompanySettingsForm({
 						control={form.control}
 						name="gstin"
 						render={({ field }) => (
-							<FormItem className="min-h-19">
+							<FormItem className="min-h-19 gap-1.5">
+								<FormLabel htmlFor="company-gstin">GSTIN</FormLabel>
 								<FormControl>
-									<FloatingLabelInput
-										{...field}
-										id="company-gstin"
-										label="GSTIN"
-										maxLength={15}
-									/>
+									<Input {...field} id="company-gstin" maxLength={15} />
 								</FormControl>
 								<FormMessage />
 							</FormItem>
@@ -96,14 +87,10 @@ export function CompanySettingsForm({
 						control={form.control}
 						name="stateCode"
 						render={({ field }) => (
-							<FormItem className="min-h-19">
+							<FormItem className="min-h-19 gap-1.5">
+								<FormLabel htmlFor="company-state-code">State code</FormLabel>
 								<FormControl>
-									<FloatingLabelInput
-										{...field}
-										id="company-state-code"
-										label="State code"
-										maxLength={2}
-									/>
+									<Input {...field} id="company-state-code" maxLength={2} />
 								</FormControl>
 								<FormMessage />
 							</FormItem>

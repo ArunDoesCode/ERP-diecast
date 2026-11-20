@@ -5,14 +5,15 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
-import { FloatingLabelInput } from "@/components/ui/floating-label";
 import {
 	Form,
 	FormControl,
 	FormField,
 	FormItem,
+	FormLabel,
 	FormMessage,
 } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 import {
 	useCreateRoleMutation,
 	useUpdateRoleMutation,
@@ -73,14 +74,10 @@ export function RoleForm({
 					control={form.control}
 					name="name"
 					render={({ field }) => (
-						<FormItem className="min-h-19">
+						<FormItem className="min-h-19 gap-1.5">
+							<FormLabel htmlFor="name">Name</FormLabel>
 							<FormControl>
-								<FloatingLabelInput
-									{...field}
-									id="name"
-									label="Name"
-									disabled={isSystem}
-								/>
+								<Input {...field} id="name" disabled={isSystem} />
 							</FormControl>
 							<FormMessage />
 						</FormItem>

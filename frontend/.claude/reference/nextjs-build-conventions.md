@@ -99,7 +99,7 @@ Use the queried descriptor to write `src/types/[feature].ts` and the fetcher's g
 - [ ] Mutations expose/use `isPending` for submit disable state
 - [ ] Toasts handled in `useMutation` `onSuccess`/`onError`
 - [ ] `onSuccess` branches on `result.success` (200 + `{ success: false, message }`) and toasts `result.message`
-- [ ] Form fields use `FloatingLabelInput` (`id` + `label`); every `FormItem` has `min-h-19`
+- [ ] Form fields: label above (`FormLabel`/`Label` with `htmlFor` = input `id`), no floating labels; every `FormItem` has `min-h-19`
 - [ ] Any table/list page has pagination, a loading skeleton, and real data fetching
       (`data-table` skill) — reuses `DataTable`/`DataTableColumnHeader`/`DataTablePagination` or
       the card-grid pagination equivalent, no hand-rolled table/skeleton markup
