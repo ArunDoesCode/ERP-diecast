@@ -88,6 +88,11 @@ beforeAll(async () => {
   await admin.unsafe(`CREATE DATABASE ${SCRATCH}`);
   await admin.end({ timeout: 5 });
 
+  // drizzle-kit push does not create extensions; the schema's GIN indexes need pg_trgm
+  const scratch = postgres(scratchUrl, { max: 1, onnotice: () => {} });
+  await scratch.unsafe("CREATE EXTENSION IF NOT EXISTS pg_trgm");
+  await scratch.end({ timeout: 5 });
+
   const push = Bun.spawnSync(["bunx", "drizzle-kit", "push", "--force"], {
     cwd: BACKEND,
     env: { ...process.env, DATABASE_URL: scratchUrl },

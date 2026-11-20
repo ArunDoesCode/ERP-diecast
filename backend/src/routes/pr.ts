@@ -1,9 +1,14 @@
 import { Hono } from "hono";
+import { z } from "zod";
 
 import { prController } from "../controller/prController";
 import { asyncHandler } from "../lib/async-handler";
 import { requirePermission } from "../lib/auth-middleware";
-import { paginatedResponse, successResponse } from "../lib/response-schemas";
+import {
+  paginatedResponse,
+  paginationMetaSchema,
+  successResponse,
+} from "../lib/response-schemas";
 import { register } from "../lib/route-registry";
 import type { AppEnv } from "../lib/types";
 import {
@@ -14,6 +19,7 @@ import {
   prLineCancelResultSchema,
   prListQuerySchema,
   prSchema,
+  prStatusSchema,
   prUpdateResultSchema,
   updatePrSchema,
 } from "../types/pr.types";
@@ -37,7 +43,15 @@ register({
     "List purchase requisitions (PRs feed into purchase order creation), paginated.",
   auth: { type: "permission", key: "pr.manage" },
   request: { query: prListQuerySchema },
-  responses: { "200": paginatedResponse(prSchema) },
+  // purchase-order BR-PO-26: meta.statusCounts = rows per status for the
+  // same search (the PO screen's quick filters).
+  responses: {
+    "200": paginatedResponse(prSchema).extend({
+      meta: paginationMetaSchema.extend({
+        statusCounts: z.record(prStatusSchema, z.number().int().min(0)),
+      }),
+    }),
+  },
   pagination: {
     sortableFields: ["id", "prNumber", "type", "status", "createdAt"],
     searchable: true,

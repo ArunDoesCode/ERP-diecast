@@ -1,7 +1,7 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, ne, sql } from "drizzle-orm";
 
 import { db } from "../db/client";
-import { permissions, rolePermissions } from "../db/schemas/01_auth";
+import { permissions, rolePermissions, roles } from "../db/schemas/01_auth";
 import type { DbExecutor } from "./executor";
 
 export const permissionRepository = {
@@ -18,6 +18,28 @@ export const permissionRepository = {
         grantable: permissions.grantable,
       })
       .from(permissions)
+      .orderBy(asc(permissions.module), asc(permissions.key));
+  },
+
+  /** The catalog with a `held` flag for one role, in one query (#50). */
+  async listCatalogForRole(roleId: number) {
+    return db
+      .select({
+        key: permissions.key,
+        module: permissions.module,
+        label: permissions.label,
+        description: permissions.description,
+        grantable: permissions.grantable,
+        held: sql<boolean>`${rolePermissions.roleId} is not null`,
+      })
+      .from(permissions)
+      .leftJoin(
+        rolePermissions,
+        and(
+          eq(rolePermissions.permissionKey, permissions.key),
+          eq(rolePermissions.roleId, roleId),
+        ),
+      )
       .orderBy(asc(permissions.module), asc(permissions.key));
   },
 
@@ -49,6 +71,27 @@ export const permissionRepository = {
       })
       .from(rolePermissions)
       .where(inArray(rolePermissions.permissionKey, keys));
+  },
+
+  /**
+   * (role, key) pairs for the given keys, skipping one role by name (the
+   * super-admin, which holds every key anyway) — no separate role read (#50).
+   */
+  async listRoleKeysByKeysExceptRole(keys: string[], exceptRoleName: string) {
+    if (keys.length === 0) return [];
+    return db
+      .select({
+        roleId: rolePermissions.roleId,
+        key: rolePermissions.permissionKey,
+      })
+      .from(rolePermissions)
+      .innerJoin(roles, eq(roles.id, rolePermissions.roleId))
+      .where(
+        and(
+          inArray(rolePermissions.permissionKey, keys),
+          ne(roles.name, exceptRoleName),
+        ),
+      );
   },
 
   async addKeys(

@@ -7,6 +7,9 @@ export type TokenPayload = {
   userName: string;
 };
 
+/** Refresh token claims: `cv` = credential version at issue time (BR-AUTH-27). */
+export type RefreshTokenPayload = TokenPayload & { cv: string };
+
 const accessSecret = new TextEncoder().encode(env.ACCESS_TOKEN_SECRET);
 const refreshSecret = new TextEncoder().encode(env.REFRESH_TOKEN_SECRET);
 
@@ -20,7 +23,7 @@ export async function signAccessToken(
     .sign(accessSecret);
 }
 
-export async function signRefreshToken(payload: TokenPayload) {
+export async function signRefreshToken(payload: RefreshTokenPayload) {
   return new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256", typ: "JWT" })
     .setJti(crypto.randomUUID())
@@ -36,7 +39,7 @@ export async function verifyAccessToken(token: string) {
 
 export async function verifyRefreshToken(token: string) {
   const { payload } = await jwtVerify(token, refreshSecret);
-  return payload as TokenPayload;
+  return payload as Partial<RefreshTokenPayload> & TokenPayload;
 }
 
 export async function sha256(value: string) {

@@ -13,6 +13,18 @@ if (!apiBaseUrl) {
 	throw new Error("NEXT_PUBLIC_API_URL is required");
 }
 
+/** Refresh failed: drop the session and send the user to sign in again (BR-AUTH session states). */
+function endSession() {
+	clearAccessToken();
+	useAuthSessionStore.getState().clearSession();
+	if (
+		typeof window !== "undefined" &&
+		!window.location.pathname.startsWith("/login")
+	) {
+		window.location.replace("/login");
+	}
+}
+
 async function refreshAccessToken() {
 	const response = await fetch(`${apiBaseUrl}${API_ROUTES.auth.refresh}`, {
 		method: "POST",
@@ -20,8 +32,7 @@ async function refreshAccessToken() {
 	});
 
 	if (!response.ok) {
-		clearAccessToken();
-		useAuthSessionStore.getState().clearSession();
+		endSession();
 		throw new Error("Session expired");
 	}
 
@@ -31,13 +42,11 @@ async function refreshAccessToken() {
 	};
 
 	if (!json.success || !json.data?.accessToken) {
-		clearAccessToken();
-		useAuthSessionStore.getState().clearSession();
+		endSession();
 		throw new Error("Session expired");
 	}
 
 	setAccessToken(json.data.accessToken);
-	useAuthSessionStore.getState().setToken(json.data.accessToken);
 	return json.data.accessToken;
 }
 
@@ -48,7 +57,9 @@ async function refreshAcrossTabs(staleToken: string | null): Promise<string> {
 		return refreshAccessToken();
 	}
 
+	// Tabs share the refresh cookie, and each refresh rotates it (single use): one tab at a time.
 	return navigator.locks.request("erp-diecast-auth-refresh", async () => {
+		// The token is per tab (memory, BR-AUTH-30): reuse it only if this tab already refreshed.
 		const current = getAccessToken();
 		if (current && current !== staleToken) {
 			return current;

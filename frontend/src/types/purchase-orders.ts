@@ -24,6 +24,8 @@ export interface PurchaseOrder {
 	id: number;
 	poNumber: string;
 	supplierId: number;
+	/** BR-PO-24 */
+	supplierName: string;
 	status: POStatus;
 	subtotalPaise: number;
 	taxAmountPaise: number;
@@ -115,7 +117,11 @@ export type POCreatePayload = {
 };
 
 export type POCreateResult = ApiResult<PurchaseOrderDetailPayload>;
-export type POListResult = PaginatedResponse<PurchaseOrder>;
+// BR-PO-26: the list `meta` also counts rows per status for the same search.
+export type StatusCounts<S extends string> = Record<S, number>;
+export type POListResult = PaginatedResponse<PurchaseOrder> & {
+	meta: { statusCounts?: StatusCounts<POStatus> };
+};
 
 export type POUpdatePayload = {
 	poId: number;
@@ -139,7 +145,29 @@ export type POUpdateResult = ApiResult<{
 
 export type POCancelResult = ApiResult<PurchaseOrder>;
 
-export type LastRateSource = "po_history" | "supplier_catalog" | "pr_estimate";
+// inventory BR-INV-30: where the rate suggestion comes from.
+export type LastRateSource =
+	| "po_history"
+	| "supplier_catalog"
+	| "item_average"
+	| "standard_rate";
+
+/** BR-PO-25: the label shown next to the rate suggestion. */
+export const LAST_RATE_SOURCE_LABEL: Record<LastRateSource, string> = {
+	po_history: "Last PO",
+	supplier_catalog: "Price list",
+	item_average: "Item average",
+	standard_rate: "Standard rate",
+};
+
+/**
+ * BR-PO-25: the rate box text for a suggestion in paise. A suggestion of 0
+ * (legacy item with no standard rate, BR-INV-24) or none leaves the box empty
+ * for the user to type; it is never prefilled with 0.
+ */
+export function suggestedRateInput(ratePaise: number | null | undefined) {
+	return ratePaise != null && ratePaise > 0 ? String(ratePaise / 100) : "";
+}
 
 export type LastRateResult = ApiResult<{
 	ratePaise: number;

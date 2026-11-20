@@ -72,6 +72,9 @@ Header status. Line status goes `pending` → `passed` / `failed` / `waived` and
 | BR-GRN-29 | A correction needs `grn.correct`, is allowed only on a `passed` or `waived` line, needs qty > 0 and a reason, and all corrections on a line together may not exceed its accepted qty. Otherwise 400. | Accepted 980, corrections 500 then 500 → second gets 400, net 480; `failed` line → 400 |
 | BR-GRN-34 | A correction lowers the PO line's received qty and recomputes PO status, so `fully_received` can go back to `partial_received`. Blocked with 409 if the PO is invoiced or closed. | PO 1000/1000, correct 30 → 970, `partial_received`; PO `closed` → 409 |
 | BR-GRN-35 | A correction never changes the line's accepted qty. The line shows net accepted = accepted − all corrections. | Accepted 980, correction 30 → shows 980 and net 950 |
+| BR-GRN-45 | Read-only: each GRN list row carries its PO's number (`poNumber`, null when no PO). GRN details carry `po` (`id`, `poNumber`, `status`; null when no PO) and `prs`: every requisition linked to that PO through its PR–PO line links, once each, sorted by id (`id`, `prNumber`, `status`; empty when none). | GRN on PO-2026-11-1, whose lines came from PR-2026-11-3 and PR-2026-11-5 → list row `poNumber` "PO-2026-11-1"; details `po.poNumber` "PO-2026-11-1", `prs` = [PR-…-3, PR-…-5] |
+| BR-GRN-46 | Read-only: each line in GRN details carries its item's unit (`uom`), so anyone with `grn.view` can enter quantities in the right unit without reading the PO. | QA inspector (no `po.manage`) opens a GRN line of 20 kg → line shows `uom` "kg" |
+| BR-GRN-47 | The GRN screen warns about over-receipt with the same sum as BR-GRN-15: PO line received qty so far (all earlier GRNs) + this accepted qty > ordered × 1.05. Only then does it ask for the override reason; the server check stays the judge. | L1 ordered 1000, 1000 already received, accept 60 → warning and reason box; first GRN accepting 1040 → no warning |
 
 ## Not now
 
@@ -94,3 +97,6 @@ None open.
 - 2026-09-29 — pre-freeze touch-up: short-close "Not now" line points to purchase-order BR-PO-13.
 - 2026-09-29 — accepted defaults at freeze (were "assumed"): BR-GRN-02, BR-GRN-13
 - 2026-09-29 — frozen v1 (all questions answered by Arun)
+- 2026-11-19 — change after freeze, approved by Arun in chat: BR-GRN-45 (PO and PR numbers on GRN list and details, for the GRN document flow and PO number; issue #109). Read-only, no state change.
+- 2026-11-19 — change after freeze, approved by Arun in chat: BR-GRN-46 (item unit on GRN detail lines; QA inspector got 403 reading the PO for units). Read-only.
+- 2026-11-19 — change after freeze, approved by Arun in chat: BR-GRN-47 over-receipt warning on screen counts earlier receipts (#30). Why: `grn.assumptions.md`.

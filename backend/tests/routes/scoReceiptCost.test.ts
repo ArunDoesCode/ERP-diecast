@@ -487,3 +487,58 @@ describe("BR-SCO-14 / BR-SCO-17 cost of processed pieces across challan lots", (
     expect(all.reduce((a, r) => a + r.q, 0)).toBe(0);
   });
 });
+
+describe("BR-SCO-28 issue cost when a receipt line settles no raw piece", () => {
+  test("BR-SCO-28 1 raw -> 3 finished, challan 10 pcs @ 12,000, 1 piece back maps to 0 raw -> finished cost 4,000 + service price, not the service price alone", async () => {
+    const raw = await makeItem("raw28", "7616");
+    const fin = await makeItem("fin28", null);
+    await openStock(raw, 10, 12_000);
+    const res = await call("bo", "POST", "/sco/createsco", {
+      vendorId,
+      expectedReturnDate: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+      lines: [
+        {
+          rawItemId: raw,
+          finishedItemId: fin,
+          serviceId,
+          rawQtyToIssue: 10,
+          expectedReturnQty: 30,
+        },
+      ],
+    });
+    expect(res.status).toBe(201);
+    const scoId = res.json.data.sco.id as number;
+    createdScoIds.push(scoId);
+    const itemId = res.json.data.items[0].id as number;
+    await db
+      .update(subcontractingOrders)
+      .set({ status: "approved" })
+      .where(eq(subcontractingOrders.id, scoId));
+    expect(await challan(scoId, itemId, 10)).toBe(12_000);
+
+    const rcpt = await call("fs", "POST", `/sco/${scoId}/receipts`, {
+      vendorChallanNo: uniq("VC"),
+      lines: [{ scoItemId: itemId, processedQty: 1 }],
+    });
+    expect(rcpt.status).toBe(201);
+    const receiptId = rcpt.json.data.receipt.id as number;
+    const lineId = rcpt.json.data.lines[0].id as number;
+    const dec = await call(
+      "qa",
+      "POST",
+      `/sco/receipts/${receiptId}/lines/${lineId}/qa`,
+      { acceptedQty: 1, rejectedQty: 0 },
+    );
+    expect(dec.status).toBe(200);
+
+    const finIn = (await ledgerRows(fin, "sco_receipt")).filter(
+      (r) => r.quantityChange > 0,
+    );
+    expect(finIn.reduce((a, r) => a + r.quantityChange, 0)).toBe(1);
+    const finValue = finIn.reduce(
+      (a, r) => a + r.quantityChange * r.unitCostPaise,
+      0,
+    );
+    expect(finValue).toBe(4_000 + SERVICE_PRICE);
+  });
+});

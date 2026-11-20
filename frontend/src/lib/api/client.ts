@@ -34,7 +34,12 @@ async function request<T>(
 	body?: unknown,
 	options: RequestOptions = {},
 ): Promise<T> {
-	const token = options.skipAuth ? null : getAccessToken();
+	let token = options.skipAuth ? null : getAccessToken();
+	// BR-AUTH-30: after a reload there is no token in memory; restore the session through the
+	// refresh cookie first instead of sending a request that can only answer 401.
+	if (!options.skipAuth && !token) {
+		token = await refreshAccessTokenOnce(null);
+	}
 
 	const runRequest = async (authToken?: string | null) => {
 		const response = await fetch(`${apiBaseUrl}${path}`, {

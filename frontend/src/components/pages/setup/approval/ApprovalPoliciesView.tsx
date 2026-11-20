@@ -119,6 +119,10 @@ export function ApprovalPoliciesView() {
 	}
 
 	// BR-APR-57: open the edit form only after fresh details have loaded.
+	// Reviewed (#19): the effect reads only the deps listed (formMode is only set,
+	// never read); `policyForm.reset` is stable, so it never re-fires on its own;
+	// `seededForRef` makes the reset run once per opened policy, so a background
+	// refetch (new `policy` object) cannot wipe typed values.
 	useEffect(() => {
 		if (
 			selectedPolicyId !== null &&
@@ -141,7 +145,7 @@ export function ApprovalPoliciesView() {
 	]);
 
 	return (
-		<div className="flex w-full flex-col gap-6 p-6">
+		<div className="flex w-full flex-col gap-4">
 			{formMode === null ? (
 				<>
 					<SetupBackButton />

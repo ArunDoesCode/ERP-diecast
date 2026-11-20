@@ -11,6 +11,7 @@ import {
 	SetupDialog,
 	type SetupModalState,
 } from "@/components/pages/setup/shared/SetupDialog";
+import { PageHeader } from "@/components/shared/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCan } from "@/hooks/use-can";
@@ -43,15 +44,15 @@ const SetupView = () => {
 	}
 
 	return (
-		<div className="flex w-full flex-col gap-6 p-6">
-			<div className="flex items-center justify-between gap-3">
-				<div>
-					<h1 className="text-lg font-semibold">Setup</h1>
-				</div>
-				<Button asChild variant="outline">
-					<Link href="/setup/approval">Approval Policies</Link>
-				</Button>
-			</div>
+		<div className="flex w-full flex-col gap-4">
+			<PageHeader
+				title="Setup"
+				actions={
+					<Button asChild variant="outline">
+						<Link href="/setup/approval">Approval Policies</Link>
+					</Button>
+				}
+			/>
 
 			<Tabs value={tab} onValueChange={setTab}>
 				<TabsList>

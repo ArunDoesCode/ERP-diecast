@@ -298,7 +298,7 @@ Inventory `IconStack2` · Subcontracting `IconArrowsExchange` · Employee direct
 Setup `IconSettings`.
 
 ## Rules
-"Adopted" = the shell, the shared components and the purchase-order list, detail and form.
+"Adopted" = the shell, the shared components and the purchase-order list, detail and form, plus each view of "Roll-out" once its step has landed.
 Checked by: **script** (standards check, contrast script or unit test) · **Playwright** (smoke run;
 until plan 3.6–3.9 lands a human does the same steps) · **screenshot** (light + dark) · **human** (review).
 
@@ -326,12 +326,12 @@ until plan 3.6–3.9 lands a human does the same steps) · **screenshot** (light
 | BR-DS-20 | Every interactive element shows a solid 2 px ring with a 2 px offset on keyboard focus, in `--ring` (in the sidebar `--sidebar-ring`); no blurred or half-transparent ring. | Tab through the PO list → each link, chip and button shows the same blue ring | Playwright |
 | BR-DS-21 | Every sidebar item has a Tabler icon; the active item is shown by tint, bold text and bar together. | On `/purchase-orders` → only "Purchase orders" is tinted | screenshot |
 | BR-DS-22 | Each page has exactly one `h1` (from `PageHeader` or `DetailHeader`) and one breadcrumb trail, in the top bar, that matches the route. | PO detail → "Purchase / Purchase orders / PO-2026-0187" | Playwright |
+| BR-DS-23 | Toasts: a success toast closes by itself after 4 s; an error toast stays until the user closes it; at most three toasts show at once, a fourth removes the oldest. Enter and exit motion as "Tokens — motion" (row 2). | PO approved → "PO approved" toast gone after 4 s; save fails → error toast stays until closed; four quick saves → three toasts visible | Playwright |
 | BR-DS-24 | A new tone, a new motion place, a new weight place or a change to a token value is an owner decision recorded in `docs/decisions.md` before code. | Dev wants a hover lift on cards → stop, raise an issue | human |
 | BR-DS-25 | Adoption changes look only: no route, permission, API call, validation or business rule changes in the same commit. | Commit that adopts `StatusBadge` in PO also changes a PO action rule → rejected | human |
 | BR-DS-26 | Colour carries weight only in the seven places of "Where colour carries weight", status tones (BR-DS-03), selection and position (BR-DS-07) and the brand mark (BR-DS-06); no gradients, no coloured page background, no coloured card fill. | A dashboard card gets a blue background → review finding | screenshot |
 | BR-DS-27 | An element the user has no permission for is not rendered: no disabled ghost, no gap. Shared components take no permission input; the view decides with the existing permission checks. | User without PO create permission opens the PO list → no "New purchase order" button, header keeps its height | Playwright |
 
-BR-DS-23 (toast timing) is not used: moved to "Not now".
 
 ## Adoption order
 One commit per step; each step leaves every page working.
@@ -346,16 +346,28 @@ One commit per step; each step leaves every page working.
 | 6 | Form pattern (field border, focus ring, one primary button, `format.ts`) | purchase order create / edit form |
 | 7 | `StatCard` (component only) | none; first used by the home dashboard feature |
 
+## Roll-out (in scope since 2026-11-19, #104, #91, #106)
+Same rules as "Adoption order": one commit per step, each step leaves every page working, BR-DS-25 (look only).
+
+| Step | What | Views touched |
+|---|---|---|
+| 8 | List, detail and form patterns, `StatusBadge`, `format.ts` | PO tracking (keeps its own `h1`, BR-DS-22) |
+| 9 | same | purchase requisitions; then delete the PR badge map |
+| 10 | same | approvals |
+| 11 | same | GRN; then delete the GRN badge map |
+| 12 | same | subcontracting; then delete the SCO badge map |
+| 13 | same | inventory (items, stock view, movements, stock check) |
+| 14 | same | suppliers |
+| 15 | same | employee directory and setup |
+| 16 | Move the remaining date and money call sites (about 27 in 20 files) to `format.ts` (BR-DS-18) | any left after steps 8–15 |
+| 17 | Switch the `raw-palette` and `motion` standards checks from report to blocking, in the commit where their count is 0 (BR-DS-01, 09; api-standards BR-STD-30, 32) | none |
+
 ## Not now
 - Home dashboard content and the approvals count badge in the sidebar (needs count queries; pilot feature).
 - Touch density mode (44 px rows, 14 px text) and shop-floor screens: after the first tablet trial.
 - What the top-bar search finds. Print and PDF layouts. Phone layout. Login and public landing page.
 - A charts library and real charts. Logo design. Languages other than English.
 - The `design-system` skill, `ui-ux-designer` and `design-reviewer` agents, Playwright smoke (plan 3.6–3.9).
-- Toast timing (success closes after 4 s, errors stay until closed, at most three visible); the library defaults stay. → GitHub issue
-- Moving the 27 existing date and money call sites (20 files) to `format.ts`. → GitHub issue
-- Rolling the patterns and `StatusBadge` out to PO tracking, purchase requisitions, approvals, GRN, subcontracting, inventory, suppliers, employee directory and setup; deleting the PR, GRN and SCO badge maps. → GitHub issue
-- Switching the standards checks (plan 1.4 b, c) from report to blocking, after that roll-out. → GitHub issue
 
 ## Open questions
 None.
@@ -377,3 +389,4 @@ Built in epic `epic/design-system` (PRs #101 foundation, #102 shell, #103 purcha
 - 2026-11-18 v0 — pre-freeze review fixes: one design (owner picked A / B / A / A / A / A), stronger accent, solid selection, blue focus ring, tone icons, approval statuses, scope cut to one reference module
 - 2026-11-18 v1 — frozen. Owner answered 6 cards and confirmed 5 choices; spec and design reviews passed in round 2
 - 2026-11-18 v1 — built (epic design-system). Choices made during the build: assumptions A-46 to A-57 (all info). Decision D-024 (e2e locally before push).
+- 2026-11-19 — change after freeze, approved by Arun in chat: BR-DS-23 toast timing moved from "Not now" to rules (#105). New "Roll-out" section (steps 8–17) moves from "Not now" to in scope: roll-out to the other modules and badge-map removal (#104), the remaining `format.ts` call sites (#106), and blocking standards checks after the roll-out (#91). No other rule id added.

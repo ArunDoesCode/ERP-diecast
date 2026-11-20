@@ -456,3 +456,20 @@ export type AssetServiceCreatePayload = z.infer<
 export type AssetServiceUpdatePayload = z.infer<
 	typeof assetServiceUpdateSchema
 >;
+
+// GET /asset/inventory/reconciliation (BR-GRN-41): one row per mismatch.
+export interface AssetReconciliationRow {
+	kind: "item_stock" | "item_location_balance";
+	itemId: number;
+	itemSku: string;
+	locationId: number | null;
+	storedQty: number;
+	ledgerQty: number;
+}
+
+export type AssetReconciliationListParams = {
+	page?: number;
+	pageSize?: number;
+	sortBy?: "itemId";
+	sortDir?: "asc" | "desc";
+};

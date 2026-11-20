@@ -2,8 +2,6 @@
 
 import { IconArrowLeft, IconPrinter } from "@tabler/icons-react";
 import Link from "next/link";
-
-import { formatPaise } from "@/components/pages/inventory/inventory-format";
 import { ChallanDueBadge } from "@/components/pages/subcontracting/ChallanDueBadge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,7 +14,7 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { useChallanDetailQuery } from "@/lib/api/subcontracting/queries";
-import { formatScoDate } from "@/lib/sco-format";
+import { formatDate, formatMoney } from "@/lib/format";
 
 export function ChallanDetailView({ challanId }: { challanId: number }) {
 	const query = useChallanDetailQuery(challanId);
@@ -38,7 +36,7 @@ export function ChallanDetailView({ challanId }: { challanId: number }) {
 
 	if (query.isLoading) {
 		return (
-			<div className="flex flex-col gap-4 p-6">
+			<div className="flex flex-col gap-4">
 				{back}
 				<Skeleton className="h-64" />
 			</div>
@@ -48,7 +46,7 @@ export function ChallanDetailView({ challanId }: { challanId: number }) {
 	const result = query.data;
 	if (!result?.success) {
 		return (
-			<div className="flex flex-col gap-4 p-6">
+			<div className="flex flex-col gap-4">
 				{back}
 				<p className="text-sm text-muted-foreground">
 					{result?.message ?? "Challan not found."}
@@ -62,7 +60,7 @@ export function ChallanDetailView({ challanId }: { challanId: number }) {
 	const total = lines.reduce((sum, line) => sum + line.lineValuePaise, 0);
 
 	return (
-		<div className="flex w-full flex-col gap-4 p-6">
+		<div className="flex w-full flex-col gap-4">
 			<div className="flex items-center justify-between print:hidden">
 				{back}
 				<Button type="button" size="sm" onClick={() => window.print()}>
@@ -78,19 +76,17 @@ export function ChallanDetailView({ challanId }: { challanId: number }) {
 							Delivery challan - job work
 						</h1>
 						<p className="text-sm font-semibold">{challan.challanNumber}</p>
-						<p>Date: {formatScoDate(challan.challanDate)}</p>
+						<p>Date: {formatDate(challan.challanDate)}</p>
 						<p>SCO: {challan.scoNumber}</p>
 						<p>E-way bill: {challan.ewayBillNo ?? "-"}</p>
 					</div>
 					<div className="space-y-1 text-right print:hidden">
 						<p className="text-muted-foreground">Return due</p>
-						<p className="font-medium">
-							{formatScoDate(challan.returnDueDate)}
-						</p>
+						<p className="font-medium">{formatDate(challan.returnDueDate)}</p>
 						<ChallanDueBadge challan={challan} />
 					</div>
 					<div className="hidden text-right print:block">
-						<p>Return due: {formatScoDate(challan.returnDueDate)}</p>
+						<p>Return due: {formatDate(challan.returnDueDate)}</p>
 					</div>
 				</div>
 
@@ -138,10 +134,10 @@ export function ChallanDetailView({ challanId }: { challanId: number }) {
 								<TableCell>{line.heatNumber ?? "-"}</TableCell>
 								<TableCell className="text-right">{line.qty}</TableCell>
 								<TableCell className="text-right">
-									{formatPaise(line.unitIssueCostPaise)}
+									{formatMoney(line.unitIssueCostPaise)}
 								</TableCell>
 								<TableCell className="text-right">
-									{formatPaise(line.lineValuePaise)}
+									{formatMoney(line.lineValuePaise)}
 								</TableCell>
 							</TableRow>
 						))}
@@ -150,7 +146,7 @@ export function ChallanDetailView({ challanId }: { challanId: number }) {
 								Total
 							</TableCell>
 							<TableCell className="text-right font-medium">
-								{formatPaise(total)}
+								{formatMoney(total)}
 							</TableCell>
 						</TableRow>
 					</TableBody>

@@ -1,5 +1,9 @@
 import { db } from "../db/client";
-import { invalidateRole, isSuperAdminRoleName } from "../lib/auth-middleware";
+import {
+  invalidateRole,
+  isSuperAdminRoleName,
+  SUPER_ADMIN_ROLE_NAME,
+} from "../lib/auth-middleware";
 import { BadRequestError, ForbiddenError, NotFoundError } from "../lib/errors";
 import { authAuditRepository } from "../repository/authAuditRepository";
 import { permissionRepository } from "../repository/permissionRepository";
@@ -21,16 +25,12 @@ async function roleIdsByKey(rows: ScreenRow[]) {
   const keys = rows.flatMap((row) =>
     row.permissionKey ? [row.permissionKey] : [],
   );
-  const [pairs, allRoles] = await Promise.all([
-    permissionRepository.listRoleKeysByKeys(keys),
-    roleRepository.listAll(),
-  ]);
-  const superAdminIds = new Set(
-    allRoles.filter((r) => isSuperAdminRoleName(r.name)).map((r) => r.id),
+  const pairs = await permissionRepository.listRoleKeysByKeysExceptRole(
+    keys,
+    SUPER_ADMIN_ROLE_NAME,
   );
   const byKey = new Map<string, number[]>();
   for (const { roleId, key } of pairs) {
-    if (superAdminIds.has(roleId)) continue;
     byKey.set(key, [...(byKey.get(key) ?? []), roleId]);
   }
   return byKey;

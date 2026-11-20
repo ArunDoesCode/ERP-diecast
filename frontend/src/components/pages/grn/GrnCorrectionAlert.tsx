@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { useGrnCorrectionMutation, usePoItemUoms } from "@/lib/api/grn/queries";
+import { useGrnCorrectionMutation } from "@/lib/api/grn/queries";
 import { qtyStep } from "@/lib/grn-units";
 import type { GrnItemDetail } from "@/types/grn";
 
@@ -34,8 +34,7 @@ export function GrnCorrectionAlert({
 	const [qty, setQty] = useState("");
 	const [reason, setReason] = useState("");
 	const mutation = useGrnCorrectionMutation();
-	const uoms = usePoItemUoms(poId, open);
-	const uom = line.poItemId != null ? uoms.get(line.poItemId) : undefined;
+	const uom = line.uom;
 	const qtyNum = Number(qty);
 	const outOfRange = !(qtyNum > 0) || qtyNum > line.netAcceptedQty;
 

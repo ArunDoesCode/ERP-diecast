@@ -7,14 +7,14 @@
  */
 import { describe, expect, test } from "bun:test";
 import { IconInbox } from "@tabler/icons-react";
-import {
-	type ColumnDef,
-	getCoreRowModel,
-	useReactTable,
-} from "@tanstack/react-table";
+import { useTable } from "@tanstack/react-table";
 import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { DataTable } from "@/components/common/DataTable";
+import {
+	type DataTableColumnDef,
+	dataTableFeatures,
+} from "@/components/common/data-table-features";
 import { DetailHeader } from "@/components/shared/DetailHeader";
 import { DocumentFlow } from "@/components/shared/DocumentFlow";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -336,14 +336,14 @@ function TableHarness(props: {
 	errorState?: ReactNode;
 	skeletonRows?: number;
 }) {
-	const columns: ColumnDef<Row>[] = [
+	const columns: DataTableColumnDef<Row>[] = [
 		{ accessorKey: "docNo", header: "PO no." },
 		{ accessorKey: "value", header: "Value" },
 	];
-	const table = useReactTable({
+	const table = useTable({
+		features: dataTableFeatures,
 		data: props.rows,
 		columns,
-		getCoreRowModel: getCoreRowModel(),
 	});
 	return createElement(DataTable<Row>, {
 		table,

@@ -7,12 +7,29 @@ import {
 } from "../lib/http";
 import type { AppEnv } from "../lib/types";
 import { authService } from "../service/authService";
-import { loginSchema } from "../types/auth.types";
+import { loginSchema, qrLoginSchema } from "../types/auth.types";
 
 export const authController = {
   async login(c: Context<AppEnv>) {
     const body = loginSchema.parse(await c.req.json());
     const result = await authService.login(body.email, body.password);
+
+    setRefreshCookie(c, result.refreshToken);
+
+    return c.json({
+      success: true,
+      message: "Login Successful",
+      data: {
+        accessToken: result.accessToken,
+        user: result.user,
+      },
+    });
+  },
+
+  /** BR-AUTH-29: same answer as password login. */
+  async qrLogin(c: Context<AppEnv>) {
+    const body = qrLoginSchema.parse(await c.req.json());
+    const result = await authService.qrLogin(body.qrToken);
 
     setRefreshCookie(c, result.refreshToken);
 

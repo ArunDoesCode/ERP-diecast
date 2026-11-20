@@ -3,7 +3,10 @@ import type { Context } from "hono";
 import { UnauthorizedError } from "../lib/errors";
 import type { AppEnv } from "../lib/types";
 import { companySettingsService } from "../service/companySettingsService";
-import { companySettingsUpsertSchema } from "../types/sco.types";
+import {
+  companySettingsHistoryQuerySchema,
+  companySettingsUpsertSchema,
+} from "../types/sco.types";
 
 export const companySettingsController = {
   async get(c: Context<AppEnv>) {
@@ -19,5 +22,11 @@ export const companySettingsController = {
     }
     const data = await companySettingsService.upsert(body, actorId);
     return c.json({ success: true, data });
+  },
+
+  async listHistory(c: Context<AppEnv>) {
+    const query = companySettingsHistoryQuerySchema.parse(c.req.query());
+    const { data, meta } = await companySettingsService.listHistory(query);
+    return c.json({ success: true, data, meta });
   },
 };

@@ -10,10 +10,7 @@ import { toast } from "sonner";
 
 import { assetKeys } from "@/lib/api/asset/queries";
 import { ApiClientError } from "@/lib/api/client";
-import {
-	purchaseOrderKeys,
-	usePurchaseOrderDetailQuery,
-} from "@/lib/api/purchase-orders/queries";
+import { purchaseOrderKeys } from "@/lib/api/purchase-orders/queries";
 import type {
 	GrnBypassPayload,
 	GrnCreatePayload,
@@ -230,11 +227,4 @@ export function useGrnCorrectionMutation() {
 			toast.error(errorMessage(error, "Failed to correct GRN line"));
 		},
 	});
-}
-
-/** poItemId -> uom, from the PO detail (GRN lines carry no uom). */
-export function usePoItemUoms(poId: number, enabled: boolean) {
-	const query = usePurchaseOrderDetailQuery(poId, enabled);
-	const items = query.data?.success ? query.data.data.items : [];
-	return new Map(items.map((item) => [item.id, item.uom]));
 }

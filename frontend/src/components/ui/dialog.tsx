@@ -50,6 +50,7 @@ function DialogContent({
 	className,
 	children,
 	showCloseButton = true,
+	onInteractOutside,
 	...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
 	showCloseButton?: boolean;
@@ -64,6 +65,15 @@ function DialogContent({
 					className,
 				)}
 				{...props}
+				onInteractOutside={(event) => {
+					// Closing a toast is not a click "outside" the dialog (BR-DS-23 error toasts stay until closed).
+					const target = event.target as Element | null;
+					if (target?.closest?.("[data-sonner-toaster]")) {
+						event.preventDefault();
+						return;
+					}
+					onInteractOutside?.(event);
+				}}
 			>
 				{children}
 				{showCloseButton && (

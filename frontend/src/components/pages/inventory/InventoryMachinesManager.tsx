@@ -2,23 +2,27 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { IconPlus } from "@tabler/icons-react";
-import {
-	type ColumnDef,
-	getCoreRowModel,
-	type PaginationState,
-	useReactTable,
-} from "@tanstack/react-table";
+import { type PaginationState, useTable } from "@tanstack/react-table";
 import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { DataTable } from "@/components/common/DataTable";
 import { DataTableColumnHeader } from "@/components/common/DataTableColumnHeader";
 import {
+	type DataTableColumnDef,
+	dataTableFeatures,
+} from "@/components/common/data-table-features";
+import {
 	SearchableSelect,
 	type SearchableSelectOption,
 } from "@/components/common/SearchableSelect";
-import { InventoryBackButton } from "@/components/pages/inventory/InventoryBackButton";
 import { todayIso } from "@/components/pages/inventory/inventory-format";
-
+import {
+	listEmptyState,
+	listErrorState,
+} from "@/components/pages/inventory/list-states";
+import { FilterBar } from "@/components/shared/FilterBar";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -51,6 +55,7 @@ import {
 	useMachinesQuery,
 	useUpdateMachineMutation,
 } from "@/lib/api/asset/queries";
+import { formatDateTime } from "@/lib/format";
 import {
 	type AssetMachine,
 	type AssetMachineCreatePayload,
@@ -327,7 +332,7 @@ export function InventoryMachinesManager() {
 		[machines],
 	);
 
-	const columns = useMemo<ColumnDef<AssetMachine>[]>(
+	const columns = useMemo<DataTableColumnDef<AssetMachine>[]>(
 		() => [
 			{
 				accessorKey: "name",
@@ -364,12 +369,12 @@ export function InventoryMachinesManager() {
 			{
 				accessorKey: "isActive",
 				header: "Active",
-				cell: ({ getValue }) =>
-					getValue<boolean>() ? (
-						<Badge variant="secondary">Active</Badge>
-					) : (
-						<Badge variant="outline">Inactive</Badge>
-					),
+				cell: ({ getValue }) => (
+					<StatusBadge
+						doc="machine"
+						status={getValue<boolean>() ? "active" : "inactive"}
+					/>
+				),
 			},
 			{
 				accessorKey: "status",
@@ -388,17 +393,17 @@ export function InventoryMachinesManager() {
 				),
 				cell: ({ getValue }) => {
 					const value = getValue<string>();
-					return value ? new Date(value).toLocaleString() : "—";
+					return formatDateTime(value);
 				},
 			},
 		],
 		[],
 	);
 
-	const table = useReactTable({
+	const table = useTable({
+		features: dataTableFeatures,
 		data: machines,
 		columns,
-		getCoreRowModel: getCoreRowModel(),
 		manualPagination: true,
 		pageCount: meta?.totalPages ?? 1,
 		onPaginationChange: setPagination,
@@ -406,9 +411,18 @@ export function InventoryMachinesManager() {
 	});
 
 	return (
-		<div className="flex w-full flex-col gap-6 p-6">
-			<InventoryBackButton />
-			<div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+		<div className="flex w-full flex-col gap-4">
+			<PageHeader
+				title="Machines"
+				description="Production machines and their status."
+				actions={
+					<Button onClick={() => setModal({ open: true, mode: "create" })}>
+						<IconPlus className="size-3.5" />
+						Create machine
+					</Button>
+				}
+			/>
+			<FilterBar value="" onChange={() => {}}>
 				<div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
 					<div className="w-full sm:max-w-sm">
 						<SearchableSelect
@@ -457,14 +471,17 @@ export function InventoryMachinesManager() {
 						</SelectContent>
 					</Select>
 				</div>
+			</FilterBar>
 
-				<Button onClick={() => setModal({ open: true, mode: "create" })}>
-					<IconPlus className="size-3.5" />
-					Create machine
-				</Button>
-			</div>
-
-			<DataTable table={table} isLoading={machinesQuery.isLoading} />
+			<DataTable
+				table={table}
+				isLoading={machinesQuery.isLoading}
+				emptyState={listEmptyState("No machines yet")}
+				errorState={listErrorState(
+					machinesQuery,
+					"The list could not be loaded.",
+				)}
+			/>
 
 			<Dialog
 				open={modal.open}

@@ -114,7 +114,7 @@ export type assetLastRateQuerySchemaType = z.infer<
 export const assetLastRateSourceSchema = z.enum([
   "po_history",
   "supplier_catalog",
-  "pr_estimate", // item average cost (> 0)
+  "item_average", // item average cost (> 0) (BR-INV-30; was pr_estimate)
   "standard_rate", // item standard rate (BR-INV-24 last resort)
 ]);
 
@@ -323,10 +323,11 @@ export const assetLocationUpdateSchema = createUpdateSchema(locations)
     linkedVendorId: z.number().int().positive().nullable().optional(),
   })
   .superRefine((data, ctx) => {
+    // BR-INV-28: isVirtual is derived from type (BR-INV-27), so it does not
+    // count as an editable field.
     const hasUpdateField =
       data.name !== undefined ||
       data.type !== undefined ||
-      data.isVirtual !== undefined ||
       data.isActive !== undefined ||
       data.linkedVendorId !== undefined;
 
@@ -370,7 +371,7 @@ const qty3dp = z
   .refine((v) => Math.abs(v) <= 1e9, { message: "Quantity is too large" });
 const reasonSchema = z.string().trim().min(1).max(1000);
 const batchSchema = z.string().trim().min(1).max(100).nullish();
-const costSchema = z.number().int().min(1).max(MAX_MONEY_PAISE); // int4
+const costSchema = z.number().int().min(1).max(MAX_MONEY_PAISE); // BR-GRN-48
 
 export const assetManualMovementCreateSchema = z.discriminatedUnion(
   "referenceType",

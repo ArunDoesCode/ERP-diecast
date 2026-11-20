@@ -10,7 +10,7 @@ import {
   ForbiddenError,
   NotFoundError,
 } from "../lib/errors";
-import { generateRawQrToken } from "../lib/qr-token";
+import { generateRawQrToken, hashQrToken } from "../lib/qr-token";
 import { authAuditRepository } from "../repository/authAuditRepository";
 import { authRepository } from "../repository/authRepository";
 import { employeeRepository } from "../repository/employeeRepository";
@@ -85,6 +85,16 @@ async function assertNotLastActiveAdmin(
  * Concurrent demotions/deactivations therefore run one after the other and
  * the second sees the first's result (BR-AUTH-17, v9).
  */
+/** BR-AUTH-28: QR (re)generate only for an employee whose login method is QR. */
+function assertQrMethod(authState: { passwordHash: string | null }) {
+  if (authState.passwordHash) {
+    throw new BadRequestError(
+      "QR login is only for employees whose login method is QR",
+      "LOGIN_METHOD_NOT_QR",
+    );
+  }
+}
+
 async function lockTarget(id: number, tx: DbExecutor) {
   const peek = await employeeRepository.findById(id, tx);
   if (!peek) throw new NotFoundError("Employee not found");
@@ -209,7 +219,7 @@ export const employeeService = {
       isPassword && input.password
         ? await Bun.password.hash(input.password)
         : null;
-    const qrToken = rawQrToken ? await Bun.password.hash(rawQrToken) : null;
+    const qrToken = rawQrToken ? await hashQrToken(rawQrToken) : null;
 
     const employee = await db.transaction(async (tx) => {
       const row = await employeeRepository.create(
@@ -292,7 +302,7 @@ export const employeeService = {
         roleId: input.roleId,
         email: null,
         passwordHash: null,
-        ...(rawQrToken ? { qrToken: await Bun.password.hash(rawQrToken) } : {}),
+        ...(rawQrToken ? { qrToken: await hashQrToken(rawQrToken) } : {}),
       };
     }
     const methodChanged = input.loginMethod !== currentMethod;
@@ -395,10 +405,14 @@ export const employeeService = {
     }
 
     const rawQrToken = generateRawQrToken();
-    const qrToken = await Bun.password.hash(rawQrToken);
+    const qrToken = await hashQrToken(rawQrToken);
     await db.transaction(async (tx) => {
       const { role } = await lockTarget(id, tx);
       await assertCanManageTarget(actor, role, tx);
+      // BR-AUTH-28, after the BR-AUTH-16 check (403 first) and under the row lock.
+      const locked = await employeeRepository.findAuthStateById(id, tx);
+      if (!locked) throw new NotFoundError("Employee not found");
+      assertQrMethod(locked);
       await employeeRepository.update(id, { qrToken }, tx);
       // The raw token and its hash are never logged (BR-AUTH-20).
       await authAuditRepository.insert(tx, {

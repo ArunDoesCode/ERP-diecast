@@ -21,6 +21,7 @@ import type {
 	AssetMachineUpdatePayload,
 	AssetMovementCreatePayload,
 	AssetMovementListParams,
+	AssetReconciliationListParams,
 	AssetServiceCreatePayload,
 	AssetServiceListParams,
 	AssetServiceUpdatePayload,
@@ -37,6 +38,7 @@ import {
 	getLocations,
 	getMachines,
 	getMovements,
+	getReconciliation,
 	getServices,
 	getStock,
 	updateItem,
@@ -66,6 +68,10 @@ export const assetKeys = {
 		params
 			? (["assets", "stock", params] as const)
 			: (["assets", "stock"] as const),
+	reconciliation: (params?: AssetReconciliationListParams) =>
+		params
+			? (["assets", "reconciliation", params] as const)
+			: (["assets", "reconciliation"] as const),
 	services: (params?: AssetServiceListParams) =>
 		params
 			? (["assets", "services", params] as const)
@@ -301,5 +307,13 @@ export function useUpdateServiceMutation() {
 		onError: (error) => {
 			toast.error(errorMessage(error, "Failed to update service"));
 		},
+	});
+}
+
+export function useReconciliationQuery(params?: AssetReconciliationListParams) {
+	return useQuery({
+		queryKey: assetKeys.reconciliation(params),
+		queryFn: () => getReconciliation(params),
+		placeholderData: keepPreviousData,
 	});
 }

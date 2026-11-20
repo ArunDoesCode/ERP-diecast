@@ -159,12 +159,12 @@ function GrantsGrid({
 				{changed ? (
 					<ul className="flex flex-col gap-1">
 						{added.map((k) => (
-							<li key={k.key} className="text-green-700 dark:text-green-400">
+							<li key={k.key} className="text-success">
 								+ {k.label}
 							</li>
 						))}
 						{removed.map((k) => (
-							<li key={k.key} className="text-red-700 dark:text-red-400">
+							<li key={k.key} className="text-destructive">
 								− {k.label}
 							</li>
 						))}

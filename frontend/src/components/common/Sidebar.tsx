@@ -3,6 +3,7 @@
 import { IconBuildingFactory2 } from "@tabler/icons-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useMemo } from "react";
 
 import {
 	Sidebar,
@@ -24,32 +25,38 @@ import { useAuthSessionStore } from "@/lib/store/auth-session-store";
 export function NavSidebar() {
 	const pathname = usePathname();
 
-	const token = useAuthSessionStore((state) => state.token);
 	const screens = useAuthSessionStore((state) => state.screens);
 	const hasHydrated = useAuthSessionStore((state) => state.hasHydrated);
 
-	useMeQuery(Boolean(token) && hasHydrated);
+	// Restores the session on load (BR-AUTH-30): with no token in memory the client refreshes
+	// through the httpOnly cookie first, and a failed refresh sends the user to /login
+	// (refresh-token.ts), so a page that makes no other API call still checks the session.
+	useMeQuery(true);
 
-	const sidebarPages = [...screens]
-		.sort((a, b) => a.sortOrder - b.sortOrder)
-		.map((screen) => ({
-			path: normalizeAllowedPath(screen.path),
-			title: screen.label,
-			group: screen.menuGroup,
-		}))
-		.filter((page) => page.path)
-		.filter(
-			(page, index, pages) =>
-				pages.findIndex((other) => other.path === page.path) === index,
+	// #51: sort and group only when the screens change, not on every render.
+	const sidebarGroups = useMemo(() => {
+		const sidebarPages = [...screens]
+			.sort((a, b) => a.sortOrder - b.sortOrder)
+			.map((screen) => ({
+				path: normalizeAllowedPath(screen.path),
+				title: screen.label,
+				group: screen.menuGroup,
+			}))
+			.filter((page) => page.path)
+			.filter(
+				(page, index, pages) =>
+					pages.findIndex((other) => other.path === page.path) === index,
+			);
+		return sidebarPages.reduce<{ name: string; pages: typeof sidebarPages }[]>(
+			(groups, page) => {
+				const existing = groups.find((group) => group.name === page.group);
+				if (existing) existing.pages.push(page);
+				else groups.push({ name: page.group, pages: [page] });
+				return groups;
+			},
+			[],
 		);
-	const sidebarGroups = sidebarPages.reduce<
-		{ name: string; pages: typeof sidebarPages }[]
-	>((groups, page) => {
-		const existing = groups.find((group) => group.name === page.group);
-		if (existing) existing.pages.push(page);
-		else groups.push({ name: page.group, pages: [page] });
-		return groups;
-	}, []);
+	}, [screens]);
 
 	return (
 		<Sidebar variant="inset" collapsible="icon">

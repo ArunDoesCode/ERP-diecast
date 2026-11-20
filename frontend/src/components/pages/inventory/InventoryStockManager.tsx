@@ -1,17 +1,23 @@
 "use client";
 
 import {
-	type ColumnDef,
-	getCoreRowModel,
 	type PaginationState,
 	type SortingState,
-	useReactTable,
+	useTable,
 } from "@tanstack/react-table";
 import { useMemo, useState } from "react";
 import { DataTable } from "@/components/common/DataTable";
 import { DataTableColumnHeader } from "@/components/common/DataTableColumnHeader";
-import { InventoryBackButton } from "@/components/pages/inventory/InventoryBackButton";
-import { formatPaise } from "@/components/pages/inventory/inventory-format";
+import {
+	type DataTableColumnDef,
+	dataTableFeatures,
+} from "@/components/common/data-table-features";
+import {
+	listEmptyState,
+	listErrorState,
+} from "@/components/pages/inventory/list-states";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,6 +30,7 @@ import {
 } from "@/components/ui/select";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useStockQuery } from "@/lib/api/asset/queries";
+import { formatMoney } from "@/lib/format";
 import {
 	type AssetItemCategory,
 	type AssetStockListParams,
@@ -72,7 +79,7 @@ export function InventoryStockManager() {
 	const rows = stockQuery.data?.data ?? [];
 	const meta = stockQuery.data?.meta;
 
-	const columns = useMemo<ColumnDef<AssetStockRow>[]>(
+	const columns = useMemo<DataTableColumnDef<AssetStockRow>[]>(
 		() => [
 			{
 				id: "name",
@@ -84,7 +91,7 @@ export function InventoryStockManager() {
 					<div className="flex items-center gap-2">
 						<span>{row.original.name}</span>
 						{row.original.isActive ? null : (
-							<Badge variant="outline">Inactive</Badge>
+							<StatusBadge doc="item" status="inactive" />
 						)}
 					</div>
 				),
@@ -125,7 +132,7 @@ export function InventoryStockManager() {
 				accessorKey: "averageCostPaise",
 				enableSorting: false,
 				header: "Average cost",
-				cell: ({ getValue }) => formatPaise(getValue<number>()),
+				cell: ({ getValue }) => formatMoney(getValue<number>()),
 			},
 			{
 				id: "valuePaise",
@@ -133,7 +140,7 @@ export function InventoryStockManager() {
 				header: ({ column }) => (
 					<DataTableColumnHeader column={column} title="Value" />
 				),
-				cell: ({ getValue }) => formatPaise(getValue<number>()),
+				cell: ({ getValue }) => formatMoney(getValue<number>()),
 			},
 			{
 				id: "reorderLevel",
@@ -162,10 +169,10 @@ export function InventoryStockManager() {
 		[],
 	);
 
-	const table = useReactTable({
+	const table = useTable({
+		features: dataTableFeatures,
 		data: rows,
 		columns,
-		getCoreRowModel: getCoreRowModel(),
 		manualPagination: true,
 		manualSorting: true,
 		pageCount: meta?.totalPages ?? 1,
@@ -178,9 +185,11 @@ export function InventoryStockManager() {
 	});
 
 	return (
-		<div className="flex w-full flex-col gap-6 p-6">
-			<InventoryBackButton />
-			<h1 className="text-2xl font-semibold">Stock</h1>
+		<div className="flex w-full flex-col gap-4">
+			<PageHeader
+				title="Stock"
+				description="Current stock, value and balance by location."
+			/>
 			<div className="flex flex-col gap-3 sm:flex-row sm:items-end">
 				<div className="flex w-full flex-col gap-1.5 sm:max-w-sm">
 					<Label htmlFor="stock-search">Search</Label>
@@ -238,7 +247,12 @@ export function InventoryStockManager() {
 				</div>
 			</div>
 
-			<DataTable table={table} isLoading={stockQuery.isLoading} />
+			<DataTable
+				table={table}
+				isLoading={stockQuery.isLoading}
+				emptyState={listEmptyState("No stock yet")}
+				errorState={listErrorState(stockQuery, "The list could not be loaded.")}
+			/>
 		</div>
 	);
 }

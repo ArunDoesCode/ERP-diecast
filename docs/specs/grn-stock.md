@@ -53,8 +53,9 @@ check finds zero differences after any mix of receipts, corrections and manual a
 | BR-GRN-40 | Item current stock and average cost cannot be set through the item create/edit API (400, BR-INV-03). Opening stock goes in as a manual adjustment with type `opening_stock`, qty and rate. | Edit item with stock 50 → 400, stock unchanged |
 | BR-GRN-41 | For every item, current stock = ledger total; for every item+location, the last balance = ledger total. The reconciliation check returns zero rows after any sequence of postings. | Any mix of accepts, bypasses, corrections, adjustments → 0 rows |
 | BR-GRN-42 | Postings for the same item are handled one at a time (item row locked before reading balance or average), including the very first posting for a new item+location. | New item, two +10 at once → balances 10 and 20, stock 20 |
-| BR-GRN-43 | The manual movement screen may post only `stock_adjustment` (stock-take) or `opening_stock`, type `adjustment`, with a reason, by holders of `inventory.adjust`. Document types (`grn`, `grn_bypass`, `grn_correction`, `pro`, `sco_issue`, `sco_receipt`, `sco_loss`, `job_order_issue`, `scrap_dispatch`) get 400 "post from its source document"; without the key → 403. | back_office posts type `grn` → 400; no reason → 400; floor_supervisor (no key) → 403; owner → 200 |
+| BR-GRN-43 | The manual movement screen may post only `stock_adjustment` (stock-take) or `opening_stock`, type `adjustment`, with a reason, by holders of `inventory.adjust`. Document types (`grn`, `grn_bypass`, `grn_correction`, `pro`, `sco_issue`, `sco_receipt`, `sco_loss`, `job_order_issue`, `scrap_dispatch`) get 400 "post from its source document"; without the key → 403. | back_office posts type `grn` → 400; no reason → 400; floor_supervisor (no key) → 403; owner → 201 |
 | BR-GRN-44 | A manual stock-in needs cost > 0. A manual stock-out is valued at the current average cost, whatever the client sends. | Manual −2 sent with cost 1 → row cost = current average |
+| BR-GRN-48 | Manual movement input caps: qty ≤ 1,000,000,000 (BR-STD-17); unit cost ≤ the money limit (BR-STD-16; replaces the old 32-bit cap); a row value or resulting stock value above the money limit → 400 `AMOUNT_TOO_LARGE` (BR-STD-39, 43). Unknown item or location → 404. Nothing is posted on any of these. | counted qty 1000000001 → 400; location id 99999 → 404; no ledger row in either case |
 
 ## Not now
 
@@ -73,3 +74,4 @@ None open.
 - 2026-09-29 — consistency pass: manual adjustment by key `inventory.adjust` (who-table, BR-GRN-43); reference type `sco_loss` added (BR-SCO-19); BR-GRN-40 → 400, same as BR-INV-03.
 - 2026-09-29 — accepted defaults at freeze (were "assumed"): BR-GRN-21, BR-GRN-32, BR-GRN-40
 - 2026-09-29 — frozen v1 (all questions answered by Arun)
+- 2026-11-19 — change after freeze, approved by Arun in chat: BR-GRN-43 example owner → 201 (the API answers 201 Created) (#32); new BR-GRN-48 manual movement input caps and unknown location → 404 (#28).

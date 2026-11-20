@@ -403,14 +403,38 @@ export const approvalRepository = {
     return row;
   },
 
-  async countActiveEmployeesByRoleName(roleName: string) {
-    const [row] = await db
-      .select({ value: count() })
+  /**
+   * One query for a whole approval chain (#55): which of `roleNames` have an
+   * active employee, and which of `employeeIds` are active. One row per role.
+   */
+  async findActiveApprovers(roleNames: string[], employeeIds: number[]) {
+    const roleNameSet = new Set(roleNames);
+    if (roleNames.length === 0 && employeeIds.length === 0) {
+      return { roleNames: new Set<string>(), employeeIds: new Set<number>() };
+    }
+    const match = [
+      ...(roleNames.length > 0 ? [inArray(roles.name, roleNames)] : []),
+      ...(employeeIds.length > 0 ? [inArray(employees.id, employeeIds)] : []),
+    ];
+    const idFilter =
+      employeeIds.length > 0 ? inArray(employees.id, employeeIds) : sql`false`;
+    const rows = await db
+      .select({
+        roleName: roles.name,
+        ids: sql<
+          number[]
+        >`coalesce(array_agg(${employees.id}) filter (where ${idFilter}), '{}')`,
+      })
       .from(employees)
       .innerJoin(roles, eq(roles.id, employees.roleId))
-      .where(and(eq(roles.name, roleName), eq(employees.isActive, true)));
-
-    return row?.value ?? 0;
+      .where(and(eq(employees.isActive, true), or(...match)))
+      .groupBy(roles.name);
+    return {
+      roleNames: new Set(
+        rows.map((r) => r.roleName).filter((name) => roleNameSet.has(name)),
+      ),
+      employeeIds: new Set(rows.flatMap((r) => r.ids.map(Number))),
+    };
   },
 
   async findPendingRequestByDoc(

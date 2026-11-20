@@ -25,7 +25,11 @@ import type {
 	ShortClosePoPayload,
 	UpdatePoDelayPayload,
 } from "@/types/purchase-orders";
-import type { ApiResult } from "@/types/purchase-requisitions";
+import type {
+	ApiResult,
+	PaginatedResponse,
+} from "@/types/purchase-requisitions";
+import type { SupplierItem } from "@/types/suppliers";
 
 function toQueryString(params?: Record<string, unknown>) {
 	if (!params) return "";
@@ -62,6 +66,37 @@ export function getItemLastRate(itemId: number, supplierId: number) {
 	return api.get<LastRateResult>(
 		`${API_ROUTES.assets.itemLastRate(itemId)}${toQueryString({ supplierId })}`,
 	);
+}
+
+// Ids per call: the supplier item list takes at most 100 ids, one page.
+const PRICE_ROW_CHUNK = 100;
+
+/**
+ * The supplier's price-list rows for exactly these items (#107, PERF-03): no
+ * 100-row cap, whatever the size of the supplier's price list. One call per
+ * 100 items.
+ */
+export async function getSupplierPriceRows(
+	supplierId: number,
+	itemIds: number[],
+): Promise<SupplierItem[]> {
+	const ids = [...new Set(itemIds)].sort((a, b) => a - b);
+	const chunks: number[][] = [];
+	for (let i = 0; i < ids.length; i += PRICE_ROW_CHUNK) {
+		chunks.push(ids.slice(i, i + PRICE_ROW_CHUNK));
+	}
+	const pages = await Promise.all(
+		chunks.map((chunk) =>
+			api.get<PaginatedResponse<SupplierItem>>(
+				`${API_ROUTES.suppliers.listItems(supplierId)}${toQueryString({
+					page: 1,
+					pageSize: PRICE_ROW_CHUNK,
+					itemIds: chunk.join(","),
+				})}`,
+			),
+		),
+	);
+	return pages.flatMap((page) => page.data);
 }
 
 export function updatePurchaseOrder(payload: POUpdatePayload) {

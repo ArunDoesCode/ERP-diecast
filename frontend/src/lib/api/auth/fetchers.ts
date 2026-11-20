@@ -32,6 +32,9 @@ export function getMe() {
 	return api.get<MeResponse>(API_ROUTES.auth.me);
 }
 
+/** Public route: revokes the refresh cookie; never restores a session first. */
 export function logout() {
-	return api.post<{ success: true }>(API_ROUTES.auth.logout);
+	return api.post<{ success: true }>(API_ROUTES.auth.logout, undefined, {
+		skipAuth: true,
+	});
 }

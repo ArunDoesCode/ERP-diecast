@@ -7,6 +7,7 @@
 export const END_POINTS = {
   auth: {
     login: "/login",
+    qrLogin: "/qr-login",
     refresh: "/refresh",
     logout: "/logout",
     me: "/me",
@@ -60,6 +61,7 @@ export const END_POINTS = {
     },
     accessLog: {
       list: "/access-log",
+      detail: "/access-log/:id",
     },
   },
   supplier: {
@@ -130,6 +132,7 @@ export const END_POINTS = {
   },
   company: {
     settings: "/settings",
+    settingsHistory: "/settings/history",
   },
   approval: {
     getPolicies: "/getPolicies",

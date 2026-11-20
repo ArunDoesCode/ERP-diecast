@@ -67,4 +67,23 @@ export const authAuditRepository = {
 
     return { rows, total: totalRow?.value ?? 0 };
   },
+
+  async findById(id: number) {
+    const [row] = await db
+      .select({
+        id: authAuditLog.id,
+        at: authAuditLog.at,
+        actorId: authAuditLog.actorId,
+        actorName: employees.name,
+        action: authAuditLog.action,
+        target: authAuditLog.target,
+        before: authAuditLog.before,
+        after: authAuditLog.after,
+      })
+      .from(authAuditLog)
+      .leftJoin(employees, eq(employees.id, authAuditLog.actorId))
+      .where(eq(authAuditLog.id, id))
+      .limit(1);
+    return row ?? null;
+  },
 };

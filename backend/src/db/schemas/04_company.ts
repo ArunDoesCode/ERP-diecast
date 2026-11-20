@@ -1,5 +1,13 @@
 import { sql } from "drizzle-orm";
-import { check, integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import {
+  check,
+  index,
+  integer,
+  pgTable,
+  serial,
+  text,
+  timestamp,
+} from "drizzle-orm/pg-core";
 import { employees } from "./03_hcm";
 
 // BR-SCO-09: our own name, address, GSTIN and state for the job-work challan.
@@ -19,5 +27,31 @@ export const companySettings = pgTable(
   },
   (t) => ({
     singleRow: check("company_settings_single_row", sql`${t.id} = 1`),
+  }),
+);
+
+// BR-SCO-29: one row per changed company-settings field (old -> new, who,
+// when). Append-only: rows are never edited or deleted.
+export const companySettingsHistory = pgTable(
+  "company_settings_history",
+  {
+    id: serial("id").primaryKey(),
+    // name | address | gstin | stateCode
+    field: text("field").notNull(),
+    // null on the first save (nothing before it)
+    oldValue: text("old_value"),
+    newValue: text("new_value").notNull(),
+    // no-index: audit who-did-it column, read only by joining to employees
+    createdBy: integer("created_by")
+      .references(() => employees.id)
+      .notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    // history is read newest first
+    createdAtIdx: index("idx_company_settings_history_created_at").on(
+      t.createdAt.desc(),
+      t.id.desc(),
+    ),
   }),
 );

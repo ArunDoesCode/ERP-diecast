@@ -17,8 +17,11 @@ import {
   grnCorrections,
   grnItems,
   grns,
+  prPoItemLinks,
   purchaseOrderItems,
   purchaseOrders,
+  purchaseRequestItems,
+  purchaseRequests,
   qaTests,
 } from "../../src/db/schemas/02_procurement-purchasing";
 import { supplierMaster } from "../../src/db/schemas/02_procurement-suppliers";
@@ -1276,5 +1279,139 @@ describe("BR-GRN-35 accepted qty is never changed by a correction", () => {
     const d = await details(g.grnId);
     expect(d.items[0].correctedQty).toBe(0);
     expect(d.items[0].netAcceptedQty).toBe(980);
+  });
+});
+
+describe("BR-GRN-45 PO and PR numbers on GRN list and details", () => {
+  const prIds: number[] = [];
+  const prItemIds: number[] = [];
+  const noPoGrnIds: number[] = [];
+
+  async function newPr(status: "approved" | "fully_ordered" = "approved") {
+    const [pr] = await db
+      .insert(purchaseRequests)
+      .values({
+        prNumber: uid(),
+        type: "stock_reorder",
+        status: status as any,
+        requestedBy: actorId,
+      })
+      .returning({
+        id: purchaseRequests.id,
+        prNumber: purchaseRequests.prNumber,
+      });
+    prIds.push(pr!.id);
+    return pr!;
+  }
+
+  async function linkPrLine(prId: number, itemId: number, poItemId: number) {
+    const [pri] = await db
+      .insert(purchaseRequestItems)
+      .values({ prId, itemId, requestedQty: 10, uom: "kg" })
+      .returning({ id: purchaseRequestItems.id });
+    prItemIds.push(pri!.id);
+    await db
+      .insert(prPoItemLinks)
+      .values({ prItemId: pri!.id, poItemId, linkedQty: 10 });
+  }
+
+  afterAll(async () => {
+    if (prItemIds.length)
+      await db
+        .delete(prPoItemLinks)
+        .where(inArray(prPoItemLinks.prItemId, prItemIds));
+    if (prItemIds.length)
+      await db
+        .delete(purchaseRequestItems)
+        .where(inArray(purchaseRequestItems.id, prItemIds));
+    if (prIds.length)
+      await db
+        .delete(purchaseRequests)
+        .where(inArray(purchaseRequests.id, prIds));
+    if (noPoGrnIds.length)
+      await db.delete(grns).where(inArray(grns.id, noPoGrnIds));
+  });
+
+  async function poWithTwoPrs() {
+    const po = await newPo([{ qty: 100 }, { qty: 100 }, { qty: 100 }]);
+    const prA = await newPr();
+    const prB = await newPr("fully_ordered");
+    // prB is linked through two PO lines: it must still appear once.
+    await linkPrLine(prA.id, po.itemIds[0]!, po.poItemIds[0]!);
+    await linkPrLine(prB.id, po.itemIds[1]!, po.poItemIds[1]!);
+    await linkPrLine(prB.id, po.itemIds[2]!, po.poItemIds[2]!);
+    const g = await newGrn(po, [10, 10, 10]);
+    const [poRow] = await db
+      .select()
+      .from(purchaseOrders)
+      .where(eq(purchaseOrders.id, po.poId));
+    return { po, g, prA, prB, poRow: poRow! };
+  }
+
+  test("BR-GRN-45 list row carries the PO number", async () => {
+    const { po, g, poRow } = await poWithTwoPrs();
+    const r = await call("GET", `/getgrns?poId=${po.poId}`, "owner");
+    expect(r.status).toBe(200);
+    const row = r.json.data.find((x: any) => x.id === g.grnId);
+    expect(row.poNumber).toBe(poRow.poNumber);
+  });
+
+  test("BR-GRN-45 details carry po (id, poNumber, status)", async () => {
+    const { po, g, poRow } = await poWithTwoPrs();
+    const d = await details(g.grnId);
+    expect(d.po).toEqual({
+      id: po.poId,
+      poNumber: poRow.poNumber,
+      status: poRow.status,
+    });
+  });
+
+  test("BR-GRN-45 details prs: linked requisitions once each, sorted by id", async () => {
+    const { g, prA, prB } = await poWithTwoPrs();
+    const d = await details(g.grnId);
+    expect(d.prs).toEqual([
+      { id: prA.id, prNumber: prA.prNumber, status: "approved" },
+      { id: prB.id, prNumber: prB.prNumber, status: "fully_ordered" },
+    ]);
+  });
+
+  test("BR-GRN-45 details prs is empty when the PO has no linked PR", async () => {
+    const po = await newPo([{ qty: 100 }]);
+    const g = await newGrn(po, [10]);
+    const d = await details(g.grnId);
+    expect(d.prs).toEqual([]);
+    expect(d.po.id).toBe(po.poId);
+  });
+
+  test("BR-GRN-45 GRN with no PO: list poNumber null, details po null and prs empty", async () => {
+    const [row] = await db
+      .insert(grns)
+      .values({ grnNumber: uid(), supplierId, poId: null, createdBy: actorId })
+      .returning({ id: grns.id });
+    noPoGrnIds.push(row!.id);
+    const list = await call("GET", `/getgrns?pageSize=100&q=${RUN}`, "owner");
+    expect(list.status).toBe(200);
+    const found = list.json.data.find((x: any) => x.id === row!.id);
+    expect(found).toBeDefined();
+    expect(found.poNumber).toBeNull();
+    const d = await details(row!.id);
+    expect(d.po).toBeNull();
+    expect(d.prs).toEqual([]);
+  });
+});
+
+describe("BR-GRN-46 item unit on GRN detail lines", () => {
+  test("BR-GRN-46 regression: each line carries its item's uom, readable by qa_inspector", async () => {
+    const po = await newPo([
+      { qty: 100, uom: "kg" },
+      { qty: 100, uom: "pcs" },
+    ]);
+    const g = await newGrn(po, [20, 5]);
+    const r = await call("GET", `/getgrndetails/${g.grnId}`, "qa_inspector");
+    expect(r.status).toBe(200);
+    const items = r.json.data.items as { id: number; uom?: string }[];
+    const uomOf = (lineId: number) => items.find((i) => i.id === lineId)?.uom;
+    expect(uomOf(g.lineIds[0]!)).toBe("kg");
+    expect(uomOf(g.lineIds[1]!)).toBe("pcs");
   });
 });

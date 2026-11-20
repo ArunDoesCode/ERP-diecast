@@ -4,11 +4,12 @@ import { z } from "zod";
 import { authController } from "../controller/authController";
 import { asyncHandler } from "../lib/async-handler";
 import { requireAuth } from "../lib/auth-middleware";
+import { env } from "../lib/env";
 import { rateLimiter } from "../lib/rate-limiter";
 import { successResponseWithMessage } from "../lib/response-schemas";
 import { register } from "../lib/route-registry";
 import type { AppEnv } from "../lib/types";
-import { loginSchema } from "../types/auth.types";
+import { loginSchema, qrLoginSchema } from "../types/auth.types";
 import { END_POINTS } from "./end-points";
 
 const AUTH_ROUTES = END_POINTS.auth;
@@ -37,7 +38,7 @@ const authRouter = new Hono<AppEnv>();
 
 authRouter.post(
   AUTH_ROUTES.login,
-  rateLimiter({ windowMs: 15 * 60_000, max: 10 }),
+  rateLimiter({ windowMs: 15 * 60_000, max: env.AUTH_RATE_LIMIT_MAX }),
   asyncHandler(authController.login),
 );
 register({
@@ -48,6 +49,32 @@ register({
     "Log in with email/password, returns access token + sets refresh cookie.",
   auth: { type: "public" },
   request: { body: loginSchema },
+  responses: {
+    "200": z.object({
+      success: z.literal(true),
+      message: z.string(),
+      data: z.object({
+        accessToken: z.string(),
+        user: sessionUserSchema,
+      }),
+    }),
+  },
+});
+
+// BR-AUTH-29: same rate limit as login (BR-AUTH-04), its own counter.
+authRouter.post(
+  AUTH_ROUTES.qrLogin,
+  rateLimiter({ windowMs: 15 * 60_000, max: env.AUTH_RATE_LIMIT_MAX }),
+  asyncHandler(authController.qrLogin),
+);
+register({
+  method: "POST",
+  path: `${AUTH_BASE_PATH}${AUTH_ROUTES.qrLogin}`,
+  tags: ["auth"],
+  summary:
+    "Operator QR login: scanned QR token, returns access token + sets refresh cookie.",
+  auth: { type: "public" },
+  request: { body: qrLoginSchema },
   responses: {
     "200": z.object({
       success: z.literal(true),

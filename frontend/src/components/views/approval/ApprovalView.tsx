@@ -5,13 +5,15 @@ import {
 	ApprovalActionDialog,
 	type InboxAction,
 } from "@/components/pages/approval/ApprovalActionDialog";
+import { ApprovalCardsSkeleton } from "@/components/pages/approval/ApprovalCards";
 import {
-	ApprovalCards,
-	ApprovalCardsSkeleton,
+	ApprovalInboxTable,
 	type PendingApprovalAction,
-} from "@/components/pages/approval/ApprovalCards";
-import { ApprovalPagination } from "@/components/pages/approval/ApprovalPagination";
-import { Button } from "@/components/ui/button";
+} from "@/components/pages/approval/ApprovalInboxTable";
+import { ErrorState } from "@/components/shared/ErrorState";
+import { FilterBar } from "@/components/shared/FilterBar";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { Pagination } from "@/components/shared/Pagination";
 import {
 	Select,
 	SelectContent,
@@ -91,34 +93,24 @@ function ApprovalList({ employeeId }: ApprovalListProps) {
 		);
 	}
 
-	if (approvalsQuery.isError) {
-		return (
-			<div className="flex w-full flex-col gap-4 p-6">
-				<p className="text-sm text-destructive">
-					Failed to load pending approvals.
-				</p>
-				<Button
-					type="button"
-					variant="outline"
-					className="w-fit"
-					onClick={() => approvalsQuery.refetch()}
-				>
-					Retry
-				</Button>
-			</div>
-		);
-	}
+	const filtersActive = docType !== "all";
 
 	return (
-		<div className="flex w-full flex-col gap-6 p-6">
-			<div className="flex flex-col gap-1">
-				<h1 className="font-heading text-lg font-medium">Approvals</h1>
-				<p className="text-sm text-muted-foreground">
-					Review requests waiting for your action.
-				</p>
-			</div>
+		<div className="flex w-full flex-col gap-4">
+			<PageHeader
+				title="Approvals"
+				description="Review requests waiting for your action."
+			/>
 
-			<div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+			<FilterBar
+				value="all"
+				onChange={() => {}}
+				onReset={() => {
+					setDocType("all");
+					setPage(1);
+				}}
+				filtersActive={filtersActive}
+			>
 				<Select
 					value={docType}
 					onValueChange={(value) => {
@@ -126,7 +118,7 @@ function ApprovalList({ employeeId }: ApprovalListProps) {
 						setPage(1);
 					}}
 				>
-					<SelectTrigger className="w-full sm:w-40">
+					<SelectTrigger className="w-44" aria-label="Document type">
 						<SelectValue placeholder="Document type" />
 					</SelectTrigger>
 					<SelectContent>
@@ -144,7 +136,7 @@ function ApprovalList({ employeeId }: ApprovalListProps) {
 						setPage(1);
 					}}
 				>
-					<SelectTrigger className="w-full sm:w-44">
+					<SelectTrigger className="w-44" aria-label="Sort by">
 						<SelectValue placeholder="Sort by" />
 					</SelectTrigger>
 					<SelectContent>
@@ -163,7 +155,7 @@ function ApprovalList({ employeeId }: ApprovalListProps) {
 						setPage(1);
 					}}
 				>
-					<SelectTrigger className="w-full sm:w-32">
+					<SelectTrigger className="w-32" aria-label="Order">
 						<SelectValue placeholder="Order" />
 					</SelectTrigger>
 					<SelectContent>
@@ -171,15 +163,26 @@ function ApprovalList({ employeeId }: ApprovalListProps) {
 						<SelectItem value="asc">Asc</SelectItem>
 					</SelectContent>
 				</Select>
-			</div>
+			</FilterBar>
 
-			<ApprovalCards
+			<ApprovalInboxTable
 				approvals={approvals}
 				isLoading={approvalsQuery.isLoading}
 				actingRequest={actingRequest}
 				isActing={actionMutation.isPending}
 				currentUserId={employeeId}
 				onAction={actOnRequest}
+				errorState={
+					approvalsQuery.isError ? (
+						<ErrorState
+							message="Failed to load pending approvals."
+							onRetry={() => {
+								void approvalsQuery.refetch();
+							}}
+							retrying={approvalsQuery.isRefetching}
+						/>
+					) : undefined
+				}
 			/>
 
 			<ApprovalActionDialog
@@ -195,10 +198,10 @@ function ApprovalList({ employeeId }: ApprovalListProps) {
 				onClose={() => setDialogRequest(null)}
 			/>
 
-			<ApprovalPagination
+			<Pagination
 				page={page}
 				pageSize={pageSize}
-				meta={meta}
+				total={meta?.total ?? 0}
 				onPageChange={setPage}
 				onPageSizeChange={(nextPageSize) => {
 					setPageSize(nextPageSize);
@@ -216,7 +219,7 @@ export function ApprovalView() {
 
 	if (!hasHydrated) {
 		return (
-			<div className="flex w-full flex-col gap-6 p-6">
+			<div className="flex w-full flex-col gap-4">
 				<ApprovalCardsSkeleton />
 			</div>
 		);
@@ -224,10 +227,8 @@ export function ApprovalView() {
 
 	if (!Number.isFinite(employeeId)) {
 		return (
-			<div className="flex w-full flex-col gap-4 p-6">
-				<p className="text-sm text-destructive">
-					Employee id is required to load pending approvals.
-				</p>
+			<div className="flex w-full flex-col gap-4">
+				<ErrorState message="Employee id is required to load pending approvals." />
 			</div>
 		);
 	}

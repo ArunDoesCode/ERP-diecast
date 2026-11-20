@@ -313,7 +313,7 @@ export const assetRepository = {
     if (itemRow.averageCostPaise > 0) {
       return {
         ratePaise: itemRow.averageCostPaise,
-        source: "pr_estimate" as const,
+        source: "item_average" as const,
       };
     }
     return {

@@ -1,14 +1,13 @@
 "use client";
 
-import {
-	type ColumnMeta,
-	flexRender,
-	type RowData,
-	type Table as TableInstance,
-} from "@tanstack/react-table";
+import { flexRender, type RowData } from "@tanstack/react-table";
 import type { ReactNode } from "react";
 
 import { DataTablePagination } from "@/components/common/DataTablePagination";
+import type {
+	DataTableColumnMeta,
+	DataTableInstance,
+} from "@/components/common/data-table-features";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
 	Table,
@@ -21,22 +20,14 @@ import {
 
 import { cn } from "@/lib/utils";
 
-declare module "@tanstack/react-table" {
-	// biome-ignore lint/correctness/noUnusedVariables: must match the library's generic signature
-	interface ColumnMeta<TData extends RowData, TValue> {
-		/** Right-align the column (header and cells) with tabular numbers (BR-DS-19). */
-		numeric?: boolean;
-	}
-}
-
 const SKELETON_ROWS = 8;
 
-function isNumeric(meta: ColumnMeta<never, unknown> | undefined) {
+function isNumeric(meta: DataTableColumnMeta | undefined) {
 	return meta?.numeric === true;
 }
 
-type DataTableProps<TData> = {
-	table: TableInstance<TData>;
+type DataTableProps<TData extends RowData> = {
+	table: DataTableInstance<TData>;
 	isLoading?: boolean;
 	rowClassName?: (row: TData) => string | undefined;
 	/** Rendered in place of the empty row. */
@@ -52,7 +43,7 @@ type DataTableProps<TData> = {
 // Render-only: owns header/body/skeleton/pagination markup for any TanStack Table
 // instance. Fetching, columns, sorting/pagination state stay with the feature
 // component that builds `table` — this just draws it.
-export function DataTable<TData>({
+export function DataTable<TData extends RowData>({
 	table,
 	isLoading,
 	rowClassName,

@@ -86,6 +86,7 @@ Links to cancelled POs stay for history.
 | BR-PR-45 | Every PR endpoint needs a login (401) and the `pr.manage` key (403 `PERMISSION_DENIED`); super-admin passes (auth-setup BR-AUTH-09, 18). | No token → 401. Role without `pr.manage` (qa_inspector seed) → 403 |
 | BR-PR-46 | Every header and line status change records who and when: approval moves in the approval trail, the rest on the PR row. | After cancel, submit or a PO-driven change → actor and time readable |
 | BR-PR-47 | Edit, submit and cancel re-read the PR under a row lock and check status inside the transaction. The loser of a race gets 409; nothing is half-written. | Edit and submit race → one gets 409; approval never uses a stale estimate |
+| BR-PR-48 | The PR list search `q` matches PR number and notes only. Status and type are filtered only through their own `status` (comma list) and `type` params, and the PR list screen sends them there, never inside `q`. | `q=approved` → only PRs whose number or notes contain "approved"; `status=approved,partial_ordered` → those PRs; `q=PR-2026-11` → PRs of that period |
 
 ## Not now
 
@@ -112,3 +113,4 @@ None open.
 - 2026-09-29 — pre-freeze touch-up: checked BR-PR-30, 31, 36 agree with approval Q4=B; last "pending subcontracting Q1" text replaced (subcontracting PRs → PO, SCOs created directly). `PR_NOT_EDITABLE` is also the code approval BR-APR-47 uses for PRs.
 - 2026-09-29 — frozen v1 (all questions answered by Arun)
 - 2026-09-29 — v2 clarified during build (review): status is never set through edit (400 `PR_STATUS_VIA_ACTION`); the `pr.link_machine` check (auth BR-AUTH-26) applies only when the machine is added or changed, not when an edit resends the same one; notes are at most 2000 characters (the sale order link is not checked until the sale-order module exists, M4). PO-driven line changes (ordered / closed / cancelled by a PO action) are recorded on the PO's own record (who, when, reason) — BR-PR-46 is met through it. Error codes used: `PR_NOT_EDITABLE`, `PR_NOT_REQUESTER`, `PR_MIN_ONE_LINE`, `PR_INVALID_ITEM`, `PR_DUPLICATE_ITEM`, `PR_LINE_NOT_PENDING`, `PR_DATE_IN_PAST`, `PR_CANCEL_REASON_REQUIRED`, `PR_HAS_ORDERED_LINES`, `PR_INVALID_TRANSITION`.
+- 2026-11-19 — change after freeze, approved by Arun in chat: BR-PR-48 list `q` matches number and notes only; status and type through their own params (#23). Why: `purchase-requisition.assumptions.md`.

@@ -1,6 +1,8 @@
 "use client";
 
-import type { Table } from "@tanstack/react-table";
+import type { RowData } from "@tanstack/react-table";
+
+import type { DataTableInstance } from "@/components/common/data-table-features";
 
 import {
 	Pagination,
@@ -13,8 +15,8 @@ import {
 } from "@/components/ui/pagination";
 import { cn } from "@/lib/utils";
 
-type DataTablePaginationProps<TData> = {
-	table: Table<TData>;
+type DataTablePaginationProps<TData extends RowData> = {
+	table: DataTableInstance<TData>;
 };
 
 const DOTS = "dots" as const;
@@ -61,10 +63,10 @@ function getPageNumbers(
 	return [1, DOTS, ...middleRange, DOTS, total];
 }
 
-export function DataTablePagination<TData>({
+export function DataTablePagination<TData extends RowData>({
 	table,
 }: DataTablePaginationProps<TData>) {
-	const currentPage = table.getState().pagination.pageIndex + 1;
+	const currentPage = table.state.pagination.pageIndex + 1;
 	const totalPages = table.getPageCount();
 	const canPreviousPage = table.getCanPreviousPage();
 	const canNextPage = table.getCanNextPage();

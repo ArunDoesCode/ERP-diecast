@@ -9,6 +9,9 @@ const envSchema = z
     REFRESH_TOKEN_SECRET: z.string().min(32),
     ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().positive().default(900),
     REFRESH_TOKEN_TTL_SECONDS: z.coerce.number().positive().default(604800),
+    // BR-AUTH-04: login attempts per client per 15 min. Raised only in the CI e2e job,
+    // where every browser login shares one counter.
+    AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
     // "test" is included because `bun test` sets NODE_ENV=test by default —
     // needed for the route-registry drift test, which imports the full
     // route tree (and therefore this env module) as an import side effect.

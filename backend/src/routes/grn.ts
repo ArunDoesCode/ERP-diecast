@@ -14,6 +14,7 @@ import {
   grnDetailsSchema,
   grnItemSchema,
   grnListQuerySchema,
+  grnListRowSchema,
   grnQaActionBodySchema,
   grnSchema,
   updateGrnSchema,
@@ -37,7 +38,7 @@ register({
   summary: "List GRNs, paginated. Filterable by poId/status/qaStatus.",
   auth: { type: "permission", key: "grn.view" },
   request: { query: grnListQuerySchema },
-  responses: { "200": paginatedResponse(grnSchema) },
+  responses: { "200": paginatedResponse(grnListRowSchema) },
   pagination: {
     sortableFields: ["id", "grnNumber", "status", "receivedDate"],
     searchable: true,

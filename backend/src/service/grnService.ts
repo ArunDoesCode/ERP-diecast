@@ -9,13 +9,14 @@ import { grnRepository } from "../repository/grnRepository";
 import { poRepository } from "../repository/poRepository";
 import { postStock } from "../repository/stockPostingRepository";
 import { poService } from "../service/poService";
-import type {
-  createGrnSchemaType,
-  grnBypassSchemaType,
-  grnCorrectionSchemaType,
-  grnListQuerySchemaType,
-  grnQaActionSchemaType,
-  updateGrnSchemaType,
+import {
+  type createGrnSchemaType,
+  type grnBypassSchemaType,
+  type grnCorrectionSchemaType,
+  type grnListQuerySchemaType,
+  type grnQaActionSchemaType,
+  type updateGrnSchemaType,
+  WHOLE_NUMBER_UNITS,
 } from "../types/grn.types";
 
 // Over-receipt tolerance: 5% above the PO line's ordered qty (BR-GRN-15).
@@ -33,9 +34,6 @@ const CORRECTABLE_PO_STATUSES = [
   "partial_received",
   "fully_received",
 ];
-
-// Units counted in whole pieces (BR-GRN-02).
-const WHOLE_NUMBER_UNITS = ["pcs", "set", "sets", "nos"];
 
 function toPaginatedMeta(page: number, pageSize: number, total: number) {
   return {
@@ -185,7 +183,7 @@ async function applyDraftUpdate(
 
   // Same whole-number rule as create (BR-GRN-02), checked before any write.
   if (input.lines.length > 0) {
-    const uoms = await grnRepository.findLineUoms(input.grnId);
+    const uoms = await grnRepository.findLineUoms(input.grnId, tx);
     for (const line of input.lines) {
       const uom = uoms.get(line.id)?.trim().toLowerCase();
       if (
@@ -205,6 +203,7 @@ async function applyDraftUpdate(
       grn.supplierId,
       input.challanNo,
       input.grnId,
+      tx,
     );
     if (clash) {
       throw duplicateChallan(input.challanNo);

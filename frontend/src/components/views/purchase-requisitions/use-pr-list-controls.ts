@@ -3,37 +3,25 @@ import { useState } from "react";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import type { PRStatus, PRType } from "@/types/purchase-requisitions";
 
-export type SearchField = "prNumber" | "status" | "type";
-
+// Free text matches PR number and notes only; status and type go to their own
+// query params (BR-PR-48).
 export function usePRListControls() {
 	const [page, setPage] = useState(1);
 	const [pageSize, setPageSize] = useState(10);
-	const [searchField, setSearchField] = useState<SearchField>("status");
-	const [prNumberSearch, setPrNumberSearch] = useState("");
+	const [search, setSearch] = useState("");
 	const [statusFilter, setStatusFilter] = useState<"all" | PRStatus>("all");
 	const [typeFilter, setTypeFilter] = useState<"all" | PRType>("all");
 	const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
-	const debouncedPRNumber = useDebouncedValue(prNumberSearch, 350);
-	const q =
-		searchField === "prNumber"
-			? debouncedPRNumber.trim() || undefined
-			: searchField === "status" && statusFilter !== "all"
-				? statusFilter
-				: searchField === "type" && typeFilter !== "all"
-					? typeFilter
-					: undefined;
+	const debouncedSearch = useDebouncedValue(search, 350);
+	const q = debouncedSearch.trim() || undefined;
+	const status = statusFilter === "all" ? undefined : statusFilter;
+	const type = typeFilter === "all" ? undefined : typeFilter;
+	const filtersActive =
+		statusFilter !== "all" || typeFilter !== "all" || search.trim() !== "";
 
-	function onSearchFieldChange(value: SearchField) {
-		setSearchField(value);
-		setPrNumberSearch("");
-		setStatusFilter("all");
-		setTypeFilter("all");
-		setPage(1);
-	}
-
-	function onPRNumberChange(value: string) {
-		setPrNumberSearch(value);
+	function onSearchChange(value: string) {
+		setSearch(value);
 		setPage(1);
 	}
 
@@ -57,21 +45,30 @@ export function usePRListControls() {
 		setPage(1);
 	}
 
+	function resetFilters() {
+		setSearch("");
+		setStatusFilter("all");
+		setTypeFilter("all");
+		setPage(1);
+	}
+
 	return {
 		page,
 		pageSize,
 		q,
-		searchField,
-		prNumberSearch,
+		search,
+		status,
 		statusFilter,
+		type,
 		typeFilter,
 		sortDir,
+		filtersActive,
 		setPage,
 		onPageSizeChange,
-		onSearchFieldChange,
-		onPRNumberChange,
+		onSearchChange,
 		onStatusFilterChange,
 		onTypeFilterChange,
 		onSortDirectionChange,
+		resetFilters,
 	};
 }

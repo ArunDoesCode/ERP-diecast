@@ -2,21 +2,25 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { IconPlus } from "@tabler/icons-react";
-import {
-	type ColumnDef,
-	getCoreRowModel,
-	type PaginationState,
-	useReactTable,
-} from "@tanstack/react-table";
+import { type PaginationState, useTable } from "@tanstack/react-table";
 import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { DataTable } from "@/components/common/DataTable";
 import { DataTableColumnHeader } from "@/components/common/DataTableColumnHeader";
 import {
+	type DataTableColumnDef,
+	dataTableFeatures,
+} from "@/components/common/data-table-features";
+import {
 	SearchableSelect,
 	type SearchableSelectOption,
 } from "@/components/common/SearchableSelect";
-import { InventoryBackButton } from "@/components/pages/inventory/InventoryBackButton";
+import {
+	listEmptyState,
+	listErrorState,
+} from "@/components/pages/inventory/list-states";
+import { FilterBar } from "@/components/shared/FilterBar";
+import { PageHeader } from "@/components/shared/PageHeader";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -361,7 +365,7 @@ export function InventoryLocationsManager() {
 		[locations],
 	);
 
-	const columns = useMemo<ColumnDef<AssetLocation>[]>(
+	const columns = useMemo<DataTableColumnDef<AssetLocation>[]>(
 		() => [
 			{
 				accessorKey: "name",
@@ -424,10 +428,10 @@ export function InventoryLocationsManager() {
 		[],
 	);
 
-	const table = useReactTable({
+	const table = useTable({
+		features: dataTableFeatures,
 		data: locations,
 		columns,
-		getCoreRowModel: getCoreRowModel(),
 		manualPagination: true,
 		pageCount: meta?.totalPages ?? 1,
 		onPaginationChange: setPagination,
@@ -435,9 +439,18 @@ export function InventoryLocationsManager() {
 	});
 
 	return (
-		<div className="flex w-full flex-col gap-6 p-6">
-			<InventoryBackButton />
-			<div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+		<div className="flex w-full flex-col gap-4">
+			<PageHeader
+				title="Locations"
+				description="Stores, shop floor and vendor locations."
+				actions={
+					<Button onClick={() => setModal({ open: true, mode: "create" })}>
+						<IconPlus className="size-3.5" />
+						Create location
+					</Button>
+				}
+			/>
+			<FilterBar value="" onChange={() => {}}>
 				<div className="w-full sm:max-w-sm">
 					<SearchableSelect
 						value={
@@ -464,14 +477,17 @@ export function InventoryLocationsManager() {
 						isLoading={locationsQuery.isLoading}
 					/>
 				</div>
+			</FilterBar>
 
-				<Button onClick={() => setModal({ open: true, mode: "create" })}>
-					<IconPlus className="size-3.5" />
-					Create location
-				</Button>
-			</div>
-
-			<DataTable table={table} isLoading={locationsQuery.isLoading} />
+			<DataTable
+				table={table}
+				isLoading={locationsQuery.isLoading}
+				emptyState={listEmptyState("No locations yet")}
+				errorState={listErrorState(
+					locationsQuery,
+					"The list could not be loaded.",
+				)}
+			/>
 
 			<Dialog
 				open={modal.open}

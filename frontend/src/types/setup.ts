@@ -66,6 +66,12 @@ export interface AccessLogEntry {
 	actorName: string | null;
 	action: string;
 	target: string;
+	/** One-line description of the change, built on the server (BR-AUTH-31). */
+	summary: string;
+}
+
+/** One access-log row with the full before/after records (BR-AUTH-31). */
+export interface AccessLogDetail extends AccessLogEntry {
 	before: unknown;
 	after: unknown;
 }

@@ -4,8 +4,19 @@ import {
   grnItems,
   grnStatusEnum,
   grns,
+  poStatusEnum,
+  prStatusEnum,
 } from "../db/schemas/02_procurement-purchasing";
 import { searchTermSchema } from "../lib/safe-search";
+
+// Units counted in whole pieces (BR-GRN-02). One source: the frontend copy in
+// frontend/src/lib/grn-units.ts must match (contract test, #31).
+export const WHOLE_NUMBER_UNITS: readonly string[] = [
+  "pcs",
+  "set",
+  "sets",
+  "nos",
+];
 
 // Quantities: up to 3 decimals (BR-GRN-02). Whole-number rule for pcs/set items
 // needs the item's unit, so the service enforces that one (400).
@@ -31,6 +42,24 @@ export type grnQaStatusSchemaType = z.infer<typeof grnQaStatusSchema>;
 export const grnSchema = createSelectSchema(grns);
 export type grnSchemaType = z.infer<typeof grnSchema>;
 
+// GET /grn/getgrns row: the header plus its PO's number (BR-GRN-45).
+export const grnListRowSchema = grnSchema.extend({
+  poNumber: z.string().nullable(),
+});
+export type grnListRowSchemaType = z.infer<typeof grnListRowSchema>;
+
+// The GRN's PO and the requisitions behind it, for the document flow (BR-GRN-45).
+export const grnLinkedPoSchema = z.object({
+  id: z.number().int(),
+  poNumber: z.string(),
+  status: z.enum(poStatusEnum.enumValues),
+});
+export const grnLinkedPrSchema = z.object({
+  id: z.number().int(),
+  prNumber: z.string(),
+  status: z.enum(prStatusEnum.enumValues),
+});
+
 // Response shape for a stored GRN line row.
 export const grnItemSchema = createSelectSchema(grnItems);
 export type grnItemSchemaType = z.infer<typeof grnItemSchema>;
@@ -40,7 +69,11 @@ export const grnItemDetailSchema = grnItemSchema.extend({
   itemId: z.number().int(),
   itemSku: z.string(),
   itemName: z.string(),
+  // BR-GRN-46
+  uom: z.string(),
   orderedQty: z.number(),
+  // PO line qty accepted so far across all GRNs (BR-GRN-47).
+  poReceivedQty: z.number(),
   // Sum of all corrections posted on this line (BR-GRN-35).
   correctedQty: z.number(),
   // acceptedQty - correctedQty. acceptedQty itself never changes (BR-GRN-35).
@@ -51,6 +84,8 @@ export type grnItemDetailSchemaType = z.infer<typeof grnItemDetailSchema>;
 // GET /grn/getgrndetails/:id response payload.
 export const grnDetailsSchema = z.object({
   grn: grnSchema,
+  po: grnLinkedPoSchema.nullable(),
+  prs: z.array(grnLinkedPrSchema),
   items: z.array(grnItemDetailSchema),
 });
 export type grnDetailsSchemaType = z.infer<typeof grnDetailsSchema>;

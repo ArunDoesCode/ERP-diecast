@@ -4,7 +4,10 @@ import { IconArrowLeft, IconSearch } from "@tabler/icons-react";
 import Link from "next/link";
 
 import { PurchaseOrderTrackingCards } from "@/components/pages/purchase-orders/PurchaseOrderTrackingCards";
-import { PurchaseRequisitionsPagination } from "@/components/pages/purchase-requisitions/PurchaseRequisitionsPagination";
+import { ErrorState } from "@/components/shared/ErrorState";
+import { FilterBar } from "@/components/shared/FilterBar";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { Pagination } from "@/components/shared/Pagination";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -61,101 +64,128 @@ export function PurchaseOrderTrackingView() {
 	const purchaseOrders = poQuery.data?.data ?? [];
 	const meta = poQuery.data?.meta;
 
+	const filtersActive =
+		statusFilter !== "active" || overdueOnly || qInput.trim() !== "";
+
+	function resetFilters() {
+		onQChange("");
+		onStatusFilterChange("active");
+		onOverdueToggle(false);
+	}
+
 	return (
-		<div className="flex w-full flex-col gap-6 p-6">
-			<Button type="button" variant="ghost" size="sm" className="w-fit" asChild>
-				<Link href="/purchase-orders">
-					<IconArrowLeft className="size-3.5" />
-					Back to queue
-				</Link>
-			</Button>
-
-			<div>
-				<h1 className="font-heading text-lg font-medium">
-					Purchase order tracking
-				</h1>
-				<p className="text-xs text-muted-foreground">
-					Track every PO through approval, dispatch, and receipt.
-				</p>
-			</div>
-
-			<div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-				<div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
-					<Select
-						value={statusFilter}
-						onValueChange={(value) =>
-							onStatusFilterChange(value as "active" | POStatus)
-						}
-					>
-						<SelectTrigger className="w-full sm:w-64">
-							<SelectValue placeholder="Status" />
-						</SelectTrigger>
-						<SelectContent>
-							{PO_TRACKING_STATUS_OPTIONS.map((option) => (
-								<SelectItem key={option.value} value={option.value}>
-									{option.label}
-								</SelectItem>
-							))}
-						</SelectContent>
-					</Select>
-
-					<div className="relative w-full sm:max-w-sm">
-						<IconSearch className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-						<Input
-							value={qInput}
-							onChange={(event) => onQChange(event.target.value)}
-							placeholder="Search PO number or notes"
-							className="pl-7"
-						/>
-					</div>
-
-					<Select
-						value={sortBy}
-						onValueChange={(value) => onSortByChange(value as POSortField)}
-					>
-						<SelectTrigger className="w-full sm:w-40">
-							<SelectValue placeholder="Sort by" />
-						</SelectTrigger>
-						<SelectContent>
-							{SORT_FIELDS.map((field) => (
-								<SelectItem key={field.value} value={field.value}>
-									{field.label}
-								</SelectItem>
-							))}
-						</SelectContent>
-					</Select>
-				</div>
-
-				<div className="flex items-center gap-4 text-xs text-muted-foreground">
-					<div className="flex items-center gap-2">
-						<span>Asc</span>
-						<Switch
-							checked={sortDir === "desc"}
-							onCheckedChange={onSortDirectionChange}
-							aria-label="Toggle sort direction"
-						/>
-						<span>Dsc</span>
-					</div>
-					<div className="flex items-center gap-2">
-						<Switch
-							checked={overdueOnly}
-							onCheckedChange={onOverdueToggle}
-							aria-label="Toggle overdue only"
-						/>
-						<span>Overdue only</span>
-					</div>
-				</div>
-			</div>
-
-			<PurchaseOrderTrackingCards
-				purchaseOrders={purchaseOrders}
-				isLoading={poQuery.isLoading}
+		<div className="flex w-full flex-col gap-4">
+			<PageHeader
+				title="Purchase order tracking"
+				description="Track every PO through approval, dispatch, and receipt."
+				actions={
+					<Button type="button" variant="outline" size="sm" asChild>
+						<Link href="/purchase-orders">
+							<IconArrowLeft />
+							Back to queue
+						</Link>
+					</Button>
+				}
 			/>
 
-			<PurchaseRequisitionsPagination
+			<FilterBar
+				value="all"
+				onChange={() => {}}
+				onReset={resetFilters}
+				filtersActive={filtersActive}
+			>
+				<Select
+					value={statusFilter}
+					onValueChange={(value) =>
+						onStatusFilterChange(value as "active" | POStatus)
+					}
+				>
+					<SelectTrigger className="w-60" aria-label="Status">
+						<SelectValue placeholder="Status" />
+					</SelectTrigger>
+					<SelectContent>
+						{PO_TRACKING_STATUS_OPTIONS.map((option) => (
+							<SelectItem key={option.value} value={option.value}>
+								{option.label}
+							</SelectItem>
+						))}
+					</SelectContent>
+				</Select>
+
+				<div className="relative w-52">
+					<IconSearch
+						aria-hidden="true"
+						className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground"
+					/>
+					<Input
+						value={qInput}
+						onChange={(event) => onQChange(event.target.value)}
+						placeholder="Search PO number or notes"
+						aria-label="Search PO number or notes"
+						className="pl-7"
+					/>
+				</div>
+
+				<Select
+					value={sortBy}
+					onValueChange={(value) => onSortByChange(value as POSortField)}
+				>
+					<SelectTrigger className="w-36" aria-label="Sort by">
+						<SelectValue placeholder="Sort by" />
+					</SelectTrigger>
+					<SelectContent>
+						{SORT_FIELDS.map((field) => (
+							<SelectItem key={field.value} value={field.value}>
+								{field.label}
+							</SelectItem>
+						))}
+					</SelectContent>
+				</Select>
+
+				<div className="flex items-center gap-2 text-xs text-muted-foreground">
+					<span>Asc</span>
+					<Switch
+						checked={sortDir === "desc"}
+						onCheckedChange={onSortDirectionChange}
+						aria-label="Toggle sort direction"
+					/>
+					<span>Dsc</span>
+				</div>
+				<div className="flex items-center gap-2 text-xs text-muted-foreground">
+					<Switch
+						checked={overdueOnly}
+						onCheckedChange={onOverdueToggle}
+						aria-label="Toggle overdue only"
+					/>
+					<span>Overdue only</span>
+				</div>
+			</FilterBar>
+
+			{poQuery.isError ? (
+				<ErrorState
+					message={
+						poQuery.error instanceof Error
+							? poQuery.error.message
+							: "The list could not be loaded."
+					}
+					onRetry={() => {
+						void poQuery.refetch();
+					}}
+					retrying={poQuery.isRefetching}
+				/>
+			) : (
+				<PurchaseOrderTrackingCards
+					purchaseOrders={purchaseOrders}
+					isLoading={poQuery.isLoading}
+					filtersActive={filtersActive}
+					onResetFilters={resetFilters}
+				/>
+			)}
+
+			<Pagination
 				page={page}
 				pageSize={pageSize}
-				meta={meta}
+				total={meta?.total ?? 0}
 				onPageChange={setPage}
 				onPageSizeChange={onPageSizeChange}
 			/>

@@ -3,10 +3,12 @@ import { Hono } from "hono";
 import { companySettingsController } from "../controller/companySettingsController";
 import { asyncHandler } from "../lib/async-handler";
 import { requirePermission } from "../lib/auth-middleware";
-import { successResponse } from "../lib/response-schemas";
+import { paginatedResponse, successResponse } from "../lib/response-schemas";
 import { register } from "../lib/route-registry";
 import type { AppEnv } from "../lib/types";
 import {
+  companySettingsHistoryQuerySchema,
+  companySettingsHistoryRowSchema,
   companySettingsSchema,
   companySettingsUpsertSchema,
 } from "../types/sco.types";
@@ -46,6 +48,24 @@ register({
   auth: { type: "permission", key: "company.manage" },
   request: { body: companySettingsUpsertSchema },
   responses: { "200": successResponse(companySettingsSchema) },
+});
+
+companyRouter.get(
+  COMPANY_ROUTES.settingsHistory,
+  requirePermission("sco.view"),
+  asyncHandler(companySettingsController.listHistory),
+);
+register({
+  method: "GET",
+  path: `${COMPANY_BASE_PATH}${COMPANY_ROUTES.settingsHistory}`,
+  tags: ["company"],
+  summary:
+    "Company settings change history, one row per changed field, newest first (BR-SCO-29). Read-only.",
+  auth: { type: "permission", key: "sco.view" },
+  request: { query: companySettingsHistoryQuerySchema },
+  responses: {
+    "200": paginatedResponse(companySettingsHistoryRowSchema),
+  },
 });
 
 export { companyRouter as companyRoutes };

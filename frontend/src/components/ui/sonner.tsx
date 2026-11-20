@@ -8,7 +8,20 @@ import {
 	IconLoader,
 } from "@tabler/icons-react";
 import { useTheme } from "next-themes";
-import { Toaster as Sonner, type ToasterProps } from "sonner";
+import { Toaster as Sonner, type ToasterProps, toast } from "sonner";
+
+// BR-DS-23: success closes after 4 s (Toaster default); an error stays until closed.
+const originalError = toast.error;
+let errorPatched = false;
+if (!errorPatched) {
+	errorPatched = true;
+	toast.error = ((message, data) =>
+		originalError(message, {
+			duration: Number.POSITIVE_INFINITY,
+			closeButton: true,
+			...data,
+		})) as typeof toast.error;
+}
 
 const Toaster = ({ ...props }: ToasterProps) => {
 	const { theme = "system" } = useTheme();
@@ -16,7 +29,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
 	return (
 		<Sonner
 			theme={theme as ToasterProps["theme"]}
-			className="toaster group"
+			// pointer-events-auto: a modal dialog sets pointer-events:none on <body>; toasts must stay clickable.
+			className="toaster group pointer-events-auto"
 			icons={{
 				success: <IconCircleCheck className="size-4" />,
 				info: <IconInfoCircle className="size-4" />,

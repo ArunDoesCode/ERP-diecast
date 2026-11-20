@@ -2,15 +2,13 @@
 
 import Link from "next/link";
 import { useState } from "react";
-
-import { formatPaise } from "@/components/pages/inventory/inventory-format";
-import { PurchaseRequisitionsPagination } from "@/components/pages/purchase-requisitions/PurchaseRequisitionsPagination";
 import {
 	DateRangeFilter,
 	SortableHead,
 	VendorFilter,
 } from "@/components/pages/subcontracting/ReportFilters";
-import { Badge } from "@/components/ui/badge";
+import { Pagination } from "@/components/shared/Pagination";
+import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Card, CardContent } from "@/components/ui/card";
 import {
 	Select,
@@ -30,11 +28,7 @@ import {
 } from "@/components/ui/table";
 import { SCO_STATUS_FILTER_OPTIONS } from "@/components/views/subcontracting/use-sco-controls";
 import { useScosQuery } from "@/lib/api/subcontracting/queries";
-import {
-	formatScoDate,
-	getScoStatusBadgeStyle,
-	SCO_STATUS_LABEL,
-} from "@/lib/sco-format";
+import { formatDate, formatMoney } from "@/lib/format";
 import type { ScoSortField, ScoStatus } from "@/types/subcontracting";
 
 export function ScoRegisterReport() {
@@ -140,7 +134,6 @@ export function ScoRegisterReport() {
 							</TableHeader>
 							<TableBody>
 								{rows.map((sco) => {
-									const badge = getScoStatusBadgeStyle(sco.status);
 									return (
 										<TableRow key={sco.id}>
 											<TableCell>
@@ -153,19 +146,14 @@ export function ScoRegisterReport() {
 											</TableCell>
 											<TableCell>{sco.vendorName}</TableCell>
 											<TableCell>
-												<Badge
-													variant={badge.variant}
-													className={badge.className}
-												>
-													{SCO_STATUS_LABEL[sco.status]}
-												</Badge>
+												<StatusBadge doc="sco" status={sco.status} />
 											</TableCell>
-											<TableCell>{formatScoDate(sco.createdAt)}</TableCell>
+											<TableCell>{formatDate(sco.createdAt)}</TableCell>
 											<TableCell>
-												{formatScoDate(sco.expectedReturnDate)}
+												{formatDate(sco.expectedReturnDate)}
 											</TableCell>
 											<TableCell className="text-right">
-												{formatPaise(sco.totalAmountPaise)}
+												{formatMoney(sco.totalAmountPaise)}
 											</TableCell>
 										</TableRow>
 									);
@@ -175,10 +163,10 @@ export function ScoRegisterReport() {
 					)}
 				</CardContent>
 			</Card>
-			<PurchaseRequisitionsPagination
+			<Pagination
 				page={page}
 				pageSize={pageSize}
-				meta={query.data?.meta}
+				total={query.data?.meta.total ?? 0}
 				onPageChange={setPage}
 				onPageSizeChange={(next) => {
 					setPageSize(next);

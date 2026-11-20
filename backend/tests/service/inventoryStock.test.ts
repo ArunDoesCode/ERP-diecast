@@ -935,14 +935,14 @@ describe("last rate (BR-INV-24)", () => {
     expect(r.json.data).toEqual({ ratePaise: 240, source: "supplier_catalog" });
   });
 
-  test("BR-INV-24 no PO, no catalog, average > 0 gives the item average", async () => {
+  test("BR-INV-30 BR-INV-24 no PO, no catalog, average > 0 gives the item average, source item_average", async () => {
     const item = await mkItem({ standardRatePaise: 24000 });
     const loc = await mkLocation();
     await mustOpen(item.id, loc.id, 10, 21000);
     const sup = await mkSupplier();
     const r = await lastRate(item.id, sup);
     expect(r.status).toBe(200);
-    expect(r.json.data).toEqual({ ratePaise: 21000, source: "pr_estimate" });
+    expect(r.json.data).toEqual({ ratePaise: 21000, source: "item_average" });
   });
 
   test("BR-INV-24 no PO, no catalog, average 0, standard 24000 gives 24000 from the standard rate", async () => {
@@ -957,5 +957,92 @@ describe("last rate (BR-INV-24)", () => {
     const sup = await mkSupplier();
     const r = await lastRate(2_000_000_000, sup);
     expect(r.status).toBe(404);
+  });
+});
+
+// ---------------------------------------------------------------- 2026-11-19 rule changes
+describe("BR-INV-24 legacy item with standard rate 0", () => {
+  test("BR-INV-24 legacy item, standard 0, no PO, no catalog, average 0 -> 0 from the standard rate", async () => {
+    const item = await mkItem();
+    await db
+      .update(itemMaster)
+      .set({ standardRatePaise: 0 })
+      .where(eq(itemMaster.id, item.id));
+    const [s] = await db
+      .insert(supplierMaster)
+      .values({ name: `${RUN}_legacy_sup_${++seq}` })
+      .returning({ id: supplierMaster.id });
+    supplierIds.push(s!.id);
+    const r = await call(
+      "GET",
+      `/items/${item.id}/last-rate?supplierId=${s!.id}`,
+      "back_office",
+    );
+    expect(r.status).toBe(200);
+    expect(r.json.data).toEqual({ ratePaise: 0, source: "standard_rate" });
+  });
+});
+
+describe("BR-INV-29 stock check (reconciliation API)", () => {
+  test("BR-INV-29 item stored 480, ledger 470 -> a row with difference 10 and the SKU", async () => {
+    const item = await mkItem();
+    const loc = await mkLocation();
+    await mustOpen(item.id, loc.id, 470, 100);
+    await db
+      .update(itemMaster)
+      .set({ currentStock: 480 })
+      .where(eq(itemMaster.id, item.id));
+    let found: any;
+    for (let page = 1; page <= 50 && !found; page++) {
+      const r = await call(
+        "GET",
+        `/inventory/reconciliation?page=${page}&pageSize=100&sortBy=itemId`,
+        "owner",
+      );
+      expect(r.status).toBe(200);
+      found = (r.json.data as any[]).find(
+        (x) => x.itemId === item.id && x.kind === "item_stock",
+      );
+      if (page >= r.json.meta.totalPages) break;
+    }
+    expect(found).toBeDefined();
+    expect(found.storedQty).toBe(480);
+    expect(found.ledgerQty).toBe(470);
+    // the screen computes the difference from the two fields
+    expect(found.storedQty - found.ledgerQty).toBe(10);
+    expect(found.itemSku).toBe(item.sku);
+  });
+
+  test("BR-INV-29 default page size is 10 and 101 is refused", async () => {
+    const ok = await call("GET", "/inventory/reconciliation", "owner");
+    expect(ok.status).toBe(200);
+    expect(ok.json.meta.pageSize).toBe(10);
+    const bad = await call(
+      "GET",
+      "/inventory/reconciliation?pageSize=101",
+      "owner",
+    );
+    expect(bad.status).toBe(400);
+  });
+
+  test("BR-INV-29 rows are sorted by item", async () => {
+    const r = await call(
+      "GET",
+      "/inventory/reconciliation?page=1&pageSize=100",
+      "owner",
+    );
+    expect(r.status).toBe(200);
+    const ids = (r.json.data as any[]).map((x) => x.itemId);
+    expect(ids).toEqual([...ids].sort((a, b) => a - b));
+  });
+
+  test("BR-INV-29 qa_inspector (no inventory.view) -> 403", async () => {
+    const r = await call("GET", "/inventory/reconciliation", "qa_inspector");
+    expect(r.status).toBe(403);
+  });
+
+  test("BR-INV-29 unauthenticated -> 401", async () => {
+    const res = await app.request("/api/asset/inventory/reconciliation");
+    expect(res.status).toBe(401);
   });
 });

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { createJSONStorage, devtools, persist } from "zustand/middleware";
+import { devtools } from "zustand/middleware";
 
 import type { AuthScreen } from "@/types/auth";
 
@@ -12,8 +12,12 @@ type AuthProfile = {
 	screens?: AuthScreen[];
 };
 
+/**
+ * The signed-in user's profile, in memory only (BR-AUTH-30): nothing is persisted, and the
+ * access token is not kept here (see `@/lib/auth/token`). On load the profile comes from
+ * `/auth/me` after the session is restored through the refresh cookie.
+ */
 type AuthSessionState = {
-	token: string | null;
 	userId: string | null;
 	userName: string | null;
 	/** Display only — never gate UI on this; use `permissions` (useCan). */
@@ -22,15 +26,13 @@ type AuthSessionState = {
 	isSuperAdmin: boolean;
 	permissions: string[];
 	screens: AuthScreen[];
+	/** true once the session is restored (profile loaded) or known to be gone. */
 	hasHydrated: boolean;
-	setToken: (token: string | null) => void;
 	setProfile: (profile: AuthProfile) => void;
-	setHasHydrated: (value: boolean) => void;
 	clearSession: () => void;
 };
 
 const initialState = {
-	token: null,
 	userId: null,
 	userName: null,
 	role: null,
@@ -41,73 +43,37 @@ const initialState = {
 
 export const useAuthSessionStore = create<AuthSessionState>()(
 	devtools(
-		persist(
-			(set) => ({
-				...initialState,
-				hasHydrated: false,
+		(set) => ({
+			...initialState,
+			hasHydrated: false,
 
-				setToken: (token) => {
-					if (!token) {
-						set(
-							{
-								...initialState,
-							},
-							false,
-							"auth-session/setToken:clear",
-						);
-						return;
-					}
-
-					set({ token }, false, "auth-session/setToken");
-				},
-
-				setProfile: (profile) => {
-					set(
-						(state) => ({
-							userId: profile.userId ?? state.userId,
-							userName: profile.userName ?? state.userName,
-							role: profile.role ?? state.role,
-							isSuperAdmin: profile.isSuperAdmin ?? state.isSuperAdmin,
-							permissions: profile.permissions ?? state.permissions,
-							screens: profile.screens ?? state.screens,
-						}),
-						false,
-						"auth-session/setProfile",
-					);
-				},
-
-				setHasHydrated: (value) => {
-					set({ hasHydrated: value }, false, "auth-session/setHasHydrated");
-				},
-
-				clearSession: () => {
-					set(
-						{
-							...initialState,
-							hasHydrated: true,
-						},
-						false,
-						"auth-session/clearSession",
-					);
-				},
-			}),
-			{
-				name: "auth-session-store",
-				storage: createJSONStorage(() => localStorage),
-				partialize: (state) => ({
-					token: state.token,
-					userId: state.userId,
-					userName: state.userName,
-					role: state.role,
-					isSuperAdmin: state.isSuperAdmin,
-					permissions: state.permissions,
-					screens: state.screens,
-				}),
-				onRehydrateStorage: () => (state) => {
-					state?.setHasHydrated(true);
-				},
+			setProfile: (profile) => {
+				set(
+					(state) => ({
+						userId: profile.userId ?? state.userId,
+						userName: profile.userName ?? state.userName,
+						role: profile.role ?? state.role,
+						isSuperAdmin: profile.isSuperAdmin ?? state.isSuperAdmin,
+						permissions: profile.permissions ?? state.permissions,
+						screens: profile.screens ?? state.screens,
+						hasHydrated: true,
+					}),
+					false,
+					"auth-session/setProfile",
+				);
 			},
-		),
+
+			clearSession: () => {
+				set(
+					{
+						...initialState,
+						hasHydrated: true,
+					},
+					false,
+					"auth-session/clearSession",
+				);
+			},
+		}),
 		{ name: "auth-session-store" },
 	),
 );

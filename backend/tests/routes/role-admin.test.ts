@@ -1105,6 +1105,53 @@ describe("BR-AUTH-20 access log", () => {
     expect([...times].sort((a, b) => b - a)).toEqual(times);
   });
 
+  test("BR-AUTH-31 list rows carry a one-line summary and no full before/after", async () => {
+    const { status, json } = await call(
+      "sa",
+      "GET",
+      "/access-log?pageSize=100&sortBy=at&sortDir=desc",
+    );
+    expect(status).toBe(200);
+    const rows = json.data as Json[];
+    expect(rows.length).toBeGreaterThan(0);
+    for (const r of rows) {
+      expect(typeof r.summary).toBe("string");
+      expect((r.summary as string).length).toBeGreaterThan(0);
+      expect((r.summary as string).includes("\n")).toBe(false);
+      expect(r).not.toHaveProperty("before");
+      expect(r).not.toHaveProperty("after");
+    }
+  });
+
+  test("BR-AUTH-31 GET /access-log/:id returns the full before/after for the same row key", async () => {
+    const list = await call(
+      "sa",
+      "GET",
+      "/access-log?pageSize=100&sortBy=at&sortDir=desc",
+    );
+    const row = (list.json.data as Json[]).find(
+      (r) => r.action === "role.create",
+    );
+    expect(row).toBeDefined();
+    const one = await call("sa", "GET", `/access-log/${row?.id}`);
+    expect(one.status).toBe(200);
+    expect(one.json.data.id).toBe(row?.id);
+    expect(one.json.data.action).toBe("role.create");
+    expect(one.json.data).toHaveProperty("before");
+    expect(one.json.data).toHaveProperty("after");
+    expect(one.json.data.after).not.toBeNull();
+  });
+
+  test("BR-AUTH-31 GET /access-log/:id for an unknown id -> 404", async () => {
+    expect((await call("sa", "GET", "/access-log/2147483000")).status).toBe(
+      404,
+    );
+  });
+
+  test("BR-AUTH-31 GET /access-log/:id by a non-super-admin -> 403", async () => {
+    expect((await call("mgr", "GET", "/access-log/1")).status).toBe(403);
+  });
+
   test("BR-AUTH-20 the log cannot be edited: no POST/PATCH/PUT/DELETE route", async () => {
     for (const method of ["POST", "PATCH", "PUT", "DELETE"]) {
       const res = await app.request("/api/setup/access-log", {

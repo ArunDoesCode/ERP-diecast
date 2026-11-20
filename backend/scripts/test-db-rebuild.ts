@@ -77,7 +77,7 @@ try {
 }
 
 const resetArgs = withFixtures ? [] : ["--no-fixtures"];
-const cmd = ["bun", "scripts/db-reset.ts", ...resetArgs];
+const cmd = [process.execPath, "scripts/db-reset.ts", ...resetArgs];
 console.log(
   `Steps: db:reset ${resetArgs.join(" ")}`.trimEnd() +
     ` on ${target.label} = drop schema -> apply migrations -> roles and permissions -> admin -> approval policies${withFixtures ? " -> fixtures" : " (fixtures skipped, as in CI)"}`,

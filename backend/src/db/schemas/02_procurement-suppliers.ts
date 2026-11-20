@@ -50,6 +50,27 @@ export const supplierMaster = pgTable(
     nameNormUq: uniqueIndex("uq_supplier_master_name_norm").on(
       sql`lower(btrim(${t.name}))`,
     ),
+    // Supplier list / SCO list search (ilike %q%, #21, #62): pg_trgm GIN
+    nameTrgm: index("idx_supplier_master_name_trgm").using(
+      "gin",
+      t.name.op("gin_trgm_ops"),
+    ),
+    contactPersonTrgm: index("idx_supplier_master_contact_person_trgm").using(
+      "gin",
+      t.contactPerson.op("gin_trgm_ops"),
+    ),
+    emailTrgm: index("idx_supplier_master_email_trgm").using(
+      "gin",
+      t.email.op("gin_trgm_ops"),
+    ),
+    phoneTrgm: index("idx_supplier_master_phone_trgm").using(
+      "gin",
+      t.phone.op("gin_trgm_ops"),
+    ),
+    gstNumberTrgm: index("idx_supplier_master_gst_number_trgm").using(
+      "gin",
+      t.gstNumber.op("gin_trgm_ops"),
+    ),
   }),
 );
 
@@ -95,7 +116,6 @@ export const supplierServices = pgTable(
     supplierId: integer("supplier_id")
       .references(() => supplierMaster.id)
       .notNull(),
-    // no-index: covered:unique_supplier_service_idx supplier_id always given
     serviceId: integer("service_id")
       .references(() => serviceMaster.id)
       .notNull(),
@@ -117,6 +137,10 @@ export const supplierServices = pgTable(
     return {
       uniqueSupplierService: uniqueIndex("unique_supplier_service_idx").on(
         table.supplierId,
+        table.serviceId,
+      ),
+      // #42: "which vendors do this service" lookups
+      serviceIdIdx: index("idx_supplier_services_service_id").on(
         table.serviceId,
       ),
     };

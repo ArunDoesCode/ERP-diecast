@@ -725,7 +725,7 @@
           "success": "boolean.required",
           "data": {
             "ratePaise": "integer.nonnegative.required",
-            "source": "enum:po_history,supplier_catalog,pr_estimate,standard_rate.required"
+            "source": "enum:po_history,supplier_catalog,item_average,standard_rate.required"
           }
         }
       }
@@ -1185,6 +1185,41 @@
       }
     },
     {
+      "id": "POST /api/auth/qr-login",
+      "method": "POST",
+      "path": "/api/auth/qr-login",
+      "tags": [
+        "auth"
+      ],
+      "summary": "Operator QR login: scanned QR token, returns access token + sets refresh cookie.",
+      "auth": {
+        "type": "public"
+      },
+      "request": {
+        "body": {
+          "qrToken": "string.nonempty.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "message": "string.required",
+          "data": {
+            "accessToken": "string.required",
+            "user": {
+              "id": "number.required",
+              "name": "string.required",
+              "email": "unknown.required",
+              "role": "string.required",
+              "isSuperAdmin": "boolean.required",
+              "permissions": "array<string>.required",
+              "screens": "array<object>.required"
+            }
+          }
+        }
+      }
+    },
+    {
       "id": "POST /api/auth/refresh",
       "method": "POST",
       "path": "/api/auth/refresh",
@@ -1317,6 +1352,37 @@
       }
     },
     {
+      "id": "GET /api/company/settings/history",
+      "method": "GET",
+      "path": "/api/company/settings/history",
+      "tags": [
+        "company"
+      ],
+      "summary": "Company settings change history, one row per changed field, newest first (BR-SCO-29). Read-only.",
+      "auth": {
+        "type": "permission",
+        "key": "sco.view"
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      }
+    },
+    {
       "id": "GET /api/grn/getgrns",
       "method": "GET",
       "path": "/api/grn/getgrns",
@@ -1394,6 +1460,12 @@
               "driverPhone": "unknown.required",
               "remarks": "unknown.required"
             },
+            "po": {
+              "id": "integer.required",
+              "poNumber": "string.required",
+              "status": "enum:draft,pending_approval,approved,dispatched,partial_received,fully_received,invoiced,closed,cancelled.required"
+            },
+            "prs": "array<object>.required",
             "items": "array<object>.required"
           }
         }
@@ -1442,6 +1514,12 @@
               "driverPhone": "unknown.required",
               "remarks": "unknown.required"
             },
+            "po": {
+              "id": "integer.required",
+              "poNumber": "string.required",
+              "status": "enum:draft,pending_approval,approved,dispatched,partial_received,fully_received,invoiced,closed,cancelled.required"
+            },
+            "prs": "array<object>.required",
             "items": "array<object>.required"
           }
         }
@@ -1490,6 +1568,12 @@
               "driverPhone": "unknown.required",
               "remarks": "unknown.required"
             },
+            "po": {
+              "id": "integer.required",
+              "poNumber": "string.required",
+              "status": "enum:draft,pending_approval,approved,dispatched,partial_received,fully_received,invoiced,closed,cancelled.required"
+            },
+            "prs": "array<object>.required",
             "items": "array<object>.required"
           }
         }
@@ -1680,7 +1764,8 @@
             "page": "integer.nonnegative.required",
             "pageSize": "integer.nonnegative.required",
             "total": "integer.nonnegative.required",
-            "totalPages": "integer.nonnegative.required"
+            "totalPages": "integer.nonnegative.required",
+            "statusCounts": {}
           }
         }
       },
@@ -1745,6 +1830,7 @@
               "invoicedBy": "unrepresentable.nullable.required",
               "invoicedAt": "unrepresentable.nullable.required",
               "cancelledByName": "unknown.required",
+              "supplierName": "string.required",
               "dueDate": "unrepresentable.nullable.required"
             },
             "items": "array<object>.required"
@@ -1812,6 +1898,7 @@
               "invoicedBy": "unrepresentable.nullable.required",
               "invoicedAt": "unrepresentable.nullable.required",
               "cancelledByName": "unknown.required",
+              "supplierName": "string.required",
               "dueDate": "unrepresentable.nullable.required"
             },
             "items": "array<object>.required"
@@ -1881,6 +1968,7 @@
               "invoicedBy": "unrepresentable.nullable.required",
               "invoicedAt": "unrepresentable.nullable.required",
               "cancelledByName": "unknown.required",
+              "supplierName": "string.required",
               "dueDate": "unrepresentable.nullable.required"
             },
             "items": "array<object>.required"
@@ -1942,6 +2030,7 @@
             "invoicedBy": "unrepresentable.nullable.required",
             "invoicedAt": "unrepresentable.nullable.required",
             "cancelledByName": "unknown.required",
+            "supplierName": "string.required",
             "dueDate": "unrepresentable.nullable.required"
           }
         }
@@ -2003,6 +2092,7 @@
             "invoicedBy": "unrepresentable.nullable.required",
             "invoicedAt": "unrepresentable.nullable.required",
             "cancelledByName": "unknown.required",
+            "supplierName": "string.required",
             "dueDate": "unrepresentable.nullable.required"
           }
         }
@@ -2137,6 +2227,7 @@
             "invoicedBy": "unrepresentable.nullable.required",
             "invoicedAt": "unrepresentable.nullable.required",
             "cancelledByName": "unknown.required",
+            "supplierName": "string.required",
             "dueDate": "unrepresentable.nullable.required"
           }
         }
@@ -2197,6 +2288,7 @@
             "invoicedBy": "unrepresentable.nullable.required",
             "invoicedAt": "unrepresentable.nullable.required",
             "cancelledByName": "unknown.required",
+            "supplierName": "string.required",
             "dueDate": "unrepresentable.nullable.required"
           }
         }
@@ -2259,6 +2351,7 @@
             "invoicedBy": "unrepresentable.nullable.required",
             "invoicedAt": "unrepresentable.nullable.required",
             "cancelledByName": "unknown.required",
+            "supplierName": "string.required",
             "dueDate": "unrepresentable.nullable.required"
           }
         }
@@ -2318,6 +2411,7 @@
             "invoicedBy": "unrepresentable.nullable.required",
             "invoicedAt": "unrepresentable.nullable.required",
             "cancelledByName": "unknown.required",
+            "supplierName": "string.required",
             "dueDate": "unrepresentable.nullable.required"
           }
         }
@@ -2377,6 +2471,7 @@
             "invoicedBy": "unrepresentable.nullable.required",
             "invoicedAt": "unrepresentable.nullable.required",
             "cancelledByName": "unknown.required",
+            "supplierName": "string.required",
             "dueDate": "unrepresentable.nullable.required"
           }
         }
@@ -2433,7 +2528,8 @@
             "page": "integer.nonnegative.required",
             "pageSize": "integer.nonnegative.required",
             "total": "integer.nonnegative.required",
-            "totalPages": "integer.nonnegative.required"
+            "totalPages": "integer.nonnegative.required",
+            "statusCounts": {}
           }
         }
       },
@@ -4145,7 +4241,42 @@
         "searchable": false
       },
       "notes": [
-        "No write endpoints exist. Send sortBy=at&sortDir=desc for newest first."
+        "No write endpoints exist. Send sortBy=at&sortDir=desc for newest first.",
+        "Each row carries a one-line summary of the change, not the before/after records (BR-AUTH-31)."
+      ]
+    },
+    {
+      "id": "GET /api/setup/access-log/:id",
+      "method": "GET",
+      "path": "/api/setup/access-log/:id",
+      "tags": [
+        "setup",
+        "access-log"
+      ],
+      "summary": "One access-log row with full before/after (BR-AUTH-31).",
+      "auth": {
+        "type": "permission",
+        "key": "setup.roles.manage"
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "number.required",
+            "at": "string.required",
+            "actorId": "unknown.required",
+            "actorName": "unknown.required",
+            "action": "string.required",
+            "target": "string.required",
+            "summary": "string.required",
+            "before": "unrepresentable.nullable.required",
+            "after": "unrepresentable.nullable.required"
+          }
+        }
+      },
+      "notes": [
+        "400 non-integer id; 404 unknown id. Read-only."
       ]
     },
     {
@@ -4209,7 +4340,8 @@
         "query": {
           "page": "integer.nonnegative.required",
           "pageSize": "integer.nonnegative.required",
-          "q": "string.optional"
+          "q": "string.optional",
+          "itemIds": "array<integer.positive>.optional"
         }
       },
       "responses": {

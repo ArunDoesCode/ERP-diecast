@@ -725,6 +725,17 @@ describe("BR-SCO-21 never deleted", () => {
     expect(after.status).toBe(200);
   });
 
+  test("BR-SCO-21 DELETE an SCO -> 404 (no delete route)", async () => {
+    const created = await createSco("bo");
+    const id = created.json.data.sco.id;
+    for (const actor of ["owner", "bo"]) {
+      const res = await call(actor, "DELETE", `/sco/${id}`);
+      expect(res.status).toBe(404);
+    }
+    const after = await call("bo", "GET", `/sco/getscodetails/${id}`);
+    expect(after.status).toBe(200);
+  });
+
   test("BR-SCO-21 a cancelled SCO stays in the register", async () => {
     const created = await createSco("bo");
     const id = created.json.data.sco.id;
@@ -830,5 +841,38 @@ describe("SCO list", () => {
   test("details of an unknown SCO -> 404", async () => {
     const res = await call("bo", "GET", "/sco/getscodetails/999999999");
     expect(res.status).toBe(404);
+  });
+});
+
+describe("BR-SCO-26 item units on SCO lines", () => {
+  test("BR-SCO-26 regression: details lines carry rawItemUom and finishedItemUom", async () => {
+    const mk = async (sku: string, uom: string) => {
+      const [i] = await db
+        .insert(itemMaster)
+        .values({
+          sku: `${PREFIX}${sku}`,
+          name: `${PREFIX}${sku}`,
+          category: "Raw Material",
+          uom,
+          averageCostPaise: 12_000,
+        })
+        .returning({ id: itemMaster.id });
+      return requireRow(i, `item ${sku}`).id;
+    };
+    const rawKg = await mk("UOM-RAW", "kg");
+    const finNos = await mk("UOM-FIN", "nos");
+    const created = await createSco("bo", {
+      lines: [line({ rawItemId: rawKg, finishedItemId: finNos })],
+    });
+    expect(created.status).toBe(201);
+    const res = await call(
+      "bo",
+      "GET",
+      `/sco/getscodetails/${created.json.data.sco.id}`,
+    );
+    expect(res.status).toBe(200);
+    const l = res.json.data.items[0];
+    expect(l.rawItemUom).toBe("kg");
+    expect(l.finishedItemUom).toBe("nos");
   });
 });

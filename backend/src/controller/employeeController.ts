@@ -2,10 +2,8 @@ import type { Context } from "hono";
 
 import { BadRequestError } from "../lib/errors";
 import type { AppEnv } from "../lib/types";
-import { authAuditService } from "../service/authAuditService";
 import { employeeService } from "../service/employeeService";
 import {
-  accessLogListQuerySchema,
   employeeInputSchema,
   employeeListQuerySchema,
   employeeRoleAssignSchema,
@@ -77,13 +75,5 @@ export const employeeController = {
       c.get("actor"),
     );
     return c.json({ success: true, data });
-  },
-
-  async accessLog(c: Context<AppEnv>) {
-    const query = accessLogListQuerySchema.parse(
-      Object.fromEntries(new URL(c.req.url).searchParams),
-    );
-    const { data, meta } = await authAuditService.list(query);
-    return c.json({ success: true, data, meta });
   },
 };

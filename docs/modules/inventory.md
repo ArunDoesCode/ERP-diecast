@@ -49,7 +49,7 @@ screen for stock-take and opening stock. All BR-INV-01..25 are built and tested
 - The only active `main_store` can't be deactivated (409, decided by Arun 2026-09-29; spec line pending BL-048). With the one-main_store index this means the main store is never deactivated.
 - `isVirtual` is derived from type (vendor_premise → true, else false); client value ignored.
 - Reorder level is whole for pcs/set (checked only when reorderLevel or unit changes).
-- Last rate: newest line with rate > 0 on an approved-or-later PO → catalog → average > 0 → standard rate. Legacy items with standard rate 0 return 0 (source `standard_rate`). Source `pr_estimate` means item average (rename in BL-047).
+- Last rate: newest line with rate > 0 on an approved-or-later PO → catalog → average > 0 → standard rate. Legacy items with standard rate 0 return 0 (source `standard_rate`). Source `item_average` = item average (BR-INV-30, was `pr_estimate`).
 - `standard_rate_paise` defaults to 0 in the DB for old rows; the API requires > 0 on create.
 - Search uses `likePattern` (escapes `\ % _`); `ilike` on an enum column needs a `::text` cast.
 - drizzle wraps Postgres errors in `cause` — read the code/constraint from there for 23505 → 409.

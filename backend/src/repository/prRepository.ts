@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
 
 import { alias } from "drizzle-orm/pg-core";
 
@@ -7,6 +7,7 @@ import {
   itemMaster,
   machines,
   prPoItemLinks,
+  prStatusEnum,
   purchaseOrderItems,
   purchaseOrders,
   purchaseRequestItems,
@@ -17,7 +18,7 @@ import { employees } from "../db/schemas/03_hcm";
 import { allocateDocumentSequence } from "../lib/document-number";
 import { AppError } from "../lib/errors";
 import { assertMoneyInRange } from "../lib/money";
-import { safeSearch, safeSearchSql } from "../lib/safe-search";
+import { safeSearch } from "../lib/safe-search";
 import type { prListQuerySchemaType } from "../types/pr.types";
 
 const purchaseRequestColumns = {
@@ -176,46 +177,50 @@ export const prRepository = {
         : purchaseRequests.id;
     const orderFn = params.sortDir === "desc" ? desc : asc;
 
+    // BR-PR-48: `q` matches number and notes only; status and type have
+    // their own params.
+    const searchFilters = [
+      safeSearch(params.q, purchaseRequests.prNumber, purchaseRequests.notes),
+      params.type ? eq(purchaseRequests.type, params.type) : undefined,
+    ];
     const filters = [
-      or(
-        safeSearch(params.q, purchaseRequests.prNumber, purchaseRequests.notes),
-        safeSearchSql(params.q, sql`${purchaseRequests.type}::text`),
-        safeSearchSql(params.q, sql`${purchaseRequests.status}::text`),
-      ),
+      ...searchFilters,
       params.status && params.status.length > 0
         ? inArray(purchaseRequests.status, params.status)
         : undefined,
-      params.type ? eq(purchaseRequests.type, params.type) : undefined,
     ].filter((filter) => filter !== undefined);
 
     const whereClause = filters.length > 0 ? and(...filters) : undefined;
-    const [rows, [totalRow]] = whereClause
-      ? await Promise.all([
-          db
-            .select(purchaseRequestColumns)
-            .from(purchaseRequests)
-            .where(whereClause)
-            .orderBy(orderFn(sortColumn), asc(purchaseRequests.id))
-            .limit(params.pageSize)
-            .offset((params.page - 1) * params.pageSize),
-          db
-            .select({ value: count() })
-            .from(purchaseRequests)
-            .where(whereClause),
-        ])
-      : await Promise.all([
-          db
-            .select(purchaseRequestColumns)
-            .from(purchaseRequests)
-            .orderBy(orderFn(sortColumn), asc(purchaseRequests.id))
-            .limit(params.pageSize)
-            .offset((params.page - 1) * params.pageSize),
-          db.select({ value: count() }).from(purchaseRequests),
-        ]);
+    const countWhere = and(
+      ...searchFilters.filter((filter) => filter !== undefined),
+    );
+    const [rows, [totalRow], countRows] = await Promise.all([
+      db
+        .select(purchaseRequestColumns)
+        .from(purchaseRequests)
+        .where(whereClause)
+        .orderBy(orderFn(sortColumn), asc(purchaseRequests.id))
+        .limit(params.pageSize)
+        .offset((params.page - 1) * params.pageSize),
+      db.select({ value: count() }).from(purchaseRequests).where(whereClause),
+      // Quick-filter counts (purchase-order BR-PO-26): rows per status for the
+      // same search, whatever status filter is chosen.
+      db
+        .select({ status: purchaseRequests.status, value: count() })
+        .from(purchaseRequests)
+        .where(countWhere)
+        .groupBy(purchaseRequests.status),
+    ]);
+
+    const statusCounts = Object.fromEntries(
+      prStatusEnum.enumValues.map((status) => [status, 0]),
+    ) as Record<(typeof prStatusEnum.enumValues)[number], number>;
+    for (const row of countRows) statusCounts[row.status] = row.value;
 
     return {
       rows,
       total: totalRow?.value ?? 0,
+      statusCounts,
     };
   },
 
@@ -284,6 +289,8 @@ export const prRepository = {
           id: purchaseOrders.id,
           poNumber: purchaseOrders.poNumber,
           supplierId: purchaseOrders.supplierId,
+          // BR-PO-24
+          supplierName: sql<string>`(select ${supplierMaster.name} from ${supplierMaster} where ${supplierMaster.id} = ${purchaseOrders.supplierId})`,
           status: purchaseOrders.status,
           totalAmountPaise: purchaseOrders.totalAmountPaise,
         })
@@ -456,41 +463,89 @@ export const prRepository = {
     return row;
   },
 
-  async updatePrItemById(
+  /**
+   * #20: every changed line of one PR in one UPDATE. A field a row leaves out
+   * keeps its stored value (CASE ... ELSE column).
+   */
+  async updatePrItemsByIds(
     prId: number,
-    prItemId: number,
-    data: UpdatePrItemData,
+    rows: Array<{ id: number } & UpdatePrItemData>,
     tx?: Tx,
   ) {
+    if (rows.length === 0) return [];
     const executor = tx ?? db;
-    const [row] = await executor
+    const caseFor = <K extends keyof UpdatePrItemData>(
+      key: K,
+      column:
+        | typeof purchaseRequestItems.itemId
+        | typeof purchaseRequestItems.uom
+        | typeof purchaseRequestItems.requestedQty
+        | typeof purchaseRequestItems.expectedDate,
+      cast: string,
+    ) => {
+      const branches = rows
+        .filter((row) => row[key] !== undefined)
+        .map(
+          (row) =>
+            sql`when ${row.id} then ${sql.param(row[key], column)}::${sql.raw(cast)}`,
+        );
+      if (branches.length === 0) return undefined;
+      return sql`case ${purchaseRequestItems.id} ${sql.join(branches, sql` `)} else ${column} end`;
+    };
+
+    const itemId = caseFor("itemId", purchaseRequestItems.itemId, "integer");
+    const uom = caseFor("uom", purchaseRequestItems.uom, "text");
+    const requestedQty = caseFor(
+      "requestedQty",
+      purchaseRequestItems.requestedQty,
+      "double precision",
+    );
+    const expectedDate = caseFor(
+      "expectedDate",
+      purchaseRequestItems.expectedDate,
+      "timestamp",
+    );
+
+    return executor
       .update(purchaseRequestItems)
-      .set(data)
+      .set({
+        ...(itemId ? { itemId } : {}),
+        ...(uom ? { uom } : {}),
+        ...(requestedQty ? { requestedQty } : {}),
+        ...(expectedDate ? { expectedDate } : {}),
+      })
       .where(
         and(
           eq(purchaseRequestItems.prId, prId),
-          eq(purchaseRequestItems.id, prItemId),
+          inArray(
+            purchaseRequestItems.id,
+            rows.map((row) => row.id),
+          ),
         ),
       )
       .returning(purchaseRequestItemWriteColumns);
-
-    return row;
   },
 
-  async createPrItem(prId: number, item: CreateOrUpdatePrItemData, tx?: Tx) {
+  /** #20: all new lines of one PR in one INSERT. */
+  async createPrItems(
+    prId: number,
+    items: CreateOrUpdatePrItemData[],
+    tx?: Tx,
+  ) {
+    if (items.length === 0) return [];
     const executor = tx ?? db;
-    const [row] = await executor
+    return executor
       .insert(purchaseRequestItems)
-      .values({
-        prId,
-        itemId: item.itemId,
-        requestedQty: item.requestedQty,
-        uom: item.uom,
-        expectedDate: item.expectedDate,
-      })
+      .values(
+        items.map((item) => ({
+          prId,
+          itemId: item.itemId,
+          requestedQty: item.requestedQty,
+          uom: item.uom,
+          expectedDate: item.expectedDate,
+        })),
+      )
       .returning(purchaseRequestItemWriteColumns);
-
-    return row;
   },
 
   async deletePrItemsByIds(prId: number, itemIds: number[], tx?: Tx) {

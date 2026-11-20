@@ -16,6 +16,8 @@ import type {
 	AssetMovement,
 	AssetMovementCreatePayload,
 	AssetMovementListParams,
+	AssetReconciliationListParams,
+	AssetReconciliationRow,
 	AssetService,
 	AssetServiceCreatePayload,
 	AssetServiceListParams,
@@ -100,6 +102,12 @@ export function createMovement(payload: AssetMovementCreatePayload) {
 export function getStock(params?: AssetStockListParams) {
 	return api.get<PaginatedResponse<AssetStockRow>>(
 		`${API_ROUTES.assets.inventory.stock}${toQueryString(params)}`,
+	);
+}
+
+export function getReconciliation(params?: AssetReconciliationListParams) {
+	return api.get<PaginatedResponse<AssetReconciliationRow>>(
+		`${API_ROUTES.assets.inventory.reconciliation}${toQueryString(params)}`,
 	);
 }
 

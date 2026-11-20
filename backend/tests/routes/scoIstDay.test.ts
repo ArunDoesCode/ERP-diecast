@@ -37,6 +37,9 @@ import {
 import {
   scoChallanLines,
   scoChallans,
+  scoReceiptSettlements,
+  subcontractingGrnItems,
+  subcontractingGrns,
   subcontractingOrderItems,
   subcontractingOrders,
 } from "../../src/db/schemas/02_procurement-purchasing";
@@ -345,6 +348,29 @@ afterAll(async () => {
     .where(eq(subcontractingOrders.vendorId, vendorId));
   const scoIds = [...new Set([...createdScoIds, ...scoRows.map((s) => s.id)])];
   if (scoIds.length > 0) {
+    const grnRows = await db
+      .select({ id: subcontractingGrns.id })
+      .from(subcontractingGrns)
+      .where(inArray(subcontractingGrns.scoId, scoIds));
+    const grnIds = grnRows.map((g) => g.id);
+    if (grnIds.length > 0) {
+      const grnItemRows = await db
+        .select({ id: subcontractingGrnItems.id })
+        .from(subcontractingGrnItems)
+        .where(inArray(subcontractingGrnItems.scoGrnId, grnIds));
+      const grnItemIds = grnItemRows.map((g) => g.id);
+      if (grnItemIds.length > 0) {
+        await db
+          .delete(scoReceiptSettlements)
+          .where(inArray(scoReceiptSettlements.receiptItemId, grnItemIds));
+        await db
+          .delete(subcontractingGrnItems)
+          .where(inArray(subcontractingGrnItems.id, grnItemIds));
+      }
+      await db
+        .delete(subcontractingGrns)
+        .where(inArray(subcontractingGrns.id, grnIds));
+    }
     const chRows = await db
       .select({ id: scoChallans.id })
       .from(scoChallans)
@@ -641,5 +667,95 @@ describe("BR-SCO-11 due date and days left use the IST day", () => {
     expect(old.status).toBe(201);
     const fresh = await challan(scoId, itemId, { challanDate: "2026-10-01" });
     expect(fresh.status).toBe(201);
+  });
+});
+
+describe("BR-SCO-27 receipt date and number period use the IST day", () => {
+  /** An approved SCO with one 10-pcs challan issued at clock `iso`. */
+  async function issuedAt(iso: string) {
+    const sco = await makeApprovedSco();
+    await setClock(iso);
+    const c = await challan(sco.scoId, sco.itemId, {}, 10);
+    expect(c.status).toBe(201);
+    return sco;
+  }
+
+  function receiptWith(
+    scoId: number,
+    itemId: number,
+    extra: Record<string, unknown>,
+  ) {
+    return call("bo", "POST", `/sco/${scoId}/receipts`, {
+      vendorChallanNo: uniq("VC"),
+      lines: [{ scoItemId: itemId, processedQty: 5 }],
+      ...extra,
+    });
+  }
+
+  async function receiptCount(scoId: number) {
+    const rows = await db
+      .select({ id: subcontractingGrns.id })
+      .from(subcontractingGrns)
+      .where(eq(subcontractingGrns.scoId, scoId));
+    return rows.length;
+  }
+
+  test("BR-SCO-27 at 02:00 IST on 1 Oct 2026, received date 2 Oct -> 400 SCO_RECEIPT_DATE_FUTURE, nothing saved", async () => {
+    const sco = await issuedAt(IST_0200_1_OCT_2026);
+    const res = await receiptWith(sco.scoId, sco.itemId, {
+      receivedDate: "2026-10-02",
+    });
+    expect(res.status).toBe(400);
+    expect(res.json.code).toBe("SCO_RECEIPT_DATE_FUTURE");
+    expect(await receiptCount(sco.scoId)).toBe(0);
+  });
+
+  test("BR-SCO-27 at 02:00 IST on 1 Oct 2026, a timestamp at 00:00 IST on 2 Oct -> 400 SCO_RECEIPT_DATE_FUTURE", async () => {
+    const sco = await issuedAt(IST_0200_1_OCT_2026);
+    const res = await receiptWith(sco.scoId, sco.itemId, {
+      receivedDate: "2026-10-01T18:30:00.000Z",
+    });
+    expect(res.status).toBe(400);
+    expect(res.json.code).toBe("SCO_RECEIPT_DATE_FUTURE");
+    expect(await receiptCount(sco.scoId)).toBe(0);
+  });
+
+  test("BR-SCO-27 at 02:00 IST on 1 Oct 2026, received date 1 Oct -> saved", async () => {
+    const sco = await issuedAt(IST_0200_1_OCT_2026);
+    const res = await receiptWith(sco.scoId, sco.itemId, {
+      receivedDate: "2026-10-01",
+    });
+    expect(res.status).toBe(201);
+    expect(istDayOf(res.json.data.receipt.receivedDate)).toBe("2026-10-01");
+  });
+
+  test("BR-SCO-27 at 02:00 IST on 1 Oct 2026, received date 28 Sep (back-dated) -> saved", async () => {
+    const sco = await issuedAt(IST_0200_1_OCT_2026);
+    const res = await receiptWith(sco.scoId, sco.itemId, {
+      receivedDate: "2026-09-28",
+    });
+    expect(res.status).toBe(201);
+    expect(istDayOf(res.json.data.receipt.receivedDate)).toBe("2026-09-28");
+  });
+
+  test("BR-SCO-27 at 02:00 IST on 1 Oct 2026, no received date -> today in IST", async () => {
+    const sco = await issuedAt(IST_0200_1_OCT_2026);
+    const res = await receiptWith(sco.scoId, sco.itemId, {});
+    expect(res.status).toBe(201);
+    expect(istDayOf(res.json.data.receipt.receivedDate)).toBe("2026-10-01");
+  });
+
+  test("BR-SCO-27 saved at 00:30 IST on 1 Nov 2026 (still 31 Oct in UTC) -> number SCO-GRN-2026-11-..., not 2026-10", async () => {
+    const sco = await issuedAt("2026-10-31T19:00:00.000Z");
+    const res = await receiptWith(sco.scoId, sco.itemId, {});
+    expect(res.status).toBe(201);
+    expect(res.json.data.receipt.grnNumber).toMatch(/^SCO-GRN-2026-11-\d+$/);
+  });
+
+  test("BR-SCO-27 saved at 02:00 IST on 1 Oct 2026 -> number SCO-GRN-2026-10-...", async () => {
+    const sco = await issuedAt(IST_0200_1_OCT_2026);
+    const res = await receiptWith(sco.scoId, sco.itemId, {});
+    expect(res.status).toBe(201);
+    expect(res.json.data.receipt.grnNumber).toMatch(/^SCO-GRN-2026-10-\d+$/);
   });
 });

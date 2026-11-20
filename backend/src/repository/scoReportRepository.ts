@@ -61,26 +61,35 @@ export const scoReportRepository = {
 
     const sortColumn = grouped[q.sortBy];
     const orderFn = q.sortDir === "desc" ? desc : asc;
-    const [rows, [totalRow]] = await Promise.all([
-      db
-        .select()
-        .from(grouped)
-        .orderBy(
-          orderFn(sortColumn),
-          asc(grouped.vendorId),
-          asc(grouped.itemId),
-        )
-        .limit(q.pageSize)
-        .offset((q.page - 1) * q.pageSize),
-      db.select({ value: count() }).from(grouped),
-    ]);
+    // One pass over the ledger: the page and the total come from the same
+    // query (window count, #62). Only a page past the end needs a count.
+    const pageRows = await db
+      .select({
+        vendorId: grouped.vendorId,
+        vendorName: grouped.vendorName,
+        itemId: grouped.itemId,
+        itemSku: grouped.itemSku,
+        itemName: grouped.itemName,
+        qty: grouped.qty,
+        valuePaise: grouped.valuePaise,
+        total: sql<number>`count(*) over ()`.mapWith(Number),
+      })
+      .from(grouped)
+      .orderBy(orderFn(sortColumn), asc(grouped.vendorId), asc(grouped.itemId))
+      .limit(q.pageSize)
+      .offset((q.page - 1) * q.pageSize);
+    let total = pageRows[0]?.total ?? 0;
+    if (pageRows.length === 0 && q.page > 1) {
+      const [totalRow] = await db.select({ value: count() }).from(grouped);
+      total = totalRow?.value ?? 0;
+    }
     return {
-      rows: rows.map((r) => ({
+      rows: pageRows.map(({ total: _total, ...r }) => ({
         ...r,
         qty: Number(r.qty),
         valuePaise: toSafePaise(r.valuePaise),
       })),
-      total: totalRow?.value ?? 0,
+      total,
     };
   },
 

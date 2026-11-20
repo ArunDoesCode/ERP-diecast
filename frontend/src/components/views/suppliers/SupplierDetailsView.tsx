@@ -3,10 +3,11 @@
 import { IconArrowLeft, IconEdit } from "@tabler/icons-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-
 import { SupplierHistoryCard } from "@/components/pages/suppliers/SupplierHistoryCard";
 import { SupplierMasterModal } from "@/components/pages/suppliers/SupplierMasterModal";
 import { SupplierOfferingsSection } from "@/components/pages/suppliers/SupplierOfferingsSection";
+import { DetailHeader } from "@/components/shared/DetailHeader";
+import { StatusBadge } from "@/components/shared/StatusBadge";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -17,9 +18,8 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCan } from "@/hooks/use-can";
 import {
@@ -27,6 +27,7 @@ import {
 	useSupplierDetailQuery,
 	useUpdateSupplierMasterMutation,
 } from "@/lib/api/suppliers/queries";
+import { useBreadcrumbLast } from "@/lib/shell/breadcrumb-last";
 import type { Supplier, SupplierMasterInput } from "@/types/suppliers";
 
 type SupplierDetailsViewProps = {
@@ -64,7 +65,7 @@ function toMasterDefaultValues(supplier?: Supplier): SupplierMasterInput {
 }
 
 function renderValue(value?: string | number | null) {
-	if (value === null || value === undefined || value === "") return "N/A";
+	if (value === null || value === undefined || value === "") return "–";
 	return String(value);
 }
 
@@ -80,6 +81,7 @@ export function SupplierDetailsView({ supplierId }: SupplierDetailsViewProps) {
 	const supplier = detailQuery.data?.success
 		? detailQuery.data.data.supplier
 		: null;
+	useBreadcrumbLast(supplier?.name);
 	const defaultValues = useMemo(
 		() => toMasterDefaultValues(supplier ?? undefined),
 		[supplier],
@@ -87,7 +89,7 @@ export function SupplierDetailsView({ supplierId }: SupplierDetailsViewProps) {
 
 	if (detailQuery.isLoading) {
 		return (
-			<div className="flex w-full flex-col gap-6 p-6">
+			<div className="flex w-full flex-col gap-4">
 				<Skeleton className="h-10 w-44" />
 				<Skeleton className="h-52 w-full" />
 				<Skeleton className="h-72 w-full" />
@@ -97,7 +99,7 @@ export function SupplierDetailsView({ supplierId }: SupplierDetailsViewProps) {
 
 	if (detailQuery.isError || !supplier) {
 		return (
-			<div className="flex w-full flex-col gap-4 p-6">
+			<div className="flex w-full flex-col gap-4">
 				<Button
 					variant="outline"
 					className="w-fit"
@@ -124,25 +126,31 @@ export function SupplierDetailsView({ supplierId }: SupplierDetailsViewProps) {
 	}
 
 	return (
-		<div className="flex w-full flex-col gap-6 p-6">
-			<div className="flex items-center justify-between gap-3">
-				<Button variant="outline" onClick={() => router.push("/suppliers")}>
-					<IconArrowLeft className="size-4" />
-					Back to suppliers
-				</Button>
-			</div>
-
-			<Card>
-				<CardHeader className="flex flex-row items-start justify-between gap-3">
-					<div className="space-y-2">
-						<CardTitle>{supplier.name}</CardTitle>
-						<Badge variant={supplier.isActive ? "default" : "outline"}>
-							{supplier.isActive ? "Active" : "Inactive"}
-						</Badge>
-					</div>
-
-					{canManage ? (
-						<div className="flex gap-2">
+		<div className="flex w-full flex-col gap-4">
+			<DetailHeader
+				docNo={supplier.name}
+				status={
+					<StatusBadge
+						doc="supplier"
+						status={supplier.isActive ? "active" : "inactive"}
+					/>
+				}
+				meta={[
+					{ label: "Type", value: renderValue(supplier.type) },
+					{ label: "GST", value: renderValue(supplier.gstNumber) },
+					{
+						label: "Payment terms",
+						value:
+							supplier.defaultPaymentTermsDays != null
+								? `${supplier.defaultPaymentTermsDays} days`
+								: "–",
+					},
+				]}
+				backHref="/suppliers"
+				backLabel="suppliers"
+				actions={
+					canManage ? (
+						<>
 							<Button
 								type="button"
 								variant="outline"
@@ -155,13 +163,15 @@ export function SupplierDetailsView({ supplierId }: SupplierDetailsViewProps) {
 								variant="outline"
 								onClick={() => setEditOpen(true)}
 							>
-								<IconEdit className="size-3.5" />
+								<IconEdit />
 								Edit details
 							</Button>
-						</div>
-					) : null}
-				</CardHeader>
+						</>
+					) : undefined
+				}
+			/>
 
+			<Card>
 				<CardContent>
 					<div className="grid grid-cols-1 gap-x-4 gap-y-5 sm:grid-cols-2 md:grid-cols-3">
 						<div>
@@ -199,7 +209,7 @@ export function SupplierDetailsView({ supplierId }: SupplierDetailsViewProps) {
 							<p className="text-sm">
 								{supplier.defaultPaymentTermsDays != null
 									? `${supplier.defaultPaymentTermsDays} days`
-									: "N/A"}
+									: "–"}
 							</p>
 						</div>
 					</div>

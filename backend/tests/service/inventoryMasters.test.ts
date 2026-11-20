@@ -1614,3 +1614,203 @@ describe("who can do what (inventory spec table)", () => {
     expect(r.json.meta.page).toBe(1);
   });
 });
+
+// ---------------------------------------------------------------- 2026-11-19 rule changes
+describe("BR-INV-07 reorder level is whole for pcs and set", () => {
+  test("BR-INV-07 reorder 2.5 on a pcs item -> 400 on create", async () => {
+    const r = await call("POST", "/items", "back_office", {
+      sku: uid(),
+      name: "n",
+      category: "Raw Material",
+      uom: "pcs",
+      standardRatePaise: 100,
+      reorderLevel: 2.5,
+    });
+    expect(r.status).toBe(400);
+  });
+
+  test("BR-INV-07 reorder 2.5 on a set item -> 400 on create", async () => {
+    const r = await call("POST", "/items", "back_office", {
+      sku: uid(),
+      name: "n",
+      category: "Raw Material",
+      uom: "set",
+      standardRatePaise: 100,
+      reorderLevel: 2.5,
+    });
+    expect(r.status).toBe(400);
+  });
+
+  test("BR-INV-07 reorder 2.5 on a pcs item -> 400 on edit and unchanged", async () => {
+    const item = await mkItem({ uom: "pcs", reorderLevel: 3 });
+    const r = await call("PATCH", `/items/${item.id}`, "back_office", {
+      reorderLevel: 2.5,
+    });
+    expect(r.status).toBe(400);
+    expect((await itemRow(item.id)).reorderLevel).toBe(3);
+  });
+
+  test("BR-INV-07 whole reorder 3 on a pcs item is accepted", async () => {
+    const item = await mkItem({ uom: "pcs", reorderLevel: 3 });
+    expect(item.reorderLevel).toBe(3);
+  });
+});
+
+describe("BR-INV-13 the only main store can't be deactivated", () => {
+  test("BR-INV-13 deactivating the only main_store -> 409 and it stays active", async () => {
+    const r = await call("PATCH", `/locations/${mainStoreId}`, "back_office", {
+      isActive: false,
+    });
+    const [row] = await db
+      .select()
+      .from(locations)
+      .where(eq(locations.id, mainStoreId));
+    if (row && !row.isActive) {
+      // restore shared data if the rule is broken
+      await db
+        .update(locations)
+        .set({ isActive: true })
+        .where(eq(locations.id, mainStoreId));
+    }
+    expect(r.status).toBe(409);
+    expect(row?.isActive).toBe(true);
+  });
+});
+
+describe("BR-INV-15 posting to a location that does not exist -> 404", () => {
+  test("BR-INV-15 stock-take into location id 99999 -> 404, nothing posted", async () => {
+    const item = await mkItem();
+    const r = await call("POST", "/inventory/movements", "owner", {
+      itemId: item.id,
+      locationId: 99999,
+      referenceType: "stock_adjustment",
+      countedQty: 5,
+      unitCostPaise: 100,
+      reason: "x",
+    });
+    expect(r.status).toBe(404);
+    const rows = await db
+      .select()
+      .from(inventoryLedger)
+      .where(eq(inventoryLedger.itemId, item.id));
+    expect(rows.length).toBe(0);
+  });
+
+  test("BR-INV-15 opening stock into location id 99999 -> 404", async () => {
+    const item = await mkItem();
+    const r = await call("POST", "/inventory/movements", "owner", {
+      itemId: item.id,
+      locationId: 99999,
+      referenceType: "opening_stock",
+      qty: 5,
+      unitCostPaise: 100,
+      reason: "x",
+    });
+    expect(r.status).toBe(404);
+  });
+});
+
+describe("BR-INV-27 isVirtual comes from the location type only", () => {
+  test("BR-INV-27 create scrap_yard with isVirtual true -> saved false", async () => {
+    const r = await call("POST", "/locations", "back_office", {
+      name: uid(),
+      type: "scrap_yard",
+      isVirtual: true,
+    });
+    expect(r.status).toBe(201);
+    expect(r.json.data.isVirtual).toBe(false);
+  });
+
+  test("BR-INV-27 create vendor_premise with isVirtual false -> saved true", async () => {
+    const [s] = await db
+      .insert(supplierMaster)
+      .values({ name: `${RUN}_v27a` })
+      .returning({ id: supplierMaster.id });
+    const r = await call("POST", "/locations", "back_office", {
+      name: uid(),
+      type: "vendor_premise",
+      linkedVendorId: s!.id,
+      isVirtual: false,
+    });
+    expect(r.status).toBe(201);
+    expect(r.json.data.isVirtual).toBe(true);
+    await db.delete(locations).where(eq(locations.id, r.json.data.id));
+    await db.delete(supplierMaster).where(eq(supplierMaster.id, s!.id));
+  });
+
+  test("BR-INV-27 edit: isVirtual sent with a name change is ignored", async () => {
+    const loc = await mkLocation({ type: "finished_goods" });
+    const r = await call("PATCH", `/locations/${loc.id}`, "back_office", {
+      name: uid(),
+      isVirtual: true,
+    });
+    expect(r.status).toBe(200);
+    expect(r.json.data.isVirtual).toBe(false);
+  });
+
+  test("BR-INV-27 edit: changing type to vendor_premise makes it virtual, back to scrap_yard makes it real", async () => {
+    const [s] = await db
+      .insert(supplierMaster)
+      .values({ name: `${RUN}_v27b` })
+      .returning({ id: supplierMaster.id });
+    const loc = await mkLocation({ type: "finished_goods" });
+    const a = await call("PATCH", `/locations/${loc.id}`, "back_office", {
+      type: "vendor_premise",
+      linkedVendorId: s!.id,
+    });
+    expect(a.status).toBe(200);
+    expect(a.json.data.isVirtual).toBe(true);
+    const b = await call("PATCH", `/locations/${loc.id}`, "back_office", {
+      type: "scrap_yard",
+      linkedVendorId: null,
+    });
+    expect(b.status).toBe(200);
+    expect(b.json.data.isVirtual).toBe(false);
+    await db.delete(locations).where(eq(locations.id, loc.id));
+    await db.delete(supplierMaster).where(eq(supplierMaster.id, s!.id));
+  });
+});
+
+describe("BR-INV-28 a location edit must carry an editable field", () => {
+  test("BR-INV-28 PATCH {} -> 400, nothing changes, audit stamp included", async () => {
+    const loc = await mkLocation();
+    const before = await db
+      .select()
+      .from(locations)
+      .where(eq(locations.id, loc.id));
+    const r = await call("PATCH", `/locations/${loc.id}`, "back_office", {});
+    expect(r.status).toBe(400);
+    const after = await db
+      .select()
+      .from(locations)
+      .where(eq(locations.id, loc.id));
+    expect(after[0]).toEqual(before[0]);
+  });
+
+  test("BR-INV-28 PATCH { isVirtual: true } -> 400, last updated unchanged", async () => {
+    const loc = await mkLocation({ type: "scrap_yard" });
+    const before = await db
+      .select()
+      .from(locations)
+      .where(eq(locations.id, loc.id));
+    const r = await call("PATCH", `/locations/${loc.id}`, "back_office", {
+      isVirtual: true,
+    });
+    expect(r.status).toBe(400);
+    const after = await db
+      .select()
+      .from(locations)
+      .where(eq(locations.id, loc.id));
+    expect(after[0]?.lastUpdatedAt).toEqual(before[0]?.lastUpdatedAt);
+    expect(after[0]?.lastUpdatedBy).toEqual(before[0]?.lastUpdatedBy);
+    expect(after[0]?.isVirtual).toBe(false);
+  });
+
+  test("BR-INV-28 PATCH { name } -> 200", async () => {
+    const loc = await mkLocation();
+    const r = await call("PATCH", `/locations/${loc.id}`, "back_office", {
+      name: uid(),
+    });
+    expect(r.status).toBe(200);
+  });
+});

@@ -74,8 +74,11 @@ export interface ScoLine {
 	lossQty: number;
 	rawItemSku: string;
 	rawItemName: string;
+	/** BR-SCO-26 */
+	rawItemUom: string;
 	finishedItemSku: string;
 	finishedItemName: string;
+	finishedItemUom: string;
 	lineValuePaise: number;
 	lineTaxPaise: number;
 	/** S3: raw pcs still at vendor (incl. pending QA). Absent on create/update responses. */
@@ -177,6 +180,22 @@ export interface CompanySettings {
 	updatedBy: number | null;
 	updatedAt: string;
 }
+
+// BR-SCO-29: one row per changed field, newest first. Shape assumed from the spec
+// until the backend contract lands (see report).
+export interface CompanySettingsHistoryRow {
+	id: number;
+	field: string;
+	oldValue: string | null;
+	newValue: string | null;
+	changedByName: string | null;
+	changedAt: string;
+}
+
+export type CompanySettingsHistoryResult = {
+	success: true;
+	data: CompanySettingsHistoryRow[];
+};
 
 export type CompanySettingsResult = {
 	success: true;

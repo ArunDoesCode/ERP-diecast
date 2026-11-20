@@ -61,20 +61,17 @@ export async function applyRoleKeyDiff(
 
 async function buildGrants(role: RoleRow): Promise<roleGrantsSchemaType> {
   const isSuperAdmin = isSuperAdminRoleName(role.name);
-  const [catalog, held] = await Promise.all([
-    permissionRepository.listCatalog(),
-    permissionRepository.listKeysByRoleId(role.id),
-  ]);
-  const heldSet = new Set(held);
+  // #50: catalog and the role's keys in one query.
+  const catalog = await permissionRepository.listCatalogForRole(role.id);
   return {
     roleId: role.id,
     roleName: role.name,
     isSystem: role.isSystem,
     isSuperAdmin,
     readOnly: isSuperAdmin,
-    keys: catalog.map((entry) => ({
+    keys: catalog.map(({ held, ...entry }) => ({
       ...entry,
-      granted: isSuperAdmin || heldSet.has(entry.key),
+      granted: isSuperAdmin || held,
     })),
   };
 }

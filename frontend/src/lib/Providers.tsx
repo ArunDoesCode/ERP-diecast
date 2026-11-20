@@ -28,7 +28,7 @@ const Providers = ({ children }: { children: ReactNode }) => {
 			<NuqsAdapter>
 				<QueryClientProvider client={queryClient}>
 					<TooltipProvider>{children}</TooltipProvider>
-					<Toaster duration={5000} />
+					<Toaster duration={4000} visibleToasts={3} />
 				</QueryClientProvider>
 			</NuqsAdapter>
 		</ThemeProvider>

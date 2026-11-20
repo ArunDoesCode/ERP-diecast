@@ -48,6 +48,7 @@ export const API_ROUTES = {
 		},
 		accessLog: {
 			list: `${API_Header.setup}/access-log`,
+			detail: (id: number) => `${API_Header.setup}/access-log/${id}`,
 		},
 	},
 	approval: {
@@ -109,6 +110,7 @@ export const API_ROUTES = {
 		},
 		inventory: {
 			stock: `${API_Header.asset}/inventory/stock`,
+			reconciliation: `${API_Header.asset}/inventory/reconciliation`,
 			movements: {
 				list: `${API_Header.asset}/inventory/movements`,
 				create: `${API_Header.asset}/inventory/movements`,
@@ -175,5 +177,6 @@ export const API_ROUTES = {
 	},
 	company: {
 		settings: `${API_Header.company}/settings`,
+		settingsHistory: `${API_Header.company}/settings/history`,
 	},
 } as const;

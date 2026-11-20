@@ -55,6 +55,192 @@ function assertItemsUsable(
   }
 }
 
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+type ExistingPr = NonNullable<
+  Awaited<ReturnType<typeof prRepository.findPrByIdForUpdate>>
+>;
+
+// BR-PR-15, 17, 47: lock the PR; only the requester or a super-admin edits,
+// and only in draft.
+async function lockEditablePr(prId: number, actor: Actor, tx: Tx) {
+  const existingPr = await prRepository.findPrByIdForUpdate(prId, tx);
+  if (!existingPr) {
+    throw new NotFoundError("Purchase request not found");
+  }
+  if (existingPr.requestedBy !== actor.id && !actor.isSuperAdmin) {
+    throw new ForbiddenError(
+      "Only the requester or a super-admin can edit this PR",
+      "PR_NOT_REQUESTER",
+    );
+  }
+  if (existingPr.status !== "draft") {
+    throw new ConflictError(
+      `A PR in status ${existingPr.status} cannot be edited`,
+      "PR_NOT_EDITABLE",
+    );
+  }
+  return existingPr;
+}
+
+// Header checks: machine key, maintenance needs a machine, machine exists.
+async function assertHeaderValid(
+  input: updatePrSchemaType,
+  existingPr: ExistingPr,
+  actor: Actor,
+) {
+  // BR-AUTH-26 (PR v2): the key is needed only when the machine is added or changed.
+  if (input.assetId !== undefined && input.assetId !== existingPr.assetId) {
+    assertCanLinkMachine(actor, input.assetId);
+  }
+
+  const targetType = input.type ?? existingPr.type;
+  const targetAssetId =
+    input.assetId !== undefined ? input.assetId : existingPr.assetId;
+
+  if (targetType === "maintenance" && targetAssetId == null) {
+    throw new BadRequestError(
+      "assetId is required when PR type is maintenance",
+    );
+  }
+
+  if (targetAssetId != null) {
+    const machine = await prRepository.findMachineById(targetAssetId);
+    if (!machine) {
+      throw new BadRequestError("Invalid assetId");
+    }
+  }
+}
+
+// BR-PR-15: at least one line left, each item once.
+function assertFinalLines(
+  existingPrItems: Array<{ id: number; itemId: number | null }>,
+  input: updatePrSchemaType,
+  deleteIds: Set<number>,
+) {
+  const finalItemIds = new Map<number, number>();
+  for (const row of existingPrItems) {
+    if (row.itemId == null) {
+      throw new BadRequestError("Invalid PR item data");
+    }
+    if (!deleteIds.has(row.id)) {
+      finalItemIds.set(row.id, row.itemId);
+    }
+  }
+  for (const item of input.updates) {
+    if (item.itemId !== undefined) {
+      finalItemIds.set(item.id, item.itemId);
+    }
+  }
+  input.inserts.forEach((item, index) => {
+    finalItemIds.set(-(index + 1), item.itemId);
+  });
+
+  if (finalItemIds.size === 0) {
+    throw new BadRequestError(
+      "A PR must keep at least one line",
+      "PR_MIN_ONE_LINE",
+    );
+  }
+
+  const uniqueFinalItemIds = new Set<number>();
+  for (const itemId of finalItemIds.values()) {
+    if (uniqueFinalItemIds.has(itemId)) {
+      throw new BadRequestError(
+        "Each item can appear only once per PR",
+        "PR_DUPLICATE_ITEM",
+      );
+    }
+    uniqueFinalItemIds.add(itemId);
+  }
+}
+
+// Validates the line inserts / updates / deletes, then writes them with one
+// statement each (#20). Returns the touched lines: updates first, then inserts.
+async function applyLineChanges(
+  input: updatePrSchemaType,
+  tx: Tx,
+): Promise<prItemSchemaType[]> {
+  const { inserts, updates, deletes } = input;
+  if (inserts.length === 0 && updates.length === 0 && deletes.length === 0) {
+    return [];
+  }
+
+  const existingPrItems = await prRepository.findPrItemsByPrId(input.prId, tx);
+  const existingLineIds = new Set(existingPrItems.map((row) => row.id));
+
+  const deleteIds = new Set(deletes.map((item) => item.id));
+  for (const id of [...deleteIds, ...updates.map((item) => item.id)]) {
+    if (!existingLineIds.has(id)) {
+      throw new NotFoundError(`PR item not found for id ${id}`);
+    }
+  }
+
+  assertFinalLines(existingPrItems, input, deleteIds);
+
+  for (const item of [...inserts, ...updates]) {
+    assertNotPastDate(item.expectedDate);
+  }
+
+  const requestedItemIds = [
+    ...new Set([
+      ...inserts.map((item) => item.itemId),
+      ...updates
+        .map((item) => item.itemId)
+        .filter((itemId): itemId is number => itemId !== undefined),
+    ]),
+  ];
+  const itemMap = await prRepository.findItemMasterByIds(requestedItemIds);
+  assertItemsUsable(requestedItemIds, itemMap);
+  const uomOf = (itemId: number) => {
+    const row = itemMap.get(itemId);
+    if (!row) throw new BadRequestError(`Invalid itemId: ${itemId}`);
+    return row.uom;
+  };
+
+  if (deleteIds.size > 0) {
+    await prRepository.deletePrItemsByIds(input.prId, [...deleteIds], tx);
+  }
+
+  const updatedRows = await prRepository.updatePrItemsByIds(
+    input.prId,
+    updates.map((item) => ({
+      id: item.id,
+      ...(item.requestedQty !== undefined
+        ? { requestedQty: item.requestedQty }
+        : {}),
+      ...(item.expectedDate !== undefined
+        ? { expectedDate: item.expectedDate }
+        : {}),
+      ...(item.itemId !== undefined
+        ? { itemId: item.itemId, uom: uomOf(item.itemId) }
+        : {}),
+    })),
+    tx,
+  );
+  const updatedById = new Map(updatedRows.map((row) => [row.id, row]));
+  const updatedItems = updates.map((item) => {
+    const row = updatedById.get(item.id);
+    if (!row) throw new NotFoundError(`PR item not found for id ${item.id}`);
+    return row;
+  });
+
+  const createdItems = await prRepository.createPrItems(
+    input.prId,
+    inserts.map((item) => ({
+      itemId: item.itemId,
+      requestedQty: item.requestedQty,
+      uom: uomOf(item.itemId),
+      expectedDate: item.expectedDate ?? null,
+    })),
+    tx,
+  );
+  if (createdItems.length !== inserts.length) {
+    throw new BadRequestError("Failed to create PR item");
+  }
+
+  return [...updatedItems, ...createdItems];
+}
+
 function toPaginatedMeta(page: number, pageSize: number, total: number) {
   return {
     page,
@@ -75,10 +261,13 @@ export const prService = {
   },
 
   async list(params: prListQuerySchemaType) {
-    const { rows, total } = await prRepository.list(params);
+    const { rows, total, statusCounts } = await prRepository.list(params);
     return {
       data: rows,
-      meta: toPaginatedMeta(params.page, params.pageSize, total),
+      meta: {
+        ...toPaginatedMeta(params.page, params.pageSize, total),
+        statusCounts,
+      },
     };
   },
 
@@ -137,230 +326,35 @@ export const prService = {
 
   async update(input: updatePrSchemaType, actor: Actor) {
     return db.transaction(async (tx) => {
-      const existingPr = await prRepository.findPrByIdForUpdate(input.prId, tx);
-      if (!existingPr) {
-        throw new NotFoundError("Purchase request not found");
-      }
-      // BR-PR-17: only the requester or a super-admin edits.
-      if (existingPr.requestedBy !== actor.id && !actor.isSuperAdmin) {
-        throw new ForbiddenError(
-          "Only the requester or a super-admin can edit this PR",
-          "PR_NOT_REQUESTER",
-        );
-      }
-      // BR-PR-15: header and lines change only in draft.
-      if (existingPr.status !== "draft") {
-        throw new ConflictError(
-          `A PR in status ${existingPr.status} cannot be edited`,
-          "PR_NOT_EDITABLE",
-        );
-      }
-
-      // BR-AUTH-26 (PR v2): the key is needed only when the machine is added or changed.
-      if (input.assetId !== undefined && input.assetId !== existingPr.assetId) {
-        assertCanLinkMachine(actor, input.assetId);
-      }
-
-      const targetType = input.type ?? existingPr.type;
-      const targetAssetId =
-        input.assetId !== undefined ? input.assetId : existingPr.assetId;
-
-      if (targetType === "maintenance" && targetAssetId == null) {
-        throw new BadRequestError(
-          "assetId is required when PR type is maintenance",
-        );
-      }
-
-      if (targetAssetId != null) {
-        const machine = await prRepository.findMachineById(targetAssetId);
-        if (!machine) {
-          throw new BadRequestError("Invalid assetId");
-        }
-      }
-
-      const sanitizedUpdateData = {
-        updatedAt: new Date(),
-        ...(input.type !== undefined ? { type: input.type } : {}),
-        ...(input.saleOrderId !== undefined
-          ? { saleOrderId: input.saleOrderId }
-          : {}),
-        ...(input.assetId !== undefined ? { assetId: input.assetId } : {}),
-        ...(input.notes !== undefined ? { notes: input.notes } : {}),
-      };
+      const existingPr = await lockEditablePr(input.prId, actor, tx);
+      await assertHeaderValid(input, existingPr, actor);
 
       const pr = await prRepository.updatePrById(
         input.prId,
-        sanitizedUpdateData,
+        {
+          updatedAt: new Date(),
+          ...(input.type !== undefined ? { type: input.type } : {}),
+          ...(input.saleOrderId !== undefined
+            ? { saleOrderId: input.saleOrderId }
+            : {}),
+          ...(input.assetId !== undefined ? { assetId: input.assetId } : {}),
+          ...(input.notes !== undefined ? { notes: input.notes } : {}),
+        },
         tx,
       );
-
       if (!pr) {
         throw new NotFoundError("Purchase request not found");
       }
 
-      const inserts = input.inserts;
-      const updates = input.updates;
-      const deletes = input.deletes;
-
-      const changedItems: prItemSchemaType[] = [];
-      const hasItemMutations =
-        inserts.length > 0 || updates.length > 0 || deletes.length > 0;
-
-      let responsePr = pr;
-
-      if (hasItemMutations) {
-        const existingPrItems = await prRepository.findPrItemsByPrId(
-          input.prId,
-          tx,
-        );
-        const existingItemByLineId = new Map(
-          existingPrItems.map((row) => [row.id, row.itemId]),
-        );
-
-        const deleteIds = new Set(deletes.map((item) => item.id));
-        for (const deleteId of deleteIds) {
-          if (!existingItemByLineId.has(deleteId)) {
-            throw new NotFoundError(`PR item not found for id ${deleteId}`);
-          }
-        }
-
-        for (const item of updates) {
-          if (!existingItemByLineId.has(item.id)) {
-            throw new NotFoundError(`PR item not found for id ${item.id}`);
-          }
-        }
-
-        const finalItemIds = new Map<number, number>();
-        for (const row of existingPrItems) {
-          if (row.itemId == null) {
-            throw new BadRequestError("Invalid PR item data");
-          }
-          if (!deleteIds.has(row.id)) {
-            finalItemIds.set(row.id, row.itemId);
-          }
-        }
-
-        for (const item of updates) {
-          if (item.itemId !== undefined) {
-            finalItemIds.set(item.id, item.itemId);
-          }
-        }
-
-        inserts.forEach((item, index) => {
-          finalItemIds.set(-(index + 1), item.itemId);
-        });
-
-        // BR-PR-15: a PR cannot be left with zero lines.
-        if (finalItemIds.size === 0) {
-          throw new BadRequestError(
-            "A PR must keep at least one line",
-            "PR_MIN_ONE_LINE",
-          );
-        }
-
-        const uniqueFinalItemIds = new Set<number>();
-        for (const itemId of finalItemIds.values()) {
-          if (uniqueFinalItemIds.has(itemId)) {
-            throw new BadRequestError(
-              "Each item can appear only once per PR",
-              "PR_DUPLICATE_ITEM",
-            );
-          }
-          uniqueFinalItemIds.add(itemId);
-        }
-
-        for (const item of [...inserts, ...updates]) {
-          assertNotPastDate(item.expectedDate);
-        }
-
-        const requestedItemIds = [
-          ...new Set([
-            ...inserts.map((item) => item.itemId),
-            ...updates
-              .map((item) => item.itemId)
-              .filter((itemId): itemId is number => itemId !== undefined),
-          ]),
-        ];
-        const itemMap =
-          await prRepository.findItemMasterByIds(requestedItemIds);
-
-        assertItemsUsable(requestedItemIds, itemMap);
-
-        if (deleteIds.size > 0) {
-          await prRepository.deletePrItemsByIds(input.prId, [...deleteIds], tx);
-        }
-
-        for (const item of updates) {
-          const updateItemData = {
-            ...(item.requestedQty !== undefined
-              ? { requestedQty: item.requestedQty }
-              : {}),
-            ...(item.expectedDate !== undefined
-              ? { expectedDate: item.expectedDate }
-              : {}),
-          };
-
-          if (item.itemId !== undefined) {
-            const itemMasterRow = itemMap.get(item.itemId);
-            if (!itemMasterRow) {
-              throw new BadRequestError(`Invalid itemId: ${item.itemId}`);
-            }
-            Object.assign(updateItemData, {
-              itemId: item.itemId,
-              uom: itemMasterRow.uom,
-            });
-          }
-
-          const updatedItem = await prRepository.updatePrItemById(
-            input.prId,
-            item.id,
-            updateItemData,
-            tx,
-          );
-
-          if (!updatedItem) {
-            throw new NotFoundError(`PR item not found for id ${item.id}`);
-          }
-
-          changedItems.push(updatedItem);
-        }
-
-        for (const item of inserts) {
-          const itemMasterRow = itemMap.get(item.itemId);
-          if (!itemMasterRow) {
-            throw new BadRequestError(`Invalid itemId: ${item.itemId}`);
-          }
-
-          const createdItem = await prRepository.createPrItem(
-            input.prId,
-            {
-              itemId: item.itemId,
-              requestedQty: item.requestedQty,
-              uom: itemMasterRow.uom,
-              expectedDate: item.expectedDate ?? null,
-            },
-            tx,
-          );
-
-          if (!createdItem) {
-            throw new BadRequestError("Failed to create PR item");
-          }
-
-          changedItems.push(createdItem);
-        }
-      }
+      const changedItems = await applyLineChanges(input, tx);
 
       const recalculatedPr =
         await prRepository.recalculateEstimatedAmountByPrId(input.prId, tx);
       if (!recalculatedPr) {
         throw new NotFoundError("Purchase request not found");
       }
-      responsePr = recalculatedPr;
 
-      return {
-        pr: responsePr,
-        items: changedItems,
-      };
+      return { pr: recalculatedPr, items: changedItems };
     });
   },
 
