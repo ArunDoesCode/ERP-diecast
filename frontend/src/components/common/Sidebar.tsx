@@ -20,6 +20,7 @@ import {
 import { useMeQuery } from "@/lib/api/auth/queries";
 import { useApprovalsBadgeCount } from "@/lib/api/home/queries";
 import { normalizeAllowedPath } from "@/lib/path-utils";
+import { buildMenuGroups } from "@/lib/shell/menu-groups";
 import { getNavIcon, getNavLabel } from "@/lib/shell/nav-icons";
 import { useAuthSessionStore } from "@/lib/store/auth-session-store";
 
@@ -54,15 +55,7 @@ export function NavSidebar() {
 				(page, index, pages) =>
 					pages.findIndex((other) => other.path === page.path) === index,
 			);
-		return sidebarPages.reduce<{ name: string; pages: typeof sidebarPages }[]>(
-			(groups, page) => {
-				const existing = groups.find((group) => group.name === page.group);
-				if (existing) existing.pages.push(page);
-				else groups.push({ name: page.group, pages: [page] });
-				return groups;
-			},
-			[],
-		);
+		return buildMenuGroups(sidebarPages);
 	}, [screens]);
 
 	// Longest matching path wins, so /inventory/reorder does not also light up /inventory.
