@@ -709,7 +709,7 @@ describe("BR-RO-17 raised PR is an ordinary PR; run link is read-only", () => {
       deletes: [],
     });
     expect(res.status).toBe(200);
-    const [l] = await linesOf(it.id);
+    const l = (await linesOf(it.id)).find((x) => x.id === lineId);
     expect(l?.requestedQty).toBe(750);
   });
 
