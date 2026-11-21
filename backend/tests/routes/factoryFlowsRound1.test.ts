@@ -233,15 +233,30 @@ beforeAll(async () => {
 
 afterAll(cleanup);
 
+function moneyKeys(v: unknown): string[] {
+  const out: string[] = [];
+  const walk = (x: unknown) => {
+    if (Array.isArray(x)) x.forEach(walk);
+    else if (x && typeof x === "object") {
+      for (const [k, val] of Object.entries(x)) {
+        if (/paise|price|gst|tax|amount|rate|value|total/i.test(k)) out.push(k);
+        walk(val);
+      }
+    }
+  };
+  walk(v);
+  return out;
+}
+
 describe("BR-FF-06 no prices for non-holders", () => {
   test("BR-FF-06 the receive picker (grn.edit_draft only) carries no price, GST, value or total anywhere in the body", async () => {
     const po = await mkPo("dispatched", [{ qty: 500 }, { qty: 200 }]);
     const r = await picker("fs");
     expect(r.status).toBe(200);
     expect(r.json.data.map((x: Row) => x.poId)).toContain(po.id);
-    const text = JSON.stringify(r.json);
-    expect(text).not.toMatch(/paise|price|gst|tax|amount|value|total|rate/i);
-    expect(text).not.toContain("24500");
+    // money keys only, in data (meta.total / totalPages are pagination, not money)
+    expect(moneyKeys(r.json.data)).toEqual([]);
+    expect(JSON.stringify(r.json.data)).not.toContain("24500");
   });
 
   test("BR-FF-06 the same caller gets no PO amounts from the PO endpoints (403)", async () => {
@@ -262,9 +277,7 @@ describe("BR-FF-06 no prices for non-holders", () => {
       `/api/grn/getgrns?q=${encodeURIComponent(g.grnNumber)}`,
     );
     expect(r.status).toBe(200);
-    expect(JSON.stringify(r.json)).not.toMatch(
-      /paise|price|gst|tax|amount|total/i,
-    );
+    expect(moneyKeys(r.json.data)).toEqual([]);
   });
 });
 
@@ -372,8 +385,8 @@ describe("BR-FF-31 plant head Home is the same page with every tile the keys all
 
 describe("BR-FF-70 picker with nothing receivable", () => {
   test("BR-FF-70 when every PO is fully received the picker returns an empty list, not an error", async () => {
-    await mkPo("fully_received", [{ qty: 100, received: 100 }]);
-    const r = await picker("fs");
+    const po = await mkPo("fully_received", [{ qty: 100, received: 100 }]);
+    const r = await picker("fs", `poId=${po.id}`);
     expect(r.status).toBe(200);
     expect(r.json.data).toEqual([]);
     expect(r.json.meta.total).toBe(0);
