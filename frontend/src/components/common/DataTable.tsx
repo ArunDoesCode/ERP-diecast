@@ -26,6 +26,8 @@ function isNumeric(meta: DataTableColumnMeta | undefined) {
 	return meta?.numeric === true;
 }
 
+const HIDE_BELOW_1100 = "max-[1099px]:hidden";
+
 type DataTableProps<TData extends RowData> = {
 	table: DataTableInstance<TData>;
 	isLoading?: boolean;
@@ -68,6 +70,8 @@ export function DataTable<TData extends RowData>({
 									className={cn(
 										isNumeric(header.column.columnDef.meta) &&
 											"text-right tabular-nums",
+										header.column.columnDef.meta?.hideBelow1100 &&
+											HIDE_BELOW_1100,
 									)}
 								>
 									{header.isPlaceholder
@@ -87,7 +91,12 @@ export function DataTable<TData extends RowData>({
 							// biome-ignore lint/suspicious/noArrayIndexKey: fixed skeleton row count, never reorders
 							<TableRow key={`skeleton-row-${rowIndex}`}>
 								{leafColumns.map((column) => (
-									<TableCell key={column.id}>
+									<TableCell
+										key={column.id}
+										className={cn(
+											column.columnDef.meta?.hideBelow1100 && HIDE_BELOW_1100,
+										)}
+									>
 										<Skeleton className="h-4 w-full" />
 									</TableCell>
 								))}
@@ -120,6 +129,8 @@ export function DataTable<TData extends RowData>({
 										className={cn(
 											isNumeric(cell.column.columnDef.meta) &&
 												"text-right tabular-nums",
+											cell.column.columnDef.meta?.hideBelow1100 &&
+												HIDE_BELOW_1100,
 										)}
 									>
 										{flexRender(cell.column.columnDef.cell, cell.getContext())}

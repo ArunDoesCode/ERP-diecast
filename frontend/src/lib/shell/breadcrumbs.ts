@@ -84,6 +84,18 @@ export function buildBreadcrumbs(
 		delete crumbs[crumbs.length - 1].href;
 		return crumbs;
 	}
+	if (segments[0] === "inventory" && segments.length > 1) {
+		// Inventory > Stock | Movements | Locations | Items … (> doc / Details).
+		crumbs.push(
+			{ label: LIST_LABELS.inventory, href: "/inventory" },
+			{ label: labelFor(segments[1]), href: `/inventory/${segments[1]}` },
+		);
+		if (segments.length > 2) {
+			crumbs.push({ label: options?.docNumber ?? "Details" });
+		}
+		delete crumbs[crumbs.length - 1].href;
+		return crumbs;
+	}
 	if (
 		segments[0] === "rfq" &&
 		segments.length > 2 &&

@@ -60,10 +60,23 @@ const returnColumns: DataTableColumnDef<PrtListRow>[] = [
 			<StatusBadge doc="purchaseReturn" status={row.original.status} />
 		),
 	},
-	{ accessorKey: "supplierName", header: "Supplier" },
+	{
+		accessorKey: "supplierName",
+		header: "Supplier",
+		// Below 1100 px the GRN / PO columns are hidden; their numbers sit under the supplier.
+		cell: ({ row }) => (
+			<div className="flex flex-col">
+				<span>{row.original.supplierName}</span>
+				<span className="font-mono text-[13px] text-muted-foreground min-[1100px]:hidden">
+					{row.original.grnNumber} · {row.original.poNumber}
+				</span>
+			</div>
+		),
+	},
 	{
 		accessorKey: "grnNumber",
 		header: "GRN no.",
+		meta: { hideBelow1100: true },
 		cell: ({ row }) => (
 			<span className="font-mono">{row.original.grnNumber}</span>
 		),
@@ -71,6 +84,7 @@ const returnColumns: DataTableColumnDef<PrtListRow>[] = [
 	{
 		accessorKey: "poNumber",
 		header: "PO no.",
+		meta: { hideBelow1100: true },
 		cell: ({ row }) => (
 			<span className="font-mono">{row.original.poNumber}</span>
 		),
@@ -78,7 +92,7 @@ const returnColumns: DataTableColumnDef<PrtListRow>[] = [
 	{
 		accessorKey: "linesCount",
 		header: "Lines",
-		meta: { numeric: true },
+		meta: { numeric: true, hideBelow1100: true },
 	},
 	{
 		accessorKey: "totalPaise",

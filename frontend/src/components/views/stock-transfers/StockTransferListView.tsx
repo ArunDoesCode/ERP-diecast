@@ -23,6 +23,7 @@ import { Pagination } from "@/components/shared/Pagination";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
 	Select,
 	SelectContent,
@@ -72,11 +73,22 @@ const columns: DataTableColumnDef<StListRow>[] = [
 	{
 		accessorKey: "createdAt",
 		header: "Date",
-		cell: ({ row }) => formatDate(row.original.createdAt),
+		// Below 1100 px the Posted on column is hidden; its time sits under the date.
+		cell: ({ row }) => (
+			<div className="flex flex-col">
+				<span>{formatDate(row.original.createdAt)}</span>
+				{row.original.postedAt ? (
+					<span className="text-[13px] text-muted-foreground min-[1100px]:hidden">
+						Posted {formatDateTime(row.original.postedAt)}
+					</span>
+				) : null}
+			</div>
+		),
 	},
 	{
 		accessorKey: "postedAt",
 		header: "Posted on",
+		meta: { hideBelow1100: true },
 		cell: ({ row }) => formatDateTime(row.original.postedAt),
 	},
 ];
@@ -130,7 +142,7 @@ function ItemFilter({
 			placeholder="Item"
 			searchPlaceholder="Type SKU or name"
 			isLoading={query.isFetching && !query.data}
-			className="w-44 min-w-0 [&>span]:truncate"
+			className="w-32 min-w-0 [&>span]:truncate"
 		/>
 	);
 }
@@ -194,7 +206,7 @@ export function StockTransferListView() {
 			value={value === null ? "all" : String(value)}
 			onValueChange={(next) => onChange(next === "all" ? null : Number(next))}
 		>
-			<SelectTrigger className="w-36" aria-label={label}>
+			<SelectTrigger className="w-30" aria-label={label}>
 				<SelectValue placeholder={label} />
 			</SelectTrigger>
 			<SelectContent>
@@ -228,22 +240,30 @@ export function StockTransferListView() {
 				{locationSelect("From", controls.fromId, controls.onFromChange)}
 				{locationSelect("To", controls.toId, controls.onToChange)}
 				<ItemFilter value={controls.itemId} onChange={controls.onItemChange} />
-				<Input
-					type="date"
-					value={controls.dateFrom ?? ""}
-					max={controls.dateTo ?? undefined}
-					onChange={(event) => controls.onDateFromChange(event.target.value)}
-					aria-label="Date from"
-					className="w-34"
-				/>
-				<Input
-					type="date"
-					value={controls.dateTo ?? ""}
-					min={controls.dateFrom ?? undefined}
-					onChange={(event) => controls.onDateToChange(event.target.value)}
-					aria-label="Date to"
-					className="w-34"
-				/>
+				<div className="flex items-center gap-2">
+					<Label htmlFor="st-date-from" className="text-muted-foreground">
+						Date
+					</Label>
+					<Input
+						id="st-date-from"
+						type="date"
+						value={controls.dateFrom ?? ""}
+						max={controls.dateTo ?? undefined}
+						onChange={(event) => controls.onDateFromChange(event.target.value)}
+						className="w-32"
+					/>
+					<Label htmlFor="st-date-to" className="text-muted-foreground">
+						to
+					</Label>
+					<Input
+						id="st-date-to"
+						type="date"
+						value={controls.dateTo ?? ""}
+						min={controls.dateFrom ?? undefined}
+						onChange={(event) => controls.onDateToChange(event.target.value)}
+						className="w-32"
+					/>
+				</div>
 			</FilterBar>
 
 			<DataTable

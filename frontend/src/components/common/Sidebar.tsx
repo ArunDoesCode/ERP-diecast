@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/sidebar";
 import { useMeQuery } from "@/lib/api/auth/queries";
 import { normalizeAllowedPath } from "@/lib/path-utils";
-import { getNavIcon } from "@/lib/shell/nav-icons";
+import { getNavIcon, getNavLabel } from "@/lib/shell/nav-icons";
 import { useAuthSessionStore } from "@/lib/store/auth-session-store";
 
 export function NavSidebar() {
@@ -39,7 +39,7 @@ export function NavSidebar() {
 			.sort((a, b) => a.sortOrder - b.sortOrder)
 			.map((screen) => ({
 				path: normalizeAllowedPath(screen.path),
-				title: screen.label,
+				title: getNavLabel(normalizeAllowedPath(screen.path), screen.label),
 				group: screen.menuGroup,
 			}))
 			.filter((page) => page.path)

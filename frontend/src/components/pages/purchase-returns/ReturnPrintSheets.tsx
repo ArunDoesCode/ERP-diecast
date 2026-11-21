@@ -43,11 +43,8 @@ function Party({
 
 function CancelledMark() {
 	return (
-		<div
-			aria-hidden="true"
-			className="pointer-events-none absolute top-4 right-4 flex justify-end"
-		>
-			<span className="-rotate-6 rounded-md border-2 border-destructive px-3 py-1 text-xl font-bold tracking-widest text-destructive opacity-30">
+		<div aria-hidden="true" className="flex justify-center py-2">
+			<span className="-rotate-3 rounded-md border-2 border-destructive px-3 py-1 text-xl font-bold tracking-widest text-destructive opacity-60">
 				CANCELLED
 			</span>
 		</div>
@@ -77,7 +74,6 @@ export function DebitNoteSheet({
 	const cancelled = note.status === "cancelled";
 	return (
 		<Paper>
-			{cancelled ? <CancelledMark /> : null}
 			<div className="flex items-start justify-between gap-4">
 				<div className="space-y-0.5">
 					<p className="font-medium">{note.plantName}</p>
@@ -120,6 +116,7 @@ export function DebitNoteSheet({
 				</div>
 			</div>
 
+			{cancelled ? <CancelledMark /> : null}
 			<div className="grid gap-4 sm:grid-cols-2">
 				<Party
 					title="To (supplier)"
@@ -241,7 +238,6 @@ export function ReturnChallanSheet({
 }) {
 	return (
 		<Paper>
-			{prt.status === "cancelled" ? <CancelledMark /> : null}
 			<div className="flex items-start justify-between gap-4">
 				<div className="space-y-0.5">
 					<p className="text-base font-semibold tracking-wide">
@@ -269,6 +265,7 @@ export function ReturnChallanSheet({
 				/>
 			</div>
 
+			{prt.status === "cancelled" ? <CancelledMark /> : null}
 			<div className="grid gap-4 sm:grid-cols-2">
 				<Party
 					title="From (plant)"

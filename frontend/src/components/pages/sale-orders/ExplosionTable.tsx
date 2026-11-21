@@ -192,7 +192,7 @@ export function ExplosionTable({
 														aria-hidden="true"
 													/>
 												)}
-												<div className="min-w-0">
+												<div className="min-w-0 max-w-64 whitespace-normal xl:max-w-none">
 													<div className="flex flex-wrap items-center gap-x-1.5">
 														<span className="font-mono">{row.sku}</span>
 														<span className="rounded-sm bg-muted px-1.5 text-[12px] text-muted-foreground">
@@ -277,11 +277,11 @@ export function ExplosionTable({
 													) : null}
 												</div>
 											) : tag === "no_bom" ? (
-												<span className="text-[13px] whitespace-nowrap text-muted-foreground">
+												<span className="block max-w-36 text-[13px] whitespace-normal text-muted-foreground">
 													Fix BOM and re-run
 												</span>
 											) : row.blockReason ? null : plan ? (
-												<span className="text-[13px] text-muted-foreground">
+												<span className="block max-w-36 text-[13px] whitespace-normal text-muted-foreground">
 													{plan}
 												</span>
 											) : net <= 0 ? (

@@ -7,12 +7,14 @@ import {
 	SearchableSelect,
 	type SearchableSelectOption,
 } from "@/components/common/SearchableSelect";
-import { transferQtyError } from "@/components/pages/stock-transfers/transfer-format";
+import {
+	transferQty,
+	transferQtyError,
+} from "@/components/pages/stock-transfers/transfer-format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useItemsQuery } from "@/lib/api/asset/queries";
-import { formatQty } from "@/lib/format";
 import { ST_MAX_LINES } from "@/types/stock-transfer";
 
 export type TransferRow = {
@@ -82,7 +84,7 @@ function ItemPicker({
 			searchPlaceholder="Type SKU or name"
 			emptyText="No items found."
 			isLoading={query.isFetching && !query.data}
-			className="min-w-0 [&>span]:truncate"
+			className="min-w-0 bg-input/20 dark:bg-input/30 [&>span]:truncate"
 		/>
 	);
 }
@@ -123,14 +125,14 @@ export function TransferLinesEditor({
 		<div className="flex flex-col gap-3">
 			<div
 				aria-hidden="true"
-				className="hidden grid-cols-[minmax(0,1fr)_minmax(0,13rem)_9rem_2.25rem] gap-x-3 border-b bg-table-header px-3 py-2 text-[13px] font-medium text-muted-foreground lg:grid"
+				className="hidden grid-cols-[minmax(0,1fr)_minmax(0,13rem)_9rem_2.25rem] gap-x-3 border-b bg-table-header px-3 py-2 text-[13px] font-medium text-muted-foreground min-[1100px]:grid"
 			>
 				<span>Item</span>
 				<span>Available at source</span>
 				<span className="text-right">Qty</span>
 				<span />
 			</div>
-			<ul className="flex flex-col gap-3 lg:gap-1">
+			<ul className="flex flex-col gap-3 min-[1100px]:gap-1">
 				{rows.map((row, index) => {
 					const number = index + 1;
 					const itemId = `st-item-${row.key}`;
@@ -152,12 +154,12 @@ export function TransferLinesEditor({
 					return (
 						<li
 							key={row.key}
-							className="grid gap-x-3 gap-y-2 rounded-md border p-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,13rem)_9rem_2.25rem] lg:items-start lg:rounded-none lg:border-0 lg:p-0 lg:px-3 lg:py-1"
+							className="grid gap-x-3 gap-y-2 rounded-md border p-3 sm:grid-cols-2 min-[1100px]:grid-cols-[minmax(0,1fr)_minmax(0,13rem)_9rem_2.25rem] min-[1100px]:items-start min-[1100px]:rounded-none min-[1100px]:border-0 min-[1100px]:p-0 min-[1100px]:px-3 min-[1100px]:py-1"
 						>
-							<div className="min-w-0 space-y-1 sm:col-span-2 lg:col-span-1">
+							<div className="min-w-0 space-y-1 sm:col-span-2 min-[1100px]:col-span-1">
 								<label
 									htmlFor={itemId}
-									className="text-sm font-medium lg:sr-only"
+									className="text-sm font-medium min-[1100px]:sr-only"
 								>
 									Item (line {number})
 								</label>
@@ -174,7 +176,7 @@ export function TransferLinesEditor({
 							<div className="min-w-0 space-y-1">
 								<label
 									htmlFor={availId}
-									className="text-sm font-medium lg:sr-only"
+									className="text-sm font-medium min-[1100px]:sr-only"
 								>
 									Available at source
 								</label>
@@ -184,15 +186,15 @@ export function TransferLinesEditor({
 								>
 									{row.itemId && available !== null && sourceName
 										? over
-											? `Only ${formatQty(available, row.unit, 3)} at ${sourceName}`
-											: `${formatQty(available, row.unit, 3)} at ${sourceName}`
+											? `Only ${transferQty(available, row.unit)} at ${sourceName}`
+											: `${transferQty(available, row.unit)} at ${sourceName}`
 										: "–"}
 								</output>
 							</div>
 							<div className="min-w-0 space-y-1">
 								<label
 									htmlFor={qtyId}
-									className="text-sm font-medium lg:sr-only"
+									className="text-sm font-medium min-[1100px]:sr-only"
 								>
 									Qty (line {number})
 								</label>
@@ -214,7 +216,7 @@ export function TransferLinesEditor({
 									</span>
 								</div>
 							</div>
-							<div className="flex items-start justify-end sm:col-span-2 lg:col-span-1">
+							<div className="flex items-start justify-end sm:col-span-2 min-[1100px]:col-span-1">
 								<Button
 									type="button"
 									size="icon"
@@ -229,7 +231,7 @@ export function TransferLinesEditor({
 							{qtyProblem ? (
 								<p
 									id={`${qtyId}-error`}
-									className="text-[13px] text-destructive sm:col-span-2 lg:col-span-4"
+									className="text-[13px] text-destructive sm:col-span-2 min-[1100px]:col-span-4"
 								>
 									Line {number}: {qtyProblem}
 								</p>

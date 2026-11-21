@@ -1,6 +1,7 @@
 import {
 	type Icon,
 	IconArrowsExchange,
+	IconArrowsRightLeft,
 	IconChecklist,
 	IconFileCertificate,
 	IconFileInvoice,
@@ -39,8 +40,24 @@ const ICONS: Record<string, Icon> = {
 	setup: IconSettings,
 };
 
+/** Nested screens that must not share their parent's icon (Reorder keeps the Inventory icon). */
+const NESTED_ICONS: Record<string, Icon> = {
+	"/inventory/stock-transfers": IconArrowsRightLeft,
+};
+
+/** Sidebar labels shown in sentence case when the screen list sends title case. */
+const NAV_LABELS: Record<string, string> = {
+	"/inventory/stock-transfers": "Stock transfers",
+};
+
+export function getNavLabel(path: string, label: string): string {
+	return NAV_LABELS[path] ?? label;
+}
+
 /** Route path (e.g. "/purchase-orders") -> Tabler icon. Unknown routes get a fallback icon. */
 export function getNavIcon(path: string): Icon {
+	const nested = NESTED_ICONS[path];
+	if (nested) return nested;
 	const first = path.split("/").filter(Boolean)[0];
 	if (!first) return IconLayoutDashboard;
 	return ICONS[first] ?? IconFileText;

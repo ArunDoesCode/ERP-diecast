@@ -1,8 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-
+import { transferQty } from "@/components/pages/stock-transfers/transfer-format";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatDateTime, formatMoney, formatQty } from "@/lib/format";
+import { formatDateTime, formatMoney } from "@/lib/format";
 import type { StActorRef, StDetail } from "@/types/stock-transfer";
 
 const COLS = "xl:grid-cols-[minmax(0,1fr)_7.5rem_6rem_8rem]";
@@ -44,7 +44,7 @@ export function TransferLinesCard({ transfer }: { transfer: StDetail }) {
 								</span>
 								<p className="break-words">{line.name}</p>
 							</div>
-							<Pair label="Qty">{formatQty(line.qty, line.unit, 3)}</Pair>
+							<Pair label="Qty">{transferQty(line.qty, line.unit)}</Pair>
 							{hasCost ? (
 								<>
 									<Pair label="Rate">
@@ -56,7 +56,7 @@ export function TransferLinesCard({ transfer }: { transfer: StDetail }) {
 								</>
 							) : isDraft ? (
 								<Pair label="Available at source">
-									{formatQty(line.sourceBalanceQty, line.unit, 3)}
+									{transferQty(line.sourceBalanceQty, line.unit)}
 								</Pair>
 							) : null}
 						</li>
@@ -147,7 +147,19 @@ export function TransferHistoryCard({ transfer }: { transfer: StDetail }) {
 			text: `Created by ${transfer.createdBy?.name ?? "–"}`,
 		},
 	];
-	if (transfer.lastUpdatedAt !== transfer.createdAt && transfer.lastUpdatedBy) {
+	// Only a real edit: later than Created and before the post / cancel / reverse.
+	const closedAt = [
+		transfer.postedAt,
+		transfer.cancelledAt,
+		transfer.reversedAt,
+	].filter((at): at is string => at !== null);
+	const SECOND = 1000;
+	const updatedMs = Date.parse(transfer.lastUpdatedAt);
+	const editedAfterCreate = updatedMs - Date.parse(transfer.createdAt) > SECOND;
+	const editedBeforeClose = closedAt.every(
+		(at) => Date.parse(at) - updatedMs > SECOND,
+	);
+	if (editedAfterCreate && editedBeforeClose && transfer.lastUpdatedBy) {
 		events.push({
 			key: "updated",
 			at: transfer.lastUpdatedAt,
@@ -214,8 +226,8 @@ export function TransferHistoryCard({ transfer }: { transfer: StDetail }) {
 										{locationName(row.locationId)}
 									</p>
 									<p className="text-[13px] text-muted-foreground tabular-nums">
-										{row.quantityChange > 0 ? "+" : ""}
-										{formatQty(row.quantityChange, null, 3)} at{" "}
+										{row.quantityChange > 0 ? "In " : "Out "}
+										{transferQty(Math.abs(row.quantityChange), null)} at{" "}
 										{formatMoney(row.unitCostPaise)} ={" "}
 										{formatMoney(row.totalValueChangePaise)}
 									</p>

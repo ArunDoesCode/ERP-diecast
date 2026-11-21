@@ -11,6 +11,7 @@ import {
 } from "@/components/pages/stock-transfers/TransferForm";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorState } from "@/components/shared/ErrorState";
+import { PageHeader } from "@/components/shared/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCan } from "@/hooks/use-can";
@@ -73,16 +74,21 @@ export function StockTransferFormView({
 
 	if (!canManage) {
 		return (
-			<EmptyState
-				title="You can't create transfers"
-				action={
-					<Button type="button" size="sm" variant="outline" asChild>
-						<Link href="/inventory/stock-transfers">
-							Back to stock transfers
-						</Link>
-					</Button>
-				}
-			/>
+			<div className="flex w-full flex-col gap-4">
+				<PageHeader
+					title={transferId === undefined ? "New transfer" : "Edit transfer"}
+				/>
+				<EmptyState
+					title="You can't create transfers"
+					action={
+						<Button type="button" size="sm" variant="outline" asChild>
+							<Link href="/inventory/stock-transfers">
+								Back to stock transfers
+							</Link>
+						</Button>
+					}
+				/>
+			</div>
 		);
 	}
 

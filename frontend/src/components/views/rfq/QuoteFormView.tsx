@@ -158,6 +158,26 @@ export function QuoteFormView({
 		rfq.rfq.status === "sent" || rfq.rfq.status === "partially_awarded";
 	const isDraftQuote = quoteId === undefined || saved?.status === "draft";
 	const editable = canManage && isDraftQuote && rfqOpen;
+	if (quoteId === undefined && !rfqOpen) {
+		const awarded = rfq.rfq.status === "awarded";
+		return (
+			<div className="flex w-full max-w-6xl flex-col gap-4">
+				<PageHeader title={`Quote · ${rfq.rfq.rfqNumber}`} />
+				<EmptyState
+					title={
+						awarded
+							? "This RFQ is awarded; quotes are closed"
+							: "This RFQ is not open for quotes"
+					}
+					action={
+						<Button type="button" size="sm" variant="outline" asChild>
+							<Link href={`/rfq/${rfqId}`}>Back to RFQ</Link>
+						</Button>
+					}
+				/>
+			</div>
+		);
+	}
 	const late = today > rfq.rfq.dueDate;
 	const liveSupplierIds = new Set(
 		rfq.quotes.filter((q) => q.status !== "cancelled").map((q) => q.supplierId),

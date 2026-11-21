@@ -20,6 +20,7 @@ import {
 	listEmptyState,
 	listErrorState,
 } from "@/components/pages/inventory/list-states";
+import { transferQty } from "@/components/pages/stock-transfers/transfer-format";
 import { FilterBar } from "@/components/shared/FilterBar";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +41,7 @@ import {
 	FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
 	Select,
 	SelectContent,
@@ -80,7 +82,7 @@ const REFERENCE_TYPE_LABEL: Record<AssetReferenceType, string> = {
 	scrap_dispatch: "Scrap dispatch",
 	stock_adjustment: "Stock-take",
 	stock_transfer: "Stock transfer",
-	stock_transfer_reversal: "Transfer reversed",
+	stock_transfer_reversal: "Transfer reversal",
 };
 
 const MANUAL_REFERENCE_LABEL = {
@@ -552,6 +554,8 @@ export function InventoryMovementsManager({
 				header: ({ column }) => (
 					<DataTableColumnHeader column={column} title="Qty Change" />
 				),
+				cell: ({ row }) =>
+					`${row.original.quantityChange > 0 ? "+" : ""}${transferQty(row.original.quantityChange, row.original.itemUom)}`,
 			},
 			{
 				accessorKey: "createdAt",
@@ -589,30 +593,33 @@ export function InventoryMovementsManager({
 				}
 			/>
 			<FilterBar value="" onChange={() => {}}>
-				<div className="flex w-full flex-wrap gap-2 sm:max-w-2xl">
-					<Select
-						value={referenceType ?? TRANSFER_FILTER_ALL}
-						onValueChange={(value) => {
-							setReferenceType(
-								value === TRANSFER_FILTER_ALL
-									? undefined
-									: (value as AssetReferenceType),
-							);
-							setPagination((prev) => ({ ...prev, pageIndex: 0 }));
-						}}
-					>
-						<SelectTrigger className="w-44" aria-label="Source type">
-							<SelectValue placeholder="Source type" />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value={TRANSFER_FILTER_ALL}>All sources</SelectItem>
-							{assetReferenceTypeValues.map((type) => (
-								<SelectItem key={type} value={type}>
-									{REFERENCE_TYPE_LABEL[type]}
-								</SelectItem>
-							))}
-						</SelectContent>
-					</Select>
+				<div className="flex w-full flex-wrap items-end gap-2 sm:max-w-2xl">
+					<div className="flex flex-col gap-1.5">
+						<Label htmlFor="movement-source-type">Source type</Label>
+						<Select
+							value={referenceType ?? TRANSFER_FILTER_ALL}
+							onValueChange={(value) => {
+								setReferenceType(
+									value === TRANSFER_FILTER_ALL
+										? undefined
+										: (value as AssetReferenceType),
+								);
+								setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+							}}
+						>
+							<SelectTrigger id="movement-source-type" className="w-44">
+								<SelectValue placeholder="Source type" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value={TRANSFER_FILTER_ALL}>All sources</SelectItem>
+								{assetReferenceTypeValues.map((type) => (
+									<SelectItem key={type} value={type}>
+										{REFERENCE_TYPE_LABEL[type]}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+					</div>
 					<div className="flex-1">
 						<ItemPicker
 							value={selectedItemId}
@@ -705,11 +712,17 @@ export function InventoryMovementsManager({
 							) : null}
 							<p>
 								<span className="font-medium">Quantity Change:</span>{" "}
-								{detailMovement.quantityChange}
+								{transferQty(
+									detailMovement.quantityChange,
+									detailMovement.itemUom,
+								)}
 							</p>
 							<p>
 								<span className="font-medium">Balance After:</span>{" "}
-								{detailMovement.balanceAfter}
+								{transferQty(
+									detailMovement.balanceAfter,
+									detailMovement.itemUom,
+								)}
 							</p>
 							<p>
 								<span className="font-medium">Created:</span>{" "}

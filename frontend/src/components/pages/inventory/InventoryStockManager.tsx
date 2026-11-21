@@ -92,17 +92,23 @@ export function InventoryStockManager() {
 					<DataTableColumnHeader column={column} title="Item" />
 				),
 				cell: ({ row }) => (
-					<div className="flex items-center gap-2">
-						<span>{row.original.name}</span>
-						{row.original.isActive ? null : (
-							<StatusBadge doc="item" status="inactive" />
-						)}
+					<div className="flex flex-col">
+						<div className="flex items-center gap-2">
+							<span>{row.original.name}</span>
+							{row.original.isActive ? null : (
+								<StatusBadge doc="item" status="inactive" />
+							)}
+						</div>
+						<span className="font-mono text-[13px] text-muted-foreground min-[1100px]:hidden">
+							{row.original.sku}
+						</span>
 					</div>
 				),
 			},
 			{
 				id: "sku",
 				accessorKey: "sku",
+				meta: { hideBelow1100: true },
 				header: ({ column }) => (
 					<DataTableColumnHeader column={column} title="SKU" />
 				),
@@ -135,6 +141,7 @@ export function InventoryStockManager() {
 				id: "averageCostPaise",
 				accessorKey: "averageCostPaise",
 				enableSorting: false,
+				meta: { hideBelow1100: true },
 				header: "Average cost",
 				cell: ({ getValue }) => formatMoney(getValue<number>()),
 			},
@@ -150,6 +157,7 @@ export function InventoryStockManager() {
 				id: "reorderLevel",
 				accessorKey: "reorderLevel",
 				enableSorting: false,
+				meta: { hideBelow1100: true },
 				header: "Reorder level",
 			},
 			{
@@ -164,7 +172,7 @@ export function InventoryStockManager() {
 							{row.original.locations.map((location) => (
 								<li
 									key={location.locationId}
-									className="flex flex-wrap items-center gap-x-2"
+									className="flex flex-wrap items-center gap-x-2 gap-y-1 py-1"
 								>
 									<span>
 										{location.locationName}: {location.balance}{" "}
@@ -173,7 +181,7 @@ export function InventoryStockManager() {
 									{canTransfer &&
 									location.balance > 0 &&
 									location.locationType !== "vendor_premise" ? (
-										<Button type="button" size="sm" variant="outline" asChild>
+										<Button type="button" variant="outline" asChild>
 											<Link
 												href={`/inventory/stock-transfers/new?item=${row.original.itemId}&from=${location.locationId}`}
 												aria-label={`Move ${row.original.name} from ${location.locationName}`}

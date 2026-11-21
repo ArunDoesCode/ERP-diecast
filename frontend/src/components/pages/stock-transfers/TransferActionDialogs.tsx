@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-
+import { transferQty } from "@/components/pages/stock-transfers/transfer-format";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -20,7 +20,6 @@ import {
 	usePostStockTransferMutation,
 	useReverseStockTransferMutation,
 } from "@/lib/api/stock-transfer/queries";
-import { formatQty } from "@/lib/format";
 import { ST_REASON_MAX, type StDetail } from "@/types/stock-transfer";
 
 export type TransferDialog = "post" | "cancel" | "reverse";
@@ -85,7 +84,7 @@ export function TransferActionDialogs({
 									{line.sku} · {line.name}
 								</span>
 								<span className="shrink-0 tabular-nums">
-									{formatQty(line.qty, line.unit, 3)}
+									{transferQty(line.qty, line.unit)}
 								</span>
 							</li>
 						))}
@@ -129,6 +128,7 @@ export function TransferActionDialogs({
 						</AlertDialogCancel>
 						<AlertDialogAction
 							variant="destructive"
+							className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
 							disabled={cancel.isPending}
 							onClick={(event) => {
 								event.preventDefault();
@@ -174,6 +174,7 @@ export function TransferActionDialogs({
 						</AlertDialogCancel>
 						<AlertDialogAction
 							variant="destructive"
+							className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
 							disabled={!reasonValid || reverse.isPending}
 							onClick={(event) => {
 								event.preventDefault();
