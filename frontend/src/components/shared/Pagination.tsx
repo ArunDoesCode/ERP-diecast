@@ -20,6 +20,8 @@ export type PaginationProps = {
 	total: number;
 	onPageChange: (page: number) => void;
 	onPageSizeChange?: (pageSize: number) => void;
+	/** Show the "1 to 7 of 7" row even when everything fits on one page. */
+	alwaysShow?: boolean;
 };
 
 const ARROW =
@@ -31,6 +33,7 @@ export function Pagination({
 	total,
 	onPageChange,
 	onPageSizeChange,
+	alwaysShow,
 }: PaginationProps) {
 	const pageCount = Math.max(1, Math.ceil(total / pageSize));
 	// One page that fits: nothing to page through. The size select stays so a large
@@ -39,7 +42,8 @@ export function Pagination({
 	const fitsOnePage = total <= pageSize && page <= 1;
 	const showSizeSelect =
 		onPageSizeChange !== undefined && total > Math.min(...PAGE_SIZE_OPTIONS);
-	if (total <= 0 || (fitsOnePage && !showSizeSelect)) return null;
+	if (total <= 0 || (!alwaysShow && fitsOnePage && !showSizeSelect))
+		return null;
 	const atStart = page <= 1;
 	const atEnd = page >= pageCount;
 	const numbers = getPageNumbers(page, pageCount);

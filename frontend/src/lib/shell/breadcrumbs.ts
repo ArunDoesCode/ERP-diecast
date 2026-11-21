@@ -40,6 +40,11 @@ function labelFor(segment: string): string {
 	return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
+/** Last crumb before the document loads (or when it has no number): "#12" for an id, the page name otherwise. Never "Details". */
+function docFallback(segment: string): string {
+	return /^\d+$/.test(segment) ? `#${segment}` : labelFor(segment);
+}
+
 /** Route + optional group / document number -> crumbs. Last crumb has no href. */
 export function buildBreadcrumbs(
 	pathname: string,
@@ -56,7 +61,7 @@ export function buildBreadcrumbs(
 		if (segments[2] === "runs") {
 			crumbs.push({ label: "Reorder runs", href: "/inventory/reorder/runs" });
 			if (segments.length > 3) {
-				crumbs.push({ label: options?.docNumber ?? "Details" });
+				crumbs.push({ label: options?.docNumber ?? docFallback(segments[3]) });
 			}
 		}
 		delete crumbs[crumbs.length - 1].href;
@@ -74,13 +79,13 @@ export function buildBreadcrumbs(
 			if (segments[3] === "edit") {
 				crumbs.push(
 					{
-						label: options?.docNumber ?? "Details",
+						label: options?.docNumber ?? docFallback(segments[2]),
 						href: `/inventory/stock-transfers/${segments[2]}`,
 					},
 					{ label: "Edit" },
 				);
 			} else {
-				crumbs.push({ label: options?.docNumber ?? "Details" });
+				crumbs.push({ label: options?.docNumber ?? docFallback(segments[2]) });
 			}
 		}
 		delete crumbs[crumbs.length - 1].href;
@@ -93,7 +98,7 @@ export function buildBreadcrumbs(
 			{ label: labelFor(segments[1]), href: `/inventory/${segments[1]}` },
 		);
 		if (segments.length > 2) {
-			crumbs.push({ label: options?.docNumber ?? "Details" });
+			crumbs.push({ label: options?.docNumber ?? docFallback(segments[2]) });
 		}
 		delete crumbs[crumbs.length - 1].href;
 		return crumbs;
@@ -113,7 +118,10 @@ export function buildBreadcrumbs(
 		if (options?.group) crumbs.push({ label: options.group });
 		crumbs.push(
 			{ label: LIST_LABELS.rfq, href: "/rfq" },
-			{ label: options?.docNumber ?? "Details", href: `/rfq/${segments[1]}` },
+			{
+				label: options?.docNumber ?? docFallback(segments[1]),
+				href: `/rfq/${segments[1]}`,
+			},
 			{ label: leaf[segments[2]] ?? labelFor(segments[2]) },
 		);
 		delete crumbs[crumbs.length - 1].href;
@@ -137,13 +145,13 @@ export function buildBreadcrumbs(
 			if (segments[2]) {
 				crumbs.push(
 					{
-						label: options?.docNumber ?? "Details",
+						label: options?.docNumber ?? docFallback(segments[1]),
 						href: `/delivery-notes/${segments[1]}`,
 					},
 					{ label: leaf[segments[2]] ?? labelFor(segments[2]) },
 				);
 			} else {
-				crumbs.push({ label: options?.docNumber ?? "Details" });
+				crumbs.push({ label: options?.docNumber ?? docFallback(segments[1]) });
 			}
 		}
 		delete crumbs[crumbs.length - 1].href;
@@ -152,10 +160,16 @@ export function buildBreadcrumbs(
 	if (options?.group) crumbs.push({ label: options.group });
 	if (segments.length === 0) {
 		crumbs.push({ label: LIST_LABELS.landing });
+	} else if (segments[0] === "landing" && options?.docNumber) {
+		// The denied page: Home > No access.
+		crumbs.push(
+			{ label: LIST_LABELS.landing, href: "/landing" },
+			{ label: options.docNumber },
+		);
 	} else {
 		crumbs.push({ label: labelFor(segments[0]), href: `/${segments[0]}` });
 		if (segments.length > 1) {
-			crumbs.push({ label: options?.docNumber ?? "Details" });
+			crumbs.push({ label: options?.docNumber ?? docFallback(segments[1]) });
 		}
 	}
 	const last = crumbs[crumbs.length - 1];

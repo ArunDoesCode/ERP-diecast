@@ -54,6 +54,7 @@ const NESTED_ICONS: Record<string, Icon> = {
 /** Sidebar labels shown in sentence case when the screen list sends title case. */
 const NAV_LABELS: Record<string, string> = {
 	"/inventory/stock-transfers": "Stock transfers",
+	"/supplier-ratings": "Supplier rating",
 };
 
 export function getNavLabel(path: string, label: string): string {

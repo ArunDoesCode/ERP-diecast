@@ -34,7 +34,7 @@ import {
 	useRfqQuery,
 	useUpdateRfqMutation,
 } from "@/lib/api/rfq/queries";
-import { formatMoney, formatQty } from "@/lib/format";
+import { formatMoney, formatQtyTrim } from "@/lib/format";
 import { istTodayIso } from "@/lib/ist-date";
 import { useBreadcrumbLast } from "@/lib/shell/breadcrumb-last";
 import {
@@ -321,7 +321,7 @@ export function RfqFormView({
 											{line.itemCode} · {line.itemName}
 										</TableCell>
 										<TableCell className="text-right tabular-nums">
-											{formatQty(line.qty, line.uom, 3)}
+											{formatQtyTrim(line.qty, line.uom)}
 										</TableCell>
 										<TableCell className="text-muted-foreground">
 											{line.hints.length === 0

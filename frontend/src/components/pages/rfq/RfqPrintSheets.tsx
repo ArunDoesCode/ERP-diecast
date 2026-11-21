@@ -6,7 +6,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { formatDate, formatQty } from "@/lib/format";
+import { formatDate, formatQtyTrim } from "@/lib/format";
 import type { PrintSheet, RfqPrint } from "@/types/rfq";
 
 const BLANK = "________";
@@ -67,7 +67,7 @@ function Sheet({ print, sheet }: { print: RfqPrint; sheet: PrintSheet }) {
 								{line.itemCode} · {line.itemName}
 							</TableCell>
 							<TableCell className="text-right tabular-nums">
-								{formatQty(line.qty, line.uom, 3)}
+								{formatQtyTrim(line.qty, line.uom)}
 							</TableCell>
 							<TableCell>{BLANK}</TableCell>
 							<TableCell>{BLANK}</TableCell>

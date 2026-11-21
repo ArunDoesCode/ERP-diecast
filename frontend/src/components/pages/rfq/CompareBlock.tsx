@@ -15,7 +15,7 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { formatDate, formatMoney, formatQty } from "@/lib/format";
+import { formatDate, formatMoney, formatQtyTrim } from "@/lib/format";
 import { istTodayIso } from "@/lib/ist-date";
 import {
 	type ComparisonCell,
@@ -86,7 +86,7 @@ function CompareBlockImpl({
 		<Card aria-labelledby={titleId}>
 			<CardHeader>
 				<CardTitle id={titleId}>
-					{row.itemCode} · {row.itemName} · {formatQty(row.qty, row.uom, 3)}
+					{row.itemCode} · {row.itemName} · {formatQtyTrim(row.qty, row.uom)}
 				</CardTitle>
 				<p className="text-[13px] text-muted-foreground">
 					{row.lastPoRatePaise !== undefined ? (

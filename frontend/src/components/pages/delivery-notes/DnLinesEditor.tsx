@@ -176,6 +176,7 @@ export function DnLinesEditor(props: Props) {
 							>
 								<div className="flex items-start gap-2">
 									<Checkbox
+										className="rounded-[4px]"
 										id={`dn-pick-${info.soLineId}`}
 										aria-label={`Ship ${info.sku}`}
 										checked={state?.picked === true}
@@ -305,6 +306,7 @@ export function DnLinesEditor(props: Props) {
 						<TableRow key={info.soLineId} className="align-top">
 							<TableCell>
 								<Checkbox
+									className="rounded-[4px]"
 									aria-label={`Ship ${info.sku}`}
 									checked={state?.picked === true}
 									disabled={props.disabled}

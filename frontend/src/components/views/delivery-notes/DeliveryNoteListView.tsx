@@ -76,7 +76,7 @@ function columns(canViewSo: boolean): DataTableColumnDef<DnListRow>[] {
 			header: "Customer",
 			// Below 1100 px the SO column is hidden; its number sits under the customer.
 			cell: ({ row }) => (
-				<div className="flex flex-col">
+				<div className="flex max-w-44 flex-col whitespace-normal">
 					<span>{row.original.customer.name}</span>
 					<span className="text-[13px] min-[1100px]:hidden">
 						<SoNumberLink
@@ -136,7 +136,7 @@ function columns(canViewSo: boolean): DataTableColumnDef<DnListRow>[] {
 							<StatusBadge doc="dnTag" status="eway_expired" />
 						) : null}
 						{r.ewayValidUntil ? (
-							<span className="text-[13px] text-muted-foreground min-[1100px]:hidden">
+							<span className="text-[13px] whitespace-normal text-muted-foreground min-[1100px]:hidden">
 								Valid until {formatDateTime(r.ewayValidUntil)}
 							</span>
 						) : null}
@@ -312,6 +312,7 @@ export function DeliveryNoteListView() {
 				page={controls.page}
 				pageSize={controls.pageSize}
 				total={total}
+				alwaysShow
 				onPageChange={controls.setPage}
 				onPageSizeChange={controls.onPageSizeChange}
 			/>

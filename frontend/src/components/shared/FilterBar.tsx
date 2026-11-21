@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-/** `count: null` hides the number (the API gives no counts); `undefined` shows "–" while loading. */
+/** `count: null` hides the number (the API gives no counts); `undefined` shows "–" while loading. A bar where no chip has a `count` key at all shows no numbers. */
 export type QuickFilter = {
 	key: string;
 	label: string;
@@ -29,12 +29,13 @@ export function FilterBar({
 	filtersActive,
 }: FilterBarProps) {
 	const firstKey = quick?.[0]?.key;
+	const noCounts = quick?.every((q) => !("count" in q)) ?? true;
 	const active = filtersActive === true || (quick ? value !== firstKey : false);
 	return (
 		<div
 			role="toolbar"
 			aria-label="Filters"
-			className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"
+			className="flex flex-col gap-3 min-[1280px]:flex-row min-[1280px]:items-center min-[1280px]:justify-between"
 		>
 			<div className="flex flex-wrap items-center gap-2">
 				{quick?.map((q) => {
@@ -52,7 +53,7 @@ export function FilterBar({
 									: "border-border bg-card text-foreground hover:bg-muted",
 							)}
 						>
-							{q.count === null ? null : (
+							{noCounts || q.count === null ? null : (
 								<span className="tabular-nums">{q.count ?? "–"}</span>
 							)}
 							<span>{q.label}</span>

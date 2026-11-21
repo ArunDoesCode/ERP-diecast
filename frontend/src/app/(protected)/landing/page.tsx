@@ -6,5 +6,5 @@ export default async function LandingPage({
 	searchParams: Promise<{ denied?: string }>;
 }) {
 	const { denied } = await searchParams;
-	return <LandingView denied={Boolean(denied)} />;
+	return <LandingView denied={denied} />;
 }

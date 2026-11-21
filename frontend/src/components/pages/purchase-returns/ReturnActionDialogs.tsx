@@ -20,7 +20,7 @@ import {
 	useCancelReturnDraftMutation,
 	usePostReturnMutation,
 } from "@/lib/api/purchase-return/queries";
-import { formatMoney, formatQty } from "@/lib/format";
+import { formatMoney, formatQtyTrim } from "@/lib/format";
 import {
 	PRT_REASON_MAX,
 	PRT_REASON_MIN,
@@ -48,7 +48,7 @@ function impactText(prt: PrtDetail) {
 	const parts = preview.stockOut.map((entry) => {
 		const name =
 			prt.lines.find((line) => line.itemId === entry.itemId)?.itemName ?? "";
-		return `Stock −${formatQty(entry.qty, entry.uom, 3)} ${name}`.trim();
+		return `Stock −${formatQtyTrim(entry.qty, entry.uom)} ${name}`.trim();
 	});
 	if (parts.length === 0) parts.push("No stock movement");
 	parts.push(`debit note ${formatMoney(preview.debitNoteTotalPaise)}`);

@@ -29,7 +29,7 @@ import {
 import { useCan } from "@/hooks/use-can";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { rfqErrorMessage, usePrLinesQuery } from "@/lib/api/rfq/queries";
-import { formatQty } from "@/lib/format";
+import { formatQtyTrim } from "@/lib/format";
 import type { PrLineRow } from "@/types/rfq";
 
 const PAGE_SIZE = 10;
@@ -171,7 +171,7 @@ export function RfqLinePickerDialog({
 											) : null}
 										</TableCell>
 										<TableCell className="text-right tabular-nums">
-											{formatQty(row.qty, row.uom, 3)}
+											{formatQtyTrim(row.qty, row.uom)}
 										</TableCell>
 									</TableRow>
 								);

@@ -16,7 +16,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { formatMoney, formatQty } from "@/lib/format";
+import { formatMoney, formatQtyTrim } from "@/lib/format";
 import type { PrtPrefillLine, PrtSource } from "@/types/purchase-return";
 
 export type EditorRow = {
@@ -125,7 +125,7 @@ export function ReturnLinesEditor({
 									{line.gstPercent}%
 								</TableCell>
 								<TableCell className="text-right tabular-nums">
-									{formatQty(cap, line.uom, 3)}
+									{formatQtyTrim(cap, line.uom)}
 								</TableCell>
 								<TableCell className="min-w-32 text-right">
 									<label htmlFor={inputId} className="sr-only">

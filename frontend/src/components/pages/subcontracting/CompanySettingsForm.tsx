@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useSaveCompanySettingsMutation } from "@/lib/api/subcontracting/queries";
+import { formatMoney } from "@/lib/format";
 import {
 	type CompanySettings,
 	type CompanySettingsInput,
@@ -123,6 +124,9 @@ export function CompanySettingsForm({
 								/>
 							</FormControl>
 							<p className="text-[13px] text-muted-foreground">
+								{Number.isFinite(Number(field.value)) && field.value !== ""
+									? `${formatMoney(Math.round(Number(field.value) * 100))}. `
+									: ""}
 								A delivery note at or above this value needs an e-way bill.
 								Other-state sales always need one.
 							</p>

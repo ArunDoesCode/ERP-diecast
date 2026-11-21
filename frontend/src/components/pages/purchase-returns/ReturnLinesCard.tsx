@@ -7,7 +7,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { formatMoney, formatQty } from "@/lib/format";
+import { formatMoney, formatQtyTrim } from "@/lib/format";
 import type { PrtDetail } from "@/types/purchase-return";
 
 const SOURCE_LABEL = { rejected: "Rejected", accepted: "Accepted" } as const;
@@ -56,7 +56,7 @@ export function ReturnLinesCard({ prt }: { prt: PrtDetail }) {
 									</span>
 								</TableCell>
 								<TableCell className="text-right tabular-nums">
-									{formatQty(line.qty, line.uom, 3)}
+									{formatQtyTrim(line.qty, line.uom)}
 								</TableCell>
 								<TableCell className="text-right tabular-nums">
 									{formatMoney(line.ratePaise)}
@@ -146,7 +146,7 @@ export function ReturnPreviewCard({ prt }: { prt: PrtDetail }) {
 									?.itemName ?? `Item ${entry.itemId}`;
 							return (
 								<li key={entry.itemId}>
-									Stock −{formatQty(entry.qty, entry.uom, 3)} {name}
+									Stock −{formatQtyTrim(entry.qty, entry.uom)} {name}
 								</li>
 							);
 						})

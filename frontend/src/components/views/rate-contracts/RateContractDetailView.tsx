@@ -44,7 +44,7 @@ import {
 	formatDate,
 	formatDateTime,
 	formatMoney,
-	formatQty,
+	formatQtyTrim,
 } from "@/lib/format";
 import { istTodayIso } from "@/lib/ist-date";
 import { useBreadcrumbLast } from "@/lib/shell/breadcrumb-last";
@@ -244,10 +244,10 @@ export function RateContractDetailView({ contractId }: { contractId: number }) {
 											<TableCell className="text-right tabular-nums">
 												{line.agreedQty === null
 													? "Rate only"
-													: formatQty(line.agreedQty, line.uom, 3)}
+													: formatQtyTrim(line.agreedQty, line.uom)}
 											</TableCell>
 											<TableCell className="text-right tabular-nums">
-												{formatQty(line.orderedQty, line.uom, 3)}
+												{formatQtyTrim(line.orderedQty, line.uom)}
 												<span className="block text-[13px] text-muted-foreground">
 													{line.percentOrdered === null
 														? "–"
@@ -255,7 +255,7 @@ export function RateContractDetailView({ contractId }: { contractId: number }) {
 												</span>
 											</TableCell>
 											<TableCell className="text-right tabular-nums">
-												{formatQty(line.receivedQty, line.uom, 3)}
+												{formatQtyTrim(line.receivedQty, line.uom)}
 											</TableCell>
 										</TableRow>
 									))}

@@ -37,7 +37,7 @@ import {
 	usePurchaseReturnsQuery,
 } from "@/lib/api/purchase-return/queries";
 import { useSuppliersQuery } from "@/lib/api/suppliers/queries";
-import { formatDate, formatMoney, formatQty } from "@/lib/format";
+import { formatDate, formatMoney, formatQtyTrim } from "@/lib/format";
 import type { PrtAwaitingRow, PrtListRow } from "@/types/purchase-return";
 
 const returnColumns: DataTableColumnDef<PrtListRow>[] = [
@@ -135,14 +135,14 @@ function awaitingColumns(
 			header: "Rejected qty",
 			meta: { numeric: true },
 			cell: ({ row }) =>
-				formatQty(row.original.rejectedQty, row.original.uom, 3),
+				formatQtyTrim(row.original.rejectedQty, row.original.uom),
 		},
 		{
 			accessorKey: "awaitingQty",
 			header: "Open to return",
 			meta: { numeric: true },
 			cell: ({ row }) =>
-				formatQty(row.original.awaitingQty, row.original.uom, 3),
+				formatQtyTrim(row.original.awaitingQty, row.original.uom),
 		},
 	];
 	if (canReturn) {

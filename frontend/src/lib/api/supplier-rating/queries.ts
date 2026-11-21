@@ -42,10 +42,11 @@ function retryUnlessClientError(count: number, error: unknown) {
 	return count < 2;
 }
 
-export function useRatingListQuery(params: RatingListParams) {
+export function useRatingListQuery(params: RatingListParams, enabled = true) {
 	return useQuery({
 		queryKey: supplierRatingKeys.list(params),
 		queryFn: () => getRatingList(params),
+		enabled,
 		placeholderData: keepPreviousData,
 		retry: retryUnlessClientError,
 	});

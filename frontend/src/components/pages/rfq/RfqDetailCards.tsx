@@ -18,7 +18,7 @@ import {
 	formatDate,
 	formatDateTime,
 	formatMoney,
-	formatQty,
+	formatQtyTrim,
 } from "@/lib/format";
 import type { QuoteHeader, RfqDetails, RfqLine } from "@/types/rfq";
 
@@ -85,7 +85,7 @@ export function RfqLinesCard({ data }: { data: RfqDetails }) {
 										</span>
 									</TableCell>
 									<TableCell className="text-right tabular-nums">
-										{formatQty(line.qty, line.uom, 3)}
+										{formatQtyTrim(line.qty, line.uom)}
 									</TableCell>
 									<TableCell>
 										{contract.length === 0
@@ -155,9 +155,7 @@ export function RfqQuotesCard({
 					<TableRow>
 						<TableHead>Supplier / quote ref</TableHead>
 						<TableHead>Status</TableHead>
-						<TableHead className="text-right">Lines priced</TableHead>
 						<TableHead className="text-right">Total landed</TableHead>
-						<TableHead>Valid till</TableHead>
 						<TableHead>
 							<span className="sr-only">Actions</span>
 						</TableHead>
@@ -190,18 +188,20 @@ export function RfqQuotesCard({
 											<StatusBadge doc="rfqFlag" status="late" />
 										) : null}
 									</span>
-								</TableCell>
-								<TableCell className="text-right tabular-nums">
-									{quote.status === "cancelled"
-										? "–"
-										: `${quote.linesPriced} of ${data.lines.length}`}
+									{quote.status === "cancelled" ? null : (
+										<span className="mt-1 block text-[13px] text-muted-foreground">
+											{quote.linesPriced} of {data.lines.length} lines priced
+										</span>
+									)}
 								</TableCell>
 								<TableCell className="text-right tabular-nums">
 									{quote.totalLandedPaise == null
 										? "–"
 										: formatMoney(quote.totalLandedPaise)}
+									<span className="block text-[13px] text-muted-foreground">
+										Valid till {formatDate(quote.validTill)}
+									</span>
 								</TableCell>
-								<TableCell>{formatDate(quote.validTill)}</TableCell>
 								<TableCell className="text-right">
 									<span className="inline-flex flex-wrap justify-end gap-1">
 										<Button type="button" size="sm" variant="ghost" asChild>
@@ -240,7 +240,7 @@ export function RfqQuotesCard({
 					{missing.map((supplier) => (
 						<TableRow key={`missing-${supplier.supplierId}`}>
 							<TableCell>{supplier.name}</TableCell>
-							<TableCell colSpan={4} className="text-muted-foreground">
+							<TableCell colSpan={2} className="text-muted-foreground">
 								No quote yet
 							</TableCell>
 							<TableCell className="text-right">

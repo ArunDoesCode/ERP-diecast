@@ -15,7 +15,7 @@ import {
 	useRatingCardQuery,
 	useRatingTrendQuery,
 } from "@/lib/api/supplier-rating/queries";
-import { formatDate, formatPercentTenths, formatQty } from "@/lib/format";
+import { formatDate, formatPercentTenths, formatQtyTrim } from "@/lib/format";
 import type { Rating, RatingMeasure } from "@/types/supplier-rating";
 
 function drillHref(supplierId: number, measure: RatingMeasure) {
@@ -93,7 +93,7 @@ export function RatingMeasureTiles({ rating }: { rating: Rating }) {
 						{rejection.notInspectedLines} not inspected
 						{rejection.notInspectedRejectedQty.length > 0
 							? `, ${rejection.notInspectedRejectedQty
-									.map((q) => formatQty(q.qty, q.uom, 3))
+									.map((q) => formatQtyTrim(q.qty, q.uom))
 									.join(", ")} rejected`
 							: ""}
 					</span>

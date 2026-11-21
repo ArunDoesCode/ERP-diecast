@@ -23,7 +23,7 @@ import { type DnDetail, dnQtyDecimals } from "@/types/delivery-note";
 /** Always-light A4 paper: the sheet re-declares the light tokens, so dark mode never reaches it. */
 function Paper({ children }: { children: ReactNode }) {
 	return (
-		<div className="print-sheet-light dn-print-sheet relative mx-auto w-full max-w-4xl space-y-5 overflow-hidden rounded-md border bg-background p-6 text-sm text-foreground print:max-w-none print:overflow-visible print:border-0 print:p-0">
+		<div className="print-sheet-light dn-print-sheet relative mx-auto [&_table]:text-[13px] [&_td]:px-2 [&_th]:px-2 w-full max-w-4xl space-y-5 overflow-hidden rounded-md border bg-background p-6 text-sm text-foreground print:max-w-none print:overflow-visible print:border-0 print:p-0">
 			{children}
 		</div>
 	);
@@ -37,6 +37,17 @@ function Watermark({ text }: { text: string }) {
 		>
 			<span className="-rotate-12 text-7xl font-bold tracking-widest text-destructive opacity-15">
 				{text}
+			</span>
+		</div>
+	);
+}
+
+/** In the page flow under the title, so it never runs across the item table (DES-59). */
+function CancelledMark() {
+	return (
+		<div aria-hidden="true" className="flex justify-center">
+			<span className="-rotate-3 rounded-md border-2 border-destructive px-3 py-1 text-xl font-bold tracking-widest text-destructive opacity-60">
+				CANCELLED
 			</span>
 		</div>
 	);
@@ -70,10 +81,10 @@ export function DnPrintSheet({ note }: { note: DnDetail }) {
 	return (
 		<Paper>
 			{draft ? <Watermark text="DRAFT" /> : null}
-			{cancelled ? <Watermark text="CANCELLED" /> : null}
 			<p className="text-center text-base font-semibold tracking-wide">
 				DELIVERY NOTE — NOT A TAX INVOICE
 			</p>
+			{cancelled ? <CancelledMark /> : null}
 			<div className="flex items-start justify-between gap-4">
 				<div className="space-y-0.5">
 					<p className="font-medium">{company?.name ?? "–"}</p>
@@ -242,17 +253,27 @@ export function DnPrintSheet({ note }: { note: DnDetail }) {
 				<p>
 					Mode {t.mode ? MODE_LABEL[t.mode] : "–"}
 					{t.mode === "road"
-						? ` · Vehicle ${t.vehicleNo ?? "–"} · Transporter ID ${t.transporterId ?? "–"}`
-						: ` · Doc ${t.transportDocNo ?? "–"} (${formatDate(t.transportDocDate)})`}
+						? [
+								t.vehicleNo ? ` · Vehicle ${t.vehicleNo}` : "",
+								t.transporterId ? ` · Transporter ID ${t.transporterId}` : "",
+							].join("")
+						: [
+								t.transportDocNo ? ` · Doc ${t.transportDocNo}` : "",
+								t.transportDocDate
+									? ` (${formatDate(t.transportDocDate)})`
+									: "",
+							].join("")}
 					{t.transporterName ? ` · ${t.transporterName}` : ""}
 				</p>
-				<p>
-					Distance {t.distanceKm === null ? "–" : `${t.distanceKm} km`} · E-way
-					bill {groupEway(t.ewayBillNo)} ({formatDate(t.ewayBillDate)})
-					{t.ewayBillNo
-						? ` · Valid until ${formatDateTime(note.ewayValidUntil)}`
-						: ""}
-				</p>
+				{t.distanceKm !== null || t.ewayBillNo ? (
+					<p>
+						{t.distanceKm === null ? "" : `Distance ${t.distanceKm} km`}
+						{t.distanceKm !== null && t.ewayBillNo ? " · " : ""}
+						{t.ewayBillNo
+							? `E-way bill ${groupEway(t.ewayBillNo)}${t.ewayBillDate ? ` (${formatDate(t.ewayBillDate)})` : ""} · Valid until ${formatDateTime(note.ewayValidUntil)}`
+							: ""}
+					</p>
+				) : null}
 			</div>
 
 			<div className="grid grid-cols-2 gap-6 pt-10 text-center text-[13px] text-muted-foreground">

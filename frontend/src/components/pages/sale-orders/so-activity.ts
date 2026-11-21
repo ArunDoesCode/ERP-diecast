@@ -27,6 +27,7 @@ const FIELD_LABELS: Record<string, string> = {
 	lines: "Lines",
 	deliveredQty: "Delivered",
 	runNo: "Run",
+	dnNumber: "Delivery note",
 };
 
 /** Keys that mean nothing to the owner. */
@@ -103,6 +104,9 @@ export function activityChanges(
 				continue;
 			}
 		}
+		// A new value that is only an empty / zero default is noise, not a change.
+		const empty = (v: unknown) => v === null || v === undefined || v === "";
+		if (empty(from) && (empty(to) || to === 0)) continue;
 		out.push({
 			label: FIELD_LABELS[key] ?? humanize(key),
 			from: showValue(key, from),

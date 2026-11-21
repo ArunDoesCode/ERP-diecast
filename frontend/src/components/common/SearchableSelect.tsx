@@ -86,7 +86,10 @@ export function SearchableSelect({
 					id={id}
 					type="button"
 					variant="outline"
-					className={cn("w-full justify-between font-normal", className)}
+					className={cn(
+						"w-full justify-between bg-input/20 font-normal dark:bg-input/30",
+						className,
+					)}
 					disabled={disabled}
 				>
 					<span className={cn(!selected && "text-muted-foreground")}>

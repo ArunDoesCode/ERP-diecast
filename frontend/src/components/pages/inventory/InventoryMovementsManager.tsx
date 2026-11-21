@@ -523,18 +523,25 @@ export function InventoryMovementsManager({
 					<DataTableColumnHeader column={column} title="Item" />
 				),
 				cell: ({ row }) => (
-					<Button
-						type="button"
-						variant="link"
-						className="h-auto p-0"
-						onClick={() => setDetailMovement(row.original)}
-					>
-						{row.original.itemName}
-					</Button>
+					<div className="flex max-w-56 flex-col items-start whitespace-normal">
+						<Button
+							type="button"
+							variant="link"
+							className="h-auto p-0 text-left whitespace-normal"
+							onClick={() => setDetailMovement(row.original)}
+						>
+							{row.original.itemName}
+						</Button>
+						{/* Below 1100 px the Location column is hidden; it sits under the item. */}
+						<span className="text-[13px] text-muted-foreground min-[1100px]:hidden">
+							{row.original.locationName}
+						</span>
+					</div>
 				),
 			},
 			{
 				accessorKey: "locationName",
+				meta: { hideBelow1100: true },
 				header: ({ column }) => (
 					<DataTableColumnHeader column={column} title="Location" />
 				),

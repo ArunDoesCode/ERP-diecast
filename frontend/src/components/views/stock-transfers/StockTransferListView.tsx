@@ -78,8 +78,8 @@ const columns: DataTableColumnDef<StListRow>[] = [
 			<div className="flex flex-col">
 				<span>{formatDate(row.original.createdAt)}</span>
 				{row.original.postedAt ? (
-					<span className="text-[13px] text-muted-foreground min-[1100px]:hidden">
-						Posted {formatDateTime(row.original.postedAt)}
+					<span className="text-[13px] whitespace-normal text-muted-foreground min-[1100px]:hidden">
+						Posted {formatDate(row.original.postedAt)}
 					</span>
 				) : null}
 			</div>

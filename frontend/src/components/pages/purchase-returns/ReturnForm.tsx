@@ -36,7 +36,7 @@ import {
 	useCreatePurchaseReturnMutation,
 	useUpdatePurchaseReturnMutation,
 } from "@/lib/api/purchase-return/queries";
-import { formatMoney, formatQty } from "@/lib/format";
+import { formatMoney, formatQtyTrim } from "@/lib/format";
 import {
 	PRT_REASON_MAX,
 	PRT_REASON_MIN,
@@ -253,7 +253,7 @@ export function ReturnForm({
 	if (impact.stock.length > 0) {
 		impactParts.push(
 			`Stock ${impact.stock
-				.map((s) => `−${formatQty(s.qty, s.uom, 3)} ${s.itemName}`)
+				.map((s) => `−${formatQtyTrim(s.qty, s.uom)} ${s.itemName}`)
 				.join(", ")}`,
 		);
 	} else if (impact.hasRejected) {

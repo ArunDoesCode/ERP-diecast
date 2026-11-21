@@ -29,8 +29,6 @@ import {
 } from "@/lib/format";
 import { type DnDetail, dnQtyDecimals } from "@/types/delivery-note";
 
-const LOW = "max-[1099px]:hidden";
-
 export function DnLinesCard({ note }: { note: DnDetail }) {
 	const showMoney = note.valuePaise !== undefined;
 	return (
@@ -44,14 +42,13 @@ export function DnLinesCard({ note }: { note: DnDetail }) {
 						<TableRow>
 							<TableHead>#</TableHead>
 							<TableHead>Item</TableHead>
-							<TableHead className={LOW}>HSN</TableHead>
 							<TableHead className="text-right">Qty</TableHead>
 							<TableHead>Lot</TableHead>
 							{showMoney ? (
 								<>
 									<TableHead className="text-right">Price</TableHead>
 									<TableHead className="text-right">Taxable</TableHead>
-									<TableHead className={`${LOW} text-right`}>GST %</TableHead>
+									<TableHead className="text-right">GST %</TableHead>
 									<TableHead className="text-right">GST</TableHead>
 								</>
 							) : null}
@@ -65,10 +62,8 @@ export function DnLinesCard({ note }: { note: DnDetail }) {
 									<span className="font-mono">{line.item.sku}</span>
 									<span className="block text-[13px] text-muted-foreground">
 										{line.item.name}
+										{line.item.hsnCode ? ` · HSN ${line.item.hsnCode}` : ""}
 									</span>
-								</TableCell>
-								<TableCell className={LOW}>
-									{line.item.hsnCode ?? "–"}
 								</TableCell>
 								<TableCell className="text-right tabular-nums">
 									{formatQty(line.qty, line.uom, dnQtyDecimals(line.uom))}
@@ -82,7 +77,7 @@ export function DnLinesCard({ note }: { note: DnDetail }) {
 										<TableCell className="text-right tabular-nums">
 											{formatMoney(line.taxablePaise)}
 										</TableCell>
-										<TableCell className={`${LOW} text-right tabular-nums`}>
+										<TableCell className="text-right tabular-nums">
 											{line.gstPercent}%
 										</TableCell>
 										<TableCell className="text-right tabular-nums">
@@ -96,14 +91,14 @@ export function DnLinesCard({ note }: { note: DnDetail }) {
 					{showMoney ? (
 						<TableFooter>
 							<TableRow>
-								<TableCell colSpan={5} className="text-right">
+								<TableCell colSpan={4} className="text-right">
 									Total
 								</TableCell>
 								<TableCell />
 								<TableCell className="text-right tabular-nums">
 									{formatMoney(note.taxablePaise)}
 								</TableCell>
-								<TableCell className={LOW} />
+								<TableCell />
 								<TableCell className="text-right tabular-nums">
 									{formatMoney(note.gstPaise)}
 								</TableCell>

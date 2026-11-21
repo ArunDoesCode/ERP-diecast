@@ -56,16 +56,29 @@ function columns(
 		{
 			id: "customer",
 			header: "Customer",
-			cell: ({ row }) => row.original.customer.name,
+			cell: ({ row }) => (
+				<div className="max-w-44 whitespace-normal">
+					{row.original.customer.name}
+				</div>
+			),
 		},
 		{
 			id: "item",
 			header: "Item",
 			cell: ({ row }) => (
-				<div className="flex flex-col">
+				<div className="flex max-w-56 flex-col whitespace-normal">
 					<span className="font-mono">{row.original.item.sku}</span>
 					<span className="text-[13px] text-muted-foreground">
 						{row.original.item.name}
+					</span>
+					{/* Below 1100 px the Stock column is hidden; its number sits under the item. */}
+					<span className="mt-1 flex flex-wrap items-center gap-1 text-[13px] min-[1100px]:hidden">
+						<span className="text-muted-foreground">
+							Stock {qty(row.original.stockAtLocation, row.original)}
+						</span>
+						{row.original.stockAtLocation < row.original.open ? (
+							<StatusBadge doc="dnTag" status="short_stock" />
+						) : null}
 					</span>
 				</div>
 			),
@@ -118,7 +131,7 @@ function columns(
 		{
 			accessorKey: "stockAtLocation",
 			header: "Stock",
-			meta: { numeric: true },
+			meta: { numeric: true, hideBelow1100: true },
 			cell: ({ row }) => (
 				<div className="flex flex-col items-end gap-1">
 					<span>{qty(row.original.stockAtLocation, row.original)}</span>
@@ -283,6 +296,7 @@ export function PendingDispatchView() {
 				page={controls.page}
 				pageSize={controls.pageSize}
 				total={total}
+				alwaysShow
 				onPageChange={controls.setPage}
 				onPageSizeChange={controls.onPageSizeChange}
 			/>

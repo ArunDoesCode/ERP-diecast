@@ -51,17 +51,22 @@ const columns: DataTableColumnDef<Rating>[] = [
 			<DataTableColumnHeader column={column} title="Supplier" />
 		),
 		cell: ({ row }) => (
-			<span className="inline-flex flex-wrap items-center gap-2">
-				<Link
-					href={`/supplier-ratings/${row.original.supplierId}`}
-					className="text-brand-accent hover:underline"
-				>
-					{row.original.supplierName}
-				</Link>
-				{row.original.isActive ? null : (
-					<StatusBadge doc="supplier" status="inactive" />
-				)}
-			</span>
+			<div className="flex max-w-56 flex-col whitespace-normal">
+				<span className="inline-flex flex-wrap items-center gap-2">
+					<Link
+						href={`/supplier-ratings/${row.original.supplierId}`}
+						className="text-brand-accent hover:underline"
+					>
+						{row.original.supplierName}
+					</Link>
+					{row.original.isActive ? null : (
+						<StatusBadge doc="supplier" status="inactive" />
+					)}
+				</span>
+				<span className="text-[13px] text-muted-foreground min-[1100px]:hidden">
+					{row.original.onTime.lines} judged lines
+				</span>
+			</div>
 		),
 	},
 	{
@@ -85,15 +90,15 @@ const columns: DataTableColumnDef<Rating>[] = [
 		header: ({ column }) => (
 			<DataTableColumnHeader column={column} title="On-time" />
 		),
-		cell: ({ row }) => formatPercentTenths(row.original.onTime.pctTenths),
+		cell: ({ row }) => (
+			<div className="flex flex-col items-end">
+				<span>{formatPercentTenths(row.original.onTime.pctTenths)}</span>
+				<span className="text-[13px] text-muted-foreground">
+					{row.original.onTime.lateLines} late
+				</span>
+			</div>
+		),
 		meta: { numeric: true },
-	},
-	{
-		id: "lateLines",
-		header: "Late lines",
-		enableSorting: false,
-		cell: ({ row }) => row.original.onTime.lateLines,
-		meta: { numeric: true, hideBelow1100: true },
 	},
 	{
 		id: "rejectionPct",
@@ -101,25 +106,19 @@ const columns: DataTableColumnDef<Rating>[] = [
 		header: ({ column }) => (
 			<DataTableColumnHeader column={column} title="Rejection" />
 		),
-		cell: ({ row }) => formatPercentTenths(row.original.rejection.pctTenths),
-		meta: { numeric: true },
-	},
-	{
-		id: "decidedLines",
-		accessorFn: (r) => r.rejection.decidedLines,
-		header: ({ column }) => (
-			<DataTableColumnHeader column={column} title="Lines with rejects" />
+		cell: ({ row }) => (
+			<div className="flex flex-col items-end">
+				<span>{formatPercentTenths(row.original.rejection.pctTenths)}</span>
+				<span className="text-[13px] text-muted-foreground">
+					{row.original.rejection.linesWithRejects} of{" "}
+					{row.original.rejection.decidedLines} lines with rejects
+				</span>
+				<span className="text-[13px] text-muted-foreground">
+					{row.original.rejection.notInspectedLines} not inspected
+				</span>
+			</div>
 		),
-		cell: ({ row }) =>
-			`${row.original.rejection.linesWithRejects} of ${row.original.rejection.decidedLines}`,
-		meta: { numeric: true, hideBelow1100: true },
-	},
-	{
-		id: "notInspected",
-		header: "Not inspected",
-		enableSorting: false,
-		cell: ({ row }) => row.original.rejection.notInspectedLines,
-		meta: { numeric: true, hideBelow1100: true },
+		meta: { numeric: true },
 	},
 	{
 		id: "priceVariancePct",
@@ -148,14 +147,17 @@ export function SupplierRatingListView() {
 	const canView = useCan("supplier.rating.view");
 	const c = useRatingListControls();
 
-	const query = useRatingListQuery({
-		page: c.page,
-		pageSize: c.pageSize,
-		status: c.status,
-		q: c.q,
-		sortBy: c.sortBy,
-		sortDir: c.sortBy ? (c.sortDir ?? "asc") : undefined,
-	});
+	const query = useRatingListQuery(
+		{
+			page: c.page,
+			pageSize: c.pageSize,
+			status: c.status,
+			q: c.q,
+			sortBy: c.sortBy,
+			sortDir: c.sortBy ? (c.sortDir ?? "asc") : undefined,
+		},
+		canView,
+	);
 
 	const rows = useMemo(() => query.data?.data ?? [], [query.data]);
 	const meta = query.data?.meta;

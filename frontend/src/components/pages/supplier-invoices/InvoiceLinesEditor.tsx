@@ -26,7 +26,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { formatMoney, formatQty } from "@/lib/format";
+import { formatMoney, formatQtyTrim } from "@/lib/format";
 import {
 	gstPercentToBp,
 	lineTaxable,
@@ -171,7 +171,7 @@ export function InvoiceLinesEditor({
 									<p className="text-sm font-medium">{line.itemName}</p>
 									<p className="text-[13px] text-muted-foreground">
 										<span className="font-mono">{line.grnNumber}</span> ·
-										Billable {formatQty(line.billableQty, line.uom, 3)}
+										Billable {formatQtyTrim(line.billableQty, line.uom)}
 									</p>
 								</div>
 								<Button

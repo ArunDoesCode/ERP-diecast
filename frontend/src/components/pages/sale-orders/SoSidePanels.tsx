@@ -223,7 +223,9 @@ export function SoActivityPanel({ soId }: { soId: number }) {
 										>
 											{edited
 												? "Lines changed"
-												: `${change.label}: ${change.from} → ${change.to}`}
+												: change.from === "none"
+													? `${change.label}: ${change.to}`
+													: `${change.label}: ${change.from} → ${change.to}`}
 										</span>
 									))}
 								</li>

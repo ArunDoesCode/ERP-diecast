@@ -12,7 +12,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import { formatMoney, formatQty } from "@/lib/format";
+import { formatMoney, formatQtyTrim } from "@/lib/format";
 import { RFQ_GST_PERCENTS } from "@/types/rfq";
 
 import { calcRow, type QuoteRow, rowError } from "./quote-calc";
@@ -49,7 +49,7 @@ export function QuoteLinesTable({
 									{row.itemCode} · {row.itemName}
 								</p>
 								<p className="text-[13px] text-muted-foreground tabular-nums">
-									Qty {formatQty(row.qty, row.uom, 3)}
+									Qty {formatQtyTrim(row.qty, row.uom)}
 								</p>
 								{error ? (
 									<span

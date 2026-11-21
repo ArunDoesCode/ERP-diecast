@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCan } from "@/hooks/use-can";
 import { useContractQuery } from "@/lib/api/rate-contract/queries";
-import { formatQty } from "@/lib/format";
+import { formatQtyTrim } from "@/lib/format";
 
 export const OVERRIDE_REASON_MIN = 3;
 export const OVERRIDE_REASON_MAX = 500;
@@ -74,8 +74,8 @@ export function ContractRateControls({
 				</Badge>
 				{qtyLeft != null && qtyLeft !== "" ? (
 					<span className="text-muted-foreground tabular-nums">
-						Qty left {formatQty(qtyLeft, unit, 3)}
-						{cap != null ? ` of ${formatQty(cap, unit, 3)}` : ""}
+						Qty left {formatQtyTrim(qtyLeft, unit)}
+						{cap != null ? ` of ${formatQtyTrim(cap, unit)}` : ""}
 					</span>
 				) : null}
 				{overriding ? (

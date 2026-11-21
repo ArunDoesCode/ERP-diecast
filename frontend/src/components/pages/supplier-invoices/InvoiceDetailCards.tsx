@@ -17,7 +17,7 @@ import {
 	formatDate,
 	formatDateTime,
 	formatMoney,
-	formatQty,
+	formatQtyTrim,
 } from "@/lib/format";
 import { getStatusTone } from "@/lib/status-tone";
 import {
@@ -121,7 +121,7 @@ export function InvoiceItemsCard({ inv }: { inv: SinvDetail }) {
 										</span>
 									</TableCell>
 									<TableCell className="text-right tabular-nums">
-										{formatQty(line.qty, line.uom, 3)}
+										{formatQtyTrim(line.qty, line.uom)}
 									</TableCell>
 									<TableCell className="text-right tabular-nums">
 										{formatMoney(line.ratePaise)}

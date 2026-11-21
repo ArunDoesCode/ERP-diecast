@@ -218,9 +218,10 @@ export function DeliveryNoteDetailView({ noteId }: { noteId: number }) {
 				</output>
 			) : null}
 
-			<div className="grid gap-4 min-[1024px]:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
+			<DnLinesCard note={note} />
+
+			<div className="grid gap-4 min-[1280px]:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
 				<div className="flex min-w-0 flex-col gap-4">
-					<DnLinesCard note={note} />
 					<DnPackagesCard note={note} />
 					<DnTransportCard
 						note={note}

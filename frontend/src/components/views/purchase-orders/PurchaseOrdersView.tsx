@@ -48,14 +48,23 @@ function RequestQuotesCell({
 	prId,
 	prNumber,
 	linesFree,
+	status,
 }: {
 	prId: number;
 	prNumber: string;
 	linesFree: number | undefined;
+	status: PRStatus;
 }) {
 	const canManageRfq = useCan("rfq.manage");
-	// DES-34: every pending line is already on an open RFQ.
-	if (!canManageRfq || linesFree === 0) return null;
+	// DES-34 / DES-56: shown only with a free line and in the RFQ line picker's statuses.
+	if (
+		!canManageRfq ||
+		!linesFree ||
+		linesFree <= 0 ||
+		!QUEUE_STATUSES.includes(status)
+	) {
+		return null;
+	}
 	return (
 		<Button type="button" size="sm" variant="outline" asChild>
 			<Link
@@ -121,6 +130,7 @@ const columns: DataTableColumnDef<PurchaseRequisition>[] = [
 				prId={row.original.id}
 				prNumber={row.original.prNumber}
 				linesFree={row.original.linesFreeForRfq}
+				status={row.original.status}
 			/>
 		),
 	},

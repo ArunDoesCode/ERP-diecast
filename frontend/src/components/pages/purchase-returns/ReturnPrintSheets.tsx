@@ -8,7 +8,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import { formatDate, formatMoney, formatQty } from "@/lib/format";
+import { formatDate, formatMoney, formatQtyTrim } from "@/lib/format";
 import type { PrtDebitNote, PrtDetail } from "@/types/purchase-return";
 
 /** Always-light paper: the sheet re-declares the light tokens, so dark mode never reaches it. */
@@ -169,7 +169,7 @@ export function DebitNoteSheet({
 							<TableCell>{line.hsnCode ?? "–"}</TableCell>
 							<TableCell>{line.batchNumber ?? "–"}</TableCell>
 							<TableCell className="text-right tabular-nums">
-								{formatQty(line.qty, line.uom, 3)}
+								{formatQtyTrim(line.qty, line.uom)}
 							</TableCell>
 							<TableCell className="text-right tabular-nums">
 								{formatMoney(line.ratePaise)}
@@ -303,7 +303,7 @@ export function ReturnChallanSheet({
 							<TableCell>{line.hsnCode ?? "–"}</TableCell>
 							<TableCell>{line.batchNumber ?? "–"}</TableCell>
 							<TableCell className="text-right tabular-nums">
-								{formatQty(line.qty, null, 3)}
+								{formatQtyTrim(line.qty, null)}
 							</TableCell>
 							<TableCell>{line.uom}</TableCell>
 							<TableCell className="text-right tabular-nums">

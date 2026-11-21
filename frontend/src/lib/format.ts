@@ -84,6 +84,22 @@ export function formatQty(
 	return unit ? `${text} ${unit}` : text;
 }
 
+/** Quantity with only the decimals the number needs (1,500 kg; 12.5 kg; 280 pcs; max 3). */
+export function formatQtyTrim(
+	value: number | string | null | undefined,
+	unit: string | null | undefined,
+): string {
+	const n = Number(value);
+	if (value === null || value === undefined || !Number.isFinite(n)) {
+		return formatQty(value, unit, 0);
+	}
+	const decimals = Math.min(
+		3,
+		(Math.abs(n).toFixed(3).split(".")[1] ?? "").replace(/0+$/, "").length,
+	);
+	return formatQty(n, unit, decimals);
+}
+
 /** Document number as shown (trimmed); null or empty -> `–`. */
 export function formatDocNo(value: string | null | undefined): string {
 	const t = value?.trim();

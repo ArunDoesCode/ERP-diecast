@@ -23,7 +23,7 @@ import {
 	formatDate,
 	formatMoney,
 	formatPercentTenths,
-	formatQty,
+	formatQtyTrim,
 } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
@@ -166,22 +166,21 @@ const REJECTION_COLUMNS: DataTableColumnDef<RejectionLine>[] = [
 					id={row.original.grnId}
 					value={row.original.grnNumber}
 				/>
+				<span className="text-[13px] text-muted-foreground">
+					PO{" "}
+					<DocNo
+						kind="po"
+						id={row.original.prId}
+						value={row.original.poNumber}
+					/>
+				</span>
 				{row.original.inspection === "not_inspected" ? (
-					<span className="text-[13px] text-muted-foreground">
+					<span className="text-[13px] whitespace-normal text-muted-foreground">
 						Not inspected, not counted
 					</span>
 				) : null}
 			</span>
 		),
-	},
-	{
-		id: "poNumber",
-		header: "PO no.",
-		enableSorting: false,
-		cell: ({ row }) => (
-			<DocNo kind="po" id={row.original.prId} value={row.original.poNumber} />
-		),
-		meta: { hideBelow1100: true },
 	},
 	{
 		...sortable<RejectionLine>("itemSku", "Item", (r) => r.itemSku),
@@ -196,17 +195,18 @@ const REJECTION_COLUMNS: DataTableColumnDef<RejectionLine>[] = [
 		cell: ({ row }) => formatDate(row.original.receivedDate),
 	},
 	{
-		id: "arrivedQty",
-		header: "Arrived",
-		enableSorting: false,
-		cell: ({ row }) => formatQty(row.original.arrivedQty, row.original.uom, 3),
-		meta: { numeric: true },
-	},
-	{
 		id: "rejectedQty",
 		header: "Rejected",
 		enableSorting: false,
-		cell: ({ row }) => formatQty(row.original.rejectedQty, row.original.uom, 3),
+		// Arrived sits under the rejected quantity so the verdict columns stay on screen.
+		cell: ({ row }) => (
+			<div className="flex flex-col items-end">
+				<span>{formatQtyTrim(row.original.rejectedQty, row.original.uom)}</span>
+				<span className="text-[13px] text-muted-foreground">
+					of {formatQtyTrim(row.original.arrivedQty, row.original.uom)}
+				</span>
+			</div>
+		),
 		meta: { numeric: true },
 	},
 	{
@@ -238,7 +238,12 @@ const PRICE_COLUMNS: DataTableColumnDef<PriceLine>[] = [
 	{
 		...sortable<PriceLine>("poNumber", "PO no.", (r) => r.poNumber),
 		cell: ({ row }) => (
-			<DocNo kind="po" id={row.original.prId} value={row.original.poNumber} />
+			<span className="flex flex-col">
+				<DocNo kind="po" id={row.original.prId} value={row.original.poNumber} />
+				<span className="text-[13px] text-muted-foreground">
+					{formatDate(row.original.poDate)}
+				</span>
+			</span>
 		),
 	},
 	{
@@ -246,14 +251,10 @@ const PRICE_COLUMNS: DataTableColumnDef<PriceLine>[] = [
 		cell: ({ row }) => row.original.itemSku,
 	},
 	{
-		...sortable<PriceLine>("poDate", "PO date", (r) => r.poDate),
-		cell: ({ row }) => formatDate(row.original.poDate),
-	},
-	{
 		id: "qty",
 		header: "Qty",
 		enableSorting: false,
-		cell: ({ row }) => formatQty(row.original.qty, row.original.uom, 3),
+		cell: ({ row }) => formatQtyTrim(row.original.qty, row.original.uom),
 		meta: { numeric: true },
 	},
 	{
@@ -267,15 +268,18 @@ const PRICE_COLUMNS: DataTableColumnDef<PriceLine>[] = [
 		id: "referenceRatePaise",
 		header: "Reference rate",
 		enableSorting: false,
-		cell: ({ row }) => formatMoney(row.original.referenceRatePaise),
-		meta: { numeric: true, hideBelow1100: true },
-	},
-	{
-		id: "referenceSource",
-		header: "Reference",
-		enableSorting: false,
-		cell: ({ row }) => REFERENCE_SOURCE[row.original.referenceSource],
-		meta: { hideBelow1100: true },
+		// The reference source sits under the rate (Standard rate / Previous PO).
+		cell: ({ row }) => (
+			<div className="flex flex-col items-end">
+				<span>{formatMoney(row.original.referenceRatePaise)}</span>
+				{row.original.referenceSource === "none" ? null : (
+					<span className="text-[13px] text-muted-foreground">
+						{REFERENCE_SOURCE[row.original.referenceSource]}
+					</span>
+				)}
+			</div>
+		),
+		meta: { numeric: true },
 	},
 	{
 		...sortable<PriceLine>("variancePaise", "Variance", (r) => r.variancePaise),
@@ -283,7 +287,7 @@ const PRICE_COLUMNS: DataTableColumnDef<PriceLine>[] = [
 			row.original.compared ? (
 				formatPercentTenths(row.original.variancePctTenths, { signed: true })
 			) : (
-				<span className="text-muted-foreground">
+				<span className="block max-w-36 text-[13px] whitespace-normal text-muted-foreground">
 					{row.original.notComparedReason
 						? NOT_COMPARED[row.original.notComparedReason]
 						: "Not compared"}
