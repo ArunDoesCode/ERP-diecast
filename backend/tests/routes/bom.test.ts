@@ -78,7 +78,7 @@ async function call(
   const headers: Record<string, string> = {};
   if (actor) headers.Authorization = `Bearer ${actors[actor]?.token}`;
   if (body !== undefined) headers["Content-Type"] = "application/json";
-  const res = await app.request(`/api/bom${path}`, {
+  const res = await app.request(`/api/bom${path.replace(/^\/(?=\?|$)/, "")}`, {
     method,
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -1367,7 +1367,7 @@ describe("BR-BOM-20 item in use", () => {
     const res = await app.request(`/api/asset/items/${d.comp.id}`, {
       method: "PATCH",
       headers: {
-        Authorization: `Bearer ${actors.owner?.token}`,
+        Authorization: `Bearer ${actors.bo?.token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ uom: "kg" }),
@@ -1386,7 +1386,7 @@ describe("BR-BOM-20 item in use", () => {
       const res = await app.request(`/api/asset/items/${id}`, {
         method: "PATCH",
         headers: {
-          Authorization: `Bearer ${actors.owner?.token}`,
+          Authorization: `Bearer ${actors.bo?.token}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify(body),
