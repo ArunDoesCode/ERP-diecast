@@ -27,6 +27,7 @@ import {
   supplierServices,
 } from "../db/schemas/02_procurement-suppliers";
 import { employees } from "../db/schemas/03_hcm";
+import { InternalServerError } from "../lib/errors";
 import { safeSearch } from "../lib/safe-search";
 import type {
   BomListQuery,
@@ -157,7 +158,8 @@ export const bomRepository = {
       .set({ lastRevisionNo: sql`${bomPartSeq.lastRevisionNo} + 1` })
       .where(eq(bomPartSeq.partId, partId))
       .returning({ revisionNo: bomPartSeq.lastRevisionNo });
-    if (!row) throw new Error("bom_part_seq row missing after lock");
+    if (!row)
+      throw new InternalServerError("bom_part_seq row missing after lock");
     return row.revisionNo;
   },
 
@@ -211,7 +213,7 @@ export const bomRepository = {
 
   async insertBom(tx: Tx, values: BomInsert) {
     const [row] = await tx.insert(boms).values(values).returning();
-    if (!row) throw new Error("bom insert returned no row");
+    if (!row) throw new InternalServerError("bom insert returned no row");
     return row;
   },
 
@@ -221,7 +223,7 @@ export const bomRepository = {
       .set(values)
       .where(eq(boms.id, id))
       .returning();
-    if (!row) throw new Error("bom update returned no row");
+    if (!row) throw new InternalServerError("bom update returned no row");
     return row;
   },
 
@@ -522,8 +524,8 @@ export const bomRepository = {
     partId: number,
     query: z.infer<typeof bomHistoryQuerySchema>,
   ) {
-    // Newest first unless the caller names the sort (the schema default of sortDir is asc).
-    const dir = query.sortBy && query.sortDir === "asc" ? asc : desc;
+    // Newest first by default (the history schema defaults sortDir to desc).
+    const dir = query.sortDir === "asc" ? asc : desc;
     const where = eq(bomHistory.partId, partId);
     const [rows, totals] = await Promise.all([
       db

@@ -3,15 +3,16 @@
 import { useState } from "react";
 
 import { ErrorState } from "@/components/shared/ErrorState";
-import { Button } from "@/components/ui/button";
 import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
@@ -54,15 +55,15 @@ export function RetireBomDialog({
 	}
 
 	return (
-		<Dialog open={open} onOpenChange={close}>
-			<DialogContent>
-				<DialogHeader>
-					<DialogTitle>Retire {number}?</DialogTitle>
-					<DialogDescription>
+		<AlertDialog open={open} onOpenChange={close}>
+			<AlertDialogContent>
+				<AlertDialogHeader>
+					<AlertDialogTitle>Retire {number}?</AlertDialogTitle>
+					<AlertDialogDescription>
 						A retired BOM can no longer be used for needs. Start a new revision
 						to replace it.
-					</DialogDescription>
-				</DialogHeader>
+					</AlertDialogDescription>
+				</AlertDialogHeader>
 
 				<div className="max-h-[40vh] overflow-y-auto text-sm">
 					{affected.isLoading ? (
@@ -113,25 +114,23 @@ export function RetireBomDialog({
 					</p>
 				</div>
 
-				<DialogFooter>
-					<Button type="button" variant="outline" onClick={() => close(false)}>
-						Cancel
-					</Button>
-					<Button
-						type="button"
+				<AlertDialogFooter>
+					<AlertDialogCancel>Cancel</AlertDialogCancel>
+					<AlertDialogAction
 						variant="destructive"
 						disabled={!canSubmit}
-						onClick={() =>
+						onClick={(event) => {
+							event.preventDefault();
 							mutation.mutate(
 								{ reason: trimmed },
 								{ onSuccess: () => close(false) },
-							)
-						}
+							);
+						}}
 					>
 						{mutation.isPending ? "Retiring…" : "Retire"}
-					</Button>
-				</DialogFooter>
-			</DialogContent>
-		</Dialog>
+					</AlertDialogAction>
+				</AlertDialogFooter>
+			</AlertDialogContent>
+		</AlertDialog>
 	);
 }

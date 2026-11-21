@@ -16,7 +16,8 @@ export type BomNextStep =
 	| "waiting_for_release"
 	| "start_revision"
 	| "open_draft"
-	| "open_active";
+	| "open_active"
+	| "none";
 export type BomTreatment =
 	| "cast"
 	| "job_work"

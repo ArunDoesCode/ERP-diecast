@@ -573,9 +573,7 @@ async function graphProblems(
   }
 }
 
-function assertPartIsManufacturable(
-  part: ItemRef | undefined,
-): asserts part is ItemRef {
+function assertItemFound(part: ItemRef | undefined): asserts part is ItemRef {
   if (!part) throw new NotFoundError("Part not found");
 }
 
@@ -675,7 +673,7 @@ export const bomService = {
     } else if (openDraft) {
       nextStep = "open_draft"; // a link, shown to every reader
     } else if (bom.status === "active") {
-      nextStep = canManage ? "start_revision" : "open_active";
+      nextStep = canManage ? "start_revision" : "none";
     } else if (active) {
       nextStep = "open_active";
     } else {
@@ -799,10 +797,11 @@ export const bomService = {
     const row = await requireBom(id);
     const snap = await loadSnap(row);
     const children = rootChildren(snap);
-    const { closure } = await loadClosure(db, {
-      partId: row.partId,
-      children,
-    });
+    const { closure } = await loadClosure(
+      db,
+      { partId: row.partId, children },
+      { tolerateLoop: row.status !== "draft" },
+    );
     return buildTree(
       db,
       {
@@ -869,9 +868,7 @@ export const bomService = {
     partId: number,
     query: z.infer<typeof bomHistoryQuerySchema>,
   ): Promise<Paginated<unknown>> {
-    assertPartIsManufacturable(
-      (await bomRepository.findItemsByIds([partId]))[0],
-    );
+    assertItemFound((await bomRepository.findItemsByIds([partId]))[0]);
     const { rows, total } = await bomRepository.listHistory(partId, query);
     return {
       data: rows.map((r) => ({
@@ -890,7 +887,7 @@ export const bomService = {
   // BR-BOM-01..04, 07, 08, 10, 26
   async create(input: CreateBomInput, actorId: number) {
     const [part] = await bomRepository.findItemsByIds([input.partId]);
-    assertPartIsManufacturable(part);
+    assertItemFound(part);
     const snap = snapFromInput(input);
 
     return db.transaction(async (tx) => {
@@ -941,7 +938,7 @@ export const bomService = {
   // BR-BOM-14: next letter, copy of the active revision (else the latest retired)
   async startRevision(partId: number, actorId: number) {
     const [part] = await bomRepository.findItemsByIds([partId]);
-    assertPartIsManufacturable(part);
+    assertItemFound(part);
 
     return db.transaction(async (tx) => {
       await bomRepository.ensurePartSeq(tx, partId);

@@ -254,8 +254,10 @@ export function BomPartView({ partId, rev }: Props) {
 						</Link>
 					</Button>
 				) : null;
+			case "none":
+				return null;
 			case "open_active":
-				return detail.activeBomId ? (
+				return detail.activeBomId && detail.activeBomId !== detail.id ? (
 					<Button type="button" size="sm" asChild>
 						<Link
 							href={`/bom/part/${partId}?rev=${

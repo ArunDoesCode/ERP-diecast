@@ -1591,7 +1591,7 @@
             "createdAt": "unrepresentable.required",
             "lastUpdatedByName": "unknown.required",
             "lastUpdatedAt": "unrepresentable.required",
-            "nextStep": "enum:create,release,waiting_for_release,start_revision,open_draft,open_active.required",
+            "nextStep": "enum:create,release,waiting_for_release,start_revision,open_draft,open_active,none.required",
             "nextRevision": "unknown.required",
             "activeBomId": "integer.nullable.required",
             "openDraftId": "integer.nullable.required",

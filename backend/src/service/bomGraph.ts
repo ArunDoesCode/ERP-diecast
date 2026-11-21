@@ -59,6 +59,10 @@ export function tooLarge() {
   );
 }
 
+export function tooLargeQty() {
+  return new AppError("Quantity too large", 400, "BOM_TOO_LARGE");
+}
+
 export async function loopError(
   executor: Executor,
   pathIds: number[],
@@ -124,10 +128,13 @@ export function draftChildren(
  * Loads the active BOMs under `root`, level by level, with a visited set.
  * Throws BOM_LOOP (naming one path), BOM_TOO_DEEP, BOM_TOO_LARGE.
  * The root's own active revision is never loaded (it is being replaced).
+ * `tolerateLoop` (viewing a released revision): a link back to the root is
+ * skipped, so the tree shows that node as "loop" instead of failing.
  */
 export async function loadClosure(
   executor: Executor,
   root: RootSpec,
+  options: { tolerateLoop?: boolean } = {},
 ): Promise<{ closure: Closure; nodes: number; levels: number }> {
   const closure: Closure = new Map();
   const parentOf = new Map<number, number>();
@@ -145,11 +152,13 @@ export async function loadClosure(
 
   for (const id of walkable(root.children)) {
     if (id === root.partId) {
+      if (options.tolerateLoop) continue;
       throw await loopError(executor, [root.partId, root.partId]);
     }
   }
 
   let frontier = [...new Set(walkable(root.children))];
+  let frontierSet = new Set(frontier);
   for (const id of frontier) parentOf.set(id, root.partId);
   let level = 2; // the root BOM is level 1
 
@@ -180,15 +189,17 @@ export async function loadClosure(
       });
       for (const childId of walkable(children)) {
         if (childId === root.partId) {
+          if (options.tolerateLoop) continue;
           throw await loopError(executor, [...pathTo(b.partId), root.partId]);
         }
-        if (!closure.has(childId) && !frontier.includes(childId)) {
+        if (!closure.has(childId) && !frontierSet.has(childId)) {
           next.add(childId);
           if (!parentOf.has(childId)) parentOf.set(childId, b.partId);
         }
       }
     }
     frontier = [...next];
+    frontierSet = next;
     level += 1;
   }
 
@@ -284,9 +295,9 @@ export async function buildTree(
     if (buyAsIs) {
       return { ...base, treatment: "buy_as_is", children: [] };
     }
+    if (path.has(itemId)) return { ...base, treatment: "loop", children: [] };
     const bom = closure.get(itemId);
     if (!bom) return { ...base, treatment: "no_bom", children: [] };
-    if (path.has(itemId)) return { ...base, treatment: "loop", children: [] };
     const nextPath = new Set(path).add(itemId);
     return {
       ...base,

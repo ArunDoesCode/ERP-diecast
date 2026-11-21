@@ -2,6 +2,7 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { toast } from "sonner";
 
 import { ErrorState } from "@/components/shared/ErrorState";
 import { Button } from "@/components/ui/button";
@@ -172,6 +173,7 @@ export function ReleaseBomDialog({
 		summary?.canRelease === true &&
 		conflict === null &&
 		(!reasonRequired || reasonValid) &&
+		(trimmed.length === 0 || reasonValid) &&
 		!mutation.isPending;
 
 	function close(next: boolean) {
@@ -218,6 +220,7 @@ export function ReleaseBomDialog({
 							return;
 						}
 					}
+					toast.error(bomErrorMessage(error, "Could not release the BOM."));
 				},
 			},
 		);

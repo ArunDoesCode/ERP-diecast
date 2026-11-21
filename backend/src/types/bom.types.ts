@@ -35,6 +35,7 @@ export const BOM_NEXT_STEPS = [
   "start_revision",
   "open_draft",
   "open_active",
+  "none",
 ] as const;
 
 // --- Shared number helpers ---
@@ -179,6 +180,7 @@ export const bomWhereUsedQuerySchema = z.object({
 export const BOM_HISTORY_SORT_FIELDS = ["changedAt"] as const;
 export const bomHistoryQuerySchema = z.object({
   ...pageQuery,
+  sortDir: z.enum(["asc", "desc"]).default("desc"),
   sortBy: z.enum(BOM_HISTORY_SORT_FIELDS).optional(),
 });
 

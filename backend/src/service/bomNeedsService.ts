@@ -21,7 +21,7 @@ import type {
   BomNeedsRow,
   BomTreatment,
 } from "../types/bom.types";
-import { loopError, tooDeep, tooLarge } from "./bomGraph";
+import { loopError, tooDeep, tooLarge, tooLargeQty } from "./bomGraph";
 
 // BR-BOM-18: the one needs calculation. HTTP (GET /needs) and sale order both
 // call it; it reads no stock, no prices, and writes nothing. No permission
@@ -76,7 +76,7 @@ const TREATMENT: Record<BomKind, NeedNode["treatment"]> = {
 const toNum = (v: string | null) => (v === null ? null : Number(v));
 
 function capped(qty: number): number {
-  if (qty > NEED_CAP) throw tooLarge();
+  if (qty > NEED_CAP) throw tooLargeQty();
   return qty;
 }
 
@@ -414,6 +414,7 @@ export async function computeBomNeeds(
               false,
             );
           for (const c of res.children) {
+            if (seq + 1 > MAX_BOM_NODES) throw tooLarge();
             next.push({
               tmp: seq++,
               parentTmp: f.tmp,
