@@ -1,7 +1,10 @@
 import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 
 import { db } from "../db/client";
-import { approvalTrails } from "../db/schemas/02_procurement-approval";
+import {
+  approvalRequests,
+  approvalTrails,
+} from "../db/schemas/02_procurement-approval";
 import {
   grnCorrections,
   grnItems,
@@ -260,8 +263,18 @@ export const documentRepository = {
       .leftJoin(employees, eq(employees.id, approvalTrails.actionBy))
       .where(
         and(
-          eq(approvalTrails.docType, docType),
-          eq(approvalTrails.docId, docId),
+          inArray(
+            approvalTrails.requestId,
+            db
+              .select({ id: approvalRequests.id })
+              .from(approvalRequests)
+              .where(
+                and(
+                  eq(approvalRequests.docType, docType),
+                  eq(approvalRequests.docId, docId),
+                ),
+              ),
+          ),
           requestId !== undefined
             ? eq(approvalTrails.requestId, requestId)
             : undefined,
