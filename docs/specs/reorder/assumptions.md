@@ -66,6 +66,10 @@
 | A-51 | 2026-11-20 | spec | Run payload for DocumentFlow | Run carries `po: {id, poNumber, status}` (newest PO linked to its PR lines) and `itemsDeferred` | Project convention (DocumentFlow run → PR → PO) | info | — |
 | A-52 | 2026-11-20 | spec | Mapping of unique-index clashes | 23505 on the one-running index → 409 `REORDER_RUN_BUSY`; 23505 on `scheduled_day` → silent in the timer | Project convention (`isUniqueViolation`) | info | — |
 | A-53 | 2026-11-20 | spec | Query shapes (PERF-01/02/04) | Partial index `idx_item_master_reorder` where level > 0; open POs filtered before joining lines; PR lines and run items inserted in batches | Project convention (performance review) | info | — |
+| A-54 | 2026-11-21 | build | Run total above the money limit (BR-RO-29) | The line that would push the PR estimate over the max money limit becomes `invalid_line`; the run goes on with the rest | SAP B1 MRP flags lines it cannot convert and still creates the rest [SAP-L]; ERPNext auto material request skips failing items [ERPN-MR] | confirm | — |
+| A-55 | 2026-11-21 | build | 500-line cap order (BR-RO-13) | Invalid lines are set aside first; valid lines fill up to 500; the smallest valid shortfalls are deferred | ERPNext auto material request raises every valid item; cap is ours, so valid lines get the slots (benchmark silent on caps) | info | — |
+| A-56 | 2026-11-21 | build | Cleared draft owner in history (BR-RO-20) | Saved as "none" in the before → after audit text | Project convention (audit text) | info | — |
+| A-57 | 2026-11-21 | build | Scheduled run failed on a bad owner (BR-RO-10/12/15) | Uses that day's scheduled slot; no retry until the next day; "Check now" still works after the owner is fixed | ERPNext scheduler daily jobs don't retry a failed day [ERPN-MR]; Odoo scheduler runs once per interval [ODOO] | confirm | — |
 
 [ERPN-MR]: https://docs.frappe.io/erpnext/user/manual/en/auto-creation-of-material-request
 [ERPN-PQ]: https://docs.frappe.io/erpnext/user/manual/en/projected-quantity
