@@ -6,6 +6,7 @@ import {
 	type SortingState,
 	useTable,
 } from "@tanstack/react-table";
+import Link from "next/link";
 import { useMemo } from "react";
 
 import { DataTable } from "@/components/common/DataTable";
@@ -17,6 +18,7 @@ import {
 } from "@/components/common/data-table-features";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorState } from "@/components/shared/ErrorState";
+import { useCan } from "@/hooks/use-can";
 import {
 	formatDate,
 	formatMoney,
@@ -34,9 +36,29 @@ import {
 
 type AnyLine = OnTimeLine | RejectionLine | PriceLine;
 
-/** PO / GRN numbers are plain text: the contract carries no PR or GRN id to link by (BR-SRT-35 gap, see report). */
-function DocNo({ value }: { value: string }) {
-	return <span className="font-mono">{value}</span>;
+/** PO links need po.manage, GRN links need grn.view (BR-SRT-35); plain text when the id is null. */
+function DocNo({
+	value,
+	kind,
+	id,
+}: {
+	value: string;
+	kind: "po" | "grn";
+	id: number | null;
+}) {
+	const canPo = useCan("po.manage");
+	const canGrn = useCan("grn.view");
+	const allowed = kind === "po" ? canPo : canGrn;
+	if (!allowed || id === null)
+		return <span className="font-mono">{value}</span>;
+	return (
+		<Link
+			href={kind === "po" ? `/purchase-orders/${id}` : `/grn/${id}`}
+			className="font-mono text-brand-accent hover:underline"
+		>
+			{value}
+		</Link>
+	);
 }
 
 function sortable<T extends RowData>(
@@ -56,7 +78,9 @@ function sortable<T extends RowData>(
 const ON_TIME_COLUMNS: DataTableColumnDef<OnTimeLine>[] = [
 	{
 		...sortable<OnTimeLine>("poNumber", "PO no.", (r) => r.poNumber),
-		cell: ({ row }) => <DocNo value={row.original.poNumber} />,
+		cell: ({ row }) => (
+			<DocNo kind="po" id={row.original.prId} value={row.original.poNumber} />
+		),
 	},
 	{
 		...sortable<OnTimeLine>("itemSku", "Item", (r) => r.itemSku),
@@ -137,7 +161,11 @@ const REJECTION_COLUMNS: DataTableColumnDef<RejectionLine>[] = [
 		...sortable<RejectionLine>("grnNumber", "GRN no.", (r) => r.grnNumber),
 		cell: ({ row }) => (
 			<span className="flex flex-col">
-				<DocNo value={row.original.grnNumber} />
+				<DocNo
+					kind="grn"
+					id={row.original.grnId}
+					value={row.original.grnNumber}
+				/>
 				{row.original.inspection === "not_inspected" ? (
 					<span className="text-[13px] text-muted-foreground">
 						Not inspected, not counted
@@ -150,7 +178,9 @@ const REJECTION_COLUMNS: DataTableColumnDef<RejectionLine>[] = [
 		id: "poNumber",
 		header: "PO no.",
 		enableSorting: false,
-		cell: ({ row }) => <DocNo value={row.original.poNumber} />,
+		cell: ({ row }) => (
+			<DocNo kind="po" id={row.original.prId} value={row.original.poNumber} />
+		),
 		meta: { hideBelow1100: true },
 	},
 	{
@@ -207,7 +237,9 @@ const NOT_COMPARED: Record<
 const PRICE_COLUMNS: DataTableColumnDef<PriceLine>[] = [
 	{
 		...sortable<PriceLine>("poNumber", "PO no.", (r) => r.poNumber),
-		cell: ({ row }) => <DocNo value={row.original.poNumber} />,
+		cell: ({ row }) => (
+			<DocNo kind="po" id={row.original.prId} value={row.original.poNumber} />
+		),
 	},
 	{
 		...sortable<PriceLine>("itemSku", "Item", (r) => r.itemSku),
