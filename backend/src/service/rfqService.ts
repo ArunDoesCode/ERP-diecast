@@ -699,7 +699,7 @@ export const rfqService = {
       const rfq = await lockRfqOrThrow(id, tx);
       if (rfq.status !== "draft") throw invalidStatus(rfq.status, "sent");
       const lines = await rfqRepository.plainLines(id, tx);
-      // PR header and lines locked in the usual order, then re-read.
+      // Owning PR headers (id asc), then the PR lines (id asc), locked in the usual order, then re-read.
       await poRepository.findPurchaseRequestItemsByIdsForUpdate(
         lines.map((l) => l.prItemId),
         tx,

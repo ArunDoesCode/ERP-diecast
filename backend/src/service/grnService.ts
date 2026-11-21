@@ -5,6 +5,7 @@ import {
   InternalServerError,
   NotFoundError,
 } from "../lib/errors";
+import { toMilli } from "../lib/milli";
 import { grnRepository } from "../repository/grnRepository";
 import { poRepository } from "../repository/poRepository";
 import { purchaseReturnRepository } from "../repository/purchaseReturnRepository";
@@ -28,8 +29,6 @@ import {
 // Over-receipt tolerance: 5% above the PO line's ordered qty (BR-GRN-15).
 // Beyond that, the actor needs the override right and a reason.
 export const OVER_RECEIPT_TOLERANCE_RATIO = 1.05;
-
-const toMilli = (qty: number) => Math.round(qty * 1000);
 
 // Accept / bypass only while the PO can still receive goods (BR-GRN-01).
 const RECEIVABLE_PO_STATUSES = ["dispatched", "partial_received"];

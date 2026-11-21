@@ -1,3 +1,4 @@
+import { isRetryableConflict } from "../lib/db-errors";
 import { allocateDocumentSequence } from "../lib/document-number";
 import {
   AppError,
@@ -6,21 +7,18 @@ import {
   ForbiddenError,
   NotFoundError,
 } from "../lib/errors";
-import { istDayKey } from "../lib/ist-day";
+import { istDayKey, istMonthKey } from "../lib/ist-day";
+import { fromMilli, toMilli } from "../lib/milli";
 import {
   type AmountLineIn,
   addDays,
   computeAmounts,
   financialYearOfDay,
-  fromMilli,
   gstPercentToBp,
-  istDay,
-  istMonth,
   itemTaxable,
   type MatchMismatch,
   resolveTaxType,
   runMatch,
-  toMilli,
 } from "../lib/supplier-invoice-math";
 import { poRepository } from "../repository/poRepository";
 import { purchaseReturnRepository } from "../repository/purchaseReturnRepository";
@@ -46,8 +44,9 @@ import { purchaseReturnService } from "./purchaseReturnService";
 import { supplierInvoiceLinkService } from "./supplierInvoiceLinkService";
 
 // Supplier invoice and 3-way match (docs/specs/supplier-invoice, BR-SINV-01..41).
-// Lock order on every state change (BR-SINV-34): invoice row -> GRN headers (asc) ->
-// PO -> GRN lines (asc) -> debit-note rows -> number counter.
+// Lock order on every state change (BR-SINV-34): GRN headers (asc) -> PO -> invoice row
+// -> GRN lines (asc) -> debit-note rows -> number counter. Same order as the purchase
+// return post (GRN -> PO -> debit note), so the two cannot deadlock each other.
 
 type Status = SupplierInvoiceRow["status"];
 
@@ -170,13 +169,13 @@ function checkDate(invoiceDate: string, poCreatedAt: Date) {
       "SINV_BAD_DATE",
     );
   }
-  if (invoiceDate > istDay(new Date())) {
+  if (invoiceDate > istDayKey(new Date())) {
     throw new BadRequestError(
       "Invoice date cannot be after today",
       "SINV_BAD_DATE",
     ); // BR-SINV-07
   }
-  if (invoiceDate < istDay(poCreatedAt)) {
+  if (invoiceDate < istDayKey(poCreatedAt)) {
     throw new BadRequestError(
       "Invoice date cannot be before the PO date",
       "SINV_BAD_DATE",
@@ -477,6 +476,51 @@ async function lockDraftForChange(id: number, tx: Tx) {
 const itemGrnIds = (lines: { grnItemId: number | null }[]) =>
   lines.flatMap((l) => (l.grnItemId === null ? [] : [l.grnItemId]));
 
+// A deadlock or serialization failure rolled everything back: safe to retry.
+async function inInvoiceTx<T>(fn: (tx: Tx) => Promise<T>): Promise<T> {
+  try {
+    return await repo.withTransaction(fn);
+  } catch (error) {
+    if (isRetryableConflict(error)) {
+      throw conflict("Another change was in progress, try again", "SINV_RETRY");
+    }
+    throw error;
+  }
+}
+
+/**
+ * Lock in the global order: GRN headers (asc) -> PO (from an unlocked read of the
+ * invoice and its lines), then the invoice row. The invoice is read again under its
+ * lock; if its PO or lines moved since the unlocked read, the loser gets 409 SINV_BUSY.
+ * The caller re-checks the status on the returned `inv`.
+ */
+async function lockInOrder(id: number, tx: Tx, extraGrnItemIds: number[] = []) {
+  const seen = await repo.findInvoice(id, tx);
+  if (!seen) {
+    throw new NotFoundError("Supplier invoice not found");
+  }
+  const seenIds = [
+    ...itemGrnIds(await repo.listLines(id, tx)),
+    ...extraGrnItemIds,
+  ];
+  const bill = await lockBillRows(seen.poId, seenIds, tx);
+  const inv = await repo.lockInvoice(id, tx);
+  if (!inv) {
+    throw new NotFoundError("Supplier invoice not found");
+  }
+  const covered = new Set(seenIds);
+  if (
+    inv.poId !== seen.poId ||
+    itemGrnIds(await repo.listLines(id, tx)).some((g) => !covered.has(g))
+  ) {
+    throw conflict(
+      "The invoice changed while you were working on it - reload and try again",
+      "SINV_BUSY",
+    );
+  }
+  return { inv, ...bill };
+}
+
 function mismatchesForHistory(
   rows: Awaited<ReturnType<typeof repo.listMismatches>>,
 ) {
@@ -494,7 +538,7 @@ export const supplierInvoiceService = {
   // ---------- reads ----------
 
   async list(params: SupplierInvoiceListQuery) {
-    const today = istDay(new Date());
+    const today = istDayKey(new Date());
     const { rows, total, statusCounts } = await repo.list(params, today);
     return {
       data: rows.map((r) => ({
@@ -542,7 +586,7 @@ export const supplierInvoiceService = {
     const grns = await repo.listGrnsByIds([
       ...new Set(lines.flatMap((l) => (l.grnId === null ? [] : [l.grnId]))),
     ]);
-    const today = istDay(new Date());
+    const today = istDayKey(new Date());
     const offset = notes
       .filter((n) => n.status !== "cancelled")
       .reduce((sum, n) => sum + n.billOffsetPaise, 0);
@@ -779,7 +823,7 @@ export const supplierInvoiceService = {
         "SINV",
         actorId,
         now,
-        istMonth(now),
+        istMonthKey(now),
       );
       const ourNumber = `SINV-${periodKey}-${seq}`;
       const row = await repo.insertInvoice(
@@ -817,8 +861,19 @@ export const supplierInvoiceService = {
 
   // BR-SINV-11, 35: invoice row first, then the same order as create.
   async update(input: UpdateSupplierInvoiceInput, actorId: number) {
-    await repo.withTransaction(async (tx) => {
-      const inv = await lockDraftForChange(input.id, tx);
+    await inInvoiceTx(async (tx) => {
+      const {
+        inv,
+        po,
+        lines: lockedLines,
+      } = await lockInOrder(
+        input.id,
+        tx,
+        input.lines?.map((l) => l.grnItemId) ?? [],
+      );
+      if (inv.status !== "draft") {
+        throw notDraft();
+      }
       if (input.poId !== undefined && input.poId !== inv.poId) {
         throw new BadRequestError(
           "The purchase order of an invoice cannot be changed",
@@ -867,14 +922,9 @@ export const supplierInvoiceService = {
               : [],
           ),
       };
-      const { po, lines } = await lockBillRows(
-        inv.poId,
-        draft.lines.map((l) => l.grnItemId),
-        tx,
-      );
       const { header, lineRows } = await prepareDraft(
         po,
-        lines,
+        lockedLines,
         draft,
         inv.id,
         tx,
@@ -919,8 +969,11 @@ export const supplierInvoiceService = {
 
   // BR-SINV-18..23, 29, 31, 40, 41.
   async submit(id: number, actorId: number) {
-    await repo.withTransaction(async (tx) => {
-      const inv = await lockDraftForChange(id, tx);
+    await inInvoiceTx(async (tx) => {
+      const { inv, po, lines: locked } = await lockInOrder(id, tx);
+      if (inv.status !== "draft") {
+        throw notDraft();
+      }
       const company = await repo.findCompany(tx);
       if (!company?.stateCode.trim()) {
         throw new BadRequestError(
@@ -936,11 +989,6 @@ export const supplierInvoiceService = {
       }
       const lines = await repo.listLines(id, tx);
       const items = lines.filter((l) => l.kind === "item");
-      const { po, lines: locked } = await lockBillRows(
-        inv.poId,
-        itemGrnIds(items),
-        tx,
-      );
       if (!SUBMIT_PO_STATUSES.includes(po.status)) {
         throw conflict(
           `Purchase order is ${po.status} - it cannot be billed`,
@@ -1132,11 +1180,8 @@ export const supplierInvoiceService = {
     input: ReleaseSupplierInvoiceInput,
     actorId: number,
   ) {
-    await repo.withTransaction(async (tx) => {
-      const inv = await repo.lockInvoice(id, tx);
-      if (!inv) {
-        throw new NotFoundError("Supplier invoice not found");
-      }
+    await inInvoiceTx(async (tx) => {
+      const { inv, po, lines: locked } = await lockInOrder(id, tx);
       if (inv.status !== "blocked") {
         throw notBlocked();
       }
@@ -1147,11 +1192,6 @@ export const supplierInvoiceService = {
         );
       }
       const lines = await repo.listLines(id, tx);
-      const { po, lines: locked } = await lockBillRows(
-        inv.poId,
-        itemGrnIds(lines),
-        tx,
-      );
       // A-52: the qty may have dropped since submit (return, correction, other bill).
       // A qty over billable that the submit match already flagged is the owner's override
       // (BR-SINV-22, 24); only a further drop since submit is stale.
@@ -1207,11 +1247,8 @@ export const supplierInvoiceService = {
   async cancel(id: number, input: CancelSupplierInvoiceInput, actorId: number) {
     // Status the caller saw before the lock: if it moved under the lock, the loser gets 409 (BR-SINV-34).
     const seen = await repo.findInvoice(id);
-    await repo.withTransaction(async (tx) => {
-      const inv = await repo.lockInvoice(id, tx);
-      if (!inv) {
-        throw new NotFoundError("Supplier invoice not found");
-      }
+    await inInvoiceTx(async (tx) => {
+      const { inv, po } = await lockInOrder(id, tx);
       if (seen && seen.status !== inv.status) {
         throw conflict(
           "The invoice changed while you were cancelling it - reload and try again",
@@ -1233,8 +1270,6 @@ export const supplierInvoiceService = {
           "SINV_REASON_LENGTH",
         );
       }
-      const lines = await repo.listLines(id, tx);
-      const { po } = await lockBillRows(inv.poId, itemGrnIds(lines), tx);
       const now = new Date();
       await repo.updateInvoice(
         id,

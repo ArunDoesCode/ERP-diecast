@@ -1,21 +1,8 @@
-import { assertMoneyInRange } from "./money";
+import { toMilli } from "./milli";
+import { divRoundHalfUp, toPaise } from "./money";
 
 // Pure maths of a purchase return / debit note (BR-PRT-31, 32). The post and the
 // draft preview both call this, so the screen and the server agree (BR-PRT-40).
-
-export const toMilli = (qty: number) => Math.round(qty * 1000);
-export const fromMilli = (milli: number) => milli / 1000;
-
-// Math.round(n / d) for n >= 0, d > 0: half up = half away from zero, exact in BigInt.
-function divRoundPositive(numerator: bigint, divisor: bigint) {
-  return (2n * numerator + divisor) / (2n * divisor);
-}
-
-function toPaise(value: bigint) {
-  const n = Number(value);
-  assertMoneyInRange(n); // AMOUNT_TOO_LARGE (BR-PRT-18)
-  return n;
-}
 
 export type ReturnMathLine = {
   qty: number;
@@ -36,13 +23,13 @@ export function computeReturnLine(
   line: ReturnMathLine,
   isInterstate: boolean,
 ): ReturnMathLineResult {
-  const taxable = divRoundPositive(
+  const taxable = divRoundHalfUp(
     BigInt(toMilli(line.qty)) * BigInt(line.ratePaise),
     1000n,
   );
   const taxablePaise = toPaise(taxable);
   const gstHundredths = BigInt(Math.round(line.gstPercent * 100));
-  const gstPaise = toPaise(divRoundPositive(taxable * gstHundredths, 10_000n));
+  const gstPaise = toPaise(divRoundHalfUp(taxable * gstHundredths, 10_000n));
   if (isInterstate) {
     return {
       taxablePaise,
@@ -52,7 +39,7 @@ export function computeReturnLine(
       igstPaise: gstPaise,
     };
   }
-  const cgstPaise = toPaise(divRoundPositive(BigInt(gstPaise), 2n));
+  const cgstPaise = toPaise(divRoundHalfUp(BigInt(gstPaise), 2n));
   return {
     taxablePaise,
     gstPaise,
@@ -98,10 +85,4 @@ export function isInterstateSupply(
     return false;
   }
   return gstin.slice(0, 2) !== plantStateCode.trim();
-}
-
-/** Plant-IST month key `YYYY-MM` for the PRT number (BR-PRT-23). */
-export function istMonthKey(date: Date) {
-  const ist = new Date(date.getTime() + 330 * 60_000);
-  return `${ist.getUTCFullYear()}-${String(ist.getUTCMonth() + 1).padStart(2, "0")}`;
 }

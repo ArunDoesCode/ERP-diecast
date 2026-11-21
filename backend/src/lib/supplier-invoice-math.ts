@@ -1,5 +1,5 @@
-import { BadRequestError } from "./errors";
 import { istDayKey } from "./ist-day";
+import { divRoundHalfUp, safePaise } from "./money";
 
 // Pure maths of the supplier invoice and its 3-way match (BR-SINV-13..22, 36, 40, 41).
 // BigInt keeps qty x rate and the tax heads exact; every result is checked against
@@ -8,19 +8,6 @@ import { istDayKey } from "./ist-day";
 export type TaxType = "cgst_sgst" | "igst" | "none";
 
 const DAY_MS = 86_400_000;
-
-export const toMilli = (qty: number) => Math.round(qty * 1000);
-export const fromMilli = (milli: number) => milli / 1000;
-
-/** The plant (IST) calendar day of an instant, `YYYY-MM-DD`. */
-export function istDay(date: Date) {
-  return istDayKey(date);
-}
-
-/** `YYYY-MM` of the plant (IST) day: the SINV number period (BR-SINV-11). */
-export function istMonth(date: Date) {
-  return istDay(date).slice(0, 7);
-}
 
 /** `day` + `days` calendar days, both `YYYY-MM-DD` (BR-SINV-28). */
 export function addDays(day: string, days: number) {
@@ -35,24 +22,6 @@ export function financialYearOfDay(day: string) {
   const start = month >= 4 ? year : year - 1;
   const two = (n: number) => String(n % 100).padStart(2, "0");
   return `${two(start)}-${two(start + 1)}`;
-}
-
-/** Math.round(n / d) for n >= 0, d > 0: half up, exact in BigInt. */
-export function divRoundHalfUp(numerator: bigint, divisor: bigint) {
-  return (2n * numerator + divisor) / (2n * divisor);
-}
-
-const MAX_SAFE = BigInt(Number.MAX_SAFE_INTEGER);
-
-/** bigint -> number, 400 SINV_AMOUNT_TOO_LARGE above MAX_SAFE_INTEGER (BR-SINV-36). */
-export function safePaise(value: bigint) {
-  if (value > MAX_SAFE || value < -MAX_SAFE) {
-    throw new BadRequestError(
-      "An amount on this invoice is above the largest value allowed",
-      "SINV_AMOUNT_TOO_LARGE",
-    );
-  }
-  return Number(value);
 }
 
 /** GST percent from the slab list -> basis points (18 -> 1800, 0.1 -> 10). */

@@ -1,11 +1,15 @@
-import { conflictLocation, isUniqueViolation } from "../lib/db-errors";
+import {
+  conflictLocation,
+  isRetryableConflict,
+  isUniqueViolation,
+} from "../lib/db-errors";
 import {
   computeNoteLine,
   computeNoteTotals,
+  DEFAULT_EWAY_INTRA_LIMIT_PAISE,
   ewayValidUntil,
   isEwayExpired,
   isEwayNeeded,
-  toMilli,
 } from "../lib/delivery-note-math";
 import { allocateFinancialYearSequence } from "../lib/document-number";
 import {
@@ -16,7 +20,7 @@ import {
   NotFoundError,
 } from "../lib/errors";
 import { istDayKey } from "../lib/ist-day";
-import { milliToString } from "../lib/milli";
+import { milliToString, toMilli } from "../lib/milli";
 import {
   type DeliveryNoteInsert,
   type DeliveryNoteLineRow,
@@ -50,7 +54,6 @@ import { saleOrderService } from "./saleOrderService";
 export type Viewer = { actorId: number; canSeePrice: boolean };
 
 const WHOLE_UNITS = new Set(["pcs", "set"]); // BR-DSP-05
-const DEFAULT_EWAY_LIMIT_PAISE = 5_000_000;
 
 const toMeta = (page: number, pageSize: number, total: number) => ({
   page,
@@ -206,11 +209,20 @@ async function assertEwayFree(
   }
 }
 
-/** Run `fn`; a unique violation on the e-way index becomes the spec's 409. */
+/**
+ * Run `fn`; a unique violation on the e-way index becomes the spec's 409, and a
+ * deadlock or serialization failure (nothing saved) becomes a retryable 409.
+ */
 async function mapEwayUnique<T>(fn: () => Promise<T>): Promise<T> {
   try {
     return await fn();
   } catch (e) {
+    if (isRetryableConflict(e)) {
+      throw new ConflictError(
+        "Another change was in progress, try again",
+        "DISPATCH_RETRY",
+      );
+    }
     if (
       isUniqueViolation(e) &&
       conflictLocation(e).constraint === "uq_delivery_notes_eway_bill_no"
@@ -323,7 +335,7 @@ function ewayAnswer(
   const plantState = company?.stateCode.trim() || null;
   const sameState =
     plantState !== null && plantState === shipToStateCode.trim();
-  const limit = company?.ewayIntraLimitPaise ?? DEFAULT_EWAY_LIMIT_PAISE;
+  const limit = company?.ewayIntraLimitPaise ?? DEFAULT_EWAY_INTRA_LIMIT_PAISE;
   return {
     sameState,
     ewayRequired: isEwayNeeded({
@@ -518,7 +530,8 @@ async function buildDetail(
     ewayValidUntil: validUntil,
     ewayExpired: isEwayExpired(validUntil, new Date()),
     ewayNeeded: h.ewayRequired,
-    ewayLimitPaise: company?.ewayIntraLimitPaise ?? DEFAULT_EWAY_LIMIT_PAISE,
+    ewayLimitPaise:
+      company?.ewayIntraLimitPaise ?? DEFAULT_EWAY_INTRA_LIMIT_PAISE,
     company: isDraft ? draftCompany : hasSnapshot ? snapshot : null,
     postedBy: person(h.postedBy),
     postedAt: h.postedAt?.toISOString() ?? null,
@@ -618,7 +631,7 @@ export const deliveryNoteService = {
     const company = await repo.findCompany();
     return {
       ewayIntraLimitPaise:
-        company?.ewayIntraLimitPaise ?? DEFAULT_EWAY_LIMIT_PAISE,
+        company?.ewayIntraLimitPaise ?? DEFAULT_EWAY_INTRA_LIMIT_PAISE,
       plantStateCode: company?.stateCode.trim() || null,
     };
   },
@@ -856,6 +869,10 @@ export const deliveryNoteService = {
   async update(id: number, input: UpdateDeliveryNoteInput, viewer: Viewer) {
     await mapEwayUnique(() =>
       repo.withTransaction(async (tx) => {
+        // Lock order SO -> note, same as post and cancel: header read unlocked first.
+        const seen = await repo.findHeader(id, tx);
+        if (!seen) throw noteNotFound();
+        await saleOrderRepository.lockById(seen.soId, tx);
         const header = await repo.lockHeader(id, tx);
         if (!header) throw noteNotFound();
         if (header.status !== "draft") {
@@ -1274,113 +1291,119 @@ export const deliveryNoteService = {
     if (pre.status !== "posted") {
       throw noteStatusError("Only a posted note can be cancelled this way");
     }
-    await repo.withTransaction(async (tx) => {
-      const so = await saleOrderRepository.lockById(pre.soId, tx);
-      if (!so) throw new NotFoundError("Sale order not found");
-      await saleOrderRepository.findAllLinesForUpdate(pre.soId, tx);
-      const note = await repo.lockHeader(id, tx);
-      if (!note) throw noteNotFound();
-      if (note.status !== "posted") {
-        throw noteStatusError("Only a posted note can be cancelled this way"); // BR-DSP-33
-      }
-      if (so.status === "closed" && so.closeKind !== "fully_delivered") {
-        throw new ConflictError(
-          "The sale order was closed by hand; this note cannot be cancelled",
-          "DISPATCH_SO_CLOSED_MANUALLY",
+    await mapEwayUnique(() =>
+      repo.withTransaction(async (tx) => {
+        const so = await saleOrderRepository.lockById(pre.soId, tx);
+        if (!so) throw new NotFoundError("Sale order not found");
+        await saleOrderRepository.findAllLinesForUpdate(pre.soId, tx);
+        const note = await repo.lockHeader(id, tx);
+        if (!note) throw noteNotFound();
+        if (note.status !== "posted") {
+          throw noteStatusError("Only a posted note can be cancelled this way"); // BR-DSP-33
+        }
+        if (so.status === "closed" && so.closeKind !== "fully_delivered") {
+          throw new ConflictError(
+            "The sale order was closed by hand; this note cannot be cancelled",
+            "DISPATCH_SO_CLOSED_MANUALLY",
+          );
+        }
+        const noteLines = await repo.findLines(id, tx);
+        await repo.lockItems(
+          [...new Set(noteLines.map((l) => l.line.itemId))].sort(
+            (a, b) => a - b,
+          ),
+          tx,
         );
-      }
-      const noteLines = await repo.findLines(id, tx);
-      await repo.lockItems(
-        [...new Set(noteLines.map((l) => l.line.itemId))].sort((a, b) => a - b),
-        tx,
-      );
-      const ledgerOut = new Map(
-        (
-          await repo.findLedgerRows(
-            noteLines.flatMap((l) =>
-              l.line.ledgerOutId === null ? [] : [l.line.ledgerOutId],
-            ),
-            tx,
-          )
-        ).map((r) => [r.id, r]),
-      );
+        const ledgerOut = new Map(
+          (
+            await repo.findLedgerRows(
+              noteLines.flatMap((l) =>
+                l.line.ledgerOutId === null ? [] : [l.line.ledgerOutId],
+              ),
+              tx,
+            )
+          ).map((r) => [r.id, r]),
+        );
 
-      // delivered qty back, SO reopened, BEFORE any stock row (a hand-closed SO rolls all back)
-      const byLine = [...noteLines].sort(
-        (a, b) => a.line.soLineId - b.line.soLineId,
-      );
-      for (const l of byLine) {
-        await saleOrderService.applyDelivery(tx, {
-          lineId: l.line.soLineId,
-          qty: -Number(l.line.qty),
-          actorId: viewer.actorId,
-          noteRef: note.dnNumber ?? `#${id}`,
-        });
-      }
-      try {
-        await saleOrderService.reopenAfterDeliveryCancel(tx, {
-          soId: so.id,
-          actorId: viewer.actorId,
-          noteRef: note.dnNumber ?? `#${id}`,
-        });
-      } catch (e) {
-        if (e instanceof AppError && e.code === "SO_CLOSED_BY_HAND") {
-          throw new ConflictError(e.message, "DISPATCH_SO_CLOSED_MANUALLY");
+        // delivered qty back, SO reopened, BEFORE any stock row (a hand-closed SO rolls all back)
+        const byLine = [...noteLines].sort(
+          (a, b) => a.line.soLineId - b.line.soLineId,
+        );
+        for (const l of byLine) {
+          await saleOrderService.applyDelivery(tx, {
+            lineId: l.line.soLineId,
+            qty: -Number(l.line.qty),
+            actorId: viewer.actorId,
+            noteRef: note.dnNumber ?? `#${id}`,
+          });
         }
-        throw e;
-      }
+        try {
+          await saleOrderService.reopenAfterDeliveryCancel(tx, {
+            soId: so.id,
+            actorId: viewer.actorId,
+            noteRef: note.dnNumber ?? `#${id}`,
+          });
+        } catch (e) {
+          if (e instanceof AppError && e.code === "SO_CLOSED_BY_HAND") {
+            throw new ConflictError(e.message, "DISPATCH_SO_CLOSED_MANUALLY");
+          }
+          throw e;
+        }
 
-      const stockOrder = [...noteLines].sort(
-        (a, b) => a.line.itemId - b.line.itemId || a.line.id - b.line.id,
-      );
-      for (const l of stockOrder) {
-        const out = l.line.ledgerOutId
-          ? ledgerOut.get(l.line.ledgerOutId)
-          : undefined;
-        if (!out) {
-          throw new InternalServerError("Posted note line has no ledger row");
+        const stockOrder = [...noteLines].sort(
+          (a, b) => a.line.itemId - b.line.itemId || a.line.id - b.line.id,
+        );
+        for (const l of stockOrder) {
+          const out = l.line.ledgerOutId
+            ? ledgerOut.get(l.line.ledgerOutId)
+            : undefined;
+          if (!out) {
+            throw new InternalServerError("Posted note line has no ledger row");
+          }
+          const row = await postStock(tx, {
+            itemId: l.line.itemId,
+            locationId: note.sourceLocationId,
+            transactionType: "in",
+            referenceType: "delivery_note_cancel",
+            referenceId: id,
+            referenceLineId: l.line.id,
+            batchNumber: l.line.lotNo,
+            quantityChange: Number(l.line.qty),
+            unitCostPaise: out.unitCostPaise,
+            notes: `${note.dnNumber ?? `#${id}`} cancelled: ${input.reason}`,
+            createdBy: viewer.actorId,
+          });
+          if (!row) {
+            throw new InternalServerError(
+              "Stock posting returned no ledger row",
+            );
+          }
+          await repo.updateLine(l.line.id, { ledgerInId: row.id }, tx);
         }
-        const row = await postStock(tx, {
-          itemId: l.line.itemId,
-          locationId: note.sourceLocationId,
-          transactionType: "in",
-          referenceType: "delivery_note_cancel",
-          referenceId: id,
-          referenceLineId: l.line.id,
-          batchNumber: l.line.lotNo,
-          quantityChange: Number(l.line.qty),
-          unitCostPaise: out.unitCostPaise,
-          notes: `${note.dnNumber ?? `#${id}`} cancelled: ${input.reason}`,
-          createdBy: viewer.actorId,
-        });
-        if (!row) {
-          throw new InternalServerError("Stock posting returned no ledger row");
-        }
-        await repo.updateLine(l.line.id, { ledgerInId: row.id }, tx);
-      }
 
-      const now = new Date();
-      await repo.updateHeader(
-        id,
-        {
-          status: "cancelled",
-          cancelReason: input.reason,
-          cancelledBy: viewer.actorId,
-          cancelledAt: now,
-          lastUpdatedBy: viewer.actorId,
-          lastUpdatedAt: now,
-        },
-        tx,
-      );
-      await audit(
-        tx,
-        viewer.actorId,
-        "dispatch.cancel",
-        note,
-        { status: "posted" },
-        { status: "cancelled", reason: input.reason },
-      );
-    });
+        const now = new Date();
+        await repo.updateHeader(
+          id,
+          {
+            status: "cancelled",
+            cancelReason: input.reason,
+            cancelledBy: viewer.actorId,
+            cancelledAt: now,
+            lastUpdatedBy: viewer.actorId,
+            lastUpdatedAt: now,
+          },
+          tx,
+        );
+        await audit(
+          tx,
+          viewer.actorId,
+          "dispatch.cancel",
+          note,
+          { status: "posted" },
+          { status: "cancelled", reason: input.reason },
+        );
+      }),
+    );
     return buildDetail(id, viewer.canSeePrice, undefined);
   },
 

@@ -1,5 +1,11 @@
 import { BadRequestError } from "./errors";
-import { AMOUNT_TOO_LARGE, assertMoneyInRange } from "./money";
+import { toMilli } from "./milli";
+import {
+  AMOUNT_TOO_LARGE,
+  assertMoneyInRange,
+  divRoundHalfUp,
+  toPaise,
+} from "./money";
 
 // Freight for a whole quote line: at most 1,000,000,000,000 paise (BR-RFQ-30, 74).
 export const MAX_FREIGHT_PAISE = 1_000_000_000_000;
@@ -24,12 +30,19 @@ export function computeLinePaise(
   unitPricePaise: number,
   gstPercent: number,
 ) {
-  const lineValuePaise = Math.round(qty * unitPricePaise);
-  const lineTaxPaise = Math.round(
-    (lineValuePaise * Math.round(gstPercent * 100)) / 10000,
+  // exact: qty in thousandths x rate in BigInt, half up (same as the other line maths)
+  const lineValuePaise = toPaise(
+    divRoundHalfUp(
+      BigInt(toMilli(qty)) * BigInt(Math.round(unitPricePaise)),
+      1000n,
+    ),
   );
-  assertMoneyInRange(lineValuePaise);
-  assertMoneyInRange(lineTaxPaise);
+  const lineTaxPaise = toPaise(
+    divRoundHalfUp(
+      BigInt(lineValuePaise) * BigInt(Math.round(gstPercent * 100)),
+      10_000n,
+    ),
+  );
   return { lineValuePaise, lineTaxPaise };
 }
 

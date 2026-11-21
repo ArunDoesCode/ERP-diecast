@@ -5,6 +5,9 @@
 export const toMilli = (v: number | string | null | undefined): number =>
   Math.round(Number(v ?? 0) * 1000);
 
+/** A thousandths integer as a plain quantity number. */
+export const fromMilli = (milli: number): number => milli / 1000;
+
 /** A thousandths integer as a numeric(14,3) string. */
 export const milliToString = (m: number): string => (m / 1000).toFixed(3);
 

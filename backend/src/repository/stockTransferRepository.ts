@@ -23,6 +23,7 @@ import {
 } from "../db/schemas/02_procurement-catalog";
 import { employees } from "../db/schemas/03_hcm";
 import { allocateDocumentSequence } from "../lib/document-number";
+import { InternalServerError } from "../lib/errors";
 import {
   istDayKey,
   istDayStartInstant,
@@ -277,7 +278,7 @@ export const stockTransferRepository = {
         status: stockTransfers.status,
       });
     if (!row) {
-      throw new Error("Stock transfer insert returned no row");
+      throw new InternalServerError("Stock transfer insert returned no row");
     }
     await tx
       .insert(stockTransferItems)

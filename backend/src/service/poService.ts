@@ -544,7 +544,8 @@ async function resolveUpdatedLines(
  * BR-PO-01..04, BR-RFQ-28, 50..52: drafts one PO inside the caller's transaction.
  * `create` opens the transaction; the RFQ award calls this once per winning supplier
  * inside the award transaction (it flips the awarded RFQ lines first, so the open-RFQ
- * check passes). Lock order: PR header, PR lines, contract lines, then the PO number.
+ * check passes). Lock order: the owning PR headers (id asc, FOR UPDATE), then the PR lines (id asc, FOR UPDATE),
+ * then contract lines, then the PO number counter.
  */
 async function createDraftInTx(tx: Tx, actor: Actor, input: DraftPoInput) {
   const supplier = await poRepository.findSupplierById(input.supplierId, tx);

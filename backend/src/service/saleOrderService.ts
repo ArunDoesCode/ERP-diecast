@@ -3,6 +3,7 @@ import { conflictLocation, isUniqueViolation } from "../lib/db-errors";
 import { allocateDocumentSequence } from "../lib/document-number";
 import { AppError, BadRequestError, NotFoundError } from "../lib/errors";
 import { istDayKey, istMonthKey } from "../lib/ist-day";
+import { milliToString, toMilli } from "../lib/milli";
 import { customerRepository } from "../repository/customerRepository";
 import type { DbExecutor, DbTransaction } from "../repository/executor";
 import {
@@ -30,8 +31,6 @@ const MIN_DATE = "2000-01-01"; // BR-SO-61
 const WHOLE_UNITS = new Set(["pcs", "set"]); // BR-SO-07
 
 /** Quantities are numeric(14,3): compare and add them as whole thousandths. */
-const toMilli = (v: number | string) => Math.round(Number(v) * 1000);
-const milliToString = (m: number) => (m / 1000).toFixed(3);
 
 /** BR-SO-11: round(qty x unit price) in integer paise, exact (BigInt, half up). */
 function lineAmountPaise(qtyMilli: number, unitPricePaise: number): number {

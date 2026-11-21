@@ -1,24 +1,14 @@
-import { assertMoneyInRange } from "./money";
+import { toMilli } from "./milli";
+import { divRoundHalfUp, toPaise } from "./money";
 
 // Pure maths of a delivery note (BR-DSP-19, 23, 28). Draft save, post and the
 // detail read all call this, so the screen and the server agree.
 
-export const toMilli = (qty: number | string) => Math.round(Number(qty) * 1000);
-export const fromMilli = (milli: number) => milli / 1000;
+/** Default of the configurable intra-state e-way limit (same as the company column default, Rs 50,000; BR-DSP-23). */
+export const DEFAULT_EWAY_INTRA_LIMIT_PAISE = 5_000_000;
 
-/** Intra-state e-way limit applies to same-state supply; other state is fixed Rs 50,000 (BR-DSP-23). */
+/** Fixed e-way limit for interstate supply, not configurable (BR-DSP-23). */
 export const EWAY_INTERSTATE_LIMIT_PAISE = 5_000_000;
-
-// Math.round(n / d) for n >= 0, d > 0: half up, exact in BigInt.
-function divRoundPositive(numerator: bigint, divisor: bigint) {
-  return (2n * numerator + divisor) / (2n * divisor);
-}
-
-function toPaise(value: bigint) {
-  const n = Number(value);
-  assertMoneyInRange(n);
-  return n;
-}
 
 export type NoteMathLine = {
   qty: number | string;
@@ -30,13 +20,13 @@ export type NoteMathLineResult = { taxablePaise: number; gstPaise: number };
 
 /** BR-DSP-19: taxable = qty x price, GST = taxable x GST %, each half up per line, in paise. */
 export function computeNoteLine(line: NoteMathLine): NoteMathLineResult {
-  const taxable = divRoundPositive(
+  const taxable = divRoundHalfUp(
     BigInt(toMilli(line.qty)) * BigInt(line.unitPricePaise),
     1000n,
   );
   const taxablePaise = toPaise(taxable);
   const gstHundredths = BigInt(Math.round(Number(line.gstPercent) * 100));
-  const gstPaise = toPaise(divRoundPositive(taxable * gstHundredths, 10_000n));
+  const gstPaise = toPaise(divRoundHalfUp(taxable * gstHundredths, 10_000n));
   return { taxablePaise, gstPaise };
 }
 

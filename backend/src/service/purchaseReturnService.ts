@@ -1,3 +1,4 @@
+import { isRetryableConflict } from "../lib/db-errors";
 import {
   allocateDocumentSequence,
   allocateFinancialYearSequence,
@@ -9,13 +10,12 @@ import {
   InternalServerError,
   NotFoundError,
 } from "../lib/errors";
+import { istMonthKey } from "../lib/ist-day";
+import { fromMilli, toMilli } from "../lib/milli";
 import {
   computeReturnLine,
   computeReturnTotals,
-  fromMilli,
   isInterstateSupply,
-  istMonthKey,
-  toMilli,
 } from "../lib/purchase-return-math";
 import { grnRepository } from "../repository/grnRepository";
 import { poRepository } from "../repository/poRepository";
@@ -286,6 +286,21 @@ function previewOf(
         ? ("replacement" as const)
         : ("credit_only" as const),
   };
+}
+
+// A deadlock or serialization failure rolled everything back: safe to retry.
+async function inPostTx<T>(fn: (tx: Tx) => Promise<T>): Promise<T> {
+  try {
+    return await repo.withTransaction(fn);
+  } catch (error) {
+    if (isRetryableConflict(error)) {
+      throw new ConflictError(
+        "Another change was in progress, try again",
+        "PRT_RETRY",
+      );
+    }
+    throw error;
+  }
 }
 
 export const purchaseReturnService = {
@@ -752,7 +767,7 @@ export const purchaseReturnService = {
   // BR-PRT-12..24, 29..35. One transaction; lock order GRN header -> PO header ->
   // GRN lines -> PO lines -> items (ascending id, inside postStock) -> counters.
   async post(id: number, actorId: number) {
-    return repo.withTransaction(async (tx) => {
+    return inPostTx(async (tx) => {
       await lockReturnUnderGrn(id, tx);
       const pre = await repo.findHeader(id, tx);
       if (!pre) {
@@ -1034,7 +1049,7 @@ export const purchaseReturnService = {
 
   // BR-PRT-25..28.
   async cancel(id: number, input: CancelPurchaseReturnInput, actorId: number) {
-    return repo.withTransaction(async (tx) => {
+    return inPostTx(async (tx) => {
       await lockReturnUnderGrn(id, tx);
       const pre = await repo.findHeader(id, tx);
       if (!pre) {
