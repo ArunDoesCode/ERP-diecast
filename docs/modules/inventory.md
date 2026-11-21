@@ -3,6 +3,7 @@ module: inventory
 spec: docs/specs/inventory.md (v1 frozen) + docs/specs/grn-stock.md (v1 frozen)
 last_verified_commit: eea4fb1
 last_verified_on: 2026-09-29
+partially_verified: de68fdf (2026-11-21) — posting row, ledger ref types, Known gaps
 depends_on: [suppliers, grn]
 ---
 
@@ -25,7 +26,7 @@ screen for stock-take and opening stock. All BR-INV-01..25 are built and tested
 | schema | `backend/src/db/schemas/02_procurement-catalog.ts` | `itemMaster` (+ `standardRatePaise`, `lastUpdated*`), `serviceMaster`, `locations` (+ `isActive`, `lastUpdated*`), `machines` (+ `code`, `isActive`), `inventoryLedger`, enums; functional unique indexes `lower(btrim(x))`; partial unique: one `main_store`, one `vendor_premise` per supplier |
 | types | `backend/src/types/asset.types.ts` | item/service/location/machine create + update schemas (`.strict()`), `ITEM_CATEGORIES`, `ITEM_UOMS`, manual movement discriminated union (`countedQty` for stock-take, `qty` + `unitCostPaise` for opening), stock view + last-rate schemas |
 | repository | `backend/src/repository/assetRepository.ts` | `listItems`, `createItem`, `updateItemLocked`, `isItemInUse`, `getLastRate`, `listStock`, `listInventoryMovements`, `manualMovement`, `inventoryReconciliation`, location/service/machine CRUD, `likePattern` |
-| posting | `backend/src/repository/stockPostingRepository.ts` | `postStock` (locks item, refuses unknown 404 / inactive 400 location, `blockNegative`) |
+| posting | `backend/src/repository/stockPostingRepository.ts` | `postStock` (locks item, refuses unknown 404 / inactive 400 location, `blockNegative` → 409 `INSUFFICIENT_STOCK`; row value and average in BigInt with `assertMoneyInRange` / `assertStockValueInRange`) |
 | service | `backend/src/service/assetService.ts` | validation not expressible in Zod: unit-dependent whole numbers (`assertReorderLevelFitsUnit`), in-use locks, main-store rules, `getConflictError` (unwraps drizzle `cause`) |
 | routes | `backend/src/routes/asset.ts` + `END_POINTS.asset` | guards `requirePermission(key)`; `GET /machines` is any signed-in user, service allows `asset.manage` or `pr.link_machine` (BR-AUTH-26) |
 | frontend | `frontend/src/lib/api/asset/{fetchers,queries}.ts`, `frontend/src/components/{pages,views}/inventory/*` (incl. `InventoryStockManager`, `InventoryStockView`, `inventory-format.ts`), `frontend/src/app/(protected)/inventory/stock/page.tsx`, `frontend/src/types/asset.ts` | UI gated by `useCan(key)` |
@@ -54,6 +55,8 @@ screen for stock-take and opening stock. All BR-INV-01..25 are built and tested
 - Search uses `likePattern` (escapes `\ % _`); `ilike` on an enum column needs a `::text` cast.
 - drizzle wraps Postgres errors in `cause` — read the code/constraint from there for 23505 → 409.
 - Reconciliation aggregates the whole ledger per call — don't poll it.
+- Ledger ref types written today: `grn`, `grn_bypass`, `grn_correction`, `opening_stock`, `stock_adjustment`, `sco_issue`, `sco_receipt`, `sco_loss`, `pro` (purchase return post, out at cost) and `pro_cancel` (counter row of a cancelled posted return, added by migration `20261121081805`). See `purchase-returns.md`.
+- Negative-stock refusal code is `INSUFFICIENT_STOCK` for every caller (was generic `CONFLICT`).
 - Super-admin passes every key. Test fixtures must be real employees with seed roles (keys come from the DB).
 
 ## Tests
@@ -65,7 +68,8 @@ screen for stock-take and opening stock. All BR-INV-01..25 are built and tested
 
 ## Known gaps / debt
 - BR-INV-05 PO half (PR line approved before deactivation) → BL-046 (PO code, auth session). SCO part → subcontracting build.
-- `inventory_ref_type` values `pro`, `job_order_issue`, `scrap_dispatch` still unwritten.
+- `inventory_ref_type` values `job_order_issue`, `scrap_dispatch` still unwritten.
+- Movements list: frontend `assetReferenceTypeValues` / `REFERENCE_TYPE_LABEL` have no `pro_cancel`; `listInventoryMovements` joins a source number only for GRN types, so return rows show no number.
 - Stock list search not indexable (BL-050). No reconciliation screen (BL-045).
 
 ## ERP benchmark (with links)
@@ -86,3 +90,4 @@ screen for stock-take and opening stock. All BR-INV-01..25 are built and tested
 | 2026-09-29 | work/m1-stock 8cab134..1fe3cfd | grn-stock parts: posting engine, manual movements, reconciliation, item API |
 | 2026-09-29 | work/m1-stock e8f395c..6257268 | inventory v1 built: masters rules, stock view, stock-take/opening, last rate, indexes, tests |
 | 2026-09-29 | work/m1 da516f2..eea4fb1 | Merged into work/m1; routes on permission keys, `GET /machines` shared with `pr.link_machine`; inactive-item check for PR lines now from work/m1 |
+| 2026-11-21 | c0f73b0..de68fdf (partial) | Purchase returns write `pro` / `pro_cancel`; `postStock` code `INSUFFICIENT_STOCK`, BigInt value checks. Other changes since eea4fb1 not re-verified |

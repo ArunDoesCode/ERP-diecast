@@ -4,8 +4,8 @@
 > PR), `/watch-prs` (merges), `/status` (on demand) and `/wrap`. Humans: read this, then run `/status`.
 
 **Updated:** 2026-11-21 · **Milestone:** M1 Procurement hardening and M2 Subcontracting are merged. UAT-1 at the factory has not started. SCM epic (`epic/scm`) in progress.
-**Now:** SCM epic — bom, sale-order and reorder built and green on `feature/scm-reorder` (2271 backend tests pass). Maps written for all three.
-**Next action:** next SCM sub-feature `purchase-returns` (spec frozen v1). Later in the epic: rfq, supplier-invoice, supplier-rating, dispatch.
+**Now:** SCM epic — bom, sale-order, reorder, purchase-returns and supplier-invoice built and green (2639 backend tests pass). Maps written for all five.
+**Next action:** next SCM sub-feature `rfq` (spec frozen v1). Later in the epic: supplier-rating, dispatch.
 
 ## Modules
 | Module | Spec | Map | Code | State |
@@ -24,14 +24,16 @@
 | bom | frozen v1 | [map](modules/bom.md) | full | built, green — epic/scm |
 | sale-order | frozen v1 | [map](modules/sale-order.md) | full (dispatch hooks only, no dispatch screens) | built, green — epic/scm |
 | reorder | frozen v1 | [map](modules/reorder.md) | full | built, green — epic/scm |
-| purchase-returns | frozen v1 | — | none | next in epic/scm |
+| purchase-returns | frozen v1 | [map](modules/purchase-returns.md) | full | built, green — epic/scm |
+| supplier-invoice | frozen v1 | [map](modules/supplier-invoice.md) | full (no payments) | built, green — epic/scm |
+| rfq | frozen v1 | — | none | next in epic/scm |
 
 Legend — Code: none / schema only / partial / full. Tests per module: see each map's **Tests** table.
 
 ## Active work
 | Item | Branch | Phase | PR | Waiting on |
 |---|---|---|---|---|
-| SCM epic: bom, sale-order, reorder | feature/scm-reorder (epic/scm) | built, green (2271 backend tests) | none yet | next sub-feature: purchase-returns |
+| SCM epic: bom, sale-order, reorder, purchase-returns, supplier-invoice | feature/scm-supplier-invoice (epic/scm) | built, green (2639 backend tests) | none yet | next sub-feature: rfq |
 | Design-review fixes, GRN on shared patterns, BR-GRN-45 (#109) | claude/cranky-payne-f2bc8a | done, local | none yet | you: push, open PR, merge |
 
 ## Waiting on you
@@ -44,6 +46,7 @@ Legend — Code: none / schema only / partial / full. Tests per module: see each
 - [ ] Open issues: 57, none P1 (`gh issue list`). P2 defects: #34 (inactive item on a new PO), #41 (PO supplier picker lists inactive suppliers). Date/guard follow-ups: #82, #83, #84, #85.
 
 ## Recently done
+- 2026-11-21 — SCM epic: purchase returns (BR-PRT-01..47: draft/post/cancel, debit note + return challan, GRN correction floor) and supplier invoice with 3-way match (BR-SINV-01..41: match, release, cancel, PO `invoiced` set by the invoice service, debit-note links); manual PO "Record invoice" removed, old invoice rows kept as `legacy`; 2639 backend tests pass. Maps added; grn, purchase-order, inventory maps partly refreshed.
 - 2026-11-21 — SCM epic: BOM (BR-BOM-01..28), sale order + customers + explosion + draft PR/SCO (BR-SO-01..62), automatic reorder (BR-RO) built; 2271 backend tests pass. Migration `20261121063850` nulls old PR `sale_order_id` values (note kept on the PR). Module maps added.
 - 2026-11-19 — All 57 open issues fixed on `claude/cranky-payne-f2bc8a`; full flow run (purchase, GRN, subcontracting) passes in the browser; 1773 backend + 301 frontend tests, 7 golden-path e2e on desktop + tablet. Frontend TypeScript stays 6.0.3 until a Next.js upgrade (TS 7 breaks `next build` on 16.2). Deploy note: everyone signs in once; operator QR badges must be regenerated.
 - 2026-11-20 — Design system v2 built (epic `epic/design-system-v2`): new colours, bigger type and controls on every screen, one field look; one push and one PR at the end (owner).
