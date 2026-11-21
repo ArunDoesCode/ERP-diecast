@@ -49,6 +49,9 @@ export function useReorderItemsQuery(params: ReorderItemsParams) {
 		queryKey: reorderKeys.items(params),
 		queryFn: () => getReorderItems(params),
 		placeholderData: keepPreviousData,
+		// The server re-classifies every item per request; don't redo it on focus.
+		staleTime: 30_000,
+		refetchOnWindowFocus: false,
 	});
 }
 
