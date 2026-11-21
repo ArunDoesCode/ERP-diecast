@@ -103,8 +103,7 @@ export function InvoiceItemsCard({ inv }: { inv: SinvDetail }) {
 							<TableHead>Item</TableHead>
 							<TableHead className="text-right">Billed qty</TableHead>
 							<TableHead className="text-right">Rate</TableHead>
-							<TableHead className="text-right">Taxable</TableHead>
-							<TableHead className="text-right">Tax</TableHead>
+							<TableHead className="text-right">Taxable · tax</TableHead>
 							<TableHead className="text-right">Line total</TableHead>
 							{showMatch ? <TableHead>Match</TableHead> : null}
 						</TableRow>
@@ -132,11 +131,8 @@ export function InvoiceItemsCard({ inv }: { inv: SinvDetail }) {
 									</TableCell>
 									<TableCell className="text-right tabular-nums">
 										{formatMoney(line.taxablePaise)}
-									</TableCell>
-									<TableCell className="text-right tabular-nums">
-										{formatMoney(tax)}
 										<span className="block text-[13px] text-muted-foreground">
-											{bpText(line.gstBp)}
+											{formatMoney(tax)} · {bpText(line.gstBp)}
 										</span>
 									</TableCell>
 									<TableCell className="text-right tabular-nums">

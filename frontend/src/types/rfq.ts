@@ -155,9 +155,10 @@ export type QuoteHeader = {
 	cancelledByName: string | null;
 	cancelledAt: string | null;
 	cancelReason: string | null;
-	/** Lines priced, when the server sends it. */
-	pricedCount?: number;
-	totalLandedPaise?: number | null;
+	/** Lines the supplier priced (of the RFQ's lines). */
+	linesPriced: number;
+	/** Sum of landed rate x qty over priced lines; null when none priced. */
+	totalLandedPaise: number | null;
 };
 
 export type ContractHint = {

@@ -4,6 +4,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useCan } from "@/hooks/use-can";
+import { useContractQuery } from "@/lib/api/rate-contract/queries";
+import { formatQty } from "@/lib/format";
 
 export const OVERRIDE_REASON_MIN = 3;
 export const OVERRIDE_REASON_MAX = 500;
@@ -21,6 +24,9 @@ export function ContractRateControls({
 	idPrefix,
 	contractNumber,
 	qtyLeft,
+	unit,
+	contractId,
+	itemId,
 	canOverride,
 	overriding,
 	onOverridingChange,
@@ -32,6 +38,11 @@ export function ContractRateControls({
 	contractNumber?: string | null;
 	/** Contract quantity still open (from the last-rate answer). */
 	qtyLeft?: number | string | null;
+	/** Unit of the line, shown after the quantities. */
+	unit?: string | null;
+	/** With `itemId`: lets the note show the contract cap (needs contract.view). */
+	contractId?: number;
+	itemId?: number;
 	canOverride: boolean;
 	overriding: boolean;
 	onOverridingChange: (on: boolean) => void;
@@ -39,6 +50,15 @@ export function ContractRateControls({
 	onReasonChange: (reason: string) => void;
 	showReasonError: boolean;
 }) {
+	const canViewContract = useCan("contract.view");
+	const contractQuery = useContractQuery(
+		canViewContract && qtyLeft != null && qtyLeft !== ""
+			? contractId
+			: undefined,
+	);
+	const cap =
+		contractQuery.data?.data.lines.find((line) => line.itemId === itemId)
+			?.capQty ?? null;
 	const label = contractNumber ? `Contract ${contractNumber}` : "Contract";
 	const reasonId = `${idPrefix}-override-reason`;
 	const reasonError =
@@ -53,7 +73,10 @@ export function ContractRateControls({
 					{label}
 				</Badge>
 				{qtyLeft != null && qtyLeft !== "" ? (
-					<span className="text-muted-foreground">Qty left {qtyLeft}</span>
+					<span className="text-muted-foreground tabular-nums">
+						Qty left {formatQty(qtyLeft, unit, 3)}
+						{cap != null ? ` of ${formatQty(cap, unit, 3)}` : ""}
+					</span>
 				) : null}
 				{overriding ? (
 					<>
@@ -62,8 +85,9 @@ export function ContractRateControls({
 						</span>
 						<Button
 							type="button"
-							variant="ghost"
+							variant="link"
 							size="sm"
+							className="h-auto px-0 underline"
 							onClick={() => {
 								onOverridingChange(false);
 								onReasonChange("");
@@ -82,8 +106,9 @@ export function ContractRateControls({
 						{canOverride ? (
 							<Button
 								type="button"
-								variant="ghost"
+								variant="link"
 								size="sm"
+								className="h-auto px-0 text-brand-accent underline"
 								onClick={() => onOverridingChange(true)}
 							>
 								Override rate

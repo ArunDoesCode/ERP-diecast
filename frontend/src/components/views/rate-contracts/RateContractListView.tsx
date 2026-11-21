@@ -56,13 +56,18 @@ const columns: DataTableColumnDef<ContractListRow>[] = [
 		),
 	},
 	{
-		accessorKey: "supplierName",
+		id: "supplier",
 		header: "Supplier",
-	},
-	{
-		accessorKey: "itemCount",
-		header: "Items",
-		meta: { numeric: true },
+		cell: ({ row }) => (
+			<span>
+				{row.original.supplierName}
+				<span className="block text-[13px] text-muted-foreground">
+					{row.original.itemCount}{" "}
+					{row.original.itemCount === 1 ? "item" : "items"} · by{" "}
+					{row.original.createdByName ?? "-"}
+				</span>
+			</span>
+		),
 	},
 	{
 		id: "valid",
@@ -78,11 +83,6 @@ const columns: DataTableColumnDef<ContractListRow>[] = [
 			row.original.orderedPercent === null
 				? "–"
 				: `${row.original.orderedPercent} %`,
-	},
-	{
-		accessorKey: "createdByName",
-		header: "Created by",
-		cell: ({ row }) => row.original.createdByName ?? "-",
 	},
 ];
 

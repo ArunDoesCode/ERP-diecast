@@ -62,8 +62,7 @@ export function RfqLinesCard({ data }: { data: RfqDetails }) {
 						<TableRow>
 							<TableHead>Item</TableHead>
 							<TableHead className="text-right">Qty</TableHead>
-							<TableHead>Contract</TableHead>
-							<TableHead>Status</TableHead>
+							<TableHead>Contract rate</TableHead>
 						</TableRow>
 					</TableHeader>
 					<TableBody>
@@ -76,10 +75,13 @@ export function RfqLinesCard({ data }: { data: RfqDetails }) {
 									key={line.id}
 									className={muted ? "text-muted-foreground" : undefined}
 								>
-									<TableCell>
+									<TableCell className="whitespace-normal">
 										<span className="font-mono">{line.prNumber}</span>
 										<span className="block">
 											{line.itemCode} · {line.itemName}
+										</span>
+										<span className="block text-[13px] text-muted-foreground">
+											{lineStatusText(line)}
 										</span>
 									</TableCell>
 									<TableCell className="text-right tabular-nums">
@@ -89,16 +91,15 @@ export function RfqLinesCard({ data }: { data: RfqDetails }) {
 										{contract.length === 0
 											? "–"
 											: contract.map((hint) => (
-													<span key={hint.contractNumber} className="block">
-														{names.get(hint.supplierId) ?? "Supplier"}:{" "}
-														<span className="font-mono">
-															{hint.contractNumber}
-														</span>{" "}
+													<span
+														key={hint.contractNumber}
+														className="block tabular-nums"
+														title={`${names.get(hint.supplierId) ?? "Supplier"} · ${hint.contractNumber}`}
+													>
 														{formatMoney(hint.ratePaise)}
 													</span>
 												))}
 									</TableCell>
-									<TableCell>{lineStatusText(line)}</TableCell>
 								</TableRow>
 							);
 						})}
@@ -152,9 +153,10 @@ export function RfqQuotesCard({
 			<Table>
 				<TableHeader>
 					<TableRow>
-						<TableHead>Supplier</TableHead>
-						<TableHead>Quote ref</TableHead>
+						<TableHead>Supplier / quote ref</TableHead>
 						<TableHead>Status</TableHead>
+						<TableHead className="text-right">Lines priced</TableHead>
+						<TableHead className="text-right">Total landed</TableHead>
 						<TableHead>Valid till</TableHead>
 						<TableHead>
 							<span className="sr-only">Actions</span>
@@ -169,11 +171,11 @@ export function RfqQuotesCard({
 								key={quote.id}
 								className={cancelled ? "text-muted-foreground" : undefined}
 							>
-								<TableCell>{quote.supplierName}</TableCell>
-								<TableCell>
+								<TableCell className="whitespace-normal">
+									{quote.supplierName}
 									<Link
 										href={`/rfq/${rfq.id}/quotes/${quote.id}`}
-										className="font-mono text-brand-accent hover:underline"
+										className="block font-mono text-[13px] text-brand-accent hover:underline"
 									>
 										{quote.supplierQuoteRef ?? quote.quoteNumber}
 									</Link>
@@ -188,6 +190,16 @@ export function RfqQuotesCard({
 											<StatusBadge doc="rfqFlag" status="late" />
 										) : null}
 									</span>
+								</TableCell>
+								<TableCell className="text-right tabular-nums">
+									{quote.status === "cancelled"
+										? "–"
+										: `${quote.linesPriced} of ${data.lines.length}`}
+								</TableCell>
+								<TableCell className="text-right tabular-nums">
+									{quote.totalLandedPaise == null
+										? "–"
+										: formatMoney(quote.totalLandedPaise)}
 								</TableCell>
 								<TableCell>{formatDate(quote.validTill)}</TableCell>
 								<TableCell className="text-right">
@@ -228,7 +240,7 @@ export function RfqQuotesCard({
 					{missing.map((supplier) => (
 						<TableRow key={`missing-${supplier.supplierId}`}>
 							<TableCell>{supplier.name}</TableCell>
-							<TableCell colSpan={3} className="text-muted-foreground">
+							<TableCell colSpan={4} className="text-muted-foreground">
 								No quote yet
 							</TableCell>
 							<TableCell className="text-right">

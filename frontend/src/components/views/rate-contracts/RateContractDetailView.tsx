@@ -75,7 +75,7 @@ export function RateContractDetailView({ contractId }: { contractId: number }) {
 		return (
 			<div className="flex flex-col gap-4">
 				<DetailHeader docNo="" status={null} loading {...back} />
-				<div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+				<div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
 					<Skeleton className="h-64" />
 					<Skeleton className="h-64" />
 				</div>
@@ -199,6 +199,9 @@ export function RateContractDetailView({ contractId }: { contractId: number }) {
 						value: `${formatDate(contract.validFrom)} to ${formatDate(contract.validTo)}`,
 					},
 					{ label: "Allowance", value: `${contract.allowancePercent}%` },
+					...(contract.notes
+						? [{ label: "Notes", value: contract.notes }]
+						: []),
 				]}
 				actions={actions}
 				{...back}
@@ -212,7 +215,7 @@ export function RateContractDetailView({ contractId }: { contractId: number }) {
 				</output>
 			) : null}
 
-			<div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+			<div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
 				<div className="flex min-w-0 flex-col gap-4">
 					<Card>
 						<CardHeader>
@@ -222,26 +225,21 @@ export function RateContractDetailView({ contractId }: { contractId: number }) {
 							<Table>
 								<TableHeader>
 									<TableRow>
-										<TableHead>Item</TableHead>
-										<TableHead className="text-right">Rate</TableHead>
-										<TableHead className="text-right">GST %</TableHead>
+										<TableHead>Item · rate · GST</TableHead>
 										<TableHead className="text-right">Agreed</TableHead>
-										<TableHead className="text-right">Ordered</TableHead>
+										<TableHead className="text-right">Ordered (%)</TableHead>
 										<TableHead className="text-right">Received</TableHead>
-										<TableHead className="text-right">% ordered</TableHead>
 									</TableRow>
 								</TableHeader>
 								<TableBody>
 									{contract.lines.map((line) => (
 										<TableRow key={line.id}>
-											<TableCell>
+											<TableCell className="whitespace-normal">
 												{line.itemCode} · {line.itemName}
-											</TableCell>
-											<TableCell className="text-right tabular-nums">
-												{formatMoney(line.ratePaise)} / {line.uom}
-											</TableCell>
-											<TableCell className="text-right tabular-nums">
-												{line.gstPercent}%
+												<span className="block text-[13px] text-muted-foreground tabular-nums">
+													{formatMoney(line.ratePaise)} / {line.uom} · GST{" "}
+													{line.gstPercent}%
+												</span>
 											</TableCell>
 											<TableCell className="text-right tabular-nums">
 												{line.agreedQty === null
@@ -250,14 +248,14 @@ export function RateContractDetailView({ contractId }: { contractId: number }) {
 											</TableCell>
 											<TableCell className="text-right tabular-nums">
 												{formatQty(line.orderedQty, line.uom, 3)}
+												<span className="block text-[13px] text-muted-foreground">
+													{line.percentOrdered === null
+														? "–"
+														: `${line.percentOrdered} %`}
+												</span>
 											</TableCell>
 											<TableCell className="text-right tabular-nums">
 												{formatQty(line.receivedQty, line.uom, 3)}
-											</TableCell>
-											<TableCell className="text-right tabular-nums">
-												{line.percentOrdered === null
-													? "–"
-													: `${line.percentOrdered} %`}
 											</TableCell>
 										</TableRow>
 									))}
@@ -329,9 +327,6 @@ export function RateContractDetailView({ contractId }: { contractId: number }) {
 							) : (
 								<p className="text-muted-foreground">Nothing more to do.</p>
 							)}
-							{contract.notes ? (
-								<p className="whitespace-pre-wrap">{contract.notes}</p>
-							) : null}
 						</CardContent>
 					</Card>
 					<Card>

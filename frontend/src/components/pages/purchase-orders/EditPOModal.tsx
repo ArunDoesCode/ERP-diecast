@@ -388,14 +388,19 @@ export function EditPOModal({
 													type="number"
 													min={0}
 													readOnly={rateLocked}
-													value={rates[item.id] ?? ""}
+													aria-readonly={rateLocked || undefined}
+													value={
+														rateLocked && rates[item.id]
+															? Number(rates[item.id]).toFixed(2)
+															: (rates[item.id] ?? "")
+													}
 													onChange={(event) =>
 														setRates((current) => ({
 															...current,
 															[item.id]: event.target.value,
 														}))
 													}
-													className="pl-7 text-right tabular-nums"
+													className={`pl-7 text-right tabular-nums ${rateLocked ? "cursor-not-allowed border-dashed bg-muted text-muted-foreground" : ""}`}
 												/>
 											</div>
 											<GstSelect
@@ -443,6 +448,11 @@ export function EditPOModal({
 													idPrefix={`po-edit-line-${item.id}`}
 													contractNumber={item.contractNumber}
 													qtyLeft={lastRatesQuery.data?.[item.itemId]?.qtyLeft}
+													unit={item.uom}
+													contractId={
+														lastRatesQuery.data?.[item.itemId]?.contractId
+													}
+													itemId={item.itemId}
 													canOverride={canOverrideRate}
 													overriding={override?.on ?? false}
 													onOverridingChange={(on) => {

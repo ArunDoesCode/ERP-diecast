@@ -87,7 +87,7 @@ export function RateContractFormView({ contractId }: { contractId?: number }) {
 	const create = useCreateContractMutation();
 	const update = useUpdateContractMutation();
 	const contract = details.data?.data;
-	useBreadcrumbLast(contract?.contractNumber);
+	useBreadcrumbLast(isEdit ? contract?.contractNumber : "New contract");
 
 	const [supplier, setSupplier] = useState<{ id: number; name: string } | null>(
 		null,

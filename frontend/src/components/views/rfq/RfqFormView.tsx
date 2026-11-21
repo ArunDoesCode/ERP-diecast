@@ -97,7 +97,7 @@ export function RfqFormView({
 	const seeded = useRef(false);
 
 	const rfq = details.data?.data;
-	useBreadcrumbLast(rfq?.rfq.rfqNumber);
+	useBreadcrumbLast(isEdit ? rfq?.rfq.rfqNumber : "New RFQ");
 
 	// Edit route of a sent RFQ goes to its detail (BR-RFQ-06).
 	const sentRfqId = rfq && rfq.rfq.status !== "draft" ? rfq.rfq.id : undefined;

@@ -84,6 +84,8 @@ export interface PurchaseRequisition {
 	cancelReason?: string | null;
 	/** Reorder run number that raised this PR; null for hand-made PRs. Read-only. */
 	reorderRunId?: number | null;
+	/** List only: pending lines still to buy that are on no open RFQ. */
+	linesFreeForRfq?: number;
 	createdAt: string;
 	updatedAt: string;
 }

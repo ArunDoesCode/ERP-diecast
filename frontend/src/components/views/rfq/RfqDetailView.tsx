@@ -109,7 +109,7 @@ export function RfqDetailView({ rfqId }: { rfqId: number }) {
 		return (
 			<div className="flex flex-col gap-4">
 				<DetailHeader docNo="" status={null} loading {...back} />
-				<div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+				<div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
 					<Skeleton className="h-64" />
 					<Skeleton className="h-64" />
 				</div>
@@ -170,7 +170,7 @@ export function RfqDetailView({ rfqId }: { rfqId: number }) {
 					<Link href={`/rfq/${rfq.id}/compare`}>Compare</Link>
 				</Button>
 			) : null}
-			{sentOnward ? (
+			{sentOnward && rfq.status !== "cancelled" ? (
 				<Button type="button" size="sm" variant="outline" asChild>
 					<Link href={`/rfq/${rfq.id}/print`}>Print sheets</Link>
 				</Button>
@@ -239,7 +239,7 @@ export function RfqDetailView({ rfqId }: { rfqId: number }) {
 				</output>
 			) : null}
 
-			<div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+			<div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
 				<div className="flex min-w-0 flex-col gap-4">
 					<RfqLinesCard data={data} />
 					<RfqQuotesCard

@@ -79,14 +79,16 @@ const columns: DataTableColumnDef<RfqListRow>[] = [
 		},
 	},
 	{
-		accessorKey: "createdByName",
-		header: "Created by",
-		cell: ({ row }) => row.original.createdByName ?? "-",
-	},
-	{
-		accessorKey: "createdAt",
-		header: "Created on",
-		cell: ({ row }) => formatDate(row.original.createdAt),
+		id: "created",
+		header: "Created by · on",
+		cell: ({ row }) => (
+			<span>
+				{row.original.createdByName ?? "-"}
+				<span className="block text-[13px] text-muted-foreground">
+					{formatDate(row.original.createdAt)}
+				</span>
+			</span>
+		),
 	},
 ];
 
@@ -147,7 +149,7 @@ export function RfqListView() {
 					value={controls.supplierId}
 					onChange={controls.onSupplierChange}
 				/>
-				<div className="relative w-64">
+				<div className="relative w-48">
 					<IconSearch
 						aria-hidden="true"
 						className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground"

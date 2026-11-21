@@ -141,14 +141,10 @@ function CompareBlockImpl({
 								</TableHead>
 							) : null}
 							<TableHead>Supplier</TableHead>
-							<TableHead className="text-right">Rate</TableHead>
-							<TableHead className="text-right">GST %</TableHead>
+							<TableHead className="text-right">Rate / GST</TableHead>
 							<TableHead className="text-right">Freight</TableHead>
 							<TableHead className="text-right">Landed per unit</TableHead>
-							<TableHead className="text-right">Lead days</TableHead>
-							<TableHead>Valid till</TableHead>
-							<TableHead className="text-right">Terms</TableHead>
-							<TableHead>Flags</TableHead>
+							<TableHead>Lead · valid · terms</TableHead>
 						</TableRow>
 					</TableHeader>
 					<TableBody>
@@ -178,7 +174,7 @@ function CompareBlockImpl({
 												<input
 													type="radio"
 													name={`pick-${row.rfqItemId}`}
-													className="accent-primary"
+													className="cursor-pointer accent-primary disabled:cursor-not-allowed disabled:opacity-40"
 													style={{ width: 20, height: 20 }}
 													aria-label={`Award ${row.itemCode} to ${name}`}
 													disabled={!canChoose}
@@ -194,34 +190,9 @@ function CompareBlockImpl({
 											</label>
 										</TableCell>
 									) : null}
-									<TableCell>{name}</TableCell>
-									<TableCell className="text-right tabular-nums">
-										{priced || cell.state === "expired"
-											? formatMoney(cell.ratePaise)
-											: "–"}
-									</TableCell>
-									<TableCell className="text-right tabular-nums">
-										{cell.gstPercent != null ? `${cell.gstPercent}%` : "–"}
-									</TableCell>
-									<TableCell className="text-right tabular-nums">
-										{cell.freightPaise ? formatMoney(cell.freightPaise) : "–"}
-									</TableCell>
-									<TableCell
-										className={`text-right tabular-nums ${priced ? "font-semibold" : ""}`}
-									>
-										{formatMoney(cell.landedRatePaise)}
-									</TableCell>
-									<TableCell className="text-right tabular-nums">
-										{cell.leadDays != null ? `${cell.leadDays}d` : "–"}
-									</TableCell>
-									<TableCell>{formatDate(cell.validTill)}</TableCell>
-									<TableCell className="text-right tabular-nums">
-										{cell.paymentTermsDays != null
-											? `${cell.paymentTermsDays}d`
-											: "–"}
-									</TableCell>
-									<TableCell>
-										<span className="flex flex-wrap items-center gap-1">
+									<TableCell className="whitespace-normal">
+										{name}
+										<span className="mt-1 flex flex-wrap items-center gap-1">
 											{cell.isLowest ? (
 												<StatusBadge doc="rfqFlag" status="lowest" />
 											) : null}
@@ -245,6 +216,35 @@ function CompareBlockImpl({
 													PO will use contract {formatMoney(contract.ratePaise)}
 												</span>
 											) : null}
+										</span>
+									</TableCell>
+									<TableCell className="text-right tabular-nums">
+										{priced || cell.state === "expired"
+											? formatMoney(cell.ratePaise)
+											: "–"}
+										<span className="block text-[13px] text-muted-foreground">
+											{cell.gstPercent != null
+												? `GST ${cell.gstPercent}%`
+												: "–"}
+										</span>
+									</TableCell>
+									<TableCell className="text-right tabular-nums">
+										{cell.freightPaise ? formatMoney(cell.freightPaise) : "–"}
+									</TableCell>
+									<TableCell
+										className={`text-right tabular-nums ${priced ? "font-semibold" : ""}`}
+									>
+										{formatMoney(cell.landedRatePaise)}
+									</TableCell>
+									<TableCell className="text-[13px] tabular-nums">
+										<span className="block">
+											{cell.leadDays != null ? `${cell.leadDays}d lead` : "–"}
+										</span>
+										<span className="block">{formatDate(cell.validTill)}</span>
+										<span className="block">
+											{cell.paymentTermsDays != null
+												? `${cell.paymentTermsDays}d terms`
+												: "–"}
 										</span>
 									</TableCell>
 								</TableRow>

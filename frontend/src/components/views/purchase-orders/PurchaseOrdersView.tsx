@@ -47,12 +47,15 @@ const QUEUE_STATUSES: PRStatus[] = ["approved", "partial_ordered"];
 function RequestQuotesCell({
 	prId,
 	prNumber,
+	linesFree,
 }: {
 	prId: number;
 	prNumber: string;
+	linesFree: number | undefined;
 }) {
 	const canManageRfq = useCan("rfq.manage");
-	if (!canManageRfq) return null;
+	// DES-34: every pending line is already on an open RFQ.
+	if (!canManageRfq || linesFree === 0) return null;
 	return (
 		<Button type="button" size="sm" variant="outline" asChild>
 			<Link
@@ -68,27 +71,38 @@ function RequestQuotesCell({
 const columns: DataTableColumnDef<PurchaseRequisition>[] = [
 	{
 		accessorKey: "prNumber",
-		header: "PR no.",
+		header: "PR no. · created",
 		cell: ({ row }) => (
-			<Link
-				href={`/purchase-orders/${row.original.id}`}
-				className="font-mono text-brand-accent hover:underline"
-			>
-				{formatDocNo(row.original.prNumber)}
-			</Link>
+			<span>
+				<Link
+					href={`/purchase-orders/${row.original.id}`}
+					className="font-mono text-brand-accent hover:underline"
+				>
+					{formatDocNo(row.original.prNumber)}
+				</Link>
+				<span className="block text-[13px] text-muted-foreground">
+					{formatDate(row.original.createdAt)}
+				</span>
+			</span>
 		),
 	},
 	{
 		accessorKey: "status",
-		header: "Status",
-		cell: ({ row }) => <StatusBadge doc="pr" status={row.original.status} />,
+		header: "Status · type",
+		cell: ({ row }) => (
+			<span className="flex flex-col items-start gap-0.5">
+				<StatusBadge doc="pr" status={row.original.status} />
+				<span className="text-[13px] text-muted-foreground">
+					{row.original.type}
+				</span>
+			</span>
+		),
 	},
-	{ accessorKey: "type", header: "Type" },
 	{
 		accessorKey: "notes",
 		header: "Notes",
 		cell: ({ row }) => (
-			<span className="line-clamp-1 max-w-xs text-muted-foreground">
+			<span className="line-clamp-1 max-w-40 text-muted-foreground">
 				{row.original.notes?.trim() || "–"}
 			</span>
 		),
@@ -100,17 +114,13 @@ const columns: DataTableColumnDef<PurchaseRequisition>[] = [
 		cell: ({ row }) => formatMoney(row.original.estimatedAmountPaise),
 	},
 	{
-		accessorKey: "createdAt",
-		header: "Created",
-		cell: ({ row }) => formatDate(row.original.createdAt),
-	},
-	{
 		id: "actions",
 		header: () => <span className="sr-only">Actions</span>,
 		cell: ({ row }) => (
 			<RequestQuotesCell
 				prId={row.original.id}
 				prNumber={row.original.prNumber}
+				linesFree={row.original.linesFreeForRfq}
 			/>
 		),
 	},

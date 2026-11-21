@@ -517,12 +517,10 @@ function LinesTable({
 					<TableHead className="w-10">
 						<span className="sr-only">Select</span>
 					</TableHead>
-					<TableHead>Item</TableHead>
+					<TableHead>Item · default supplier</TableHead>
 					<TableHead className="text-right">Qty</TableHead>
-					<TableHead>Default supplier</TableHead>
 					<TableHead className="text-right">Est rate</TableHead>
-					<TableHead>Status</TableHead>
-					<TableHead>PO</TableHead>
+					<TableHead>Status · PO</TableHead>
 					{onCancelLine ? (
 						<TableHead className="w-24">
 							<span className="sr-only">Actions</span>
@@ -552,36 +550,38 @@ function LinesTable({
 									<span className="text-muted-foreground">
 										{line.itemSku ?? line.itemCategory ?? "-"}
 									</span>
+									<span className="text-[13px] text-muted-foreground">
+										{line.defaultSupplierName ?? "No history"}
+									</span>
 								</div>
 							</TableCell>
 							<TableCell className="text-right tabular-nums">
 								{line.requestedQty} {line.uom ?? ""}
 							</TableCell>
-							<TableCell>{line.defaultSupplierName ?? "No history"}</TableCell>
 							<TableCell className="text-right tabular-nums">
 								{formatMoney(line.estRatePaise)}
 							</TableCell>
 							<TableCell>
 								<StatusBadge doc="prLine" status={line.status ?? "pending"} />
-							</TableCell>
-							<TableCell>
-								{rfq ? (
-									<span>
-										On{" "}
-										{canViewRfq ? (
-											<Link
-												href={`/rfq/${rfq.id}`}
-												className="font-mono text-brand-accent hover:underline"
-											>
-												{rfq.number}
-											</Link>
-										) : (
-											<span className="font-mono">{rfq.number}</span>
-										)}
-									</span>
-								) : (
-									(line.linkedPoNumber ?? "-")
-								)}
+								<span className="mt-0.5 block text-[13px]">
+									{rfq ? (
+										<span>
+											On{" "}
+											{canViewRfq ? (
+												<Link
+													href={`/rfq/${rfq.id}`}
+													className="font-mono text-brand-accent hover:underline"
+												>
+													{rfq.number}
+												</Link>
+											) : (
+												<span className="font-mono">{rfq.number}</span>
+											)}
+										</span>
+									) : (
+										(line.linkedPoNumber ?? "-")
+									)}
+								</span>
 							</TableCell>
 							{onCancelLine ? (
 								<TableCell>
@@ -1598,10 +1598,13 @@ function CreatePOLine({
 						type="number"
 						min={0}
 						step={1}
-						value={value}
+						value={
+							rateLocked && value !== "" ? Number(value).toFixed(2) : value
+						}
 						readOnly={rateLocked}
+						aria-readonly={rateLocked || undefined}
 						onChange={(event) => onChange(event.target.value)}
-						className="pl-7 text-right tabular-nums"
+						className={`pl-7 text-right tabular-nums ${rateLocked ? "cursor-not-allowed border-dashed bg-muted text-muted-foreground" : ""}`}
 					/>
 				</div>
 			</div>
@@ -1642,6 +1645,9 @@ function CreatePOLine({
 					idPrefix={`po-create-line-${line.id}`}
 					contractNumber={lastRate?.contractNumber}
 					qtyLeft={lastRate?.qtyLeft}
+					unit={line.uom}
+					contractId={lastRate?.contractId}
+					itemId={line.itemId}
 					canOverride={canOverride}
 					overriding={overriding}
 					onOverridingChange={(on) => {

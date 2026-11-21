@@ -1,7 +1,10 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
 	Select,
 	SelectContent,
@@ -9,14 +12,6 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import {
-	Table,
-	TableBody,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from "@/components/ui/table";
 import { formatMoney, formatQty } from "@/lib/format";
 import { RFQ_GST_PERCENTS } from "@/types/rfq";
 
@@ -35,33 +30,27 @@ export function QuoteLinesTable({
 	onChange: (rfqItemId: number, patch: Partial<QuoteRow>) => void;
 }) {
 	return (
-		<Table>
-			<TableHeader>
-				<TableRow>
-					<TableHead>Item</TableHead>
-					<TableHead className="text-right">Qty</TableHead>
-					<TableHead>Not quoted</TableHead>
-					<TableHead className="text-right">Rate (₹ per unit)</TableHead>
-					<TableHead className="text-right">GST %</TableHead>
-					<TableHead className="text-right">Lead days</TableHead>
-					<TableHead className="text-right">Freight (₹, line)</TableHead>
-					<TableHead className="text-right">Value</TableHead>
-					<TableHead className="text-right">Tax</TableHead>
-					<TableHead className="text-right">Landed / unit</TableHead>
-				</TableRow>
-			</TableHeader>
-			<TableBody>
-				{rows.map((row) => {
-					const calc = calcRow(row);
-					const error = showErrors ? rowError(row) : null;
-					const id = `quote-${row.rfqItemId}`;
-					return (
-						<TableRow
-							key={row.rfqItemId}
-							className={row.notQuoted ? "text-muted-foreground" : undefined}
-						>
-							<TableCell>
-								{row.itemCode} · {row.itemName}
+		<ul className="flex flex-col gap-3">
+			{rows.map((row) => {
+				const calc = calcRow(row);
+				const error = showErrors ? rowError(row) : null;
+				const id = `quote-${row.rfqItemId}`;
+				const hidden = readOnly || row.notQuoted;
+				return (
+					<li
+						key={row.rfqItemId}
+						className="rounded-md border border-border p-3"
+					>
+						<div className="flex flex-wrap items-start justify-between gap-2">
+							<div
+								className={row.notQuoted ? "text-muted-foreground" : undefined}
+							>
+								<p className="font-medium">
+									{row.itemCode} · {row.itemName}
+								</p>
+								<p className="text-[13px] text-muted-foreground tabular-nums">
+									Qty {formatQty(row.qty, row.uom, 3)}
+								</p>
 								{error ? (
 									<span
 										role="alert"
@@ -70,129 +59,155 @@ export function QuoteLinesTable({
 										{error}
 									</span>
 								) : null}
-							</TableCell>
-							<TableCell className="text-right tabular-nums">
-								{formatQty(row.qty, row.uom, 3)}
-							</TableCell>
-							<TableCell>
-								{readOnly ? (
-									row.notQuoted ? (
-										"Not quoted"
-									) : (
-										"–"
-									)
-								) : (
+							</div>
+							{readOnly ? (
+								row.notQuoted ? (
+									<span className="text-sm text-muted-foreground">
+										Not quoted
+									</span>
+								) : null
+							) : (
+								<div className="flex items-center gap-2">
 									<Checkbox
 										id={`${id}-nq`}
-										aria-label={`Not quoted: ${row.itemCode}`}
+										className="rounded-[4px]"
 										checked={row.notQuoted}
 										onCheckedChange={(on) =>
 											onChange(row.rfqItemId, { notQuoted: on === true })
 										}
 									/>
-								)}
-							</TableCell>
-							<TableCell className="text-right">
-								{readOnly || row.notQuoted ? (
-									<span className="tabular-nums">
-										{row.notQuoted
-											? "–"
-											: formatMoney(Math.round(Number(row.rate || 0) * 100))}
-									</span>
-								) : (
-									<Input
-										id={`${id}-rate`}
-										aria-label={`Rate for ${row.itemCode}`}
-										inputMode="decimal"
-										className="w-28 text-right tabular-nums"
-										value={row.rate}
-										aria-invalid={error ? true : undefined}
-										onChange={(event) =>
-											onChange(row.rfqItemId, { rate: event.target.value })
-										}
-									/>
-								)}
-							</TableCell>
-							<TableCell className="text-right">
-								{readOnly || row.notQuoted ? (
-									<span className="tabular-nums">
-										{row.notQuoted || row.gst === "" ? "–" : `${row.gst}%`}
-									</span>
-								) : (
-									<Select
-										value={row.gst}
-										onValueChange={(value) =>
-											onChange(row.rfqItemId, { gst: value })
-										}
-									>
-										<SelectTrigger
-											id={`${id}-gst`}
-											aria-label={`GST % for ${row.itemCode}`}
-											className="w-24"
+									<Label htmlFor={`${id}-nq`}>Not quoted</Label>
+								</div>
+							)}
+						</div>
+						{row.notQuoted ? null : (
+							<div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-3 md:grid-cols-4 xl:grid-cols-7">
+								<Field label="Rate (₹ per unit)" htmlFor={`${id}-rate`}>
+									{hidden ? (
+										<Text>
+											{formatMoney(Math.round(Number(row.rate || 0) * 100))}
+										</Text>
+									) : (
+										<Input
+											id={`${id}-rate`}
+											inputMode="decimal"
+											className="text-right tabular-nums"
+											value={row.rate}
+											aria-invalid={error ? true : undefined}
+											onChange={(event) =>
+												onChange(row.rfqItemId, { rate: event.target.value })
+											}
+										/>
+									)}
+								</Field>
+								<Field label="GST %" htmlFor={`${id}-gst`}>
+									{hidden ? (
+										<Text>{row.gst === "" ? "–" : `${row.gst}%`}</Text>
+									) : (
+										<Select
+											value={row.gst}
+											onValueChange={(value) =>
+												onChange(row.rfqItemId, { gst: value })
+											}
 										>
-											<SelectValue placeholder="GST %" />
-										</SelectTrigger>
-										<SelectContent>
-											{RFQ_GST_PERCENTS.map((value) => (
-												<SelectItem key={value} value={String(value)}>
-													{value}%
-												</SelectItem>
-											))}
-										</SelectContent>
-									</Select>
-								)}
-							</TableCell>
-							<TableCell className="text-right">
-								{readOnly || row.notQuoted ? (
-									<span className="tabular-nums">
-										{row.notQuoted || row.lead === "" ? "–" : row.lead}
-									</span>
-								) : (
-									<Input
-										id={`${id}-lead`}
-										aria-label={`Lead days for ${row.itemCode}`}
-										inputMode="numeric"
-										className="w-20 text-right tabular-nums"
-										value={row.lead}
-										onChange={(event) =>
-											onChange(row.rfqItemId, { lead: event.target.value })
-										}
-									/>
-								)}
-							</TableCell>
-							<TableCell className="text-right">
-								{readOnly || row.notQuoted ? (
-									<span className="tabular-nums">
-										{row.notQuoted || row.freight === ""
-											? "–"
-											: formatMoney(Math.round(Number(row.freight) * 100))}
-									</span>
-								) : (
-									<Input
-										id={`${id}-freight`}
-										aria-label={`Freight for ${row.itemCode}`}
-										inputMode="decimal"
-										className="w-28 text-right tabular-nums"
-										value={row.freight}
-										onChange={(event) =>
-											onChange(row.rfqItemId, { freight: event.target.value })
-										}
-									/>
-								)}
-							</TableCell>
-							<TableCell className="text-right tabular-nums">
-								{calc ? formatMoney(calc.valuePaise) : "–"}
-							</TableCell>
-							<TableCell className="text-right tabular-nums">
-								{calc ? formatMoney(calc.taxPaise) : "–"}
-							</TableCell>
-							<TableCell className="text-right font-semibold tabular-nums">
-								{calc ? formatMoney(calc.landedPerUnitPaise) : "–"}
-							</TableCell>
-						</TableRow>
-					);
-				})}
-			</TableBody>
-		</Table>
+											<SelectTrigger id={`${id}-gst`} className="w-full">
+												<SelectValue placeholder="GST %" />
+											</SelectTrigger>
+											<SelectContent>
+												{RFQ_GST_PERCENTS.map((value) => (
+													<SelectItem key={value} value={String(value)}>
+														{value}%
+													</SelectItem>
+												))}
+											</SelectContent>
+										</Select>
+									)}
+								</Field>
+								<Field label="Lead days" htmlFor={`${id}-lead`}>
+									{hidden ? (
+										<Text>{row.lead === "" ? "–" : row.lead}</Text>
+									) : (
+										<Input
+											id={`${id}-lead`}
+											inputMode="numeric"
+											className="text-right tabular-nums"
+											value={row.lead}
+											onChange={(event) =>
+												onChange(row.rfqItemId, { lead: event.target.value })
+											}
+										/>
+									)}
+								</Field>
+								<Field label="Freight (₹, line)" htmlFor={`${id}-freight`}>
+									{hidden ? (
+										<Text>
+											{row.freight === ""
+												? "–"
+												: formatMoney(Math.round(Number(row.freight) * 100))}
+										</Text>
+									) : (
+										<Input
+											id={`${id}-freight`}
+											inputMode="decimal"
+											className="text-right tabular-nums"
+											value={row.freight}
+											onChange={(event) =>
+												onChange(row.rfqItemId, { freight: event.target.value })
+											}
+										/>
+									)}
+								</Field>
+								<Field label="Value">
+									<Text>{calc ? formatMoney(calc.valuePaise) : "–"}</Text>
+								</Field>
+								<Field label="Tax">
+									<Text>{calc ? formatMoney(calc.taxPaise) : "–"}</Text>
+								</Field>
+								<Field label="Landed / unit">
+									<Text strong>
+										{calc ? formatMoney(calc.landedPerUnitPaise) : "–"}
+									</Text>
+								</Field>
+							</div>
+						)}
+					</li>
+				);
+			})}
+		</ul>
+	);
+}
+
+function Field({
+	label,
+	htmlFor,
+	children,
+}: {
+	label: string;
+	htmlFor?: string;
+	children: ReactNode;
+}) {
+	return (
+		<div className="flex min-w-0 flex-col gap-1">
+			{htmlFor ? (
+				<Label htmlFor={htmlFor} className="text-[13px]">
+					{label}
+				</Label>
+			) : (
+				<span className="text-[13px] font-medium text-muted-foreground">
+					{label}
+				</span>
+			)}
+			{children}
+		</div>
+	);
+}
+
+function Text({ children, strong }: { children: ReactNode; strong?: boolean }) {
+	return (
+		<span
+			className={`flex min-h-9 items-center justify-end tabular-nums ${strong ? "font-semibold" : ""}`}
+		>
+			{children}
+		</span>
 	);
 }
