@@ -2,13 +2,7 @@ import { z } from "zod";
 import { rateContractStatusEnum } from "../db/schemas/02_procurement-rfq";
 import { paginationMetaSchema } from "../lib/response-schemas";
 import { searchTermSchema } from "../lib/safe-search";
-import { gstPercentSchema } from "./po.types";
-import {
-  isoDateSchema,
-  qty3Schema,
-  ratePaiseSchema,
-  reasonSchema,
-} from "./rfq.types";
+import { isoDateSchema, ratePaiseSchema, reasonSchema } from "./rfq.types";
 
 // Rate contracts (docs/specs/rfq/design/api.md → Contracts).
 
@@ -41,16 +35,18 @@ export const contractLineInputSchema = z
   .object({
     itemId: idSchema,
     ratePaise: ratePaiseSchema,
-    gstPercent: gstPercentSchema,
+    // slab, rate >= 1 and qty checks are in the service (CONTRACT_LINE_INVALID, AMOUNT_TOO_LARGE)
+    gstPercent: z.number().min(0).max(100),
     // null / omitted = rate-only line (BR-RFQ-41)
-    agreedQty: qty3Schema.nullish(),
+    agreedQty: z.number().max(1e12).nullish(),
   })
   .strict();
 
 const contractBodyShape = {
   supplierId: idSchema,
-  validFrom: isoDateSchema,
-  validTo: isoDateSchema,
+  // missing / bad dates are CONTRACT_DATES_INVALID, checked in the service (BR-RFQ-40)
+  validFrom: isoDateSchema.optional(),
+  validTo: isoDateSchema.optional(),
   allowancePercent: z
     .number()
     .min(0)
@@ -60,13 +56,7 @@ const contractBodyShape = {
     })
     .optional(),
   notes: z.string().trim().max(2000).optional(),
-  lines: z
-    .array(contractLineInputSchema)
-    .min(1)
-    .max(500)
-    .refine((ls) => new Set(ls.map((l) => l.itemId)).size === ls.length, {
-      message: "Each item may appear once",
-    }),
+  lines: z.array(contractLineInputSchema).min(1).max(500),
 };
 
 export const createContractSchema = z.object(contractBodyShape).strict();
@@ -112,6 +102,7 @@ export const contractRowSchema = z.object({
   effectiveStatus: rateContractEffectiveStatusSchema,
   validFrom: z.string(),
   validTo: z.string(),
+  createdByName: z.string().nullable(),
   itemCount: z.number().int(),
   // ordered / agreed over lines with an agreed qty; null when all lines are rate-only
   orderedPercent: z.number().nullable(),
@@ -130,7 +121,7 @@ export const contractLineSchema = z.object({
   itemName: z.string(),
   uom: z.string(),
   ratePaise: z.number().int(),
-  gstPercent: z.number(),
+  gstPercent: z.number().min(0).max(100),
   agreedQty: z.number().nullable(),
   orderedQty: z.number(),
   receivedQty: z.number(),

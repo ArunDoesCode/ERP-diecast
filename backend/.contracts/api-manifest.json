@@ -722,14 +722,15 @@
       "tags": [
         "asset"
       ],
-      "summary": "Look up the rate to prefill for an item+supplier: newest approved-or-later PO line price, then supplier catalog price, then item average cost (> 0), then item standard rate. Returns the source.",
+      "summary": "Look up the rate to prefill for an item+supplier: the contract rate usable on onDate (default today IST; only for po.manage / contract.view holders), then newest approved-or-later PO line price, then supplier catalog price, then item average cost (> 0), then item standard rate. Returns the source.",
       "auth": {
         "type": "permission",
         "key": "inventory.view"
       },
       "request": {
         "query": {
-          "supplierId": "integer.positive.required"
+          "supplierId": "integer.positive.required",
+          "onDate": "string.optional"
         }
       },
       "responses": {
@@ -737,7 +738,12 @@
           "success": "boolean.required",
           "data": {
             "ratePaise": "integer.nonnegative.required",
-            "source": "enum:po_history,supplier_catalog,item_average,standard_rate.required"
+            "source": "enum:contract,po_history,supplier_catalog,item_average,standard_rate.required",
+            "contractItemId": "integer.optional",
+            "contractId": "integer.optional",
+            "contractNumber": "string.optional",
+            "qtyLeft": "unknown.optional",
+            "gstPercent": "number.optional"
           }
         }
       }
@@ -4009,8 +4015,8 @@
       "request": {
         "body": {
           "supplierId": "integer.positive.required",
-          "validFrom": "string.required",
-          "validTo": "string.required",
+          "validFrom": "string.optional",
+          "validTo": "string.optional",
           "allowancePercent": "number.nonnegative.optional",
           "notes": "string.optional",
           "lines": "array<object>.required"
@@ -4065,8 +4071,8 @@
         "body": {
           "id": "integer.positive.required",
           "supplierId": "integer.positive.required",
-          "validFrom": "string.required",
-          "validTo": "string.required",
+          "validFrom": "string.optional",
+          "validTo": "string.optional",
           "allowancePercent": "number.nonnegative.optional",
           "notes": "string.optional",
           "lines": "array<object>.required"
@@ -4632,6 +4638,7 @@
           "q": "string.optional",
           "status": "enum:draft,sent,partially_awarded,awarded,closed,cancelled.optional",
           "supplierId": "integer.positive.optional",
+          "prId": "integer.positive.optional",
           "from": "string.optional",
           "to": "string.optional"
         }

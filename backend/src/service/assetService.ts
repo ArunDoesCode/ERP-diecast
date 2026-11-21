@@ -1,3 +1,4 @@
+import { db } from "../db/client";
 import { type Actor, can } from "../lib/auth-middleware";
 import {
   BadRequestError,
@@ -6,7 +7,10 @@ import {
   InternalServerError,
   NotFoundError,
 } from "../lib/errors";
+import { istDayKey } from "../lib/ist-day";
+import { contractCapQty, isRealDay, round3 } from "../lib/rfq-math";
 import { assetRepository } from "../repository/assetRepository";
+import { rateContractRepository } from "../repository/rateContractRepository";
 import type {
   assetInventoryMovementListQuerySchemaType,
   assetItemCreateSchemaType,
@@ -239,12 +243,57 @@ export const assetService = {
     }
   },
 
-  async getLastRate(itemId: number, params: assetLastRateQuerySchemaType) {
-    const result = await assetRepository.getLastRate(itemId, params.supplierId);
+  // BR-RFQ-56: the contract rate is offered only to po.manage / contract.view holders.
+  async getLastRate(
+    itemId: number,
+    params: assetLastRateQuerySchemaType,
+    actor: Actor,
+  ) {
+    if (params.onDate !== undefined && !isRealDay(params.onDate)) {
+      throw new BadRequestError("onDate is not a valid date");
+    }
+    const result = await assetRepository.getLastRate(
+      itemId,
+      params.supplierId,
+      {
+        onDate: params.onDate ?? istDayKey(),
+        includeContract: can(actor, "po.manage") || can(actor, "contract.view"),
+      },
+    );
     if (!result) {
       throw new NotFoundError("Item not found.");
     }
-    return result;
+    if (result.source !== "contract") {
+      return { ratePaise: result.ratePaise, source: result.source };
+    }
+    let qtyLeft: number | null = null;
+    if (result.agreedQty !== null && result.agreedQty !== undefined) {
+      const f = await rateContractRepository.fulfilmentByLine(db, [
+        result.contractItemId ?? 0,
+      ]);
+      const ordered = round3(f.get(result.contractItemId ?? 0)?.ordered ?? 0);
+      qtyLeft = round3(
+        contractCapQty(result.agreedQty, result.allowancePercent ?? 0) -
+          ordered,
+      );
+    }
+    return {
+      ratePaise: result.ratePaise,
+      source: result.source,
+      ...(result.contractItemId !== undefined
+        ? { contractItemId: result.contractItemId }
+        : {}),
+      ...(result.contractId !== undefined
+        ? { contractId: result.contractId }
+        : {}),
+      ...(result.contractNumber !== undefined
+        ? { contractNumber: result.contractNumber }
+        : {}),
+      ...(result.gstPercent !== undefined
+        ? { gstPercent: result.gstPercent }
+        : {}),
+      qtyLeft,
+    };
   },
 
   async listServices(params: assetServiceListQuerySchemaType) {

@@ -25,6 +25,7 @@ import type {
   submitApprovalRequestSchemaType,
   updateApprovalPolicySchemaType,
 } from "../types/approval.types";
+import { rateContractService } from "./rateContractService";
 
 // BR-APR-24 (v2): permission key needed to submit each document type.
 const SUBMIT_KEYS: Record<
@@ -481,6 +482,8 @@ export const approvalService = {
             "APPROVAL_INVALID_SOURCE_STATUS",
           );
         }
+        // BR-RFQ-52, 54: linked contracts still usable and the contract qty in cap.
+        await rateContractService.assertPoContractsForSubmit(tx, input.docId);
         if (locked.totalAmountPaise !== doc.amountPaise) {
           policy = await resolvePolicy(locked.totalAmountPaise);
         }
@@ -702,6 +705,18 @@ export const approvalService = {
       }
 
       const chain = request.chainSnapshot;
+      // BR-RFQ-52, 72: last-level approve re-checks the contract qty cap under the
+      // contract-line lock, so two POs can't both pass it.
+      if (
+        request.docType === "po" &&
+        input.action === "approve" &&
+        request.currentLevel >= request.totalLevels
+      ) {
+        await rateContractService.assertPoContractsForApprove(
+          tx,
+          request.docId,
+        );
+      }
       if (input.action === "withdraw") {
         if (request.requestedBy !== actorId) {
           throw new ForbiddenError(

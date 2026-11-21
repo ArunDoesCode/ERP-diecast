@@ -45,6 +45,7 @@ import type {
   assetServiceListQuerySchemaType,
   assetStockListQuerySchemaType,
 } from "../types/asset.types";
+import { findRateChoices } from "./rateChainRepository";
 import { postStock } from "./stockPostingRepository";
 
 const itemColumns = getTableColumns(itemMaster);
@@ -259,81 +260,18 @@ export const assetRepository = {
     return updated;
   },
 
-  // BR-INV-24 fallback chain: newest line of an approved-or-later PO for this
-  // supplier+item; else the supplier's catalog price; else the item average
-  // cost if > 0; else the item's standard rate. Undefined only for an unknown item.
-  async getLastRate(itemId: number, supplierId: number) {
-    const [poHistoryRow] = await db
-      .select({ ratePaise: purchaseOrderItems.unitPricePaise })
-      .from(purchaseOrderItems)
-      .innerJoin(purchaseOrders, eq(purchaseOrders.id, purchaseOrderItems.poId))
-      .where(
-        and(
-          eq(purchaseOrders.supplierId, supplierId),
-          eq(purchaseOrderItems.itemId, itemId),
-          sql`${purchaseOrderItems.unitPricePaise} > 0`,
-          inArray(purchaseOrders.status, [
-            "approved",
-            "dispatched",
-            "partial_received",
-            "fully_received",
-            "invoiced",
-            "closed",
-          ]),
-        ),
-      )
-      .orderBy(desc(purchaseOrders.createdAt), desc(purchaseOrderItems.id))
-      .limit(1);
-
-    if (poHistoryRow && poHistoryRow.ratePaise > 0) {
-      return {
-        ratePaise: poHistoryRow.ratePaise,
-        source: "po_history" as const,
-      };
-    }
-
-    const [supplierCatalogRow] = await db
-      .select({ ratePaise: supplierItems.supplierUnitPricePaise })
-      .from(supplierItems)
-      .where(
-        and(
-          eq(supplierItems.supplierId, supplierId),
-          eq(supplierItems.itemId, itemId),
-          eq(supplierItems.isActive, true), // BR-SUP-15: inactive row never suggested
-        ),
-      )
-      .limit(1);
-
-    if (supplierCatalogRow && supplierCatalogRow.ratePaise > 0) {
-      return {
-        ratePaise: supplierCatalogRow.ratePaise,
-        source: "supplier_catalog" as const,
-      };
-    }
-
-    const [itemRow] = await db
-      .select({
-        averageCostPaise: itemMaster.averageCostPaise,
-        standardRatePaise: itemMaster.standardRatePaise,
-      })
-      .from(itemMaster)
-      .where(eq(itemMaster.id, itemId))
-      .limit(1);
-
-    if (!itemRow) {
-      return undefined;
-    }
-    if (itemRow.averageCostPaise > 0) {
-      return {
-        ratePaise: itemRow.averageCostPaise,
-        source: "item_average" as const,
-      };
-    }
-    return {
-      // legacy rows may still have 0 (API rejects 0 on write)
-      ratePaise: itemRow.standardRatePaise,
-      source: "standard_rate" as const,
-    };
+  // BR-INV-24 / BR-RFQ-50 chain (rateChainRepository, shared with the PO create
+  // resolver): usable contract rate first (only when `includeContract`, BR-RFQ-56),
+  // else newest line of an approved-or-later PO for this supplier+item, else the
+  // supplier's catalog price, else item average cost > 0, else item standard rate.
+  // Undefined only for an unknown item.
+  async getLastRate(
+    itemId: number,
+    supplierId: number,
+    opts: { onDate: string; includeContract: boolean },
+  ) {
+    const choices = await findRateChoices(db, supplierId, [itemId], opts);
+    return choices.get(itemId);
   },
 
   async listServices(params: assetServiceListQuerySchemaType) {

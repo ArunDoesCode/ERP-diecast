@@ -1,20 +1,27 @@
 import { db } from "../db/client";
+import { type Actor, can } from "../lib/auth-middleware";
 import { allocateDocumentSequence } from "../lib/document-number";
 import {
   AppError,
   BadRequestError,
   ConflictError,
+  ForbiddenError,
   NotFoundError,
 } from "../lib/errors";
+import { istDayKey } from "../lib/ist-day";
 import { assertMoneyInRange } from "../lib/money";
+import { computeLinePaise } from "../lib/rfq-math";
 import { approvalRepository } from "../repository/approvalRepository";
 import type {
   CreatePoLineData,
+  PoLinePriceData,
+  PoLineRateLinks,
   PreparedPoLine,
   Tx,
 } from "../repository/poRepository";
-import { poRepository } from "../repository/poRepository";
+import { NO_RATE_LINKS, poRepository } from "../repository/poRepository";
 import { prRepository } from "../repository/prRepository";
+import type { RateChoice } from "../repository/rateChainRepository";
 import type {
   closePoSchemaType,
   confirmPoSchemaType,
@@ -27,6 +34,7 @@ import type {
   updatePoDelaySchemaType,
   updatePoSchemaType,
 } from "../types/po.types";
+import { assertContractLines } from "./rateContractService";
 
 // Allowed forward moves per status. Empty array = terminal state. Only
 // draft/pending_approval/approved/cancelled are reachable by anything built
@@ -72,13 +80,13 @@ function toPaginatedMeta(page: number, pageSize: number, total: number) {
   };
 }
 
-async function assertLinesAreDraftable(prItemIds: number[]) {
+async function assertLinesAreDraftable(prItemIds: number[], tx?: Tx) {
   const uniqueIds = [...new Set(prItemIds)];
   if (uniqueIds.length !== prItemIds.length) {
     throw new BadRequestError("Duplicate prItemId in the same request");
   }
 
-  const rows = await poRepository.findPurchaseRequestItemsByIds(uniqueIds);
+  const rows = await poRepository.findPurchaseRequestItemsByIds(uniqueIds, tx);
   const rowById = new Map(rows.map((row) => [row.id, row]));
 
   const missingIds = uniqueIds.filter((id) => !rowById.has(id));
@@ -109,7 +117,23 @@ async function assertLinesAreDraftable(prItemIds: number[]) {
     assertItemActive(row);
   }
 
+  await assertNoOpenRfq(uniqueIds, tx);
   return rowById;
+}
+
+// BR-RFQ-02: a PR line on an RFQ that is draft, sent or partially_awarded can't be
+// drafted into a PO (the award flips its RFQ lines first, so it passes this check).
+async function assertNoOpenRfq(prItemIds: number[], tx?: Tx) {
+  const open = await poRepository.findOpenRfqForPrItems(prItemIds, tx ?? db);
+  const first = open[0];
+  if (first) {
+    throw new AppError(
+      `PR item ${first.prItemId} is on ${first.rfqNumber}; close or cancel the RFQ first`,
+      409,
+      "PR_LINE_ON_OPEN_RFQ",
+      { prItemId: first.prItemId, rfqNumber: first.rfqNumber },
+    );
+  }
 }
 
 // BR-INV-05: an inactive item can't go on a new PO line, even from a PR line
@@ -123,21 +147,8 @@ function assertItemActive(row: { id: number; itemIsActive: boolean }) {
   }
 }
 
-// BR-PO-04: line value = round(qty x rate); line tax = round(value x GST% / 100).
-// GST % is turned into whole basis points first so the tax maths is integer only.
-export function computeLinePaise(
-  qty: number,
-  unitPricePaise: number,
-  gstPercent: number,
-) {
-  const lineValuePaise = Math.round(qty * unitPricePaise);
-  const lineTaxPaise = Math.round(
-    (lineValuePaise * Math.round(gstPercent * 100)) / 10000,
-  );
-  assertMoneyInRange(lineValuePaise);
-  assertMoneyInRange(lineTaxPaise);
-  return { lineValuePaise, lineTaxPaise };
-}
+// BR-PO-04: the line maths lives in lib/rfq-math (shared with quote lines, BR-RFQ-16).
+export { computeLinePaise };
 
 // BR-PO-04: totals are always the sum of the stored line amounts.
 function computeTotalsPaise(
@@ -191,6 +202,12 @@ function prepareLines(
       uom: prItem.uom,
       unitPricePaise: line.unitPricePaise,
       gstPercent: line.gstPercent,
+      quoteItemId: line.quoteItemId,
+      contractItemId: line.contractItemId,
+      contractRatePaise: line.contractRatePaise,
+      rateOverrideReason: line.rateOverrideReason,
+      rateOverrideBy: line.rateOverrideBy,
+      rateOverrideAt: line.rateOverrideAt,
       ...computeLinePaise(qty, line.unitPricePaise, line.gstPercent),
     };
   });
@@ -238,16 +255,119 @@ function assertEditable(status: poStatusSchemaType) {
   }
 }
 
-// BR-PO-03 / BR-PO-04 / BR-SUP-16: fill an omitted rate (last PO rate, else
-// price list, else average cost) and an omitted GST % (price list, else 0).
-async function resolveLines(
-  supplierId: number,
-  lines: {
-    prItemId: number;
+// A PO line as typed by the caller (create, update inserts). `quoteItemId` is
+// internal: only the RFQ award sets it (BR-RFQ-31), createpo never accepts it.
+export type DraftLineInput = {
+  prItemId: number;
+  unitPricePaise?: number | undefined;
+  gstPercent?: number | undefined;
+  rateOverrideReason?: string | undefined;
+  quoteItemId?: number | undefined;
+};
+
+export type DraftPoInput = {
+  supplierId: number;
+  paymentTermsDays?: number | undefined;
+  deliveryTerms?: string | undefined;
+  expectedDeliveryDate?: Date | undefined;
+  notes?: string | undefined;
+  lines: DraftLineInput[];
+};
+
+type KeptOverride = {
+  unitPricePaise: number;
+  reason: string;
+  by: number | null;
+  at: Date | null;
+};
+
+/**
+ * BR-RFQ-50, 51, 55, 57: a line whose supplier has a usable contract for the item
+ * takes the contract rate and GST %. GST % can never differ (400
+ * CONTRACT_LINE_LOCKED_FIELD). A different rate needs contract.override_rate (403
+ * first) and a reason (400 OVERRIDE_REASON_REQUIRED). A line that came from a quote
+ * (award) takes the contract rate without any override (BR-RFQ-29).
+ */
+function applyContract(
+  line: {
     unitPricePaise?: number | undefined;
     gstPercent?: number | undefined;
-  }[],
+    rateOverrideReason?: string | undefined;
+    fromQuote: boolean;
+  },
+  choice: RateChoice,
+  actor: Actor,
+  keep: KeptOverride | null,
+): {
+  unitPricePaise: number;
+  gstPercent: number;
+  links: Omit<PoLineRateLinks, "quoteItemId">;
+} {
+  const contractRate = choice.ratePaise;
+  const contractGst = choice.gstPercent ?? 0;
+  let unitPricePaise = contractRate;
+  let override: KeptOverride | null = null;
+
+  if (!line.fromQuote) {
+    if (line.gstPercent !== undefined && line.gstPercent !== contractGst) {
+      throw new BadRequestError(
+        "GST % on a contract line is the contract's and can't be changed",
+        "CONTRACT_LINE_LOCKED_FIELD",
+      );
+    }
+    if (line.unitPricePaise !== undefined) {
+      if (keep && line.unitPricePaise === keep.unitPricePaise) {
+        unitPricePaise = keep.unitPricePaise;
+        override = keep;
+      } else if (line.unitPricePaise !== contractRate) {
+        if (!can(actor, "contract.override_rate")) {
+          throw new ForbiddenError("Permission denied", "PERMISSION_DENIED", {
+            key: "contract.override_rate",
+          });
+        }
+        if (!line.rateOverrideReason) {
+          throw new BadRequestError(
+            "A reason of 3 to 500 characters is required to change a contract rate",
+            "OVERRIDE_REASON_REQUIRED",
+          );
+        }
+        unitPricePaise = line.unitPricePaise;
+        override = {
+          unitPricePaise,
+          reason: line.rateOverrideReason,
+          by: actor.id,
+          at: new Date(),
+        };
+      }
+    } else if (keep) {
+      unitPricePaise = keep.unitPricePaise;
+      override = keep;
+    }
+  }
+
+  return {
+    unitPricePaise,
+    gstPercent: contractGst,
+    links: {
+      contractItemId: choice.contractItemId ?? null,
+      contractRatePaise: contractRate,
+      rateOverrideReason: override?.reason ?? null,
+      rateOverrideBy: override?.by ?? null,
+      rateOverrideAt: override?.at ?? null,
+    },
+  };
+}
+
+// BR-PO-03 / BR-PO-04 / BR-SUP-16 / BR-RFQ-50: contract rate first, then (when a rate
+// is omitted) last PO rate, price list, average cost; an omitted GST % comes from the
+// contract, else the price list, else 0.
+async function resolveLines(
+  tx: Tx,
+  actor: Actor,
+  supplierId: number,
+  lines: DraftLineInput[],
   prRows: Map<number, { itemId: number }>,
+  today: string,
 ) {
   const itemIds = [
     ...new Set(
@@ -258,22 +378,39 @@ async function resolveLines(
     ),
   ];
   const needRate = lines.some((line) => line.unitPricePaise === undefined);
-  const [priceRows, lastRates] = await Promise.all([
+  const [priceRows, choices] = await Promise.all([
     poRepository.findActivePriceRows(supplierId, itemIds),
     // #53: one batch lookup instead of getLastRate per line.
-    needRate
-      ? poRepository.findLastRates(supplierId, itemIds)
-      : new Map<number, number>(),
+    poRepository.findLastRates(
+      supplierId,
+      itemIds,
+      { onDate: today, includeContract: true, includeFallback: needRate },
+      tx,
+    ),
   ]);
   const gstByItem = new Map(priceRows.map((r) => [r.itemId, r.taxPercentage]));
 
   const resolved: CreatePoLineData[] = [];
   for (const line of lines) {
     const itemId = prRows.get(line.prItemId)?.itemId;
-    let unitPricePaise = line.unitPricePaise;
-    if (unitPricePaise === undefined && itemId !== undefined) {
-      unitPricePaise = lastRates.get(itemId);
+    const choice = itemId !== undefined ? choices.get(itemId) : undefined;
+    if (choice?.source === "contract") {
+      const applied = applyContract(
+        { ...line, fromQuote: line.quoteItemId !== undefined },
+        choice,
+        actor,
+        null,
+      );
+      resolved.push({
+        prItemId: line.prItemId,
+        unitPricePaise: applied.unitPricePaise,
+        gstPercent: applied.gstPercent,
+        quoteItemId: line.quoteItemId ?? null,
+        ...applied.links,
+      });
+      continue;
     }
+    const unitPricePaise = line.unitPricePaise ?? choice?.ratePaise;
     if (unitPricePaise === undefined || unitPricePaise < 1) {
       throw new BadRequestError(
         `A rate of at least 1 paise is required for PR item ${line.prItemId}`,
@@ -281,15 +418,207 @@ async function resolveLines(
       );
     }
     resolved.push({
+      ...NO_RATE_LINKS,
       prItemId: line.prItemId,
       unitPricePaise,
       gstPercent:
         line.gstPercent ??
         (itemId !== undefined ? gstByItem.get(itemId) : undefined) ??
         0,
+      quoteItemId: line.quoteItemId ?? null,
     });
   }
   return resolved;
+}
+
+/**
+ * BR-RFQ-50, 54: re-resolves the lines being repriced. A contract usable today wins
+ * (GST % locked, a different rate needs the override key and a reason); a line whose
+ * contract has ended drops its link and snapshot and takes the normal suggestion when
+ * no rate is typed; any other line keeps its rate and GST % unless new ones are given.
+ */
+async function resolveUpdatedLines(
+  tx: Tx,
+  actor: Actor,
+  supplierId: number,
+  updates: {
+    id: number;
+    unitPricePaise?: number | undefined;
+    gstPercent?: number | undefined;
+    rateOverrideReason?: string | undefined;
+  }[],
+  existingById: Map<
+    number,
+    Awaited<ReturnType<typeof poRepository.findPoItemsByPoId>>[number]
+  >,
+  today: string,
+): Promise<PoLinePriceData[]> {
+  if (updates.length === 0) return [];
+  const itemIds = [
+    ...new Set(
+      updates.map((u) => (existingById.get(u.id) as { itemId: number }).itemId),
+    ),
+  ];
+  const needFallback = updates.some((u) => {
+    const existing = existingById.get(u.id);
+    return existing?.contractItemId != null && u.unitPricePaise === undefined;
+  });
+  const choices = await poRepository.findLastRates(
+    supplierId,
+    itemIds,
+    { onDate: today, includeContract: true, includeFallback: needFallback },
+    tx,
+  );
+
+  return updates.map((update) => {
+    const existing = existingById.get(update.id) as NonNullable<
+      ReturnType<typeof existingById.get>
+    >;
+    const choice = choices.get(existing.itemId);
+    let unitPricePaise: number;
+    let gstPercent: number;
+    let links: PoLineRateLinks;
+    if (choice?.source === "contract") {
+      const keep: KeptOverride | null =
+        existing.contractItemId === choice.contractItemId &&
+        existing.rateOverrideReason !== null &&
+        existing.unitPricePaise !== existing.contractRatePaise
+          ? {
+              unitPricePaise: existing.unitPricePaise,
+              reason: existing.rateOverrideReason,
+              by: existing.rateOverrideBy,
+              at: existing.rateOverrideAt,
+            }
+          : null;
+      const applied = applyContract(
+        { ...update, fromQuote: false },
+        choice,
+        actor,
+        keep,
+      );
+      unitPricePaise = applied.unitPricePaise;
+      gstPercent = applied.gstPercent;
+      links = { quoteItemId: existing.quoteItemId, ...applied.links };
+    } else if (existing.contractItemId !== null) {
+      // the contract ended: link and snapshot dropped, the line is re-priced (BR-RFQ-54)
+      const suggested = update.unitPricePaise ?? choice?.ratePaise;
+      if (suggested === undefined || suggested < 1) {
+        throw new BadRequestError(
+          `A rate of at least 1 paise is required for PO item ${update.id}`,
+          "PO_RATE_REQUIRED",
+        );
+      }
+      unitPricePaise = suggested;
+      gstPercent = update.gstPercent ?? existing.gstPercent;
+      links = { ...NO_RATE_LINKS, quoteItemId: existing.quoteItemId };
+    } else {
+      unitPricePaise = update.unitPricePaise ?? existing.unitPricePaise;
+      gstPercent = update.gstPercent ?? existing.gstPercent;
+      links = {
+        quoteItemId: existing.quoteItemId,
+        contractItemId: null,
+        contractRatePaise: null,
+        rateOverrideReason: null,
+        rateOverrideBy: null,
+        rateOverrideAt: null,
+      };
+    }
+    return {
+      id: update.id,
+      unitPricePaise,
+      gstPercent,
+      ...computeLinePaise(existing.qty, unitPricePaise, gstPercent),
+      links,
+    };
+  });
+}
+
+/**
+ * BR-PO-01..04, BR-RFQ-28, 50..52: drafts one PO inside the caller's transaction.
+ * `create` opens the transaction; the RFQ award calls this once per winning supplier
+ * inside the award transaction (it flips the awarded RFQ lines first, so the open-RFQ
+ * check passes). Lock order: PR header, PR lines, contract lines, then the PO number.
+ */
+async function createDraftInTx(tx: Tx, actor: Actor, input: DraftPoInput) {
+  const supplier = await poRepository.findSupplierById(input.supplierId, tx);
+  if (!supplier) {
+    throw new NotFoundError("Supplier not found");
+  }
+  if (!supplier.isActive) {
+    throw new BadRequestError("Supplier is inactive", "SUPPLIER_INACTIVE");
+  }
+
+  assertNotBeforePoDate(input.expectedDeliveryDate, new Date());
+
+  const prItemIds = input.lines.map((line) => line.prItemId);
+  const prRows = await assertLinesAreDraftable(prItemIds, tx);
+  const lines = await resolveLines(
+    tx,
+    actor,
+    input.supplierId,
+    input.lines,
+    prRows,
+    istDayKey(),
+  );
+
+  const prItemRows = await poRepository.findPurchaseRequestItemsByIdsForUpdate(
+    prItemIds,
+    tx,
+  );
+  // BR-RFQ-02: re-checked under the PR line lock.
+  await assertNoOpenRfq(prItemIds, tx);
+  const prepared = prepareLines(
+    lines,
+    new Map(prItemRows.map((row) => [row.id, row])),
+  );
+  await assertContractLines(
+    tx,
+    prepared.flatMap((line) =>
+      line.contractItemId === null
+        ? []
+        : [{ contractItemId: line.contractItemId, qty: line.qty }],
+    ),
+    { checkActive: true },
+  );
+
+  const { periodKey, seq } = await allocateDocumentSequence(tx, "po", actor.id);
+  const created = await poRepository.insertPo(
+    {
+      poNumber: `PO-${periodKey}-${seq}`,
+      supplierId: input.supplierId,
+      ...computeTotalsPaise(prepared),
+      // BR-PO-23: no terms typed -> the supplier's default terms.
+      paymentTermsDays:
+        input.paymentTermsDays ?? supplier.defaultPaymentTermsDays,
+      deliveryTerms: input.deliveryTerms ?? null,
+      expectedDeliveryDate: input.expectedDeliveryDate ?? null,
+      notes: input.notes ?? null,
+      createdBy: actor.id,
+    },
+    tx,
+  );
+  if (!created) {
+    throw new AppError(
+      "Failed to create purchase order",
+      500,
+      "PO_CREATE_FAILED",
+    );
+  }
+
+  const items = await poRepository.insertPoLines(created.id, prepared, tx);
+  if (!items) {
+    throw new AppError(
+      "PO item/line mismatch during link creation",
+      500,
+      "PO_LINK_MISMATCH",
+    );
+  }
+  await recomputePrHeaders(
+    prItemRows.map((row) => row.prId),
+    tx,
+  );
+
+  return { po: await reloadPo(created.id, tx), items };
 }
 
 const LOGGABLE_STATUSES: poStatusSchemaType[] = [
@@ -349,13 +678,40 @@ async function reloadPo(poId: number, tx: Tx) {
 }
 
 export const poService = {
-  async getDetails(poId: number) {
+  // BR-RFQ-56: contract and quote links only for po.manage / contract.view holders;
+  // the override reason, who and when only for po.manage holders (spec Security table).
+  async getDetails(poId: number, actor: Actor) {
     const row = await poRepository.getDetails(poId);
     if (!row) {
       throw new NotFoundError("Purchase order not found");
     }
-
-    return row;
+    const seeLinks = can(actor, "po.manage") || can(actor, "contract.view");
+    const seeOverride = can(actor, "po.manage");
+    return {
+      ...row,
+      items: row.items.map((item) => ({
+        ...item,
+        contractItemId: seeLinks ? item.contractItemId : null,
+        contractNumber: seeLinks ? item.contractNumber : null,
+        contractRatePaise: seeLinks ? item.contractRatePaise : null,
+        quoteItemId: seeLinks ? item.quoteItemId : null,
+        quoteNumber: seeLinks ? item.quoteNumber : null,
+        rateSource: seeLinks
+          ? item.contractItemId !== null
+            ? ("contract" as const)
+            : item.quoteItemId !== null
+              ? ("quote" as const)
+              : null
+          : null,
+        rateOverrideReason: seeOverride ? item.rateOverrideReason : null,
+        rateOverrideBy: seeOverride ? item.rateOverrideBy : null,
+        rateOverrideByName: seeOverride ? item.rateOverrideByName : null,
+        rateOverrideAt:
+          seeOverride && item.rateOverrideAt
+            ? item.rateOverrideAt.toISOString()
+            : null,
+      })),
+    };
   },
 
   async list(params: poListQuerySchemaType) {
@@ -369,80 +725,15 @@ export const poService = {
     };
   },
 
-  async create(input: createPoSchemaType, actorId: number) {
-    const supplier = await poRepository.findSupplierById(input.supplierId);
-    if (!supplier) {
-      throw new NotFoundError("Supplier not found");
-    }
-    if (!supplier.isActive) {
-      throw new BadRequestError("Supplier is inactive", "SUPPLIER_INACTIVE");
-    }
-
-    assertNotBeforePoDate(input.expectedDeliveryDate, new Date());
-
-    const prItemIds = input.lines.map((line) => line.prItemId);
-    const prRows = await assertLinesAreDraftable(prItemIds);
-    const lines = await resolveLines(input.supplierId, input.lines, prRows);
-
-    return db.transaction(async (tx) => {
-      const prItemRows =
-        await poRepository.findPurchaseRequestItemsByIdsForUpdate(
-          prItemIds,
-          tx,
-        );
-      const prepared = prepareLines(
-        lines,
-        new Map(prItemRows.map((row) => [row.id, row])),
-      );
-
-      const { periodKey, seq } = await allocateDocumentSequence(
-        tx,
-        "po",
-        actorId,
-      );
-      const created = await poRepository.insertPo(
-        {
-          poNumber: `PO-${periodKey}-${seq}`,
-          supplierId: input.supplierId,
-          ...computeTotalsPaise(prepared),
-          // BR-PO-23: no terms typed -> the supplier's default terms.
-          paymentTermsDays:
-            input.paymentTermsDays ?? supplier.defaultPaymentTermsDays,
-          deliveryTerms: input.deliveryTerms ?? null,
-          expectedDeliveryDate: input.expectedDeliveryDate ?? null,
-          notes: input.notes ?? null,
-          createdBy: actorId,
-        },
-        tx,
-      );
-      if (!created) {
-        throw new AppError(
-          "Failed to create purchase order",
-          500,
-          "PO_CREATE_FAILED",
-        );
-      }
-
-      const items = await poRepository.insertPoLines(created.id, prepared, tx);
-      if (!items) {
-        throw new AppError(
-          "PO item/line mismatch during link creation",
-          500,
-          "PO_LINK_MISMATCH",
-        );
-      }
-      await recomputePrHeaders(
-        prItemRows.map((row) => row.prId),
-        tx,
-      );
-
-      return { po: await reloadPo(created.id, tx), items };
-    });
+  async create(input: createPoSchemaType, actor: Actor) {
+    return db.transaction((tx) => createDraftInTx(tx, actor, input));
   },
+
+  createDraftInTx,
 
   // BR-PO-05: draft only, checked once under the row lock (BR-PO-22). A PO
   // can't be left with no lines.
-  async update(input: updatePoSchemaType) {
+  async update(input: updatePoSchemaType, actor: Actor) {
     const { poId } = input;
     return db.transaction(async (tx) => {
       const locked = await poRepository.lockPoById(poId, tx);
@@ -452,13 +743,17 @@ export const poService = {
       assertEditable(locked.status);
       assertNotBeforePoDate(input.expectedDeliveryDate, locked.createdAt);
 
+      const today = istDayKey();
       const insertPrItemIds = input.inserts.map((line) => line.prItemId);
       const inserts =
         insertPrItemIds.length > 0
           ? await resolveLines(
+              tx,
+              actor,
               locked.supplierId,
               input.inserts,
-              await assertLinesAreDraftable(insertPrItemIds),
+              await assertLinesAreDraftable(insertPrItemIds, tx),
+              today,
             )
           : [];
 
@@ -476,6 +771,15 @@ export const poService = {
           "PO_NEEDS_A_LINE",
         );
       }
+
+      const resolvedUpdates = await resolveUpdatedLines(
+        tx,
+        actor,
+        locked.supplierId,
+        input.updates,
+        existingById,
+        today,
+      );
 
       const headerData = {
         ...(input.paymentTermsDays !== undefined
@@ -510,33 +814,48 @@ export const poService = {
           ],
           tx,
         );
-
-      await poRepository.removePoLines(poId, deleteIds, links, tx);
-
-      const updatedItems = await poRepository.updatePoLinePrices(
-        poId,
-        input.updates.map((update) => {
-          const existing = existingById.get(update.id) as NonNullable<
-            ReturnType<typeof existingById.get>
-          >;
-          const unitPricePaise =
-            update.unitPricePaise ?? existing.unitPricePaise;
-          const gstPercent = update.gstPercent ?? existing.gstPercent;
-          return {
-            id: update.id,
-            unitPricePaise,
-            gstPercent,
-            ...computeLinePaise(existing.qty, unitPricePaise, gstPercent),
-          };
-        }),
-        tx,
-      );
-      const updatedById = new Map(updatedItems.map((row) => [row.id, row]));
+      // BR-RFQ-02: re-checked under the PR line lock.
+      await assertNoOpenRfq(insertPrItemIds, tx);
 
       const prepared = prepareLines(
         inserts,
         new Map(prItemRows.map((row) => [row.id, row])),
       );
+
+      // BR-RFQ-52: the contract cap over the lines this PO will have after the edit
+      // (lock order: PR lines above, contract lines here, nothing else after).
+      const deleted = new Set(deleteIds);
+      const resolvedById = new Map(resolvedUpdates.map((u) => [u.id, u]));
+      await assertContractLines(
+        tx,
+        [
+          ...existingItems.flatMap((row) => {
+            if (deleted.has(row.id)) return [];
+            const contractItemId = resolvedById.has(row.id)
+              ? (resolvedById.get(row.id)?.links.contractItemId ?? null)
+              : row.contractItemId;
+            return contractItemId === null
+              ? []
+              : [{ contractItemId, qty: row.qty }];
+          }),
+          ...prepared.flatMap((line) =>
+            line.contractItemId === null
+              ? []
+              : [{ contractItemId: line.contractItemId, qty: line.qty }],
+          ),
+        ],
+        { checkActive: false, poId },
+      );
+
+      await poRepository.removePoLines(poId, deleteIds, links, tx);
+
+      const updatedItems = await poRepository.updatePoLinePrices(
+        poId,
+        resolvedUpdates,
+        tx,
+      );
+      const updatedById = new Map(updatedItems.map((row) => [row.id, row]));
+
       const createdItems = await poRepository.insertPoLines(poId, prepared, tx);
       if (!createdItems) {
         throw new AppError(

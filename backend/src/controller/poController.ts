@@ -31,7 +31,7 @@ export const poController = {
       throw new BadRequestError("Invalid PO id");
     }
 
-    const data = await poService.getDetails(id);
+    const data = await poService.getDetails(id, c.get("actor"));
     return c.json({ success: true, data });
   },
 
@@ -45,14 +45,14 @@ export const poController = {
 
   async create(c: Context<AppEnv>) {
     const body = createPoSchema.parse(await c.req.json());
-    const actorId = parseActorId(c);
-    const data = await poService.create(body, actorId);
+    parseActorId(c);
+    const data = await poService.create(body, c.get("actor"));
     return c.json({ success: true, data }, 201);
   },
 
   async update(c: Context<AppEnv>) {
     const body = updatePoSchema.parse(await c.req.json());
-    const data = await poService.update(body);
+    const data = await poService.update(body, c.get("actor"));
     return c.json({ success: true, data });
   },
 

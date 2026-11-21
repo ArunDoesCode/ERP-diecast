@@ -60,7 +60,7 @@ export const assetController = {
     const query = assetLastRateQuerySchema.parse(
       Object.fromEntries(new URL(c.req.url).searchParams),
     );
-    const data = await assetService.getLastRate(itemId, query);
+    const data = await assetService.getLastRate(itemId, query, c.get("actor"));
     return c.json({ success: true, data });
   },
 

@@ -115,12 +115,19 @@ export type assetItemCreateSchemaType = z.infer<typeof assetItemCreateSchema>;
 // standard rate. Always answers (ratePaise >= 1).
 export const assetLastRateQuerySchema = z.object({
   supplierId: z.coerce.number().int().positive(),
+  // BR-RFQ-50: IST day the contract must cover; default today (IST)
+  onDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD")
+    .optional(),
 });
 export type assetLastRateQuerySchemaType = z.infer<
   typeof assetLastRateQuerySchema
 >;
 
 export const assetLastRateSourceSchema = z.enum([
+  // BR-RFQ-50, 56: only for callers with po.manage or contract.view
+  "contract",
   "po_history",
   "supplier_catalog",
   "item_average", // item average cost (> 0) (BR-INV-30; was pr_estimate)
@@ -131,6 +138,13 @@ export const assetLastRateSchema = z.object({
   // 0 only for a legacy item whose standard rate was never set
   ratePaise: z.number().int().min(0),
   source: assetLastRateSourceSchema,
+  // set only when source is "contract"
+  contractItemId: z.number().int().optional(),
+  contractId: z.number().int().optional(),
+  contractNumber: z.string().optional(),
+  // cap - ordered qty; null for a rate-only contract line (BR-RFQ-52)
+  qtyLeft: z.number().nullable().optional(),
+  gstPercent: z.number().optional(),
 });
 export type assetLastRateSchemaType = z.infer<typeof assetLastRateSchema>;
 

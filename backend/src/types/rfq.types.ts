@@ -4,16 +4,14 @@ import {
   rfqQuoteStatusEnum,
   rfqStatusEnum,
 } from "../db/schemas/02_procurement-rfq";
-import { MAX_MONEY_PAISE } from "../lib/money";
 import { paginationMetaSchema } from "../lib/response-schemas";
 import { searchTermSchema } from "../lib/safe-search";
-import { gstPercentSchema } from "./po.types";
 
 // RFQ, quotes, award contract (docs/specs/rfq/design/api.md).
 // Money is integer paise per item uom, capped at MAX_MONEY_PAISE (BR-STD-16);
 // freight is the whole line and capped at 1e12 paise (BR-RFQ-30, 74).
 
-export const MAX_FREIGHT_PAISE = 1_000_000_000_000;
+export { MAX_FREIGHT_PAISE } from "../lib/rfq-math";
 
 const idSchema = z.number().int().positive();
 export const isoDateSchema = z
@@ -30,7 +28,10 @@ export const qty3Schema = z
   })
   .refine((v) => v <= 1e9, { message: "Quantity is too large" });
 
-export const ratePaiseSchema = z.number().int().min(1).max(MAX_MONEY_PAISE);
+// Rate in paise per item uom. The schema only checks "integer"; the service gives the
+// coded errors (< 1 = QUOTE_LINE_INVALID / CONTRACT_LINE_INVALID, above MAX_MONEY_PAISE =
+// AMOUNT_TOO_LARGE, BR-RFQ-15, 41, 74).
+export const ratePaiseSchema = z.number().int().max(Number.MAX_SAFE_INTEGER);
 
 export const rfqStatusSchema = z.enum(rfqStatusEnum.enumValues);
 export const rfqLineStatusSchema = z.enum(rfqLineStatusEnum.enumValues);
@@ -71,6 +72,8 @@ export const rfqListQuerySchema = z
     q: searchTermSchema,
     status: rfqStatusSchema.optional(),
     supplierId: z.coerce.number().int().positive().optional(),
+    // RFQs with any line from this PR, any status
+    prId: z.coerce.number().int().positive().optional(),
     // created-at IST days, inclusive
     from: isoDateSchema.optional(),
     to: isoDateSchema.optional(),
@@ -78,21 +81,16 @@ export const rfqListQuerySchema = z
   .strict();
 export type RfqListQuery = z.infer<typeof rfqListQuerySchema>;
 
-const uniqueIds = (max: number, min = 1) =>
-  z
-    .array(idSchema)
-    .min(min)
-    .max(max)
-    .refine((ids) => new Set(ids).size === ids.length, {
-      message: "Ids must be unique",
-    });
+// Counts and duplicates are checked in the service so they carry their codes
+// (RFQ_SUPPLIER_LIMIT, RFQ_DUPLICATE_ID, RFQ_EMPTY); the schema only bounds the array.
+const idList = (max: number, min = 0) => z.array(idSchema).min(min).max(max);
 
 export const createRfqSchema = z
   .object({
     dueDate: isoDateSchema,
     notes: z.string().trim().max(2000).optional(),
-    supplierIds: uniqueIds(10),
-    prItemIds: uniqueIds(500),
+    supplierIds: idList(50),
+    prItemIds: idList(500, 1),
   })
   .strict();
 export type CreateRfqInput = z.infer<typeof createRfqSchema>;
@@ -102,10 +100,10 @@ export const updateRfqSchema = z
     id: idSchema,
     dueDate: isoDateSchema.optional(),
     notes: z.string().trim().max(2000).nullish(),
-    addSupplierIds: uniqueIds(10, 0).optional(),
-    removeSupplierIds: uniqueIds(10, 0).optional(),
-    addPrItemIds: uniqueIds(500, 0).optional(),
-    removePrItemIds: uniqueIds(500, 0).optional(),
+    addSupplierIds: idList(50).optional(),
+    removeSupplierIds: idList(50).optional(),
+    addPrItemIds: idList(500).optional(),
+    removePrItemIds: idList(500).optional(),
   })
   .strict()
   .refine(
@@ -122,9 +120,15 @@ export const quoteLineInputSchema = z
     rfqItemId: idSchema,
     isQuoted: z.boolean(),
     ratePaise: ratePaiseSchema.optional(),
-    gstPercent: gstPercentSchema.optional(),
+    // slab and cap checks are in the service (QUOTE_LINE_INVALID, AMOUNT_TOO_LARGE)
+    gstPercent: z.number().min(0).max(100).optional(),
     leadDays: z.number().int().min(0).max(365).optional(),
-    freightPaise: z.number().int().min(0).max(MAX_FREIGHT_PAISE).optional(),
+    freightPaise: z
+      .number()
+      .int()
+      .min(0)
+      .max(Number.MAX_SAFE_INTEGER)
+      .optional(),
   })
   .strict();
 
@@ -197,6 +201,7 @@ export const rfqRowSchema = z.object({
   dueDate: z.string(),
   notes: z.string().nullable(),
   createdAt: ts,
+  createdByName: z.string().nullable(),
   supplierCount: z.number().int(),
   // suppliers with a live submitted quote
   quotedCount: z.number().int(),
