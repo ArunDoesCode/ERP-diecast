@@ -916,7 +916,7 @@
           "pageSize": "integer.nonnegative.required",
           "itemId": "integer.positive.optional",
           "locationId": "integer.positive.optional",
-          "referenceType": "enum:grn,grn_bypass,pro,pro_cancel,sco_issue,sco_receipt,job_order_issue,scrap_dispatch,stock_adjustment,grn_correction,opening_stock,sco_loss,stock_transfer,stock_transfer_reversal.optional",
+          "referenceType": "enum:grn,grn_bypass,pro,pro_cancel,sco_issue,sco_receipt,job_order_issue,scrap_dispatch,stock_adjustment,grn_correction,opening_stock,sco_loss,stock_transfer,stock_transfer_reversal,delivery_note,delivery_note_cancel.optional",
           "transactionType": "enum:in,out,adjustment.optional",
           "fromDate": "unrepresentable.optional",
           "toDate": "unrepresentable.optional",

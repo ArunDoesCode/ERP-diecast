@@ -275,6 +275,8 @@ export const inventoryReferenceTypeSchema = z.enum([
   "sco_loss",
   "stock_transfer",
   "stock_transfer_reversal",
+  "delivery_note",
+  "delivery_note_cancel",
 ]);
 
 // The only reference types the manual movement screen may post (BR-GRN-43).
@@ -302,6 +304,8 @@ export const documentMovementReferenceTypeSchema = z.enum([
   "scrap_dispatch",
   "stock_transfer",
   "stock_transfer_reversal",
+  "delivery_note",
+  "delivery_note_cancel",
 ]);
 
 export const assetInventoryMovementListQuerySchema = z

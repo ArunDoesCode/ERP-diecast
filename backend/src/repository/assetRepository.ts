@@ -28,6 +28,7 @@ import {
   supplierMaster,
 } from "../db/schemas/02_procurement";
 import { bomLines, boms } from "../db/schemas/02_procurement-bom";
+import { deliveryNotes } from "../db/schemas/06_dispatch";
 import { BadRequestError, ConflictError, NotFoundError } from "../lib/errors";
 import { istDayStartInstant, istNextDayStartInstant } from "../lib/ist-day";
 import { safeSearch, safeSearchSql } from "../lib/safe-search";
@@ -69,7 +70,7 @@ const inventoryMovementColumns = {
   referenceLineId: inventoryLedger.referenceLineId,
   sourceNumber: sql<
     string | null
-  >`coalesce(${grns.grnNumber}, ${purchaseReturns.proNumber}, ${stockTransfers.transferNumber})`,
+  >`coalesce(${grns.grnNumber}, ${purchaseReturns.proNumber}, ${stockTransfers.transferNumber}, ${deliveryNotes.dnNumber})`,
   quantityChange: inventoryLedger.quantityChange,
   balanceAfter: inventoryLedger.balanceAfter,
   unitCostPaise: inventoryLedger.unitCostPaise,
@@ -398,6 +399,16 @@ export const assetRepository = {
             inArray(inventoryLedger.referenceType, [
               "stock_transfer",
               "stock_transfer_reversal",
+            ]),
+          ),
+        )
+        .leftJoin(
+          deliveryNotes,
+          and(
+            eq(deliveryNotes.id, inventoryLedger.referenceId),
+            inArray(inventoryLedger.referenceType, [
+              "delivery_note",
+              "delivery_note_cancel",
             ]),
           ),
         )
