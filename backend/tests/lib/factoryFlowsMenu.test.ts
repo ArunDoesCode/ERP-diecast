@@ -104,8 +104,10 @@ afterAll(async () => {
 });
 
 describe("BR-FF-100 default menu", () => {
-  test("BR-FF-100 the code catalog holds exactly the ten spec screens", () => {
-    expect(Object.keys(catalog).sort()).toEqual(Object.keys(EXPECTED).sort());
+  test("BR-FF-100 the code catalog holds all ten spec screens", () => {
+    for (const key of Object.keys(EXPECTED)) {
+      expect(catalog[key]).toBeDefined();
+    }
   });
 
   test("BR-FF-100 labels, order and groups follow the spec table", () => {
@@ -118,7 +120,9 @@ describe("BR-FF-100 default menu", () => {
   });
 
   test("BR-FF-100 sorting by order gives Home, Approvals, Requisitions, Purchase orders, Goods receipts, Subcontracting, Inventory, Suppliers, Employee directory, Setup", () => {
-    const labels = Object.values(catalog)
+    const labels = Object.entries(catalog)
+      .filter(([k]) => k in EXPECTED)
+      .map(([, d]) => d)
       .sort((a, b) => a.defaultOrder - b.defaultOrder)
       .map((d) => d.defaultLabel);
     expect(labels).toEqual([
@@ -143,14 +147,31 @@ describe("BR-FF-100 default menu", () => {
 
   test("BR-FF-100 Employee directory and Setup are in group Admin, the other eight in General", () => {
     const admin = Object.entries(catalog)
-      .filter(([, d]) => d.defaultMenuGroup === "Admin")
+      .filter(([k, d]) => k in EXPECTED && d.defaultMenuGroup === "Admin")
       .map(([k]) => k)
       .sort();
     expect(admin).toEqual(["employee-directory", "setup"]);
-    const general = Object.values(catalog).filter(
-      (d) => d.defaultMenuGroup === "General",
+    const general = Object.entries(catalog).filter(
+      ([k, d]) => k in EXPECTED && d.defaultMenuGroup === "General",
     );
     expect(general).toHaveLength(8);
+  });
+
+  test("BR-FF-100 screens from later modules sit in other groups, not General or Admin", () => {
+    for (const [key, d] of Object.entries(catalog)) {
+      if (key in EXPECTED) continue;
+      expect(["General", "Admin"]).not.toContain(d.defaultMenuGroup);
+    }
+  });
+
+  test("BR-FF-100 Admin screens sort after every General screen", () => {
+    const inGroup = (g: string) =>
+      Object.values(catalog)
+        .filter((d) => d.defaultMenuGroup === g)
+        .map((d) => d.defaultOrder);
+    expect(Math.min(...inGroup("Admin"))).toBeGreaterThan(
+      Math.max(...inGroup("General")),
+    );
   });
 });
 
