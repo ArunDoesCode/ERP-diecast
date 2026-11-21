@@ -74,6 +74,10 @@ const SPEC: Record<string, R[]> = {
   "purchase_return.edit_draft": ["ow", "bo", "fs"],
   "purchase_return.post": ["ow", "bo"],
   "purchase_return.cancel_posted": ["ow", "bo"],
+  // supplier-invoice spec "Who can do what" (BR-SINV-33)
+  "invoice.view": ["ow", "bo"],
+  "invoice.manage": ["ow", "bo"],
+  "invoice.release": ["ow"],
 };
 
 describe("BR-AUTH-06 permission catalog defined in code", () => {
@@ -142,6 +146,36 @@ describe("purchase-returns keys and screen (BR-PRT who-can-do-what)", () => {
 
   test("BR-PRT-12 only owner and back_office hold post and cancel_posted; floor_supervisor cannot post", () => {
     for (const k of ["purchase_return.post", "purchase_return.cancel_posted"]) {
+      const holders = Object.entries(SEED_GRANTS)
+        .filter(([, ks]) => (ks as string[]).includes(k))
+        .map(([n]) => n)
+        .sort();
+      expect(holders).toEqual(["back_office", "owner"]);
+    }
+  });
+});
+
+describe("supplier-invoice keys and screen (BR-SINV-33)", () => {
+  test("BR-SINV-33 the three invoice keys are in the catalog", () => {
+    for (const k of ["invoice.view", "invoice.manage", "invoice.release"]) {
+      expect(PERMISSION_KEYS as string[]).toContain(k);
+    }
+  });
+
+  test("BR-SINV-33 the supplier-invoices screen is /supplier-invoices behind invoice.view", () => {
+    expect(SCREENS["supplier-invoices"].path).toBe("/supplier-invoices");
+    expect(SCREENS["supplier-invoices"].permission).toBe("invoice.view");
+  });
+
+  test("BR-SINV-25 only the owner holds invoice.release", () => {
+    const holders = Object.entries(SEED_GRANTS)
+      .filter(([, ks]) => (ks as string[]).includes("invoice.release"))
+      .map(([n]) => n);
+    expect(holders).toEqual(["owner"]);
+  });
+
+  test("BR-SINV-33 owner and back_office hold invoice.view and invoice.manage, nobody else", () => {
+    for (const k of ["invoice.view", "invoice.manage"]) {
       const holders = Object.entries(SEED_GRANTS)
         .filter(([, ks]) => (ks as string[]).includes(k))
         .map(([n]) => n)

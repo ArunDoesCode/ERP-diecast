@@ -44,7 +44,6 @@ import {
   purchaseOrders,
   purchaseRequestItems,
   purchaseRequests,
-  supplierInvoices,
 } from "../../src/db/schemas/02_procurement-purchasing";
 import {
   supplierItems,
@@ -370,9 +369,6 @@ async function cleanup() {
         .delete(prPoItemLinks)
         .where(inArray(prPoItemLinks.poItemId, poItemIds));
     }
-    await db
-      .delete(supplierInvoices)
-      .where(inArray(supplierInvoices.poId, poIds));
     await db
       .delete(poCommunications)
       .where(inArray(poCommunications.poId, poIds));
@@ -1424,15 +1420,6 @@ describe("BR-PO-12 cancelled and closed are final", () => {
     expect(
       (await p("short-close", { reason: "supplier stopped" })).status,
     ).toBe(400);
-    expect(
-      (
-        await p("invoice", {
-          invoiceNumber: "X",
-          invoiceDate: days(0).toISOString(),
-          billedAmountPaise: 1,
-        })
-      ).status,
-    ).toBe(400);
     expect((await p("reminder", { channel: "phone" })).status).toBe(400);
     expect(
       (
@@ -1549,85 +1536,6 @@ describe("BR-PO-14 close", () => {
       (await call("buyer", "POST", `/api/po/${po.poId}/close`, {})).status,
     ).toBe(400);
     expect((await poRow(po.poId)).status).toBe(status);
-  });
-});
-
-describe("BR-PO-15 record supplier invoice", () => {
-  const inv = (poId: number, over: Rec = {}) =>
-    call("buyer", "POST", `/api/po/${poId}/invoice`, {
-      invoiceNumber: "TESTPO-INV-44",
-      invoiceDate: days(0).toISOString(),
-      billedAmountPaise: 110000,
-      ...over,
-    });
-
-  test("BR-PO-15 fully_received -> invoiced, who/when stored", async () => {
-    const po = await mkDispatchedPo();
-    await setPo(po.poId, { status: "fully_received" });
-    const res = await inv(po.poId, { invoiceNumber: "TESTPO-INV-1" });
-    expect(res.status).toBe(200);
-    const d = poOf(await json(await detail(po.poId)));
-    expect(d.status).toBe("invoiced");
-    expect(d.invoicedBy).toBe(emp.buyer as number);
-    expect(d.invoicedAt).toBeTruthy();
-    const rows = await db
-      .select()
-      .from(supplierInvoices)
-      .where(eq(supplierInvoices.poId, po.poId));
-    expect(rows.length).toBe(1);
-    expect(rows[0]?.billedAmountPaise).toBe(110000);
-  });
-
-  test.each([
-    "approved",
-    "dispatched",
-    "partial_received",
-    "invoiced",
-    "closed",
-  ] as const)("BR-PO-15 invoice on %s -> 400", async (status) => {
-    const po = await mkDispatchedPo();
-    await setPo(po.poId, { status });
-    expect(
-      (await inv(po.poId, { invoiceNumber: `TESTPO-INV-${status}` })).status,
-    ).toBe(400);
-    expect((await poRow(po.poId)).status).toBe(status);
-  });
-
-  test("BR-PO-15 missing invoice number / date / amount -> 400", async () => {
-    const po = await mkDispatchedPo();
-    await setPo(po.poId, { status: "fully_received" });
-    const base = {
-      invoiceNumber: "TESTPO-INV-2",
-      invoiceDate: days(0).toISOString(),
-      billedAmountPaise: 1000,
-    };
-    for (const k of Object.keys(base)) {
-      const body: Rec = { ...base };
-      delete body[k];
-      expect(
-        (await call("buyer", "POST", `/api/po/${po.poId}/invoice`, body))
-          .status,
-      ).toBe(400);
-    }
-    expect((await poRow(po.poId)).status).toBe("fully_received");
-  });
-
-  test("BR-PO-15 same invoice number, same supplier, twice -> 409; other supplier is fine", async () => {
-    const a = await mkDispatchedPo({ supplier: "s1" });
-    const b = await mkDispatchedPo({ supplier: "s1" });
-    const c = await mkDispatchedPo({ supplier: "s3" });
-    for (const p of [a, b, c])
-      await setPo(p.poId, { status: "fully_received" });
-    expect(
-      (await inv(a.poId, { invoiceNumber: "TESTPO-INV-DUP" })).status,
-    ).toBe(200);
-    expect(
-      (await inv(b.poId, { invoiceNumber: "TESTPO-INV-DUP" })).status,
-    ).toBe(409);
-    expect((await poRow(b.poId)).status).toBe("fully_received");
-    expect(
-      (await inv(c.poId, { invoiceNumber: "TESTPO-INV-DUP" })).status,
-    ).toBe(200);
   });
 });
 
@@ -1970,12 +1878,6 @@ describe("BR-PO-20 login and po.manage on every PO endpoint", () => {
         "confirm",
         (id) => `/api/po/${id}/confirm`,
         { confirmationMethod: "phone" },
-      ],
-      [
-        "POST",
-        "invoice",
-        (id) => `/api/po/${id}/invoice`,
-        { invoiceNumber: "X", invoiceDate: "2026-01-01", billedAmountPaise: 1 },
       ],
       ["POST", "close", (id) => `/api/po/${id}/close`, {}],
       [

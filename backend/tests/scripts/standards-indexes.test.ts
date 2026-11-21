@@ -23,7 +23,7 @@ const INDEXES: [string, string, string[]][] = [
   ["idx_purchase_returns_po_id", "purchase_returns", ["po_id"]],
   ["idx_purchase_returns_supplier_id", "purchase_returns", ["supplier_id"]],
   ["idx_purchase_return_items_pro_id", "purchase_return_items", ["pro_id"]],
-  ["idx_supplier_invoices_po_id", "supplier_invoices", ["po_id"]],
+  ["idx_sinv_po_id", "supplier_invoices", ["po_id"]],
   [
     "idx_supplier_bank_details_supplier_id",
     "supplier_bank_details",
