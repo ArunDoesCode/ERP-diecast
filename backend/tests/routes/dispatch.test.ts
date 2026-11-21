@@ -342,8 +342,15 @@ describe("create a draft (BR-DSP-01..09)", () => {
 
   test("BR-DSP-08 with no location sent the default is the lowest-id active finished_goods location, else the main store", async () => {
     const c = await fx.mkCustomer();
+    // a finished_goods location of our own, so the default exists on any DB
+    await fx.mkLoc("finished_goods");
     const so = await fx.mkSo({ customerId: c, lines: [{ qty: 100 }] });
-    const r = await fx.draft(one(so.soId, so.lineIds[0] as number, 1));
+    const r = await fx.dsp(
+      "floor_supervisor",
+      "POST",
+      "/notes",
+      one(so.soId, so.lineIds[0] as number, 1),
+    );
     expect(r.status).toBe(201);
     const all = await db.select().from(locations);
     const fg = all

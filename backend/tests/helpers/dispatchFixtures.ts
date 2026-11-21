@@ -388,12 +388,23 @@ export function makeDispatchFx(tag: string) {
   }
 
   const noteIds: number[] = [];
+  let fxLoc: number | undefined;
+  async function defaultLoc() {
+    fxLoc ??= await mkLoc("finished_goods");
+    return fxLoc;
+  }
   /** Create a draft note, raw response. Default role floor_supervisor (manage, no so.view). */
   async function draft(
     body: Record<string, unknown>,
     role: Role = "floor_supervisor",
   ) {
-    const r = await dsp(role, "POST", "/notes", body);
+    // Own dispatch location so the draft never depends on seeded locations;
+    // a body that names sourceLocationId (even undefined) is sent untouched.
+    const withLoc =
+      "sourceLocationId" in body
+        ? body
+        : { ...body, sourceLocationId: await defaultLoc() };
+    const r = await dsp(role, "POST", "/notes", withLoc);
     if (r.status === 201) noteIds.push(r.json.data.id);
     return r;
   }
