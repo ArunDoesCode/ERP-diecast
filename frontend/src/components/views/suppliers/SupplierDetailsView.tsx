@@ -3,6 +3,7 @@
 import { IconArrowLeft, IconEdit } from "@tabler/icons-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { RatingCard } from "@/components/pages/supplier-rating/RatingCard";
 import { SupplierHistoryCard } from "@/components/pages/suppliers/SupplierHistoryCard";
 import { SupplierMasterModal } from "@/components/pages/suppliers/SupplierMasterModal";
 import { SupplierOfferingsSection } from "@/components/pages/suppliers/SupplierOfferingsSection";
@@ -74,6 +75,7 @@ export function SupplierDetailsView({ supplierId }: SupplierDetailsViewProps) {
 	const [editOpen, setEditOpen] = useState(false);
 	const [statusConfirmOpen, setStatusConfirmOpen] = useState(false);
 	const canManage = useCan("supplier.manage");
+	const canViewRating = useCan("supplier.rating.view");
 
 	const detailQuery = useSupplierDetailQuery(supplierId);
 	const updateMasterMutation = useUpdateSupplierMasterMutation();
@@ -229,6 +231,8 @@ export function SupplierDetailsView({ supplierId }: SupplierDetailsViewProps) {
 					</div>
 				</CardContent>
 			</Card>
+
+			{canViewRating ? <RatingCard supplierId={supplierId} /> : null}
 
 			<SupplierOfferingsSection supplierId={supplierId} canManage={canManage} />
 

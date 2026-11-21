@@ -17,6 +17,7 @@ const LIST_LABELS: Record<string, string> = {
 	approvals: "Approvals",
 	"purchase-orders": "Purchase orders",
 	suppliers: "Suppliers",
+	"supplier-ratings": "Supplier rating",
 	grn: "Goods receipt",
 	"purchase-returns": "Purchase returns",
 	"supplier-invoices": "Supplier invoices",

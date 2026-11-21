@@ -16,6 +16,7 @@ import {
 	IconShoppingCart,
 	IconSitemap,
 	IconStack2,
+	IconStarHalf,
 	IconUserCircle,
 	IconUsers,
 } from "@tabler/icons-react";
@@ -26,6 +27,7 @@ const ICONS: Record<string, Icon> = {
 	approvals: IconChecklist,
 	"purchase-orders": IconShoppingCart,
 	suppliers: IconUsers,
+	"supplier-ratings": IconStarHalf,
 	grn: IconPackage,
 	"purchase-returns": IconPackageExport,
 	"supplier-invoices": IconFileInvoice,

@@ -3,6 +3,7 @@ const API_Header = {
 	setup: "/setup",
 	approval: "/approval",
 	supplier: "/supplier",
+	supplierRating: "/supplier-rating",
 	asset: "/asset",
 	pr: "/pr",
 	po: "/po",
@@ -256,6 +257,15 @@ export const API_ROUTES = {
 		openChallans: `${API_Header.sco}/challans/open`,
 		challanDetail: (challanId: number) =>
 			`${API_Header.sco}/challans/${challanId}`,
+	},
+	supplierRating: {
+		list: `${API_Header.supplierRating}/list`,
+		card: (supplierId: number) =>
+			`${API_Header.supplierRating}/${supplierId}/card`,
+		lines: (supplierId: number) =>
+			`${API_Header.supplierRating}/${supplierId}/lines`,
+		trend: (supplierId: number) =>
+			`${API_Header.supplierRating}/${supplierId}/trend`,
 	},
 	supplierInvoices: {
 		list: `${API_Header.supplierInvoice}/getsupplierinvoices`,

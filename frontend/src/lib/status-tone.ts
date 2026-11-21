@@ -49,6 +49,7 @@ export type StatusDoc =
 	| "challanDue"
 	| "approval"
 	| "supplier"
+	| "supplierRating"
 	| "item"
 	| "machine"
 	| "employee"
@@ -259,6 +260,13 @@ const MAP: Record<StatusDoc, Record<string, Entry>> = Object.assign(
 			overdue: ["Overdue", "danger"],
 		}),
 		supplier: ACTIVE,
+		supplierRating: table({
+			good: ["Good", "success"],
+			watch: ["Watch", "warning"],
+			poor: ["Poor", "danger"],
+			not_enough_data: ["Not enough data", "neutral"],
+			no_data: ["No data", "neutral"],
+		}),
 		item: ACTIVE,
 		machine: ACTIVE,
 		employee: ACTIVE,

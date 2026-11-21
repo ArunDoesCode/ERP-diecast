@@ -8,6 +8,8 @@ export type DetailMeta = { label: string; value: ReactNode };
 
 export type DetailHeaderProps = {
 	docNo: string;
+	/** Show `docNo` as plain text, not mono (a name, not a document number). */
+	docNoPlain?: boolean;
 	title?: string;
 	status: ReactNode;
 	meta?: DetailMeta[];
@@ -20,6 +22,7 @@ export type DetailHeaderProps = {
 /** Detail page header (BR-DS-08): back link, mono document number (the only h1), status, meta pairs, actions. */
 export function DetailHeader({
 	docNo,
+	docNoPlain,
 	title,
 	status,
 	meta,
@@ -45,7 +48,13 @@ export function DetailHeader({
 							<Skeleton className="h-8 w-48" />
 						) : (
 							<>
-								<h1 className="font-mono text-2xl leading-8 font-bold tabular-nums">
+								<h1
+									className={
+										docNoPlain
+											? "text-2xl leading-8 font-bold"
+											: "font-mono text-2xl leading-8 font-bold tabular-nums"
+									}
+								>
 									{docNo}
 								</h1>
 								{status}

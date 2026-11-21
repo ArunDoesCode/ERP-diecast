@@ -89,3 +89,19 @@ export function formatDocNo(value: string | null | undefined): string {
 	const t = value?.trim();
 	return t ? t : EMPTY;
 }
+
+/**
+ * Percent from integer tenths (800 -> `80.0 %`). `signed` adds `+` on positives (`+5.0 %`).
+ * null or undefined -> `No data` (BR-SRT-23), or `empty` when given.
+ */
+export function formatPercentTenths(
+	tenths: number | null | undefined,
+	opts?: { signed?: boolean; empty?: string },
+): string {
+	if (tenths === null || tenths === undefined || !Number.isFinite(tenths)) {
+		return opts?.empty ?? "No data";
+	}
+	const value = (tenths / 10).toFixed(1);
+	const sign = opts?.signed === true && tenths > 0 ? "+" : "";
+	return `${sign}${value} %`;
+}
