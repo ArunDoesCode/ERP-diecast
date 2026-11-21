@@ -129,7 +129,7 @@ jv as (
   where j.state <> 'ignored'
 ),
 rej_facts as (
-  select gi.id as grn_item_id, g.grn_number, po.po_number, po.supplier_id, im.sku,
+  select gi.id as grn_item_id, g.id as grn_id, po.id as po_id, g.grn_number, po.po_number, po.supplier_id, im.sku,
     poi.uom, poi.unit_price_paise as rate,
     ${sql.raw(IST(ARRIVED))} as rday,
     round(gi.received_qty::numeric, 3) as recv,
@@ -149,7 +149,7 @@ rej_facts as (
   where g.status <> 'draft' and ${sql.raw(ARRIVED)} >= p.wfrom - 2
 ),
 price_facts as (
-  select pl.po_item_id, pl.po_number, pl.supplier_id, pl.po_date, im.sku, pl.uom,
+  select pl.po_item_id, pl.po_id, pl.po_number, pl.supplier_id, pl.po_date, im.sku, pl.uom,
     pl.ordered as qty, pl.rate,
     case when coalesce(im.standard_rate_paise, 0) > 0 then im.standard_rate_paise else prev.rate end as ref_rate,
     case when coalesce(im.standard_rate_paise, 0) > 0 then 'standard_rate'
@@ -302,6 +302,7 @@ export type TrendRow = {
 export type OnTimeLineRow = {
   po_item_id: number;
   po_number: string;
+  pr_id: number | null;
   sku: string;
   item_name: string;
   uom: string;
@@ -318,8 +319,10 @@ export type OnTimeLineRow = {
 
 export type RejectionLineRow = {
   grn_item_id: number;
+  grn_id: number;
   grn_number: string;
   po_number: string;
+  pr_id: number | null;
   sku: string;
   received_date: string;
   arrived_qty: string;
@@ -334,6 +337,7 @@ export type RejectionLineRow = {
 export type PriceLineRow = {
   po_item_id: number;
   po_number: string;
+  pr_id: number | null;
   po_date: string;
   sku: string;
   uom: string;
@@ -486,7 +490,7 @@ export const supplierRatingRepository = {
       cross join params p
       where j.jdate between p.wfrom and p.today and ${verdictFilter}`;
     const rows = await db.execute(sql`with ${baseCtes(today, where)}
-        select count(*) over ()::int as total_count, j.po_item_id, j.po_number, im.sku, im.name as item_name, j.uom,
+        select count(*) over ()::int as total_count, j.po_item_id, j.po_number, (select min(pr_i.pr_id) from purchase_order_items pr_poi join pr_po_item_links pr_l on pr_l.po_item_id = pr_poi.id join purchase_request_items pr_i on pr_i.id = pr_l.pr_item_id where pr_poi.po_id = j.po_id) as pr_id, im.sku, im.name as item_name, j.uom,
           j.ordered::text as ordered_qty, round(j.arrived, 3)::text as arrived_qty,
           to_char(j.due, 'YYYY-MM-DD') as due, to_char(j.revised, 'YYYY-MM-DD') as revised,
           to_char(j.completion, 'YYYY-MM-DD') as completion,
@@ -518,7 +522,7 @@ export const supplierRatingRepository = {
     const from = sql`from rej_facts f cross join params p
       where f.rday between p.wfrom and p.today and f.insp in ('decided', 'not_inspected')`;
     const rows = await db.execute(sql`with ${baseCtes(today, where)}
-        select count(*) over ()::int as total_count, f.grn_item_id, f.grn_number, f.po_number, f.sku,
+        select count(*) over ()::int as total_count, f.grn_item_id, f.grn_id, f.grn_number, f.po_number, (select min(pr_i.pr_id) from purchase_order_items pr_poi join pr_po_item_links pr_l on pr_l.po_item_id = pr_poi.id join purchase_request_items pr_i on pr_i.id = pr_l.pr_item_id where pr_poi.po_id = f.po_id) as pr_id, f.sku,
           to_char(f.rday, 'YYYY-MM-DD') as received_date,
           f.recv::text as arrived_qty, f.rej::text as rejected_qty, f.uom, f.rate,
           round(f.rej * f.rate)::bigint as rejected_value,
@@ -547,7 +551,7 @@ export const supplierRatingRepository = {
     };
     const where = eq(supplierMaster.id, supplierId);
     const rows = await db.execute(sql`with ${baseCtes(today, where)}
-        select count(*) over ()::int as total_count, f.po_item_id, f.po_number, to_char(f.po_date, 'YYYY-MM-DD') as po_date,
+        select count(*) over ()::int as total_count, f.po_item_id, f.po_number, (select min(pr_i.pr_id) from purchase_order_items pr_poi join pr_po_item_links pr_l on pr_l.po_item_id = pr_poi.id join purchase_request_items pr_i on pr_i.id = pr_l.pr_item_id where pr_poi.po_id = f.po_id) as pr_id, to_char(f.po_date, 'YYYY-MM-DD') as po_date,
           f.sku, f.uom, f.qty::text as qty, f.rate,
           f.ref_rate, f.ref_source,
           case when f.compared then f.rate - f.ref_rate end as variance,

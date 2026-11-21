@@ -98,6 +98,8 @@ function toOnTimeLine(r: OnTimeLineRow) {
   return {
     poItemId: num(r.po_item_id),
     poNumber: r.po_number,
+    prId: numOrNull(r.pr_id),
+    grnId: null,
     itemSku: r.sku,
     itemName: r.item_name,
     uom: r.uom,
@@ -116,8 +118,10 @@ function toOnTimeLine(r: OnTimeLineRow) {
 function toRejectionLine(r: RejectionLineRow) {
   return {
     grnItemId: num(r.grn_item_id),
+    grnId: num(r.grn_id),
     grnNumber: r.grn_number,
     poNumber: r.po_number,
+    prId: numOrNull(r.pr_id),
     itemSku: r.sku,
     receivedDate: r.received_date,
     arrivedQty: r.arrived_qty,
@@ -134,6 +138,8 @@ function toPriceLine(r: PriceLineRow) {
   return {
     poItemId: num(r.po_item_id),
     poNumber: r.po_number,
+    prId: numOrNull(r.pr_id),
+    grnId: null,
     poDate: r.po_date,
     itemSku: r.sku,
     uom: r.uom,
