@@ -241,7 +241,7 @@ async function main() {
         unitPricePaise: RAW_RATE,
       })),
     },
-    userId.back_office,
+    actor.back_office,
   );
   const poReq = await approvalService.submitRequest(
     { docType: "po", docId: po.po.id },

@@ -485,7 +485,7 @@ export async function runFixtures(opts: {
           unitPricePaise: rate(l.sku),
         })),
       },
-      userId.back_office,
+      actors.back_office,
     );
     const itemBySku = {} as Record<string, number>;
     for (const it of created.items) {
