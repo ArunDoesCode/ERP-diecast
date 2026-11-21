@@ -1,9 +1,14 @@
 import { Hono } from "hono";
+import { z } from "zod";
 
 import { grnController } from "../controller/grnController";
 import { asyncHandler } from "../lib/async-handler";
 import { requirePermission } from "../lib/auth-middleware";
-import { paginatedResponse, successResponse } from "../lib/response-schemas";
+import {
+  paginatedResponse,
+  paginationMetaSchema,
+  successResponse,
+} from "../lib/response-schemas";
 import { register } from "../lib/route-registry";
 import type { AppEnv } from "../lib/types";
 import { assetInventoryMovementSchema } from "../types/asset.types";
@@ -17,6 +22,8 @@ import {
   grnListRowSchema,
   grnQaActionBodySchema,
   grnSchema,
+  receivablePosQuerySchema,
+  receivablePosResponseSchema,
   updateGrnSchema,
 } from "../types/grn.types";
 import { END_POINTS } from "./end-points";
@@ -38,11 +45,41 @@ register({
   summary: "List GRNs, paginated. Filterable by poId/status/qaStatus.",
   auth: { type: "permission", key: "grn.view" },
   request: { query: grnListQuerySchema },
-  responses: { "200": paginatedResponse(grnListRowSchema) },
+  // BR-FF-28: meta.statusCounts per GRN status for the same filters.
+  responses: {
+    "200": paginatedResponse(grnListRowSchema).extend({
+      meta: paginationMetaSchema.extend({
+        statusCounts: z.record(z.string(), z.number().int().min(0)),
+      }),
+    }),
+  },
   pagination: {
     sortableFields: ["id", "grnNumber", "status", "receivedDate"],
     searchable: true,
   },
+});
+
+grnRouter.get(
+  GRN_ROUTES.receivablePos,
+  requirePermission("grn.edit_draft"),
+  asyncHandler(grnController.getReceivablePos),
+);
+register({
+  method: "GET",
+  path: `${GRN_BASE_PATH}${GRN_ROUTES.receivablePos}`,
+  tags: ["grn"],
+  summary:
+    "Receivable POs (dispatched / partial_received with an open line) with their open lines, no prices (BR-FF-61..64, 66, 70..72).",
+  auth: { type: "permission", key: "grn.edit_draft" },
+  request: { query: receivablePosQuerySchema },
+  responses: { "200": receivablePosResponseSchema },
+  pagination: {
+    sortableFields: ["dueDate", "poNumber", "supplierName"],
+    searchable: true,
+  },
+  notes: [
+    "meta carries `today` (IST day) beside the pagination fields. Unknown or not-receivable poId returns 200 with empty data.",
+  ],
 });
 
 grnRouter.get(

@@ -722,13 +722,18 @@ export const poService = {
     };
   },
 
-  async list(params: poListQuerySchemaType) {
-    const { rows, total, statusCounts } = await poRepository.list(params);
+  async list(params: poListQuerySchemaType, actorId: number) {
+    const { rows, total, statusCounts, lateCount } = await poRepository.list(
+      params,
+      actorId,
+      istDayKey(),
+    );
     return {
       data: rows,
       meta: {
         ...toPaginatedMeta(params.page, params.pageSize, total),
         statusCounts,
+        lateCount,
       },
     };
   },

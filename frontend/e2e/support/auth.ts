@@ -24,7 +24,7 @@ async function loginOnce(browser: Browser): Promise<AuthState> {
 		await page.getByLabel("Email").fill(EMAIL);
 		await page.getByLabel("Password").fill(PASSWORD);
 		await page.getByRole("button", { name: "Sign in" }).click();
-		await page.waitForURL("**/landing", { timeout: 20_000 });
+		await page.waitForURL("**/home", { timeout: 20_000 });
 		return await context.storageState();
 	} finally {
 		await context.close();

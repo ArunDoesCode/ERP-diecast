@@ -10,6 +10,7 @@ const API_Header = {
 	grn: "/grn",
 	purchaseReturn: "/purchase-return",
 	stockTransfer: "/stock-transfer",
+	document: "/document",
 	sco: "/sco",
 	bom: "/bom",
 	customers: "/customers",
@@ -75,6 +76,8 @@ export const API_ROUTES = {
 			`${API_Header.approval}/getRequestTrail/${id}`,
 		actOnRequest: (id: number) => `${API_Header.approval}/actOnRequest/${id}`,
 		getMyPendingApprovals: `${API_Header.approval}/getMyPendingApprovals`,
+		getDocumentView: (docType: string, docId: number) =>
+			`${API_Header.approval}/getDocumentView/${docType}/${docId}`,
 		getApprovalHistory: (docType: string, docId: number) =>
 			`${API_Header.approval}/getApprovalHistory/${docType}/${docId}`,
 		getCurrentApprovalByDoc: (docType: string, docId: number) =>
@@ -157,6 +160,7 @@ export const API_ROUTES = {
 		list: `${API_Header.grn}/getgrns`,
 		detail: (grnId: number) => `${API_Header.grn}/getgrndetails/${grnId}`,
 		create: `${API_Header.grn}/creategrn`,
+		receivable: `${API_Header.grn}/getreceivablepos`,
 		update: `${API_Header.grn}/updategrn`,
 		remove: (grnId: number) => `${API_Header.grn}/deletegrn/${grnId}`,
 		qaDecision: (grnId: number, lineId: number) =>
@@ -252,6 +256,10 @@ export const API_ROUTES = {
 		post: (id: number) => `${API_Header.stockTransfer}/${id}/post`,
 		reverse: (id: number) => `${API_Header.stockTransfer}/${id}/reverse`,
 	},
+	document: {
+		panel: (docType: "pr" | "po" | "grn", docId: number) =>
+			`${API_Header.document}/getpanel/${docType}/${docId}`,
+	},
 	subcontracting: {
 		list: `${API_Header.sco}/getscos`,
 		detail: (scoId: number) => `${API_Header.sco}/getscodetails/${scoId}`,
@@ -324,6 +332,9 @@ export const API_ROUTES = {
 		activate: (id: number) => `${API_Header.rateContract}/${id}/activate`,
 		terminate: (id: number) => `${API_Header.rateContract}/${id}/terminate`,
 		cancel: (id: number) => `${API_Header.rateContract}/${id}/cancel`,
+	},
+	home: {
+		getCounts: "/home/getcounts",
 	},
 	company: {
 		invoiceTolerances: `${API_Header.company}/invoice-tolerances`,

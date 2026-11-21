@@ -9,6 +9,7 @@ import {
 import { toast } from "sonner";
 
 import { ApiClientError } from "@/lib/api/client";
+import { homeKeys } from "@/lib/api/home/queries";
 import { prErrorMessage } from "@/lib/api/purchase-requisitions/error-messages";
 import type {
 	ApprovalActionInput,
@@ -23,6 +24,7 @@ import type {
 import {
 	actOnApprovalRequest,
 	createApprovalPolicy,
+	getApprovalDocumentView,
 	getApprovalHistory,
 	getApprovalPolicies,
 	getApprovalPolicyDetails,
@@ -48,6 +50,8 @@ export const approvalKeys = {
 			: (["approval", "pending"] as const),
 	history: (docType: ApprovalDocType, docId: number) =>
 		["approval", "history", docType, docId] as const,
+	documentView: (docType: ApprovalDocType, docId: number) =>
+		["approval", "document-view", docType, docId] as const,
 	currentByDoc: (docType: ApprovalDocType, docId: number) =>
 		["approval", "current-by-doc", docType, docId] as const,
 };
@@ -129,6 +133,7 @@ export function useSubmitApprovalRequestMutation() {
 				queryClient.invalidateQueries({
 					queryKey: approvalKeys.myPending(),
 				}),
+				queryClient.invalidateQueries({ queryKey: homeKeys.all }),
 				queryClient.invalidateQueries({
 					queryKey: approvalKeys.currentByDoc(
 						variables.docType,
@@ -137,6 +142,7 @@ export function useSubmitApprovalRequestMutation() {
 				}),
 				queryClient.invalidateQueries({ queryKey: ["approval", "history"] }),
 				queryClient.invalidateQueries({ queryKey: ["purchase-requisitions"] }),
+				queryClient.invalidateQueries({ queryKey: ["purchase-orders"] }),
 				queryClient.invalidateQueries({ queryKey: ["subcontracting"] }),
 			]);
 			toast.success(result.message || "Submitted for approval");
@@ -178,11 +184,16 @@ export function useActOnApprovalRequestMutation() {
 					queryKey: approvalKeys.requestTrail(variables.id),
 				}),
 				queryClient.invalidateQueries({ queryKey: approvalKeys.myPending() }),
+				queryClient.invalidateQueries({ queryKey: homeKeys.all }),
+				queryClient.invalidateQueries({
+					queryKey: ["approval", "document-view"],
+				}),
 				queryClient.invalidateQueries({
 					queryKey: ["approval", "current-by-doc"],
 				}),
 				queryClient.invalidateQueries({ queryKey: ["approval", "history"] }),
 				queryClient.invalidateQueries({ queryKey: ["purchase-requisitions"] }),
+				queryClient.invalidateQueries({ queryKey: ["purchase-orders"] }),
 				queryClient.invalidateQueries({ queryKey: ["subcontracting"] }),
 			]);
 			if (result.success) {
@@ -209,6 +220,21 @@ export function useMyPendingApprovalsQuery(params?: ApprovalMyPendingParams) {
 		queryKey: approvalKeys.myPending(params),
 		queryFn: () => getMyPendingApprovals(params),
 		placeholderData: params ? keepPreviousData : undefined,
+	});
+}
+
+/** Read-only document + open request + trail for the inbox preview (BR-FF-81). */
+export function useApprovalDocumentViewQuery(
+	docType?: ApprovalDocType,
+	docId?: number,
+) {
+	return useQuery({
+		queryKey: approvalKeys.documentView(docType ?? "pr", docId ?? 0),
+		queryFn: () => getApprovalDocumentView(docType ?? "pr", docId ?? 0),
+		enabled: Boolean(docType && docId),
+		// 4xx (no access, not found) is a final answer; do not retry it.
+		retry: (count, error) =>
+			!(error instanceof ApiClientError && error.status < 500) && count < 2,
 	});
 }
 

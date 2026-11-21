@@ -9,6 +9,7 @@ import {
   grnCorrectionSchema,
   grnListQuerySchema,
   grnQaActionSchema,
+  receivablePosQuerySchema,
   updateGrnSchema,
 } from "../types/grn.types";
 
@@ -35,11 +36,19 @@ export const grnController = {
     return c.json({ success: true, data });
   },
 
+  async getReceivablePos(c: Context<AppEnv>) {
+    const query = receivablePosQuerySchema.parse(
+      Object.fromEntries(new URL(c.req.url).searchParams),
+    );
+    const { data, meta } = await grnService.listReceivablePos(query);
+    return c.json({ success: true, data, meta });
+  },
+
   async list(c: Context<AppEnv>) {
     const query = grnListQuerySchema.parse(
       Object.fromEntries(new URL(c.req.url).searchParams),
     );
-    const { data, meta } = await grnService.list(query);
+    const { data, meta } = await grnService.list(query, c.get("actor"));
     return c.json({ success: true, data, meta });
   },
 

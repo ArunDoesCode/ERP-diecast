@@ -6,9 +6,12 @@ import { cn } from "@/lib/utils";
 
 function Table({ className, ...props }: React.ComponentProps<"table">) {
 	return (
-		<div
+		<fieldset
 			data-slot="table-container"
-			className="relative w-full overflow-x-auto"
+			aria-label="Table, scrolls sideways when wide"
+			// biome-ignore lint/a11y/noNoninteractiveTabindex: keyboard users must be able to scroll a wide table
+			tabIndex={0}
+			className="relative m-0 w-full min-w-0 overflow-x-auto border-0 p-0 rounded-sm focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
 		>
 			<table
 				data-slot="table"
@@ -18,7 +21,7 @@ function Table({ className, ...props }: React.ComponentProps<"table">) {
 				)}
 				{...props}
 			/>
-		</div>
+		</fieldset>
 	);
 }
 

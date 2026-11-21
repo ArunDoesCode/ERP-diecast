@@ -358,9 +358,9 @@ export function InvoiceForm({
 			next.link = grnId
 				? { href: `/grn/${grnId}`, label: "Back to the GRN" }
 				: {
-						href: source.prId
-							? `/purchase-orders/${source.prId}`
-							: "/purchase-orders/tracking",
+						href: source.poId
+							? `/purchase-orders/${source.poId}`
+							: "/purchase-orders",
 						label: "Back to purchase orders",
 					};
 		}

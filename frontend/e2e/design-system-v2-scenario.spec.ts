@@ -220,12 +220,15 @@ test("design-system v2 journey: PO list, focus, supplier form, density, GRN, con
 		const label = dialog.getByText("GST number", { exact: false }).first();
 		const field = dialog.locator("#supplier-gst");
 		await expect(field).toBeVisible();
+		// the dialog opens with a zoom-in animation: wait until the field size settles
+		await expect
+			.poll(async () => Math.round((await field.boundingBox())?.height ?? 0))
+			.toBe(36);
 		const l = await label.boundingBox();
 		const f = await field.boundingBox();
 		expect(l && f).toBeTruthy();
 		if (l && f) {
 			expect(l.y + l.height).toBeLessThanOrEqual(f.y + 1);
-			expect(Math.round(f.height)).toBe(36);
 		}
 		// no floating label: the label is not inside the field box
 		expect(await dialog.locator("[data-slot='floating-label']").count()).toBe(

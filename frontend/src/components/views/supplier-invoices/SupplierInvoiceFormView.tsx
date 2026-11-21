@@ -266,7 +266,7 @@ export function SupplierInvoiceFormView({
 	if (!source) return null;
 
 	if (!existing && source.catalog.length === 0) {
-		return <NothingToBill grnId={grnId} prId={source.prId} />;
+		return <NothingToBill grnId={grnId} poId={source.poId} />;
 	}
 
 	return (
@@ -289,11 +289,11 @@ export function SupplierInvoiceFormView({
 function NothingToBill({
 	message,
 	grnId,
-	prId,
+	poId,
 }: {
 	message?: string;
 	grnId?: number;
-	prId?: number | null;
+	poId?: number;
 }) {
 	return (
 		<div className="flex flex-col gap-4">
@@ -307,14 +307,14 @@ function NothingToBill({
 							href={
 								grnId
 									? `/grn/${grnId}`
-									: prId
-										? `/purchase-orders/${prId}`
-										: "/purchase-orders/tracking"
+									: poId
+										? `/purchase-orders/${poId}`
+										: "/purchase-orders"
 							}
 						>
 							{grnId
 								? "Back to the GRN"
-								: prId
+								: poId
 									? "Back to the PO"
 									: "Back to purchase orders"}
 						</Link>

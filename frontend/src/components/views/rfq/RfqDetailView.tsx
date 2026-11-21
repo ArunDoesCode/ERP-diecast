@@ -55,7 +55,7 @@ function flowSteps(data: RfqDetails): DocumentFlowStep[] {
 		steps.push({
 			label: "Purchase requisition",
 			docNo: prNumber,
-			href: `/purchase-orders/${prId}`,
+			href: `/purchase-requisitions/${prId}`,
 			state: "done",
 		});
 	}
@@ -74,7 +74,7 @@ function flowSteps(data: RfqDetails): DocumentFlowStep[] {
 		steps.push({
 			label: "Purchase order",
 			docNo: line.poNumber ?? undefined,
-			href: `/purchase-orders/${line.prId}`,
+			href: `/purchase-orders/${line.poId}`,
 			status: line.poStatus ? (
 				<StatusBadge doc="po" status={line.poStatus} />
 			) : undefined,

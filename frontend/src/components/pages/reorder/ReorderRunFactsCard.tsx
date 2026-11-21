@@ -54,7 +54,7 @@ export function ReorderRunFactsCard({
 							<span className="flex flex-wrap items-center gap-2">
 								{canOpenPr ? (
 									<Link
-										href={`/purchase-requisitions?prId=${run.pr.id}`}
+										href={`/purchase-requisitions/${run.pr.id}`}
 										className="font-mono text-brand-accent hover:underline"
 									>
 										{run.pr.prNumber}

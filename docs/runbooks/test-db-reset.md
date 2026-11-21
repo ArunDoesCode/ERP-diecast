@@ -31,15 +31,14 @@ Test DB URL (from `backend/.env.example`): `postgres://postgres:postgres@localho
    DATABASE_URL="$T" bun -e 'const u=new URL(process.env.DATABASE_URL);console.log("target:",u.host+u.pathname)'
    ```
    The line must read exactly `target: localhost:5433/diecast_test`. Anything else → stop.
-3. Reset, the way CI does it (`.github/workflows/ci.yml`, step "Test DB schema + seed"), in **one** line so
-   the override cannot get lost between commands:
+3. Reset, the way CI does it (`.github/workflows/ci.yml`, step "Test DB schema + seed"), with the test-only
+   wrapper. Agents must use this one: the plain reset command is denied in `.claude/settings.json`.
    ```bash
-   cd backend && DATABASE_URL=postgres://postgres:postgres@localhost:5433/diecast_test bun run db:reset --no-fixtures
+   cd backend && DATABASE_URL_TEST=postgres://postgres:postgres@localhost:5433/diecast_test bun run db:test:rebuild
    ```
-   With an env file: `DATABASE_URL=<same url> bun --env-file=<path> run db:reset --no-fixtures`
-   (a value given on the command line wins over the file).
-4. The first output line must be `db:reset target: localhost:5433/diecast_test (password ***)`.
-   Any other database → hard stop. Then `bun test`.
+   With an env file: `DATABASE_URL_TEST=<same url> bun --env-file=<path> run db:test:rebuild` (add
+   `--fixtures` for demo data, as the e2e job needs; `--dry-run` shows the target only).
+4. The output must name `localhost:5433/diecast_test`. Any other database → hard stop. Then `bun test`.
 
 `SEED_USER_PASSWORD` comes from the env file (CI sets a throw-away value in `ci.yml`; test DB only).
 Steps 2–3 in one command: `cd backend && bun run db:test:rebuild` (`--dry-run` shows the target and steps only; `--fixtures` adds demo data). It takes the target only from `DATABASE_URL_TEST` and exits 2, nothing changed, unless the name ends in `_test` and the host is local.

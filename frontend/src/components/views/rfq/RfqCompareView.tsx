@@ -164,18 +164,13 @@ export function RfqCompareView({ rfqId }: { rfqId: number }) {
 			{
 				onSuccess: (result) => {
 					setConfirm(false);
-					const prOfPo = new Map<number, number>();
-					for (const a of result.data.awards) {
-						const line = linesById.get(a.rfqItemId);
-						if (line) prOfPo.set(a.poId, line.prId);
-					}
 					toast.success("Award done. Draft POs created", {
 						description: (
 							<span className="flex flex-col">
 								{result.data.pos.map((po) => (
 									<Link
 										key={po.poId}
-										href={`/purchase-orders/${prOfPo.get(po.poId) ?? ""}`}
+										href={`/purchase-orders/${po.poId}`}
 										className="font-mono text-brand-accent underline"
 									>
 										{po.poNumber}

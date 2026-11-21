@@ -36,14 +36,11 @@ export function Pagination({
 	alwaysShow,
 }: PaginationProps) {
 	const pageCount = Math.max(1, Math.ceil(total / pageSize));
-	// One page that fits: nothing to page through. The size select stays so a large
-	// page size can be lowered; a stale ?page beyond the last page keeps the nav so
-	// the user can get back.
+	// Hidden when total <= page size (BR-FF-105) unless `alwaysShow` (DES-60); a stale ?page beyond the last page
+	// keeps the nav so the user can get back.
 	const fitsOnePage = total <= pageSize && page <= 1;
-	const showSizeSelect =
-		onPageSizeChange !== undefined && total > Math.min(...PAGE_SIZE_OPTIONS);
-	if (total <= 0 || (!alwaysShow && fitsOnePage && !showSizeSelect))
-		return null;
+	const showSizeSelect = onPageSizeChange !== undefined;
+	if (total <= 0 || (!alwaysShow && fitsOnePage)) return null;
 	const atStart = page <= 1;
 	const atEnd = page >= pageCount;
 	const numbers = getPageNumbers(page, pageCount);

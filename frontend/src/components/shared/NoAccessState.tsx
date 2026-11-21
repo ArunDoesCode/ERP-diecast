@@ -32,7 +32,7 @@ export function NoAccessState({ what, permission, path }: NoAccessStateProps) {
 				}
 				action={
 					<Link
-						href="/landing"
+						href="/home"
 						className="text-sm font-medium text-brand-accent hover:underline"
 					>
 						Go to home

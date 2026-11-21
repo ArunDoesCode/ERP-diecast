@@ -105,6 +105,7 @@ export type OnTimeVerdictFilter = "all" | "late" | "on_time" | "no_due_date";
 
 export type OnTimeLine = {
 	poItemId: number;
+	poId: number;
 	poNumber: string;
 	prId: number | null;
 	itemSku: string;
@@ -130,6 +131,7 @@ export type RejectionLine = {
 	grnItemId: number;
 	grnNumber: string;
 	grnId: number | null;
+	poId: number;
 	poNumber: string;
 	prId: number | null;
 	itemSku: string;
@@ -145,6 +147,7 @@ export type RejectionLine = {
 
 export type PriceLine = {
 	poItemId: number;
+	poId: number;
 	poNumber: string;
 	prId: number | null;
 	poDate: string;

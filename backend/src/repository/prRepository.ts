@@ -7,6 +7,7 @@ import {
   inArray,
   isNotNull,
   isNull,
+  type SQL,
   sql,
 } from "drizzle-orm";
 
@@ -23,6 +24,7 @@ import {
   purchaseRequestItems,
   purchaseRequests,
 } from "../db/schemas/02_procurement";
+import { approvalRequests } from "../db/schemas/02_procurement-approval";
 import { rfqItems } from "../db/schemas/02_procurement-rfq";
 import { supplierMaster } from "../db/schemas/02_procurement-suppliers";
 import { employees } from "../db/schemas/03_hcm";
@@ -31,6 +33,7 @@ import { AppError } from "../lib/errors";
 import { assertMoneyInRange } from "../lib/money";
 import { safeSearch } from "../lib/safe-search";
 import type { prListQuerySchemaType } from "../types/pr.types";
+import { istBoundsSql } from "./poPredicates";
 
 const purchaseRequestColumns = {
   id: purchaseRequests.id,
@@ -182,10 +185,31 @@ const prSortColumns = {
   type: purchaseRequests.type,
   status: purchaseRequests.status,
   createdAt: purchaseRequests.createdAt,
+  estimatedAmountPaise: purchaseRequests.estimatedAmountPaise,
 } as const;
 
+/** Earliest required-by among a PR's pending lines (BR-FF-23). */
+const earliestPendingSql = sql`(select min(${purchaseRequestItems.expectedDate}) from ${purchaseRequestItems}
+  where ${purchaseRequestItems.prId} = ${purchaseRequests.id} and ${purchaseRequestItems.status} = 'pending')`;
+const hasPendingLineSql = sql`exists (select 1 from ${purchaseRequestItems}
+  where ${purchaseRequestItems.prId} = ${purchaseRequests.id} and ${purchaseRequestItems.status} = 'pending')`;
+
+/** BR-FF-23 (same predicate as the Home tile): approved / partly ordered with a pending line. */
+const prToOrderSql = sql`(${purchaseRequests.status} in ('approved', 'partial_ordered') and ${hasPendingLineSql})`;
+/** The "Ordered" group: approved / partly / fully ordered with no pending line. */
+const prOrderedSql = sql`(${purchaseRequests.status} in ('approved', 'partial_ordered', 'fully_ordered') and not ${hasPendingLineSql})`;
+
+function prBucketSql(bucket: "late" | "today" | "later", today: string) {
+  const due = earliestPendingSql;
+  const { start, next } = istBoundsSql(today);
+  // No required-by date counts as Later (BR-FF-23).
+  if (bucket === "late") return sql`${due} < ${start}`;
+  if (bucket === "today") return sql`(${due} >= ${start} and ${due} < ${next})`;
+  return sql`(${due} is null or ${due} >= ${next})`;
+}
+
 export const prRepository = {
-  async list(params: prListQuerySchemaType) {
+  async list(params: prListQuerySchemaType, actorId: number, today: string) {
     const sortColumn =
       params.sortBy && params.sortBy in prSortColumns
         ? prSortColumns[params.sortBy as keyof typeof prSortColumns]
@@ -193,7 +217,7 @@ export const prRepository = {
     const orderFn = params.sortDir === "desc" ? desc : asc;
 
     // BR-PR-48: `q` matches number and notes only; status and type have
-    // their own params.
+    // their own params. `mine` narrows the strip counts too (BR-FF-109).
     const searchFilters = [
       safeSearch(params.q, purchaseRequests.prNumber, purchaseRequests.notes),
       params.type ? eq(purchaseRequests.type, params.type) : undefined,
@@ -206,19 +230,23 @@ export const prRepository = {
       params.reorderRunId !== undefined
         ? eq(purchaseRequests.reorderRunId, params.reorderRunId)
         : undefined,
-    ];
+      params.mine === true
+        ? eq(purchaseRequests.requestedBy, actorId)
+        : undefined,
+    ].filter((filter) => filter !== undefined);
     const filters = [
       ...searchFilters,
       params.status && params.status.length > 0
         ? inArray(purchaseRequests.status, params.status)
         : undefined,
+      params.toOrder === true ? prToOrderSql : undefined,
+      params.toOrder === false ? prOrderedSql : undefined,
+      params.bucket ? prBucketSql(params.bucket, today) : undefined,
     ].filter((filter) => filter !== undefined);
 
     const whereClause = filters.length > 0 ? and(...filters) : undefined;
-    const countWhere = and(
-      ...searchFilters.filter((filter) => filter !== undefined),
-    );
-    const [rows, [totalRow], countRows] = await Promise.all([
+    const countWhere = and(...searchFilters);
+    const [rows, [totalRow], countRows, [toOrderRow]] = await Promise.all([
       db
         .select({
           ...purchaseRequestColumns,
@@ -233,8 +261,10 @@ export const prRepository = {
                 where ri.pr_item_id = pri.id and ri.line_status = 'open'
               )
           )`,
+          requestedByName: employees.name,
         })
         .from(purchaseRequests)
+        .innerJoin(employees, eq(employees.id, purchaseRequests.requestedBy))
         .where(whereClause)
         .orderBy(orderFn(sortColumn), asc(purchaseRequests.id))
         .limit(params.pageSize)
@@ -247,6 +277,11 @@ export const prRepository = {
         .from(purchaseRequests)
         .where(countWhere)
         .groupBy(purchaseRequests.status),
+      // BR-FF-02: what toOrder=true returns under the other filters.
+      db
+        .select({ value: count() })
+        .from(purchaseRequests)
+        .where(and(countWhere, prToOrderSql)),
     ]);
 
     const statusCounts = Object.fromEntries(
@@ -254,10 +289,51 @@ export const prRepository = {
     ) as Record<(typeof prStatusEnum.enumValues)[number], number>;
     for (const row of countRows) statusCounts[row.status] = row.value;
 
+    // PERF-04: line count / earliest required-by and the last request status
+    // of the page's PRs, one batched query each.
+    const ids = rows.map((r) => r.id);
+    const [lineAgg, lastRequests] =
+      ids.length === 0
+        ? [[], []]
+        : await Promise.all([
+            db
+              .select({
+                prId: purchaseRequestItems.prId,
+                lineCount: count(),
+                earliest: sql<
+                  string | null
+                >`to_char(min(${purchaseRequestItems.expectedDate}) filter (where ${purchaseRequestItems.status} = 'pending'), 'YYYY-MM-DD')`,
+              })
+              .from(purchaseRequestItems)
+              .where(inArray(purchaseRequestItems.prId, ids))
+              .groupBy(purchaseRequestItems.prId),
+            db
+              .selectDistinctOn([approvalRequests.docId], {
+                docId: approvalRequests.docId,
+                status: approvalRequests.status,
+              })
+              .from(approvalRequests)
+              .where(
+                and(
+                  eq(approvalRequests.docType, "pr"),
+                  inArray(approvalRequests.docId, ids),
+                ),
+              )
+              .orderBy(approvalRequests.docId, desc(approvalRequests.id)),
+          ]);
+    const aggByPr = new Map(lineAgg.map((a) => [a.prId, a]));
+    const lastByPr = new Map(lastRequests.map((r) => [r.docId, r.status]));
+
     return {
-      rows,
+      rows: rows.map((r) => ({
+        ...r,
+        lineCount: aggByPr.get(r.id)?.lineCount ?? 0,
+        earliestRequiredBy: aggByPr.get(r.id)?.earliest ?? null,
+        sentBack: lastByPr.get(r.id) === "require_more_info",
+      })),
       total: totalRow?.value ?? 0,
       statusCounts,
+      toOrderCount: toOrderRow?.value ?? 0,
     };
   },
 
@@ -377,8 +453,20 @@ export const prRepository = {
               supplierMaster,
               eq(supplierMaster.id, purchaseOrders.supplierId),
             )
-            .where(inArray(purchaseOrderItems.itemId, itemIds))
-            .orderBy(purchaseOrderItems.itemId, desc(purchaseOrders.createdAt));
+            // BR-FF-91: newest PO (created time, tie -> higher id) that is not
+            // cancelled and whose supplier is still active.
+            .where(
+              and(
+                inArray(purchaseOrderItems.itemId, itemIds),
+                sql`${purchaseOrders.status} <> 'cancelled'`,
+                eq(supplierMaster.isActive, true),
+              ),
+            )
+            .orderBy(
+              purchaseOrderItems.itemId,
+              desc(purchaseOrders.createdAt),
+              desc(purchaseOrders.id),
+            );
 
     const defaultSupplierByItemId = new Map(
       latestSuppliersByItem.map((row) => [row.itemId, row]),
@@ -392,6 +480,9 @@ export const prRepository = {
           ...item,
           defaultSupplierId: defaultSupplier?.supplierId ?? null,
           defaultSupplierName: defaultSupplier?.supplierName ?? null,
+          // BR-FF-43: the PO the line is on.
+          onPoId: item.linkedPoId ?? null,
+          onPoNumber: item.linkedPoNumber ?? null,
         };
       }),
       linkedPos,

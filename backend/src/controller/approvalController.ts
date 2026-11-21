@@ -6,6 +6,7 @@ import { approvalService } from "../service/approvalService";
 import {
   approvalActionRequestSchema,
   approvalDocLookupParamSchema,
+  approvalDocumentViewParamSchema,
   approvalPolicyIdParamSchema,
   approvalPolicyListQuerySchema,
   approvalRequestIdParamSchema,
@@ -130,6 +131,16 @@ export const approvalController = {
     });
     const actor = parseActor(c);
     const data = await approvalService.getApprovalHistory(params, actor);
+    return c.json({ success: true, data });
+  },
+
+  async getDocumentView(c: Context<AppEnv>) {
+    const params = approvalDocumentViewParamSchema.parse({
+      docType: c.req.param("docType"),
+      docId: c.req.param("docId"),
+    });
+    const actor = parseActor(c);
+    const data = await approvalService.getDocumentView(params, actor);
     return c.json({ success: true, data });
   },
 };

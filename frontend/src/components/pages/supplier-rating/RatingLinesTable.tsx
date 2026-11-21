@@ -79,7 +79,7 @@ const ON_TIME_COLUMNS: DataTableColumnDef<OnTimeLine>[] = [
 	{
 		...sortable<OnTimeLine>("poNumber", "PO no.", (r) => r.poNumber),
 		cell: ({ row }) => (
-			<DocNo kind="po" id={row.original.prId} value={row.original.poNumber} />
+			<DocNo kind="po" id={row.original.poId} value={row.original.poNumber} />
 		),
 	},
 	{
@@ -170,7 +170,7 @@ const REJECTION_COLUMNS: DataTableColumnDef<RejectionLine>[] = [
 					PO{" "}
 					<DocNo
 						kind="po"
-						id={row.original.prId}
+						id={row.original.poId}
 						value={row.original.poNumber}
 					/>
 				</span>
@@ -239,7 +239,7 @@ const PRICE_COLUMNS: DataTableColumnDef<PriceLine>[] = [
 		...sortable<PriceLine>("poNumber", "PO no.", (r) => r.poNumber),
 		cell: ({ row }) => (
 			<span className="flex flex-col">
-				<DocNo kind="po" id={row.original.prId} value={row.original.poNumber} />
+				<DocNo kind="po" id={row.original.poId} value={row.original.poNumber} />
 				<span className="text-[13px] text-muted-foreground">
 					{formatDate(row.original.poDate)}
 				</span>

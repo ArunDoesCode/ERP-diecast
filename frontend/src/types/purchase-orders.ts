@@ -17,7 +17,13 @@ export const poStatusValues = [
 ] as const;
 
 export type POStatus = (typeof poStatusValues)[number];
-export type POSortField = "id" | "poNumber" | "status" | "createdAt";
+export type POSortField =
+	| "id"
+	| "poNumber"
+	| "status"
+	| "createdAt"
+	| "dueDate"
+	| "totalAmountPaise";
 
 export interface PurchaseOrder {
 	id: number;
@@ -107,6 +113,8 @@ export type PurchaseOrderListParams = {
 	supplierId?: number;
 	q?: string;
 	overdue?: boolean;
+	mine?: boolean;
+	bucket?: "late" | "today" | "later";
 };
 
 /** BR-SUP-13 allowed GST percentages. */

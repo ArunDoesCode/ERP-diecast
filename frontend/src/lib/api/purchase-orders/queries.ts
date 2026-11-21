@@ -9,6 +9,9 @@ import {
 import { toast } from "sonner";
 
 import { ApiClientError } from "@/lib/api/client";
+import { documentKeys } from "@/lib/api/document/queries";
+import { grnKeys } from "@/lib/api/grn/keys";
+import { homeKeys } from "@/lib/api/home/queries";
 import { purchaseRequisitionKeys } from "@/lib/api/purchase-requisitions/queries";
 import { istTodayIso } from "@/lib/ist-date";
 import type {
@@ -40,29 +43,7 @@ import {
 	updatePurchaseOrder,
 	updatePurchaseOrderDelay,
 } from "./fetchers";
-
-export const purchaseOrderKeys = {
-	cards: (params?: PurchaseOrderListParams) =>
-		params
-			? (["purchase-orders", "cards", params] as const)
-			: (["purchase-orders", "cards"] as const),
-	detail: (poId: number) => ["purchase-orders", "detail", poId] as const,
-	communications: (poId: number) =>
-		["purchase-orders", "communications", poId] as const,
-	lastRate: (itemId: number, supplierId: number, onDate?: string) =>
-		["purchase-orders", "last-rate", itemId, supplierId, onDate ?? ""] as const,
-	lastRates: (itemIds: number[], supplierId: number, onDate?: string) =>
-		[
-			"purchase-orders",
-			"last-rate",
-			"batch",
-			[...new Set(itemIds)].sort((a, b) => a - b),
-			supplierId,
-			onDate ?? "",
-		] as const,
-	priceRows: (supplierId: number, itemIds: number[]) =>
-		["purchase-orders", "price-rows", supplierId, itemIds] as const,
-};
+import { purchaseOrderKeys } from "./keys";
 
 const PO_ERROR_MESSAGES: Record<string, string> = {
 	PR_LINE_ON_OPEN_RFQ:
@@ -191,6 +172,8 @@ export function useCreatePurchaseOrderMutation() {
 			}
 
 			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: homeKeys.all }),
+				queryClient.invalidateQueries({ queryKey: documentKeys.all }),
 				queryClient.invalidateQueries({
 					queryKey: purchaseOrderKeys.cards(),
 				}),
@@ -211,15 +194,108 @@ export function useCreatePurchaseOrderMutation() {
 	});
 }
 
+export type PoDraftGroup = {
+	supplierId: number;
+	supplierName: string;
+	/** Earliest required-by date (YYYY-MM-DD) of the group's PR lines (A-92); omitted when none. */
+	expectedDeliveryDate?: string;
+	lines: Array<{ prItemId: number; unitPricePaise: number }>;
+};
+
+export type PoDraftOutcome =
+	| {
+			ok: true;
+			supplierName: string;
+			po: { id: number; poNumber: string };
+	  }
+	| { ok: false; supplierName: string; message: string; conflict: boolean };
+
+/**
+ * Create PO from a requisition (BR-FF-48, 58, 59): one createpo call per supplier, in
+ * parallel. A refused supplier does not stop the others; the result lists every outcome.
+ * No toasts here: the caller words the message from the outcomes.
+ */
+export function useCreateDraftPosMutation() {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: async (variables: {
+			prId: number;
+			groups: PoDraftGroup[];
+		}): Promise<PoDraftOutcome[]> =>
+			Promise.all(
+				variables.groups.map(async (group): Promise<PoDraftOutcome> => {
+					try {
+						const result = await createPurchaseOrder({
+							supplierId: group.supplierId,
+							expectedDeliveryDate: group.expectedDeliveryDate,
+							lines: group.lines,
+						});
+						if (!result.success) {
+							return {
+								ok: false,
+								supplierName: group.supplierName,
+								message: result.message || "Could not create the order",
+								conflict: false,
+							};
+						}
+						return {
+							ok: true,
+							supplierName: group.supplierName,
+							po: {
+								id: result.data.po.id,
+								poNumber: result.data.po.poNumber,
+							},
+						};
+					} catch (error) {
+						const conflict =
+							error instanceof ApiClientError &&
+							(error.status === 409 ||
+								error.code === "PO_LINE_ALREADY_DRAFTED" ||
+								// Sequential case: BR-PO-01 answers a code-less 400 "PR item N is not in pending status" (A-87).
+								(error.status === 400 &&
+									!error.code &&
+									/is not in pending status/i.test(error.message)));
+						return {
+							ok: false,
+							supplierName: group.supplierName,
+							message: conflict
+								? "Already on another order"
+								: errorMessage(error, "Could not create the order"),
+							conflict,
+						};
+					}
+				}),
+			),
+		onSettled: async (_outcomes, _error, variables) => {
+			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: homeKeys.all }),
+				queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.cards() }),
+				queryClient.invalidateQueries({
+					queryKey: purchaseRequisitionKeys.cards(),
+				}),
+				queryClient.invalidateQueries({
+					queryKey: purchaseRequisitionKeys.detail(variables.prId),
+				}),
+				queryClient.invalidateQueries({ queryKey: documentKeys.all }),
+				queryClient.invalidateQueries({ queryKey: ["approval"] }),
+			]);
+		},
+	});
+}
+
 function invalidatePOAndPR(
 	queryClient: ReturnType<typeof useQueryClient>,
 	poId: number,
 	prId?: number,
 ) {
 	return Promise.all([
+		queryClient.invalidateQueries({ queryKey: homeKeys.all }),
+		queryClient.invalidateQueries({ queryKey: grnKeys.receivable() }),
 		queryClient.invalidateQueries({
 			queryKey: purchaseOrderKeys.communications(poId),
 		}),
+		queryClient.invalidateQueries({ queryKey: documentKeys.all }),
 		queryClient.invalidateQueries({ queryKey: ["approval", "pending"] }),
 		queryClient.invalidateQueries({ queryKey: ["approval", "history"] }),
 		queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.cards() }),
@@ -243,7 +319,10 @@ function invalidatePOAndPR(
 	]);
 }
 
-export function useUpdatePurchaseOrderMutation() {
+/** `quietSuccess.current = true` skips the "updated" toast (Save and submit shows one toast). */
+export function useUpdatePurchaseOrderMutation(quietSuccess?: {
+	current: boolean;
+}) {
 	const queryClient = useQueryClient();
 
 	return useMutation({
@@ -260,7 +339,9 @@ export function useUpdatePurchaseOrderMutation() {
 				variables.payload.poId,
 				variables.prId,
 			);
-			toast.success(result.message || `${result.data.po.poNumber} updated`);
+			if (!quietSuccess?.current) {
+				toast.success(result.message || `${result.data.po.poNumber} updated`);
+			}
 		},
 		onError: (error) => {
 			toast.error(errorMessage(error, "Failed to update PO"));
@@ -413,12 +494,7 @@ export function useConfirmPoMutation() {
 				return;
 			}
 
-			await Promise.all([
-				queryClient.invalidateQueries({
-					queryKey: purchaseOrderKeys.detail(variables.poId),
-				}),
-				queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.cards() }),
-			]);
+			await invalidatePOAndPR(queryClient, variables.poId);
 			toast.success(result.message || `${result.data.poNumber} confirmed`);
 		},
 		onError: (error) => {
@@ -439,12 +515,7 @@ export function useClosePoMutation() {
 				return;
 			}
 
-			await Promise.all([
-				queryClient.invalidateQueries({
-					queryKey: purchaseOrderKeys.detail(variables.poId),
-				}),
-				queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.cards() }),
-			]);
+			await invalidatePOAndPR(queryClient, variables.poId);
 			toast.success(result.message || `${result.data.poNumber} closed`);
 		},
 		onError: (error) => {

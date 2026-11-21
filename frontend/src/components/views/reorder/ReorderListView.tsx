@@ -37,7 +37,7 @@ function coveredHref(row: ReorderItemRow) {
 	const by = row.coveredBy;
 	if (!by) return null;
 	// A PO has no page of its own by id yet; its number shows as plain text.
-	return by.type === "po" ? null : `/purchase-requisitions?prId=${by.id}`;
+	return by.type === "po" ? null : `/purchase-requisitions/${by.id}`;
 }
 
 const columns: DataTableColumnDef<ReorderItemRow>[] = [

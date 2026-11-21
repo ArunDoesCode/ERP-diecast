@@ -107,7 +107,7 @@ const columns: DataTableColumnDef<ReorderRun>[] = [
 		cell: ({ row }) =>
 			row.original.pr?.prNumber ? (
 				<Link
-					href={`/purchase-requisitions?prId=${row.original.pr.id}`}
+					href={`/purchase-requisitions/${row.original.pr.id}`}
 					className="font-mono text-brand-accent hover:underline"
 				>
 					{row.original.pr.prNumber}

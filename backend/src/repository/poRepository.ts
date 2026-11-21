@@ -44,6 +44,8 @@ import type {
   poListQuerySchemaType,
   poStatusSchemaType,
 } from "../types/po.types";
+import { openQtySql, pendingQaQtySql, round3 } from "./openQty";
+import { poBucketSql, poDueSql, poLateSql } from "./poPredicates";
 import { prRepository } from "./prRepository";
 import { findRateChoices } from "./rateChainRepository";
 
@@ -201,51 +203,52 @@ const poSortColumns = {
   poNumber: purchaseOrders.poNumber,
   status: purchaseOrders.status,
   createdAt: purchaseOrders.createdAt,
+  totalAmountPaise: purchaseOrders.totalAmountPaise,
 } as const;
 
 export const poRepository = {
-  async list(params: poListQuerySchemaType) {
-    const sortColumn =
-      params.sortBy && params.sortBy in poSortColumns
-        ? poSortColumns[params.sortBy as keyof typeof poSortColumns]
-        : purchaseOrders.id;
+  async list(params: poListQuerySchemaType, actorId: number, today: string) {
     const orderFn = params.sortDir === "desc" ? desc : asc;
+    // dueDate is the BR-PO-19 expression; no due date sorts last.
+    const dueOrder =
+      params.sortDir === "desc"
+        ? sql`${poDueSql} desc nulls last`
+        : sql`${poDueSql} asc nulls last`;
+    const sortExpr =
+      params.sortBy === "dueDate"
+        ? dueOrder
+        : orderFn(
+            params.sortBy && params.sortBy in poSortColumns
+              ? poSortColumns[params.sortBy as keyof typeof poSortColumns]
+              : purchaseOrders.id,
+          );
 
     const searchFilters = [
       safeSearch(params.q, purchaseOrders.poNumber, purchaseOrders.notes),
       params.supplierId
         ? eq(purchaseOrders.supplierId, params.supplierId)
         : undefined,
-    ];
+      // BR-FF-107: "my POs" = created by the caller; narrows the strip too.
+      params.mine === true ? eq(purchaseOrders.createdBy, actorId) : undefined,
+    ].filter((filter) => filter !== undefined);
     const filters = [
       ...searchFilters,
       params.status && params.status.length > 0
         ? inArray(purchaseOrders.status, params.status)
         : undefined,
-      params.overdue
-        ? and(
-            inArray(purchaseOrders.status, ["dispatched", "partial_received"]),
-            // BR-PO-19: due date = revised date if set, else expected date; before today.
-            sql`coalesce(${purchaseOrders.revisedDeliveryDate}, ${purchaseOrders.expectedDeliveryDate}) < current_date`,
-            sql`exists (
-              select 1 from ${purchaseOrderItems}
-              where ${purchaseOrderItems.poId} = ${purchaseOrders.id}
-                and (${purchaseOrderItems.qty} - coalesce(${purchaseOrderItems.receivedQty}, 0)) > 0
-            )`,
-          )
-        : undefined,
+      // BR-FF-26: `overdue` is the same predicate as bucket=late (BR-PO-19).
+      params.overdue ? poLateSql(today) : undefined,
+      params.bucket ? poBucketSql(params.bucket, today) : undefined,
     ].filter((filter) => filter !== undefined);
 
     const whereClause = filters.length > 0 ? and(...filters) : undefined;
-    const countWhere = and(
-      ...searchFilters.filter((filter) => filter !== undefined),
-    );
-    const [rows, [totalRow], countRows] = await Promise.all([
+    const countWhere = and(...searchFilters);
+    const [rows, [totalRow], countRows, [lateRow]] = await Promise.all([
       db
         .select(purchaseOrderColumns)
         .from(purchaseOrders)
         .where(whereClause)
-        .orderBy(orderFn(sortColumn), asc(purchaseOrders.id))
+        .orderBy(sortExpr, asc(purchaseOrders.id))
         .limit(params.pageSize)
         .offset((params.page - 1) * params.pageSize),
       db.select({ value: count() }).from(purchaseOrders).where(whereClause),
@@ -256,6 +259,11 @@ export const poRepository = {
         .from(purchaseOrders)
         .where(countWhere)
         .groupBy(purchaseOrders.status),
+      // BR-FF-26: rows the Late filter returns under the other filters.
+      db
+        .select({ value: count() })
+        .from(purchaseOrders)
+        .where(and(countWhere, poLateSql(today))),
     ]);
 
     const statusCounts = Object.fromEntries(
@@ -263,10 +271,39 @@ export const poRepository = {
     ) as Record<poStatusSchemaType, number>;
     for (const row of countRows) statusCounts[row.status] = row.value;
 
+    // PERF-04: line count and received % of the page's POs, one grouped query.
+    const ids = rows.map((r) => r.id);
+    const aggRows =
+      ids.length === 0
+        ? []
+        : await db
+            .select({
+              poId: purchaseOrderItems.poId,
+              lineCount: count(),
+              qty: sql<number>`coalesce(sum(${purchaseOrderItems.qty}), 0)`,
+              received: sql<number>`coalesce(sum(coalesce(${purchaseOrderItems.receivedQty}, 0)), 0)`,
+            })
+            .from(purchaseOrderItems)
+            .where(inArray(purchaseOrderItems.poId, ids))
+            .groupBy(purchaseOrderItems.poId);
+    const aggByPo = new Map(aggRows.map((a) => [a.poId, a]));
+
     return {
-      rows,
+      rows: rows.map((r) => {
+        const agg = aggByPo.get(r.id);
+        const qty = Number(agg?.qty ?? 0);
+        // BR-FF-107: accepted / ordered by qty, whole percent.
+        const pct =
+          qty > 0 ? Math.round((Number(agg?.received) / qty) * 100) : 0;
+        return {
+          ...r,
+          lineCount: agg?.lineCount ?? 0,
+          receivedPct: Math.min(100, Math.max(0, pct)),
+        };
+      }),
       total: totalRow?.value ?? 0,
       statusCounts,
+      lateCount: lateRow?.value ?? 0,
     };
   },
 
@@ -736,7 +773,12 @@ export const poRepository = {
         .where(eq(purchaseOrders.id, poId))
         .limit(1),
       db
-        .select(purchaseOrderItemDetailColumns)
+        .select({
+          ...purchaseOrderItemDetailColumns,
+          // BR-FF-09: arrived and pending QA / still open.
+          pendingQaQty: pendingQaQtySql.mapWith(Number),
+          openQty: openQtySql.mapWith(Number),
+        })
         .from(purchaseOrderItems)
         .innerJoin(itemMaster, eq(itemMaster.id, purchaseOrderItems.itemId))
         .leftJoin(
@@ -791,7 +833,12 @@ export const poRepository = {
 
     return {
       po,
-      items,
+      items: items.map((item) => ({
+        ...item,
+        pendingQaQty: round3(item.pendingQaQty),
+        // Over-receipt never shows a negative open qty.
+        openQty: Math.max(0, round3(item.openQty)),
+      })),
       returns,
     };
   },

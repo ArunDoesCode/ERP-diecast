@@ -11,6 +11,10 @@ async function open(page: Page, path: string) {
 	await expect(page.getByRole("heading", { level: 1 })).toBeVisible({
 		timeout: 15_000,
 	});
+	// An authenticated landmark: the session is in place before a test reloads the page.
+	await expect(page.locator("header").getByRole("button").last()).toBeVisible({
+		timeout: 15_000,
+	});
 }
 
 /** Resolve a CSS colour (token via var()) to the browser's computed rgb string. */

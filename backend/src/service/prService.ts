@@ -6,9 +6,11 @@ import {
   ForbiddenError,
   NotFoundError,
 } from "../lib/errors";
-import { istDayStart } from "../lib/ist-day";
+import { istDayKey, istDayStart } from "../lib/ist-day";
 import { approvalRepository } from "../repository/approvalRepository";
+import { poRepository } from "../repository/poRepository";
 import { prRepository } from "../repository/prRepository";
+import type { RateChoice } from "../repository/rateChainRepository";
 import type {
   createPrSchemaType,
   prItemSchemaType,
@@ -260,22 +262,62 @@ function toPaginatedMeta(page: number, pageSize: number, total: number) {
 }
 
 export const prService = {
-  async getDetails(prId: number) {
+  async getDetails(prId: number, actor: Actor) {
     const row = await prRepository.findPrDetailsById(prId);
     if (!row) {
       throw new NotFoundError("Purchase request not found");
     }
 
-    return row;
+    // BR-FF-06 / SEC-01: PO pricing only for callers holding po.manage.
+    const canSeeRates = can(actor, "po.manage");
+    // BR-FF-49, 92: the frozen BR-PO-25 rate for the line's default supplier
+    // (one lookup per distinct supplier, not per line). No default supplier
+    // or no rate -> null and the Create PO dialog asks.
+    const itemsBySupplier = new Map<number, number[]>();
+    for (const item of row.items) {
+      if (!canSeeRates || item.defaultSupplierId == null) continue;
+      const ids = itemsBySupplier.get(item.defaultSupplierId) ?? [];
+      ids.push(item.itemId);
+      itemsBySupplier.set(item.defaultSupplierId, ids);
+    }
+    const ratesBySupplier = new Map<number, Map<number, RateChoice>>();
+    await Promise.all(
+      [...itemsBySupplier].map(async ([supplierId, itemIds]) => {
+        ratesBySupplier.set(
+          supplierId,
+          await poRepository.findLastRates(supplierId, [...new Set(itemIds)]),
+        );
+      }),
+    );
+
+    return {
+      ...row,
+      items: row.items.map((item) => {
+        const rate =
+          item.defaultSupplierId == null
+            ? undefined
+            : ratesBySupplier.get(item.defaultSupplierId)?.get(item.itemId)
+                ?.ratePaise;
+        return {
+          ...item,
+          suggestedRatePaise: rate && rate > 0 ? rate : null,
+        };
+      }),
+    };
   },
 
-  async list(params: prListQuerySchemaType) {
-    const { rows, total, statusCounts } = await prRepository.list(params);
+  async list(params: prListQuerySchemaType, actorId: number) {
+    const { rows, total, statusCounts, toOrderCount } = await prRepository.list(
+      params,
+      actorId,
+      istDayKey(),
+    );
     return {
       data: rows,
       meta: {
         ...toPaginatedMeta(params.page, params.pageSize, total),
         statusCounts,
+        toOrderCount,
       },
     };
   },

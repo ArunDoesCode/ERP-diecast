@@ -31,7 +31,13 @@ export type PRType = (typeof prTypeValues)[number];
 export type PRStatus = (typeof prStatusValues)[number];
 export type PRItemStatus = (typeof prItemStatusValues)[number];
 
-export type PRSortField = "id" | "prNumber" | "type" | "status" | "createdAt";
+export type PRSortField =
+	| "id"
+	| "prNumber"
+	| "type"
+	| "status"
+	| "createdAt"
+	| "estimatedAmountPaise";
 
 export type PaginationMeta = {
 	page: number;
@@ -148,6 +154,12 @@ export type PurchaseRequisitionListParams = {
 	q?: string;
 	raisedByReorder?: boolean;
 	reorderRunId?: number;
+	/** Only my own PRs. */
+	mine?: boolean;
+	/** Explicit false is sent as "false". */
+	toOrder?: boolean;
+	/** Needs `toOrder: true` (server answers 400 otherwise). */
+	bucket?: "late" | "today" | "later";
 };
 
 /** Local calendar date as YYYY-MM-DD (matches <input type="date">). */

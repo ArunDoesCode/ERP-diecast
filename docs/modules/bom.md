@@ -22,7 +22,7 @@ sale-order explosion. Full; no prices anywhere on BOM responses.
 | Layer | Path | Key symbols |
 |---|---|---|
 | schema | `backend/src/db/schemas/02_procurement-bom.ts` (barrel `02_procurement.ts`) | `boms`, `bomLines`, `bomPartSeq`, `bomHistory`; enums `bom_kind`, `bom_status`, `bom_history_action` |
-| migration | `backend/src/db/migrations/20261120175350_free_pestilence/` | tables, CHECKs, partial unique indexes |
+| migration | `backend/src/db/migrations/20261120180000_free_pestilence/` | tables, CHECKs, partial unique indexes |
 | types | `backend/src/types/bom.types.ts` | request + response Zod (recursive tree via `z.lazy`) |
 | lib | `backend/src/lib/bom-math.ts` | revision letters, `bomNumber`, casting figures (BigInt), `ceilDiv`, `pourQty`, `alloyKg`, `sendNeed`, `childNeed` (take **thousandths**), `MAX_BOM_LEVELS` (10), `MAX_BOM_NODES` (1,000) |
 | repository | `repository/bomRepository.ts`, `repository/vendorServiceRepository.ts` | list, detail, history, locks, `listActiveFullByParts`, `findItemsWithActiveBom`, `whereUsed`, `workerHasActiveService`; shared `findActiveVendorServiceRows` (SCO's `findVendorServiceRows` delegates to it) |

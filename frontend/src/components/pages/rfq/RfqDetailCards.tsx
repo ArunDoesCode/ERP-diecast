@@ -30,11 +30,11 @@ function lineStatusText(line: RfqLine): ReactNode {
 	return (
 		<span className="flex flex-wrap items-center gap-x-1">
 			Awarded to {line.awardedSupplierName ?? "–"}
-			{line.poNumber && line.prId ? (
+			{line.poNumber && line.poId ? (
 				<>
 					{" → "}
 					<Link
-						href={`/purchase-orders/${line.prId}`}
+						href={`/purchase-orders/${line.poId}`}
 						className="font-mono text-brand-accent hover:underline"
 					>
 						{line.poNumber}
@@ -391,7 +391,7 @@ function PoLinks({ links }: { links: RfqLine[] }) {
 			{links.map((line) => (
 				<li key={line.poId}>
 					<Link
-						href={`/purchase-orders/${line.prId}`}
+						href={`/purchase-orders/${line.poId}`}
 						className="font-mono text-brand-accent hover:underline"
 					>
 						{line.poNumber}

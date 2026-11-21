@@ -128,6 +128,7 @@ const MAP: Record<StatusDoc, Record<string, Entry>> = Object.assign(
 			passed: ["Passed", "success"],
 			failed: ["Failed", "danger"],
 			waived: ["Waived", "neutral"],
+			mixed: ["Partly accepted", "warning"],
 		}),
 		purchaseReturn: table({
 			draft: ["Draft", "neutral"],

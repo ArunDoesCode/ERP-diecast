@@ -285,9 +285,9 @@ export function RateContractDetailView({ contractId }: { contractId: number }) {
 										{contract.pos.map((po) => (
 											<TableRow key={po.poId}>
 												<TableCell>
-													{po.prId ? (
+													{po.poId ? (
 														<Link
-															href={`/purchase-orders/${po.prId}`}
+															href={`/purchase-orders/${po.poId}`}
 															className="font-mono text-brand-accent hover:underline"
 														>
 															{po.poNumber}

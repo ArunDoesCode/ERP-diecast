@@ -5,6 +5,7 @@ import {
   InternalServerError,
   NotFoundError,
 } from "../lib/errors";
+import { istDayKey } from "../lib/ist-day";
 import { toMilli } from "../lib/milli";
 import { grnRepository } from "../repository/grnRepository";
 import { poRepository } from "../repository/poRepository";
@@ -22,6 +23,7 @@ import {
   type grnCorrectionSchemaType,
   type grnListQuerySchemaType,
   type grnQaActionSchemaType,
+  type receivablePosQuerySchemaType,
   type updateGrnSchemaType,
   WHOLE_NUMBER_UNITS,
 } from "../types/grn.types";
@@ -260,6 +262,15 @@ async function lockGrnAndPo(
 }
 
 export const grnService = {
+  async listReceivablePos(params: receivablePosQuerySchemaType) {
+    const { rows, total, today } =
+      await grnRepository.listReceivablePos(params);
+    return {
+      data: rows,
+      meta: { ...toPaginatedMeta(params.page, params.pageSize, total), today },
+    };
+  },
+
   async getDetails(grnId: number) {
     const row = await grnRepository.getDetails(grnId);
     if (!row) {
@@ -268,11 +279,18 @@ export const grnService = {
     return row;
   },
 
-  async list(params: grnListQuerySchemaType) {
-    const { rows, total } = await grnRepository.list(params);
+  async list(params: grnListQuerySchemaType, actor: Actor) {
+    const { rows, total, statusCounts } = await grnRepository.list(
+      params,
+      istDayKey(),
+    );
+    const poCanOpen = can(actor, "po.manage");
     return {
-      data: rows,
-      meta: toPaginatedMeta(params.page, params.pageSize, total),
+      data: rows.map((r) => ({ ...r, poCanOpen })),
+      meta: {
+        ...toPaginatedMeta(params.page, params.pageSize, total),
+        statusCounts,
+      },
     };
   },
 

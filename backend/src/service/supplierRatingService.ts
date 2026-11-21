@@ -97,6 +97,7 @@ async function requireSupplier(supplierId: number) {
 function toOnTimeLine(r: OnTimeLineRow) {
   return {
     poItemId: num(r.po_item_id),
+    poId: num(r.po_id),
     poNumber: r.po_number,
     prId: numOrNull(r.pr_id),
     grnId: null,
@@ -120,6 +121,7 @@ function toRejectionLine(r: RejectionLineRow) {
     grnItemId: num(r.grn_item_id),
     grnId: num(r.grn_id),
     grnNumber: r.grn_number,
+    poId: num(r.po_id),
     poNumber: r.po_number,
     prId: numOrNull(r.pr_id),
     itemSku: r.sku,
@@ -137,6 +139,7 @@ function toRejectionLine(r: RejectionLineRow) {
 function toPriceLine(r: PriceLineRow) {
   return {
     poItemId: num(r.po_item_id),
+    poId: num(r.po_id),
     poNumber: r.po_number,
     prId: numOrNull(r.pr_id),
     grnId: null,

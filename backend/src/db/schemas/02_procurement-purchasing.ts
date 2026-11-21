@@ -98,6 +98,10 @@ export const purchaseRequests = pgTable(
     reorderRunUq: uniqueIndex("uq_purchase_requests_reorder_run")
       .on(table.reorderRunId)
       .where(sql`${table.reorderRunId} is not null`),
+    requestedByStatusIdx: index("idx_purchase_requests_requested_by_status").on(
+      table.requestedBy,
+      table.status,
+    ),
     // List `q` search (ilike %q%, #54): pg_trgm GIN indexes
     prNumberTrgm: index("idx_purchase_requests_pr_number_trgm").using(
       "gin",
@@ -234,6 +238,10 @@ export const purchaseOrders = pgTable(
   },
   (table) => ({
     statusIdx: index("idx_purchase_orders_status").on(table.status),
+    createdByStatusIdx: index("idx_purchase_orders_created_by_status").on(
+      table.createdBy,
+      table.status,
+    ),
     supplierIdx: index("idx_purchase_orders_supplier_id").on(table.supplierId),
     // Supplier rating window scan (BR-SRT): one supplier's POs by creation date
     supplierCreatedIdx: index("idx_purchase_orders_supplier_created").on(
@@ -598,14 +606,18 @@ export const grns = pgTable(
   },
   (table) => ({
     statusIdIdx: index("idx_grns_status_id").on(table.status, table.id),
+    // BR-FF receipts-by-day lists; also serves the supplier-rating 12-month
+    // window (leading column received_date).
+    receivedDateIdx: index("idx_grns_received_date").on(
+      table.receivedDate,
+      table.id,
+    ),
     // BR-GRN-05: same challan from the same supplier only once (deleted GRNs are gone).
     supplierChallanUq: uniqueIndex("uq_grns_supplier_challan").on(
       table.supplierId,
       table.challanNo,
     ),
     poIdIdx: index("idx_grns_po_id").on(table.poId),
-    // Supplier rating: GRN lines inside the 12-month window
-    receivedDateIdx: index("idx_grns_received_date").on(table.receivedDate),
     // GRN list `q` search (ilike %q%, #54)
     grnNumberTrgm: index("idx_grns_grn_number_trgm").using(
       "gin",
@@ -657,6 +669,9 @@ export const grnItems = pgTable(
   },
   (table) => ({
     grnIdIdx: index("idx_grn_items_grn_id").on(table.grnId),
+    pendingGrnIdx: index("idx_grn_items_pending_grn")
+      .on(table.grnId)
+      .where(sql`${table.qaStatus} = 'pending'`),
     poItemIdIdx: index("idx_grn_items_po_item_id").on(table.poItemId),
     // "Awaiting return" (BR-PRT-39)
     awaitingReturnIdx: index("idx_grn_items_awaiting_return")

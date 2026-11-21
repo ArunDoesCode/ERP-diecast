@@ -18,6 +18,7 @@ import {
 	SidebarRail,
 } from "@/components/ui/sidebar";
 import { useMeQuery } from "@/lib/api/auth/queries";
+import { useApprovalsBadgeCount } from "@/lib/api/home/queries";
 import { normalizeAllowedPath } from "@/lib/path-utils";
 import { getNavIcon, getNavLabel } from "@/lib/shell/nav-icons";
 import { useAuthSessionStore } from "@/lib/store/auth-session-store";
@@ -32,6 +33,12 @@ export function NavSidebar() {
 	// through the httpOnly cookie first, and a failed refresh sends the user to /login
 	// (refresh-token.ts), so a page that makes no other API call still checks the session.
 	useMeQuery(true);
+
+	// BR-FF-85: pending-approvals badge on the Approvals entry.
+	const hasApprovals = screens.some(
+		(s) => normalizeAllowedPath(s.path) === "/approvals",
+	);
+	const approvalsCount = useApprovalsBadgeCount(hasApprovals);
 
 	// #51: sort and group only when the screens change, not on every render.
 	const sidebarGroups = useMemo(() => {
@@ -81,62 +88,73 @@ export function NavSidebar() {
 			</SidebarHeader>
 
 			<SidebarContent>
-				{!hasHydrated ? (
-					<SidebarGroup>
-						<SidebarGroupLabel>Navigation</SidebarGroupLabel>
-						<SidebarGroupContent>
-							<p className="px-2 py-1 text-sm text-muted-foreground">
-								Loading...
-							</p>
-						</SidebarGroupContent>
-					</SidebarGroup>
-				) : sidebarGroups.length > 0 ? (
-					sidebarGroups.map((group) => (
-						<SidebarGroup key={group.name}>
-							{group.name !== "" && (
-								<SidebarGroupLabel className="text-sidebar-muted">
-									{group.name}
-								</SidebarGroupLabel>
-							)}
+				<nav aria-label="Main menu" className="flex flex-col">
+					{!hasHydrated ? (
+						<SidebarGroup>
+							<SidebarGroupLabel>Navigation</SidebarGroupLabel>
 							<SidebarGroupContent>
-								<SidebarMenu>
-									{group.pages.map((page) => {
-										const isActive = page.path === activePath;
-
-										const NavIcon = getNavIcon(page.path);
-										return (
-											<SidebarMenuItem key={page.path}>
-												<SidebarMenuButton
-													asChild
-													isActive={isActive}
-													tooltip={page.title}
-													className="relative data-active:font-bold data-active:before:absolute data-active:before:inset-y-1 data-active:before:left-0 data-active:before:w-[3px] data-active:before:rounded-r data-active:before:bg-sidebar-primary data-active:before:content-['']"
-												>
-													<Link
-														href={page.path}
-														aria-current={isActive ? "page" : undefined}
-													>
-														<NavIcon />
-														<span>{page.title}</span>
-													</Link>
-												</SidebarMenuButton>
-											</SidebarMenuItem>
-										);
-									})}
-								</SidebarMenu>
+								<p className="px-2 py-1 text-sm text-muted-foreground">
+									Loading...
+								</p>
 							</SidebarGroupContent>
 						</SidebarGroup>
-					))
-				) : (
-					<SidebarGroup>
-						<SidebarGroupLabel>Navigation</SidebarGroupLabel>
-						<SidebarGroupContent>
-							<p className="px-2 py-1 text-sm text-muted-foreground">
-								No allowed pages found.
-							</p>
-						</SidebarGroupContent>
-					</SidebarGroup>
-				)}
+					) : sidebarGroups.length > 0 ? (
+						sidebarGroups.map((group) => (
+							<SidebarGroup key={group.name}>
+								{group.name !== "" && (
+									<SidebarGroupLabel className="text-sidebar-muted">
+										{group.name}
+									</SidebarGroupLabel>
+								)}
+								<SidebarGroupContent>
+									<SidebarMenu>
+										{group.pages.map((page) => {
+											const isActive = page.path === activePath;
+
+											const NavIcon = getNavIcon(page.path);
+											return (
+												<SidebarMenuItem key={page.path}>
+													<SidebarMenuButton
+														asChild
+														isActive={isActive}
+														tooltip={page.title}
+														className="relative data-active:font-bold data-active:before:absolute data-active:before:inset-y-1 data-active:before:left-0 data-active:before:w-[3px] data-active:before:rounded-r data-active:before:bg-sidebar-primary data-active:before:content-['']"
+													>
+														<Link
+															href={page.path}
+															aria-current={isActive ? "page" : undefined}
+														>
+															<NavIcon />
+															<span>{page.title}</span>
+															{page.path === "/approvals" &&
+																approvalsCount > 0 && (
+																	<span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-warning-subtle px-1.5 text-sm font-semibold text-warning tabular-nums group-data-[collapsible=icon]:hidden">
+																		{approvalsCount > 99
+																			? "99+"
+																			: approvalsCount}
+																		<span className="sr-only"> waiting</span>
+																	</span>
+																)}
+														</Link>
+													</SidebarMenuButton>
+												</SidebarMenuItem>
+											);
+										})}
+									</SidebarMenu>
+								</SidebarGroupContent>
+							</SidebarGroup>
+						))
+					) : (
+						<SidebarGroup>
+							<SidebarGroupLabel>Navigation</SidebarGroupLabel>
+							<SidebarGroupContent>
+								<p className="px-2 py-1 text-sm text-muted-foreground">
+									No allowed pages found.
+								</p>
+							</SidebarGroupContent>
+						</SidebarGroup>
+					)}
+				</nav>
 			</SidebarContent>
 
 			<SidebarRail />

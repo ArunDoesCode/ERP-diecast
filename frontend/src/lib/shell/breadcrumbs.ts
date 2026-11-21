@@ -13,6 +13,7 @@ export type BreadcrumbOptions = {
 
 const LIST_LABELS: Record<string, string> = {
 	landing: "Home",
+	home: "Home",
 	"purchase-requisitions": "Purchase requisitions",
 	approvals: "Approvals",
 	"purchase-orders": "Purchase orders",
@@ -43,6 +44,20 @@ function labelFor(segment: string): string {
 /** Last crumb before the document loads (or when it has no number): "#12" for an id, the page name otherwise. Never "Details". */
 function docFallback(segment: string): string {
 	return /^\d+$/.test(segment) ? `#${segment}` : labelFor(segment);
+}
+
+/** Screens that are not documents: name them instead of "Details". */
+function screenLabel(segments: string[]): string | undefined {
+	const [root, second, third] = segments;
+	if (second === "new") {
+		if (root === "purchase-requisitions") return "New requisition";
+		if (root === "grn") return "Receive goods";
+	}
+	if (root === "purchase-requisitions" && third === "edit")
+		return "Edit requisition";
+	if (root === "purchase-orders" && third === "edit") return "Edit order";
+	if (root === "grn" && second === "receive") return "Choose order";
+	return undefined;
 }
 
 /** Route + optional group / document number -> crumbs. Last crumb has no href. */
@@ -160,16 +175,24 @@ export function buildBreadcrumbs(
 	if (options?.group) crumbs.push({ label: options.group });
 	if (segments.length === 0) {
 		crumbs.push({ label: LIST_LABELS.landing });
-	} else if (segments[0] === "landing" && options?.docNumber) {
+	} else if (
+		(segments[0] === "home" || segments[0] === "landing") &&
+		options?.docNumber
+	) {
 		// The denied page: Home > No access.
 		crumbs.push(
-			{ label: LIST_LABELS.landing, href: "/landing" },
+			{ label: LIST_LABELS.home, href: "/home" },
 			{ label: options.docNumber },
 		);
 	} else {
 		crumbs.push({ label: labelFor(segments[0]), href: `/${segments[0]}` });
 		if (segments.length > 1) {
-			crumbs.push({ label: options?.docNumber ?? docFallback(segments[1]) });
+			crumbs.push({
+				label:
+					options?.docNumber ??
+					screenLabel(segments) ??
+					docFallback(segments[1]),
+			});
 		}
 	}
 	const last = crumbs[crumbs.length - 1];

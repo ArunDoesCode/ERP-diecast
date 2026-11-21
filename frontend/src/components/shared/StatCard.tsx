@@ -18,7 +18,29 @@ export type StatCardProps = {
 	error?: boolean;
 	onRetry?: () => void;
 	countUp?: boolean;
+	/**
+	 * Late / Today / Later chips (BR-FF-15). Each is a link next to the tile body, never inside it.
+	 * Zero counts are not drawn. Left edge turns danger when late > 0.
+	 */
+	split?: StatCardSplit;
 };
+
+export type StatCardSplitChip = { count: number; href: string };
+export type StatCardSplit = {
+	late?: StatCardSplitChip;
+	today?: StatCardSplitChip;
+	later?: StatCardSplitChip;
+};
+
+const SPLIT_CHIPS: Array<{
+	key: keyof StatCardSplit;
+	label: string;
+	tone: NonNullable<StatCardProps["tone"]>;
+}> = [
+	{ key: "late", label: "late", tone: "danger" },
+	{ key: "today", label: "today", tone: "warning" },
+	{ key: "later", label: "later", tone: "neutral" },
+];
 
 const EDGE: Record<NonNullable<StatCardProps["tone"]>, string> = {
 	neutral: "border-l-neutral",
@@ -101,14 +123,22 @@ export function StatCard({
 	error,
 	onRetry,
 	countUp,
+	split,
 }: StatCardProps) {
 	const animated = useCountUp(value, Boolean(countUp) && !loading && !error);
 	const finalText = typeof value === "number" ? String(value) : value;
 	const shownText = animated === null ? finalText : String(animated);
 
+	const edgeTone = (split?.late?.count ?? 0) > 0 ? "danger" : tone;
+	const chips =
+		split && !loading && !error
+			? SPLIT_CHIPS.filter((c) => (split[c.key]?.count ?? 0) > 0)
+			: [];
+
 	const className = cn(
 		"flex items-start gap-3 rounded-lg border border-l-[3px] bg-card p-4 text-card-foreground",
-		EDGE[tone],
+		EDGE[edgeTone],
+		chips.length > 0 && "flex-col",
 		href &&
 			"transition-colors duration-(--motion-fast) hover:bg-muted/50 focus-visible:outline-2 focus-visible:outline-ring",
 	);
@@ -168,6 +198,38 @@ export function StatCard({
 	const accessibleName =
 		!loading && !error ? `${label}: ${finalText}` : undefined;
 
+	if (href && !error && chips.length > 0) {
+		// Body link and chip links are siblings: no nested links.
+		return (
+			<div className={cn(className, "gap-2")}>
+				<Link
+					href={href}
+					aria-label={accessibleName}
+					className="flex w-full items-start gap-3 rounded-md transition-colors duration-(--motion-fast) hover:bg-muted/50 focus-visible:outline-2 focus-visible:outline-ring"
+				>
+					{body}
+				</Link>
+				<div className="flex flex-wrap gap-2">
+					{chips.map((c) => {
+						const chip = split?.[c.key];
+						if (!chip) return null;
+						return (
+							<Link
+								key={c.key}
+								href={chip.href}
+								className={cn(
+									"inline-flex h-6 items-center rounded-full px-2 text-sm font-semibold tabular-nums focus-visible:outline-2 focus-visible:outline-ring",
+									CHIP[c.tone],
+								)}
+							>
+								{chip.count} {c.label}
+							</Link>
+						);
+					})}
+				</div>
+			</div>
+		);
+	}
 	if (href && !error) {
 		return (
 			<Link

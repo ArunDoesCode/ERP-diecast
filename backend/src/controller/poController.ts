@@ -39,7 +39,7 @@ export const poController = {
     const query = poListQuerySchema.parse(
       Object.fromEntries(new URL(c.req.url).searchParams),
     );
-    const { data, meta } = await poService.list(query);
+    const { data, meta } = await poService.list(query, parseActorId(c));
     return c.json({ success: true, data, meta });
   },
 

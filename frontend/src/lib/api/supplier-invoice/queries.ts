@@ -10,8 +10,8 @@ import {
 import { toast } from "sonner";
 
 import { ApiClientError } from "@/lib/api/client";
-import { grnKeys } from "@/lib/api/grn/queries";
-import { purchaseOrderKeys } from "@/lib/api/purchase-orders/queries";
+import { grnKeys } from "@/lib/api/grn/keys";
+import { purchaseOrderKeys } from "@/lib/api/purchase-orders/keys";
 import type {
 	InvoiceTolerancesPayload,
 	SinvCancelPayload,

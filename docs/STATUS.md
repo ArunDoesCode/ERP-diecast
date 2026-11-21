@@ -30,6 +30,7 @@
 | stock-transfer | frozen v1 | [map](modules/stock-transfer.md) | full | built, green — epic/scm |
 | supplier-rating | frozen v1 | [map](modules/supplier-rating.md) | full (read-only, live SQL) | built — epic/scm |
 | dispatch | frozen v1 | [map](modules/dispatch.md) | full (delivery notes, no invoice) | built — epic/scm |
+| factory-flows | frozen v1 | [map](modules/factory-flows.md) | full — Home queues, PR/PO/GRN pages, receive goods, approvals preview, fuller lists | epic PR open, merge #111 first |
 
 Legend — Code: none / schema only / partial / full. Tests per module: see each map's **Tests** table.
 
@@ -38,8 +39,10 @@ Legend — Code: none / schema only / partial / full. Tests per module: see each
 |---|---|---|---|---|
 | SCM epic: all nine modules (bom … dispatch) | feature/scm-rfq (epic/scm) | built; epic closing | none yet | scenario test, full suite, browser check, then epic PR into `main` |
 | Design-review fixes, GRN on shared patterns, BR-GRN-45 (#109) | claude/cranky-payne-f2bc8a | done, local | none yet | you: push, open PR, merge |
+| factory-flows epic (Home, document pages, receiving, approvals preview, lists) | epic/factory-flows | handover | see PR | you: merge #111, then review decisions + merge |
 
 ## Waiting on you
+- [ ] factory-flows: merge PR #111 first, then review the overnight decisions (OWNER.md, D-040/D-041) and merge the factory-flows PR; 7 parked e2e specs in its issue.
 - [ ] Push `claude/cranky-payne-f2bc8a`, open its PR, merge; then close #109.
 - [ ] To let the local e2e step run (D-024), allow `db:reset` on the test DB (`localhost:5433/diecast_test`) for the pipeline.
 - [ ] Set `permissions.defaultMode` to `auto` in `~/.claude/settings.json`.

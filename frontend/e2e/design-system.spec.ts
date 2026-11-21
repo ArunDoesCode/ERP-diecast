@@ -86,7 +86,7 @@ test.describe("BR-DS-10 nothing on the never-list ships", () => {
 		page,
 	}) => {
 		await openPage(page);
-		await page.goto("/landing");
+		await page.goto("/home");
 		await page.waitForLoadState("networkidle");
 		const running = await page.evaluate(() =>
 			document

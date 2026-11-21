@@ -10,11 +10,12 @@ import { toast } from "sonner";
 
 import { assetKeys } from "@/lib/api/asset/queries";
 import { ApiClientError } from "@/lib/api/client";
-import { purchaseOrderKeys } from "@/lib/api/purchase-orders/queries";
+import { documentKeys } from "@/lib/api/document/queries";
+import { homeKeys } from "@/lib/api/home/queries";
+import { purchaseOrderKeys } from "@/lib/api/purchase-orders/keys";
 import type {
 	GrnBypassPayload,
 	GrnCreatePayload,
-	GrnListParams,
 	GrnQaDecisionPayload,
 	GrnUpdatePayload,
 } from "@/types/grn";
@@ -27,24 +28,34 @@ import {
 	deleteGrn,
 	getGrnById,
 	getGrns,
+	getReceivablePos,
 	updateGrn,
 } from "./fetchers";
-
-export const grnKeys = {
-	list: (params?: GrnListParams) =>
-		params ? (["grn", "list", params] as const) : (["grn", "list"] as const),
-	detail: (grnId: number) => ["grn", "detail", grnId] as const,
-};
+import { grnKeys } from "./keys";
+import type { GrnListQuery } from "./list-types";
+import type { ReceivableParams } from "./receivable-types";
 
 function errorMessage(error: unknown, fallback: string) {
 	return error instanceof ApiClientError ? error.message : fallback;
 }
 
-export function useGrnsQuery(params: GrnListParams) {
+export function useGrnsQuery(params: GrnListQuery) {
 	return useQuery({
 		queryKey: grnKeys.list(params),
 		queryFn: () => getGrns(params),
 		placeholderData: keepPreviousData,
+	});
+}
+
+export function useReceivablePosQuery(
+	params: ReceivableParams,
+	enabled = true,
+) {
+	return useQuery({
+		queryKey: grnKeys.receivable(params),
+		queryFn: () => getReceivablePos(params),
+		placeholderData: keepPreviousData,
+		enabled,
 	});
 }
 
@@ -68,7 +79,10 @@ export function useCreateGrnMutation() {
 			}
 
 			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: homeKeys.all }),
 				queryClient.invalidateQueries({ queryKey: grnKeys.list() }),
+				queryClient.invalidateQueries({ queryKey: grnKeys.receivable() }),
+				queryClient.invalidateQueries({ queryKey: documentKeys.all }),
 				...(result.data.grn.poId != null
 					? [
 							queryClient.invalidateQueries({
@@ -97,7 +111,10 @@ export function useUpdateGrnMutation() {
 			}
 
 			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: homeKeys.all }),
 				queryClient.invalidateQueries({ queryKey: grnKeys.list() }),
+				queryClient.invalidateQueries({ queryKey: grnKeys.receivable() }),
+				queryClient.invalidateQueries({ queryKey: documentKeys.all }),
 				queryClient.invalidateQueries({
 					queryKey: grnKeys.detail(variables.grnId),
 				}),
@@ -121,7 +138,12 @@ export function useDeleteGrnMutation() {
 				return;
 			}
 
-			await queryClient.invalidateQueries({ queryKey: grnKeys.list() });
+			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: homeKeys.all }),
+				queryClient.invalidateQueries({ queryKey: grnKeys.list() }),
+				queryClient.invalidateQueries({ queryKey: grnKeys.receivable() }),
+				queryClient.invalidateQueries({ queryKey: documentKeys.all }),
+			]);
 			toast.success(result.message || "GRN deleted");
 		},
 		onError: (error) => {
@@ -136,8 +158,11 @@ function invalidateGrnAndPO(
 	poId: number,
 ) {
 	return Promise.all([
+		queryClient.invalidateQueries({ queryKey: homeKeys.all }),
 		queryClient.invalidateQueries({ queryKey: grnKeys.list() }),
+		queryClient.invalidateQueries({ queryKey: grnKeys.receivable() }),
 		queryClient.invalidateQueries({ queryKey: grnKeys.detail(grnId) }),
+		queryClient.invalidateQueries({ queryKey: documentKeys.all }),
 		// Stock and moving average change on QA/bypass/correction postings.
 		queryClient.invalidateQueries({ queryKey: assetKeys.items() }),
 		queryClient.invalidateQueries({ queryKey: assetKeys.stock() }),

@@ -1,10 +1,15 @@
 "use client";
 
-import { IconFileOff, IconPlus, IconSearch } from "@tabler/icons-react";
+import {
+	IconAlertTriangle,
+	IconFileOff,
+	IconPlus,
+	IconSearch,
+	IconX,
+} from "@tabler/icons-react";
 import { useTable } from "@tanstack/react-table";
-import dynamic from "next/dynamic";
-import { parseAsInteger, useQueryState } from "nuqs";
-import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useMemo } from "react";
 import { DataTable } from "@/components/common/DataTable";
 import {
 	type DataTableColumnDef,
@@ -26,128 +31,236 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import type { PrGroup } from "@/components/views/purchase-requisitions/use-pr-list-controls";
 import { usePRListControls } from "@/components/views/purchase-requisitions/use-pr-list-controls";
 import { useCan } from "@/hooks/use-can";
+import type {
+	PrListQuery,
+	PrListRowV2,
+	PrListSortField,
+} from "@/lib/api/purchase-requisitions/list-types";
 import { usePurchaseRequisitionsQuery } from "@/lib/api/purchase-requisitions/queries";
 import { formatDate, formatDocNo, formatMoney } from "@/lib/format";
-import { getStatusTone } from "@/lib/status-tone";
-import {
-	type PRStatus,
-	type PRType,
-	type PurchaseRequisition,
-	prStatusValues,
-	prTypeValues,
-} from "@/types/purchase-requisitions";
+import type { PRStatus } from "@/types/purchase-requisitions";
 
-const CreatePurchaseRequisitionModal = dynamic(() =>
-	import(
-		"@/components/pages/purchase-requisitions/PurchaseRequisitionModals"
-	).then((module) => module.CreatePurchaseRequisitionModal),
-);
+const SORT_FIELDS: Array<{ label: string; value: PrListSortField }> = [
+	{ label: "Newest first", value: "createdAt" },
+	{ label: "PR number", value: "prNumber" },
+	{ label: "Type", value: "type" },
+	{ label: "Status", value: "status" },
+	{ label: "Estimate", value: "estimatedAmountPaise" },
+];
 
-const EditPurchaseRequisitionModal = dynamic(() =>
-	import(
-		"@/components/pages/purchase-requisitions/PurchaseRequisitionModals"
-	).then((module) => module.EditPurchaseRequisitionModal),
-);
+const BUCKET_LABEL = { late: "Late", today: "Today", later: "Later" } as const;
+
+const IST_DAY = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" });
+const TYPE_LABEL: Record<string, string> = {
+	sale_order: "Sale order",
+	stock_reorder: "Stock reorder",
+	maintenance: "Maintenance",
+	tooling: "Tooling",
+	subcontracting: "Subcontracting",
+	misc: "Miscellaneous",
+};
+
+/** Statuses the RFQ line picker accepts (DES-56). */
+const RFQ_STATUSES: PRStatus[] = ["approved", "partial_ordered"];
+
+function makeColumns(
+	canSeeEstimate: boolean,
+	today: string,
+	canManageRfq: boolean,
+) {
+	const columns: DataTableColumnDef<PrListRowV2>[] = [
+		{
+			accessorKey: "prNumber",
+			header: "PR no.",
+			cell: ({ row }) => (
+				<Link
+					href={`/purchase-requisitions/${row.original.id}`}
+					className="cursor-pointer font-mono text-brand-accent hover:underline"
+				>
+					{formatDocNo(row.original.prNumber)}
+				</Link>
+			),
+		},
+		{
+			accessorKey: "createdAt",
+			header: "Date",
+			cell: ({ row }) => formatDate(row.original.createdAt),
+		},
+		{
+			accessorKey: "type",
+			header: "Type",
+			cell: ({ row }) => TYPE_LABEL[row.original.type] ?? row.original.type,
+		},
+		{
+			id: "requester",
+			header: "Requester",
+			cell: ({ row }) => row.original.requestedByName ?? "–",
+		},
+		{
+			accessorKey: "lineCount",
+			header: "Lines",
+			meta: { numeric: true },
+			cell: ({ row }) => row.original.lineCount ?? "–",
+		},
+	];
+	if (canSeeEstimate) {
+		columns.push({
+			accessorKey: "estimatedAmountPaise",
+			header: "Estimate",
+			meta: { numeric: true },
+			cell: ({ row }) => formatMoney(row.original.estimatedAmountPaise),
+		});
+	}
+	columns.push(
+		{
+			id: "requiredBy",
+			header: "Required by",
+			cell: ({ row }) => {
+				const date = row.original.earliestRequiredBy;
+				if (!date) return "–";
+				const waiting =
+					row.original.status === "approved" ||
+					row.original.status === "partial_ordered";
+				const late = waiting && date < today;
+				return late ? (
+					<span className="inline-flex items-center gap-1 font-medium text-destructive">
+						<IconAlertTriangle className="size-3.5" aria-hidden="true" />
+						{formatDate(date)}
+						<span className="sr-only"> (late)</span>
+					</span>
+				) : (
+					formatDate(date)
+				);
+			},
+		},
+		{
+			accessorKey: "status",
+			header: "Status",
+			cell: ({ row }) => <StatusBadge doc="pr" status={row.original.status} />,
+		},
+	);
+	if (canManageRfq) {
+		// BR-RFQ-60, DES-34 / DES-56: "Request quotes" only with rfq.manage, a line
+		// free for an RFQ and a status the RFQ line picker accepts.
+		columns.push({
+			id: "actions",
+			header: () => <span className="sr-only">Actions</span>,
+			cell: ({ row }) => {
+				const { id, prNumber, status, linesFreeForRfq } = row.original;
+				if (!linesFreeForRfq || linesFreeForRfq <= 0) return null;
+				if (!RFQ_STATUSES.includes(status)) return null;
+				return (
+					<Button type="button" size="sm" variant="outline" asChild>
+						<Link
+							href={`/rfq/new?pr=${id}`}
+							aria-label={`Request quotes for ${prNumber}`}
+						>
+							Request quotes
+						</Link>
+					</Button>
+				);
+			},
+		});
+	}
+	return columns;
+}
 
 export function PurchaseRequisitionsView() {
 	const {
+		bucket,
+		clearBucket,
+		clearMine,
 		filtersActive,
+		group,
+		mine,
+		onGroupChange,
 		onPageSizeChange,
+		onQChange,
 		onRaisedByReorderChange,
-		onSearchChange,
+		onSortByChange,
 		onSortDirectionChange,
-		onStatusFilterChange,
-		onTypeFilterChange,
 		page,
 		pageSize,
 		q,
 		raisedByReorder,
+		qInput,
 		resetFilters,
-		search,
 		setPage,
+		sortBy,
 		sortDir,
 		status,
-		statusFilter,
-		type,
-		typeFilter,
+		toOrder,
 	} = usePRListControls();
 
-	const [createOpen, setCreateOpen] = useState(false);
-	// ?prId=<id> opens that PR (links from reorder runs); closing the modal clears it.
-	const [linkedPrId, setLinkedPrId] = useQueryState("prId", parseAsInteger);
-	const [pickedPrId, setSelectedPrId] = useState<number | null>(null);
-	const [editOpen, setEditOpen] = useState(false);
-	const selectedPrId = pickedPrId ?? linkedPrId;
-	const modalOpen = editOpen || linkedPrId !== null;
-	const canLinkMachine = useCan("pr.link_machine");
+	const canManage = useCan("pr.manage");
+	const canManageRfq = useCan("rfq.manage");
 
-	const requisitionsQuery = usePurchaseRequisitionsQuery({
+	const params: PrListQuery = {
 		page,
 		pageSize,
 		q,
 		status,
-		type,
+		mine: mine ? true : undefined,
+		toOrder,
+		bucket: bucket ?? undefined,
 		raisedByReorder: raisedByReorder ? true : undefined,
-		sortBy: "createdAt",
+		sortBy,
 		sortDir,
-	});
+	};
+	const requisitionsQuery = usePurchaseRequisitionsQuery(params);
+	const result = requisitionsQuery.data;
 
-	const requisitions = useMemo(
-		() => requisitionsQuery.data?.data ?? [],
-		[requisitionsQuery.data],
-	);
-	const total = requisitionsQuery.data?.meta.total ?? 0;
+	const requisitions = useMemo(() => result?.data ?? [], [result]);
+	const total = result?.meta.total ?? 0;
+	const counts = result?.meta.statusCounts;
+	const toOrderCount = result?.meta.toOrderCount;
 
-	const columns = useMemo<DataTableColumnDef<PurchaseRequisition>[]>(
-		() => [
-			{
-				accessorKey: "prNumber",
-				header: "PR no.",
-				cell: ({ row }) => (
-					<button
-						type="button"
-						onClick={() => {
-							setSelectedPrId(row.original.id);
-							setEditOpen(true);
-						}}
-						className="cursor-pointer font-mono text-brand-accent hover:underline"
-					>
-						{formatDocNo(row.original.prNumber)}
-					</button>
-				),
-			},
-			{
-				accessorKey: "status",
-				header: "Status",
-				cell: ({ row }) => (
-					<StatusBadge doc="pr" status={row.original.status} />
-				),
-			},
-			{ accessorKey: "type", header: "Type" },
-			{
-				accessorKey: "notes",
-				header: "Notes",
-				cell: ({ row }) => (
-					<span className="line-clamp-1 max-w-xs text-muted-foreground">
-						{row.original.notes?.trim() || "–"}
-					</span>
-				),
-			},
-			{
-				accessorKey: "estimatedAmountPaise",
-				header: "Estimated value",
-				meta: { numeric: true },
-				cell: ({ row }) => formatMoney(row.original.estimatedAmountPaise),
-			},
-			{
-				accessorKey: "createdAt",
-				header: "Created",
-				cell: ({ row }) => formatDate(row.original.createdAt),
-			},
-		],
-		[],
+	// BR-FF-109 groups; they add up to All. Ordered = approved / partly / fully
+	// ordered rows that are not still waiting for an order.
+	const n = (key: keyof NonNullable<typeof counts>) => counts?.[key] ?? 0;
+	const quick = [
+		{
+			key: "all",
+			label: "All",
+			count: counts
+				? Object.values(counts).reduce((sum, v) => sum + (v ?? 0), 0)
+				: undefined,
+		},
+		{ key: "draft", label: "Draft", count: counts ? n("draft") : undefined },
+		{
+			key: "in_approval",
+			label: "In approval",
+			count: counts ? n("pending_approval") : undefined,
+		},
+		{ key: "to_order", label: "To order", count: toOrderCount },
+		{
+			key: "ordered",
+			label: "Ordered",
+			count:
+				counts && toOrderCount !== undefined
+					? Math.max(
+							0,
+							n("approved") +
+								n("partial_ordered") +
+								n("fully_ordered") -
+								toOrderCount,
+						)
+					: undefined,
+		},
+		{
+			key: "closed",
+			label: "Closed",
+			count: counts ? n("rejected") + n("cancelled") : undefined,
+		},
+	];
+
+	const today = IST_DAY.format(new Date());
+	const columns = useMemo(
+		() => makeColumns(canManage, today, canManageRfq),
+		[canManage, today, canManageRfq],
 	);
 
 	const table = useTable({
@@ -158,17 +271,21 @@ export function PurchaseRequisitionsView() {
 		manualSorting: true,
 	});
 
+	const newButton = canManage ? (
+		<Button size="lg" asChild>
+			<Link href="/purchase-requisitions/new">
+				<IconPlus />
+				New requisition
+			</Link>
+		</Button>
+	) : undefined;
+
 	const emptyState = filtersActive ? (
 		<EmptyState
 			icon={IconFileOff}
 			title="Nothing matches these filters"
 			action={
-				<Button
-					type="button"
-					variant="outline"
-					size="sm"
-					onClick={resetFilters}
-				>
+				<Button type="button" variant="outline" onClick={resetFilters}>
 					Reset filters
 				</Button>
 			}
@@ -177,12 +294,7 @@ export function PurchaseRequisitionsView() {
 		<EmptyState
 			icon={IconFileOff}
 			title="No purchase requisitions yet"
-			action={
-				<Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
-					<IconPlus />
-					Create PR
-				</Button>
-			}
+			action={newButton}
 		/>
 	);
 
@@ -191,82 +303,97 @@ export function PurchaseRequisitionsView() {
 			<PageHeader
 				title="Purchase requisitions"
 				description="Ask for items to be bought, and follow each request to its order."
-				actions={
-					<Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
-						<IconPlus />
-						Create PR
-					</Button>
-				}
+				actions={newButton}
 			/>
 
 			<FilterBar
-				quick={[
-					{ key: "all", label: "All" },
-					{ key: "reorder", label: "Raised by reorder" },
-				]}
-				value={raisedByReorder ? "reorder" : "all"}
-				onChange={(key) => onRaisedByReorderChange(key === "reorder")}
+				quick={quick}
+				value={group ?? "all"}
+				onChange={(key) =>
+					onGroupChange(key === "all" ? null : (key as PrGroup))
+				}
 				onReset={resetFilters}
 				filtersActive={filtersActive}
 			>
-				<div className="relative w-52">
+				<Button
+					type="button"
+					variant="outline"
+					className="h-10"
+					aria-pressed={raisedByReorder}
+					onClick={() => onRaisedByReorderChange(!raisedByReorder)}
+				>
+					Raised by reorder
+					{raisedByReorder ? (
+						<IconX className="size-3.5" aria-hidden="true" />
+					) : null}
+				</Button>
+				{mine ? (
+					<Button
+						type="button"
+						variant="outline"
+						className="h-10"
+						onClick={clearMine}
+						aria-label="Show everyone's requisitions"
+					>
+						Mine only
+						<IconX className="size-3.5" aria-hidden="true" />
+					</Button>
+				) : null}
+				{bucket ? (
+					<Button
+						type="button"
+						variant="outline"
+						className="h-10"
+						onClick={clearBucket}
+						aria-label={`Clear the ${bucket} filter`}
+					>
+						{BUCKET_LABEL[bucket]} only
+						<IconX className="size-3.5" aria-hidden="true" />
+					</Button>
+				) : null}
+
+				<div className="relative w-56">
 					<IconSearch
 						aria-hidden="true"
 						className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground"
 					/>
 					<Input
-						value={search}
-						onChange={(event) => onSearchChange(event.target.value)}
+						value={qInput}
+						onChange={(event) => onQChange(event.target.value)}
 						placeholder="Search PR number or notes"
 						aria-label="Search PR number or notes"
-						className="pl-7"
+						className="h-10 pl-7"
 					/>
 				</div>
 
-				<Select
-					value={statusFilter}
-					onValueChange={(value) =>
-						onStatusFilterChange(value as "all" | PRStatus)
-					}
-				>
-					<SelectTrigger className="w-44" aria-label="Status">
-						<SelectValue placeholder="Select status" />
-					</SelectTrigger>
-					<SelectContent>
-						<SelectItem value="all">All statuses</SelectItem>
-						{prStatusValues.map((value) => (
-							<SelectItem key={value} value={value}>
-								{getStatusTone("pr", value).label}
-							</SelectItem>
-						))}
-					</SelectContent>
-				</Select>
+				<div className="flex items-center gap-2">
+					<Select
+						value={sortBy}
+						onValueChange={(value) => onSortByChange(value as PrListSortField)}
+					>
+						<SelectTrigger className="h-10 w-40" aria-label="Sort by">
+							<SelectValue placeholder="Sort by" />
+						</SelectTrigger>
+						<SelectContent>
+							{SORT_FIELDS.filter(
+								(field) => canManage || field.value !== "estimatedAmountPaise",
+							).map((field) => (
+								<SelectItem key={field.value} value={field.value}>
+									{field.label}
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
 
-				<Select
-					value={typeFilter}
-					onValueChange={(value) => onTypeFilterChange(value as "all" | PRType)}
-				>
-					<SelectTrigger className="w-40" aria-label="Type">
-						<SelectValue placeholder="Select type" />
-					</SelectTrigger>
-					<SelectContent>
-						<SelectItem value="all">All types</SelectItem>
-						{prTypeValues.map((value) => (
-							<SelectItem key={value} value={value}>
-								{value}
-							</SelectItem>
-						))}
-					</SelectContent>
-				</Select>
-
-				<div className="flex items-center gap-2 text-sm text-muted-foreground">
-					<span>Asc</span>
-					<Switch
-						checked={sortDir === "desc"}
-						onCheckedChange={onSortDirectionChange}
-						aria-label="Toggle sort direction"
-					/>
-					<span>Dsc</span>
+					<div className="flex items-center gap-2 text-sm text-muted-foreground">
+						<span>Asc</span>
+						<Switch
+							checked={sortDir === "desc"}
+							onCheckedChange={onSortDirectionChange}
+							aria-label="Toggle sort direction"
+						/>
+						<span>Dsc</span>
+					</div>
 				</div>
 			</FilterBar>
 
@@ -274,6 +401,7 @@ export function PurchaseRequisitionsView() {
 				table={table}
 				isLoading={requisitionsQuery.isLoading}
 				hidePagination
+				tight
 				emptyState={emptyState}
 				errorState={
 					requisitionsQuery.isError ? (
@@ -299,29 +427,6 @@ export function PurchaseRequisitionsView() {
 				onPageChange={setPage}
 				onPageSizeChange={onPageSizeChange}
 			/>
-
-			{createOpen ? (
-				<CreatePurchaseRequisitionModal
-					open={createOpen}
-					onOpenChange={setCreateOpen}
-					canLinkMachine={canLinkMachine}
-				/>
-			) : null}
-
-			{modalOpen && selectedPrId != null ? (
-				<EditPurchaseRequisitionModal
-					prId={selectedPrId}
-					open={modalOpen}
-					onOpenChange={(nextOpen) => {
-						setEditOpen(nextOpen);
-						if (!nextOpen) {
-							setSelectedPrId(null);
-							void setLinkedPrId(null);
-						}
-					}}
-					canLinkMachine={canLinkMachine}
-				/>
-			) : null}
 		</div>
 	);
 }

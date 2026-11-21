@@ -43,7 +43,7 @@ function flowSteps(
 		{
 			label: "Purchase requisition",
 			docNo: run.pr.prNumber,
-			href: canOpenPr ? `/purchase-requisitions?prId=${run.pr.id}` : undefined,
+			href: canOpenPr ? `/purchase-requisitions/${run.pr.id}` : undefined,
 			status: <StatusBadge doc="pr" status={run.pr.status} />,
 			state: run.po ? "done" : "current",
 		},
@@ -117,7 +117,7 @@ export function ReorderRunDetailView({ runId }: { runId: number }) {
 	if (run.state === "done" && run.pr && canOpenPr) {
 		primary = (
 			<Button type="button" size="sm" asChild>
-				<Link href={`/purchase-requisitions?prId=${run.pr.id}`}>
+				<Link href={`/purchase-requisitions/${run.pr.id}`}>
 					Open {run.pr.prNumber}
 				</Link>
 			</Button>

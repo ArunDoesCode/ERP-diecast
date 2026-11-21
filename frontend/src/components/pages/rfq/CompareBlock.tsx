@@ -111,7 +111,7 @@ function CompareBlockImpl({
 							<>
 								{" → "}
 								<Link
-									href={`/purchase-orders/${line.prId}`}
+									href={`/purchase-orders/${line.poId}`}
 									className="font-mono text-brand-accent hover:underline"
 								>
 									{line.poNumber}

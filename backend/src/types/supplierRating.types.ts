@@ -144,6 +144,7 @@ export type SupplierRating = z.infer<typeof ratingSchema>;
 
 export const onTimeLineSchema = z.object({
   poItemId: z.number().int(),
+  poId: z.number().int(),
   poNumber: z.string(),
   prId: z.number().int().nullable(),
   grnId: z.number().int().nullable(),
@@ -171,6 +172,7 @@ export const rejectionLineSchema = z.object({
   grnItemId: z.number().int(),
   grnId: z.number().int().nullable(),
   grnNumber: z.string(),
+  poId: z.number().int(),
   poNumber: z.string(),
   prId: z.number().int().nullable(),
   itemSku: z.string(),
@@ -186,6 +188,7 @@ export const rejectionLineSchema = z.object({
 
 export const priceLineSchema = z.object({
   poItemId: z.number().int(),
+  poId: z.number().int(),
   poNumber: z.string(),
   prId: z.number().int().nullable(),
   grnId: z.number().int().nullable(),

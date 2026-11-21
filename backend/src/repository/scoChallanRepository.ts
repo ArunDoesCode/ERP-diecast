@@ -29,9 +29,11 @@ export type ChallanRow = typeof scoChallans.$inferSelect;
 export type ChallanLineInsert = typeof scoChallanLines.$inferInsert;
 export type ChallanLineRow = typeof scoChallanLines.$inferSelect;
 
-// Whole days from `today` (YYYY-MM-DD) to the due date (BR-SCO-11); negative = overdue.
+// Whole days from IST `today` (YYYY-MM-DD) to the IST calendar day of the due
+// timestamp (BR-SCO-11, BR-FF-08); negative = overdue. The column holds UTC
+// instants, so shift +05:30 before taking the date (matches istDayBoundsOfKey).
 function daysLeftExpr(today: string) {
-  return sql<number>`(${scoChallans.returnDueDate}::date - ${today}::date)::int`;
+  return sql<number>`((${scoChallans.returnDueDate} + interval '5 hours 30 minutes')::date - ${today}::date)::int`;
 }
 
 const challanSortColumns = {
@@ -113,6 +115,10 @@ export const scoChallanRepository = {
         ? sql`${days} between 0 and 60`
         : undefined,
       params.dueStatus === "ok" ? sql`${days} > 60` : undefined,
+      // BR-FF-14, 29: bucket on returnDueDate (IST today); late = overdue.
+      params.bucket === "late" ? sql`${days} < 0` : undefined,
+      params.bucket === "today" ? sql`${days} = 0` : undefined,
+      params.bucket === "later" ? sql`${days} > 0` : undefined,
     );
     const orderFn = params.sortDir === "desc" ? desc : asc;
     const [rows, [totalRow]] = await Promise.all([

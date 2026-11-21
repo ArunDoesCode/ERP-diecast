@@ -1,8 +1,9 @@
 /**
  * api-standards spec, Tooling T-5, path (2): PR -> approval -> PO.
- * Back office raises and submits a PR on screen, the owner approves it in the approval queue, back office
- * makes a PO from the PR line, submits it, the owner approves it, back office sends it: PO `dispatched`,
- * PR line `ordered`. Only the catalog (item, supplier) is prepared through the API.
+ * Back office raises and submits a PR on the full-page form (BR-FF-111), the owner approves it in the
+ * approvals inbox (BR-FF-77..82), back office makes a PO from the PR page (BR-FF-48), submits it, the owner
+ * approves it, back office sends it: PO `dispatched`, PR line `ordered`. Only the catalog (item, supplier)
+ * is prepared through the API.
  */
 import { expect, test } from "@playwright/test";
 import {
@@ -24,61 +25,65 @@ test("T-5 (2) PR is raised, approved, ordered, approved and sent: PO dispatched,
 	const cat = await makeCatalog(t.admin);
 	const notes = uid(" PR notes");
 
-	// 1. Back office raises the PR and submits it for approval.
+	// 1. Back office raises the PR on its own page and submits it for approval.
 	await uiLogin(page, "back_office");
 	await page.goto("/purchase-requisitions");
-	await page.getByRole("button", { name: "Create PR" }).first().click();
+	await page.getByRole("link", { name: "New requisition" }).first().click();
+	await expect(page).toHaveURL(/\/purchase-requisitions\/new/);
 	await page.getByLabel("PR type").selectOption("tooling");
 	await page.getByPlaceholder("Add notes").fill(notes);
-	await page.getByRole("button", { name: "Next", exact: true }).click();
 	await page.getByText("Select item").first().click();
 	await page.keyboard.type(cat.itemSku);
 	await page.getByText(cat.itemName).click();
-	await page.getByLabel("Qty").fill("500");
-	await page
-		.getByRole("button", { name: "Create PR", exact: true })
-		.last()
-		.click();
-	await expect(page.getByText("PR created")).toBeVisible();
+	await page.getByLabel("Quantity").fill("500");
+	// BR-FF-48 / BR-PO-18: Create PO copies the earliest required-by into the PO, and a PO cannot be
+	// sent without an expected delivery date, so the line needs a (future) required-by date.
+	const requiredBy = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
+		.toISOString()
+		.slice(0, 10);
+	await page.getByLabel("Required by").first().fill(requiredBy);
+	await page.getByRole("button", { name: "Save and submit" }).click();
 
-	await page.getByPlaceholder("Search PR number or notes").fill(notes);
-	const prLink = page.getByText(/^PR-\d{4}-\d{2}-\d+$/).first();
-	await expect(prLink).toBeVisible();
-	const prNumber = (await prLink.innerText()).trim();
-	await prLink.click();
-	const editor = page.getByRole("dialog", {
-		name: "Edit purchase requisition",
-	});
-	await editor.getByRole("button", { name: "Next", exact: true }).click();
-	await editor.getByRole("button", { name: "Submit for approval" }).click();
-	await expect(editor).toBeHidden();
+	// BR-FF-46: the saved requisition's own page opens, waiting for approval.
+	await page.waitForURL(/\/purchase-requisitions\/\d+$/, { timeout: 20_000 });
+	const prUrl = page.url();
 	await expect(page.getByText("Pending approval").first()).toBeVisible();
+	const prNumber = (
+		await page
+			.getByText(/^PR-\d{4}-\d{2}-\d+$/)
+			.first()
+			.innerText()
+	).trim();
 
-	// 2. The owner approves it in the approval queue (own login, own context).
+	// 2. The owner approves it in the approvals inbox (own login, own context).
 	const ownerCtx = await browser.newContext();
 	const ownerPage = await ownerCtx.newPage();
 	await uiLogin(ownerPage, "owner");
 	await approveInQueue(ownerPage, prNumber);
 	await ownerCtx.close();
 
-	// 3. Back office makes a PO from the approved PR line.
-	await page.goto("/purchase-orders");
-	await page.getByPlaceholder("Search PR number").fill(prNumber);
-	await page.getByText(prNumber).first().click();
-	await expect(page.getByText("1 pending line", { exact: true })).toBeVisible();
-	await page.getByRole("radio").or(page.getByRole("checkbox")).first().check();
-	await page.getByRole("button", { name: /Create PO/ }).click();
-	await page.getByText("Select supplier").click();
-	await page.keyboard.type(cat.supplierName.slice(0, 14));
-	await page.getByText(cat.supplierName).click();
-	const due = new Date(Date.now() + 10 * 86_400_000).toISOString().slice(0, 10);
-	await page.locator('input[type="date"]').fill(due);
-	await page.getByRole("button", { name: /Create draft PO/ }).click();
-	await expect(page.getByText(/PO-\S+ draft created/)).toBeVisible();
+	// 3. Back office makes a PO from the approved PR page (BR-FF-48, 49).
+	await page.goto(prUrl);
+	await page.getByRole("button", { name: "Create PO", exact: true }).click();
+	const dlg = page.getByRole("dialog", { name: "Create purchase order" });
+	await Promise.race([
+		page.waitForURL(/\/purchase-orders\/\d+$/, { timeout: 20_000 }),
+		dlg.waitFor({ state: "visible", timeout: 20_000 }),
+	]);
+	if (await dlg.isVisible()) {
+		// Only when a line has no default supplier or rate.
+		await dlg.getByText("Select supplier").first().click();
+		await page.keyboard.type(cat.supplierName.slice(0, 14));
+		await page.getByText(cat.supplierName).click();
+		const rate = dlg.getByLabel(/^Rate for/);
+		if ((await rate.count()) > 0) await rate.first().fill("100");
+		await dlg.getByRole("button", { name: "Create PO", exact: true }).click();
+	}
+	await page.waitForURL(/\/purchase-orders\/\d+$/, { timeout: 20_000 });
+	const poUrl = page.url();
+	await expect(page.getByText("Draft").first()).toBeVisible();
 	await page.getByRole("button", { name: "Submit for approval" }).click();
 	await expect(page.getByText("Pending approval").first()).toBeVisible();
-
-	// The PO number is read from the PR page.
 	const poNumber = (
 		await page
 			.getByText(/^PO-\d{4}-\d{2}-\d+$/)
@@ -94,13 +99,16 @@ test("T-5 (2) PR is raised, approved, ordered, approved and sent: PO dispatched,
 	await ownerCtx2.close();
 
 	// 5. Back office sends it: PO dispatched, PR line ordered.
-	await page.reload();
+	await page.goto(poUrl);
 	await page.getByRole("button", { name: "Send to supplier" }).click();
 	await page.getByLabel("Channel").click();
 	await page.getByRole("option", { name: /whatsapp/i }).click();
 	await page.getByRole("button", { name: "Mark as sent" }).click();
 	await expect(page.getByText("Dispatched").first()).toBeVisible();
-	await expect(page.getByText("Ordered").first()).toBeVisible();
+	await page.goto(prUrl);
+	await expect(
+		page.getByText("Ordered", { exact: true }).first(),
+	).toBeVisible();
 
 	// Same facts in the API.
 	const pos: Json = await api(t.back_office, "GET", `/po/getpos?q=${poNumber}`);

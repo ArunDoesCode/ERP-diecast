@@ -10,7 +10,7 @@ import {
 import { toast } from "sonner";
 
 import { ApiClientError } from "@/lib/api/client";
-import { purchaseOrderKeys } from "@/lib/api/purchase-orders/queries";
+import { purchaseOrderKeys } from "@/lib/api/purchase-orders/keys";
 import { purchaseRequisitionKeys } from "@/lib/api/purchase-requisitions/queries";
 import type {
 	AwardPayload,

@@ -80,6 +80,15 @@ export type RequestListRow = RequestSelect & {
   docSummary: ApprovalDocSummary;
 };
 
+// getMyPendingApprovals row (BR-FF-80): flat display fields. `amountPaise`
+// is present only on the caller's own list (BR-FF-77).
+export type PendingRequestRow = RequestSelect & {
+  policyName: string;
+  docNumber: string;
+  requesterName: string;
+  amountPaise?: number;
+};
+
 // Input params remain custom because they aren't DB tables
 type PolicyListParams = {
   page: number;
@@ -437,6 +446,54 @@ export const approvalRepository = {
     };
   },
 
+  /**
+   * Latest approval request of a document in ANY status (BR-FF-53 step 1),
+   * on idx_approval_requests_doc.
+   */
+  async findLatestApprovalByDoc(
+    docType: ApprovalDocType,
+    docId: number,
+    tx?: Tx,
+  ): Promise<RequestSelect | undefined> {
+    const executor = tx ?? db;
+    const [row] = await executor
+      .select(requestColumns)
+      .from(approvalRequests)
+      .where(
+        and(
+          eq(approvalRequests.docType, docType),
+          eq(approvalRequests.docId, docId),
+        ),
+      )
+      .orderBy(desc(approvalRequests.id))
+      .limit(1);
+    return row;
+  },
+
+  /** BR-FF-53 step 3: has this employee any trail row on this request? */
+  async hasEmployeeTrailRow(requestId: number, employeeId: number) {
+    const [row] = await db
+      .select({ id: approvalTrails.id })
+      .from(approvalTrails)
+      .where(
+        and(
+          eq(approvalTrails.requestId, requestId),
+          eq(approvalTrails.actionBy, employeeId),
+        ),
+      )
+      .limit(1);
+    return row !== undefined;
+  },
+
+  async findEmployeeNameById(employeeId: number) {
+    const [row] = await db
+      .select({ name: employees.name })
+      .from(employees)
+      .where(eq(employees.id, employeeId))
+      .limit(1);
+    return row?.name;
+  },
+
   async findPendingRequestByDoc(
     docType: ApprovalDocType,
     docId: number,
@@ -611,22 +668,28 @@ export const approvalRepository = {
     docType?: ApprovalDocType | undefined;
     sortBy?: string | undefined;
     sortDir: "asc" | "desc";
-  }): Promise<{ rows: RequestListRow[]; total: number }> {
+    /** BR-FF-77: amount only on the caller's own list. */
+    includeAmount: boolean;
+  }): Promise<{
+    rows: PendingRequestRow[];
+    total: number;
+    typeCounts: { pr: number; po: number; sco: number };
+  }> {
     const sortColumn =
       params.sortBy && params.sortBy in pendingRequestSortColumns
         ? pendingRequestSortColumns[
             params.sortBy as keyof typeof pendingRequestSortColumns
           ]
-        : approvalRequests.id;
+        : approvalRequests.requestedAt;
     const orderFn = params.sortDir === "desc" ? desc : asc;
 
-    const filters = [
+    // Every filter except docType (BR-FF-79: type counts never shrink).
+    const baseFilters = [
       eq(approvalRequests.status, "pending_approval"),
       or(
         eq(approvalRequests.currentApproverRole, params.actorRole),
         eq(approvalRequests.currentApproverEmployeeId, params.employeeId),
       ),
-      params.docType ? eq(approvalRequests.docType, params.docType) : undefined,
       // BR-APR-33: hide requests this employee already approved a level of.
       notExists(
         db
@@ -640,11 +703,13 @@ export const approvalRepository = {
             ),
           ),
       ),
-    ].filter((filter) => filter !== undefined);
+    ];
+    const baseWhere = and(...baseFilters);
+    const whereClause = params.docType
+      ? and(baseWhere, eq(approvalRequests.docType, params.docType))
+      : baseWhere;
 
-    const whereClause = and(...filters);
-
-    const [rows, [totalRow]] = await Promise.all([
+    const [rows, [totalRow], [countRow]] = await Promise.all([
       db
         .select({
           ...requestColumns,
@@ -660,6 +725,14 @@ export const approvalRepository = {
         .limit(params.pageSize)
         .offset((params.page - 1) * params.pageSize),
       db.select({ value: count() }).from(approvalRequests).where(whereClause),
+      db
+        .select({
+          pr: sql<number>`(count(*) filter (where ${approvalRequests.docType} = 'pr'))::int`,
+          po: sql<number>`(count(*) filter (where ${approvalRequests.docType} = 'po'))::int`,
+          sco: sql<number>`(count(*) filter (where ${approvalRequests.docType} = 'sco'))::int`,
+        })
+        .from(approvalRequests)
+        .where(baseWhere),
     ]);
 
     const docIdsByType: Record<ApprovalDocType, number[]> = {
@@ -682,14 +755,38 @@ export const approvalRepository = {
       }
     }
 
-    const enrichedRows: RequestListRow[] = rows.map((row) => {
-      const docSummary =
+    // One batched name lookup for the page's requesters (PERF-05).
+    const requesterIds = [...new Set(rows.map((row) => row.requestedBy))];
+    const requesterRows =
+      requesterIds.length > 0
+        ? await db
+            .select({ id: employees.id, name: employees.name })
+            .from(employees)
+            .where(inArray(employees.id, requesterIds))
+        : [];
+    const requesterNames = new Map(requesterRows.map((r) => [r.id, r.name]));
+
+    const flatRows: PendingRequestRow[] = rows.map((row) => {
+      const summary =
         summaryMaps.get(row.docType)?.get(row.docId) ??
         fallbackDocSummary(row.docId);
-      return { ...row, docSummary };
+      return {
+        ...row,
+        docNumber: summary.docNumber,
+        requesterName: requesterNames.get(row.requestedBy) ?? "",
+        ...(params.includeAmount ? { amountPaise: summary.amountPaise } : {}),
+      };
     });
 
-    return { rows: enrichedRows, total: totalRow?.value ?? 0 };
+    return {
+      rows: flatRows,
+      total: totalRow?.value ?? 0,
+      typeCounts: {
+        pr: countRow?.pr ?? 0,
+        po: countRow?.po ?? 0,
+        sco: countRow?.sco ?? 0,
+      },
+    };
   },
 
   async findCurrentApprovalByDoc(docType: ApprovalDocType, docId: number) {
