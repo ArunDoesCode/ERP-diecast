@@ -373,12 +373,13 @@ export const prRepository = {
 
   async findItemMasterByIds(
     itemIds: number[],
+    tx?: Tx,
   ): Promise<Map<number, ItemMasterLookupRow>> {
     if (itemIds.length === 0) {
       return new Map<number, ItemMasterLookupRow>();
     }
 
-    const rows = await db
+    const rows = await (tx ?? db)
       .select({
         id: itemMaster.id,
         uom: itemMaster.uom,
@@ -394,8 +395,14 @@ export const prRepository = {
     return new Map(rows.map((row) => [row.id, row]));
   },
 
-  async createWithItems(data: CreatePrData, items: CreatePrItemData[]) {
-    return db.transaction(async (tx) => {
+  // `outerTx`: the caller's transaction (sale-order drafts, BR-SO-46); without
+  // it the PR gets its own.
+  async createWithItems(
+    data: CreatePrData,
+    items: CreatePrItemData[],
+    outerTx?: Tx,
+  ) {
+    const run = async (tx: Tx) => {
       const { periodKey, seq } = await allocateDocumentSequence(
         tx,
         "pr",
@@ -449,7 +456,8 @@ export const prRepository = {
         pr: createdPr,
         items: createdItems,
       };
-    });
+    };
+    return outerTx ? run(outerTx) : db.transaction(run);
   },
 
   async updatePrById(prId: number, data: UpdatePrData, tx?: Tx) {

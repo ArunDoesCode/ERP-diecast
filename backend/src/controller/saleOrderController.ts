@@ -1,18 +1,24 @@
 import type { Context } from "hono";
-
+import { can } from "../lib/auth-middleware";
 import { UnauthorizedError } from "../lib/errors";
 import type { AppEnv } from "../lib/types";
+import { saleDraftService } from "../service/saleDraftService";
+import { saleExplosionService } from "../service/saleExplosionService";
 import { saleOrderService } from "../service/saleOrderService";
 import {
+  createDraftsSchema,
   createSaleOrderSchema,
+  explosionListQuerySchema,
+  explosionRowsQuerySchema,
+  runExplosionSchema,
   soAuditQuerySchema,
+  soExplosionParamSchema,
   soIdParamSchema,
   soListQuerySchema,
   soReasonBodySchema,
   soVersionBodySchema,
   updateSaleOrderSchema,
 } from "../types/saleOrder.types";
-import { notImplemented } from "./notImplemented";
 
 function parseActorId(c: Context<AppEnv>) {
   const actorId = Number(c.get("user").userId);
@@ -26,7 +32,6 @@ const parseId = (c: Context<AppEnv>) => soIdParamSchema.parse(c.req.param()).id;
 const queryOf = (c: Context<AppEnv>) =>
   Object.fromEntries(new URL(c.req.url).searchParams);
 
-// Explosion handlers (runExplosion .. createDrafts) come with slices S2 / S3.
 export const saleOrderController = {
   async list(c: Context<AppEnv>) {
     const query = soListQuerySchema.parse(queryOf(c));
@@ -94,9 +99,49 @@ export const saleOrderController = {
     return c.json({ success: true, data, meta });
   },
 
-  runExplosion: notImplemented,
-  listExplosions: notImplemented,
-  explosionDetails: notImplemented,
-  explosionRows: notImplemented,
-  createDrafts: notImplemented,
+  async runExplosion(c: Context<AppEnv>) {
+    const id = parseId(c);
+    runExplosionSchema.parse(await c.req.json().catch(() => ({})));
+    const data = await saleExplosionService.run(id, parseActorId(c));
+    return c.json({ success: true, data }, 201);
+  },
+
+  async listExplosions(c: Context<AppEnv>) {
+    const id = parseId(c);
+    const query = explosionListQuerySchema.parse(queryOf(c));
+    const { data, meta } = await saleExplosionService.list(id, query);
+    return c.json({ success: true, data, meta });
+  },
+
+  async explosionDetails(c: Context<AppEnv>) {
+    const { id, eid } = soExplosionParamSchema.parse(c.req.param());
+    const data = await saleExplosionService.details(id, eid);
+    return c.json({ success: true, data });
+  },
+
+  async explosionRows(c: Context<AppEnv>) {
+    const { id, eid } = soExplosionParamSchema.parse(c.req.param());
+    const query = explosionRowsQuerySchema.parse(queryOf(c));
+    // BR-SO-50: job-worker candidate names only for so.explode holders
+    const canSeeCandidates = can(c.get("actor"), "so.explode");
+    const { data, meta } = await saleExplosionService.rows(
+      id,
+      eid,
+      query,
+      canSeeCandidates,
+    );
+    return c.json({ success: true, data, meta });
+  },
+
+  async createDrafts(c: Context<AppEnv>) {
+    const { id, eid } = soExplosionParamSchema.parse(c.req.param());
+    const body = createDraftsSchema.parse(await c.req.json());
+    const data = await saleDraftService.createDrafts(
+      id,
+      eid,
+      body,
+      c.get("actor"),
+    );
+    return c.json({ success: true, data }, 201);
+  },
 };

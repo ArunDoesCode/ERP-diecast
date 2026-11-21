@@ -60,20 +60,23 @@ export type RaisedDocument = {
 // BR-SO-38: a snapshot is out of date when the need or delivery version moved,
 // or when an item's active BOM revision is no longer the one the row used
 // (null-safe: also catches a BOM created for a "no BOM" item). Needs
-// sale_explosions and sale_orders in scope.
-const explosionOutOfDate = sql`(
-  ${saleExplosions.soNeedVersion} <> ${saleOrders.needVersion}
-  or ${saleExplosions.soDeliveryVersion} <> ${saleOrders.deliveryVersion}
-  or exists (
-    select 1 from ${saleExplosionRows}
-    where ${saleExplosionRows.explosionId} = ${saleExplosions.id}
-      and ${saleExplosionRows.bomRevisionId} is distinct from (
-        select ${boms.id} from ${boms}
-        where ${boms.partId} = ${saleExplosionRows.itemId}
-          and ${boms.status} = 'active'
-        limit 1
-      )
-  )
+// sale_explosions and sale_orders in scope. The three parts are exported so the
+// explosion header can name its reasons (so_changed / delivery_changed /
+// bom_changed).
+export const soChangedSql = sql`(${saleExplosions.soNeedVersion} <> ${saleOrders.needVersion})`;
+export const deliveryChangedSql = sql`(${saleExplosions.soDeliveryVersion} <> ${saleOrders.deliveryVersion})`;
+export const bomChangedSql = sql`exists (
+  select 1 from ${saleExplosionRows}
+  where ${saleExplosionRows.explosionId} = ${saleExplosions.id}
+    and ${saleExplosionRows.bomRevisionId} is distinct from (
+      select ${boms.id} from ${boms}
+      where ${boms.partId} = ${saleExplosionRows.itemId}
+        and ${boms.status} = 'active'
+      limit 1
+    )
+)`;
+export const explosionOutOfDate = sql`(
+  ${soChangedSql} or ${deliveryChangedSql} or ${bomChangedSql}
 )`;
 
 const snapshotStatusSql = sql<

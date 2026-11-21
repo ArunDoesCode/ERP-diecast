@@ -26,6 +26,11 @@ export function isUniqueViolation(error: unknown): boolean {
   return findPgError(error, "23505") !== undefined;
 }
 
+/** 55P03: lock_not_available, e.g. a `lock_timeout` that ran out. */
+export function isLockTimeout(error: unknown): boolean {
+  return findPgError(error, "55P03") !== undefined;
+}
+
 /** 23503: foreign-key violation, anywhere in the cause chain. */
 export function isForeignKeyViolation(error: unknown): boolean {
   return findPgError(error, "23503") !== undefined;

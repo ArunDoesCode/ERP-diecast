@@ -280,7 +280,14 @@ export const prService = {
     };
   },
 
-  async create(input: createPrSchemaType, actorId: number, actor: Actor) {
+  // `tx`: the caller's transaction (sale-order drafts, BR-SO-46); without it
+  // the PR is saved in its own.
+  async create(
+    input: createPrSchemaType,
+    actorId: number,
+    actor: Actor,
+    tx?: Tx,
+  ) {
     assertCanLinkMachine(actor, input.assetId);
     if (input.type === "maintenance" && input.assetId == null) {
       throw new BadRequestError(
@@ -297,7 +304,7 @@ export const prService = {
 
     // BR-SO-48: a linked SO must exist and be confirmed.
     if (input.saleOrderId != null) {
-      await saleOrderService.assertConfirmedForPrLink(input.saleOrderId);
+      await saleOrderService.assertConfirmedForPrLink(input.saleOrderId, tx);
     }
 
     const itemIds = [...new Set(input.items.map((item) => item.itemId))];
@@ -309,7 +316,7 @@ export const prService = {
     }
     for (const item of input.items) assertNotPastDate(item.expectedDate);
 
-    const itemMap = await prRepository.findItemMasterByIds(itemIds);
+    const itemMap = await prRepository.findItemMasterByIds(itemIds, tx);
     assertItemsUsable(itemIds, itemMap);
 
     const normalizedItems = input.items.map((item) => {
@@ -335,6 +342,7 @@ export const prService = {
         requestedBy: actorId,
       },
       normalizedItems,
+      tx,
     );
   },
 

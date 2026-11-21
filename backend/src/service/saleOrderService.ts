@@ -1303,8 +1303,8 @@ export const saleOrderService = {
   },
 
   /** BR-SO-48: a PR may name only an existing, confirmed SO. */
-  async assertConfirmedForPrLink(soId: number) {
-    const row = await saleOrderRepository.findStatusById(soId);
+  async assertConfirmedForPrLink(soId: number, executor?: DbExecutor) {
+    const row = await saleOrderRepository.findStatusById(soId, executor);
     if (!row) {
       throw new BadRequestError(
         "saleOrderId does not name an existing sale order",

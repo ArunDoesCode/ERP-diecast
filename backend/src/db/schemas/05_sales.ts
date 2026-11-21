@@ -303,6 +303,7 @@ export const saleExplosionRows = pgTable(
       .notNull(),
     // 1..10, top item = L1 (BR-SO-50)
     level: smallint("level").notNull(),
+    // no-index: low-card four values, always filtered together with explosion_id
     rowType: explosionRowTypeEnum("row_type").notNull(),
     // no_bom | buy_as_is (BR-SO-22, 50)
     tag: text("tag"),
