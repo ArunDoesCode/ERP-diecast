@@ -872,7 +872,8 @@ describe("BR-SO-30..35 free stock, supply, reservations", () => {
     expect(a.openPrQty).toBe(200);
     expect(a.openPoQty).toBe(0);
     expect(a.openScoQty).toBe(0);
-    expect(a.netQty).toBeCloseTo(723.8 - 200 - a.freeQty, 3);
+    expect(a.grossQty).toBeCloseTo(900.1, 3);
+    expect(a.netQty).toBeCloseTo(a.grossQty - 200 - a.freeQty, 3);
   });
 
   test("BR-SO-31 a cancelled PR is not supply", async () => {
