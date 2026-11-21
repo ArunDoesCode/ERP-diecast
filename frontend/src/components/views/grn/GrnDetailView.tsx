@@ -7,6 +7,8 @@ import { useState } from "react";
 
 import { EditGrnModal } from "@/components/pages/grn/EditGrnModal";
 import { GrnLinesTable } from "@/components/pages/grn/GrnLinesTable";
+import { EnterInvoiceButton } from "@/components/pages/supplier-invoices/EnterInvoiceButton";
+import { InvoicesCard } from "@/components/pages/supplier-invoices/InvoicesCard";
 import { DetailHeader } from "@/components/shared/DetailHeader";
 import { DocumentFlow } from "@/components/shared/DocumentFlow";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -59,6 +61,10 @@ export function GrnDetailView({ grnId }: { grnId: number }) {
 			grn.poId !== null,
 	);
 	const returnAction = prefillQuery.data?.data.mainAction;
+
+	// "Enter supplier invoice" next step (BR-SINV-38): only a GRN with accepted goods.
+	const billableGrn =
+		grn?.status === "accepted" || grn?.status === "partial_accepted";
 
 	if (detailQuery.isLoading) {
 		return (
@@ -125,6 +131,13 @@ export function GrnDetailView({ grnId }: { grnId: number }) {
 								</Link>
 							</Button>
 						) : null}
+						{grn.poId !== null ? (
+							<EnterInvoiceButton
+								poId={grn.poId}
+								grnId={grn.id}
+								enabled={billableGrn}
+							/>
+						) : null}
 						{canManage ? (
 							<GrnDraftActions grn={grn} onEdit={() => setEditOpen(true)} />
 						) : null}
@@ -149,6 +162,10 @@ export function GrnDetailView({ grnId }: { grnId: number }) {
 					<GrnLinesTable grnId={grn.id} poId={grn.poId ?? 0} items={items} />
 				</CardContent>
 			</Card>
+
+			{grn.poId !== null ? (
+				<InvoicesCard poId={grn.poId} grnId={grn.id} canEnter={billableGrn} />
+			) : null}
 
 			{editOpen ? (
 				<EditGrnModal

@@ -14,6 +14,7 @@ const API_Header = {
 	saleOrders: "/sale-orders",
 	reorder: "/reorder",
 	company: "/company",
+	supplierInvoice: "/supplier-invoice",
 };
 export const API_ROUTES = {
 	auth: {
@@ -142,7 +143,6 @@ export const API_ROUTES = {
 		escalate: (poId: number) => `${API_Header.po}/${poId}/escalate`,
 		delay: (poId: number) => `${API_Header.po}/${poId}/delay`,
 		confirm: (poId: number) => `${API_Header.po}/${poId}/confirm`,
-		invoice: (poId: number) => `${API_Header.po}/${poId}/invoice`,
 		close: (poId: number) => `${API_Header.po}/${poId}/close`,
 		shortClose: (poId: number) => `${API_Header.po}/${poId}/short-close`,
 		communications: (poId: number) => `${API_Header.po}/${poId}/communications`,
@@ -244,7 +244,23 @@ export const API_ROUTES = {
 		challanDetail: (challanId: number) =>
 			`${API_Header.sco}/challans/${challanId}`,
 	},
+	supplierInvoices: {
+		list: `${API_Header.supplierInvoice}/getsupplierinvoices`,
+		billableLines: `${API_Header.supplierInvoice}/getbillablelines`,
+		detail: (id: number) =>
+			`${API_Header.supplierInvoice}/getsupplierinvoicedetails/${id}`,
+		create: `${API_Header.supplierInvoice}/createsupplierinvoice`,
+		update: `${API_Header.supplierInvoice}/updatesupplierinvoice`,
+		remove: (id: number) =>
+			`${API_Header.supplierInvoice}/deletesupplierinvoice/${id}`,
+		submit: (id: number) => `${API_Header.supplierInvoice}/${id}/submit`,
+		backToDraft: (id: number) =>
+			`${API_Header.supplierInvoice}/${id}/back-to-draft`,
+		release: (id: number) => `${API_Header.supplierInvoice}/${id}/release`,
+		cancel: (id: number) => `${API_Header.supplierInvoice}/${id}/cancel`,
+	},
 	company: {
+		invoiceTolerances: `${API_Header.company}/invoice-tolerances`,
 		settings: `${API_Header.company}/settings`,
 		settingsHistory: `${API_Header.company}/settings/history`,
 	},

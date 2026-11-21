@@ -14,7 +14,6 @@ import type {
 	ClosePoPayload,
 	ConfirmPoPayload,
 	LogPoCommunicationPayload,
-	MarkPoInvoicedFormInput,
 	POCreatePayload,
 	POUpdatePayload,
 	PurchaseOrderListParams,
@@ -33,7 +32,6 @@ import {
 	getPurchaseOrderCommunications,
 	getPurchaseOrders,
 	getSupplierPriceRows,
-	markPurchaseOrderInvoiced,
 	sendPurchaseOrder,
 	sendPurchaseOrderReminder,
 	shortClosePurchaseOrder,
@@ -379,42 +377,6 @@ export function useConfirmPoMutation() {
 		},
 		onError: (error) => {
 			toast.error(errorMessage(error, "Failed to record confirmation"));
-		},
-	});
-}
-
-export function useMarkPoInvoicedMutation() {
-	const queryClient = useQueryClient();
-
-	return useMutation({
-		mutationFn: (variables: {
-			poId: number;
-			payload: MarkPoInvoicedFormInput;
-		}) =>
-			markPurchaseOrderInvoiced(variables.poId, {
-				invoiceNumber: variables.payload.invoiceNumber,
-				invoiceDate: variables.payload.invoiceDate,
-				billedAmountPaise: Math.round(
-					variables.payload.billedAmountRupees * 100,
-				),
-				dueDate: normalize(variables.payload.dueDate),
-			}),
-		onSuccess: async (result, variables) => {
-			if (!result.success) {
-				toast.error(result.message || "Failed to mark PO as invoiced");
-				return;
-			}
-
-			await Promise.all([
-				queryClient.invalidateQueries({
-					queryKey: purchaseOrderKeys.detail(variables.poId),
-				}),
-				queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.cards() }),
-			]);
-			toast.success(result.message || `${result.data.poNumber} invoiced`);
-		},
-		onError: (error) => {
-			toast.error(errorMessage(error, "Failed to mark PO as invoiced"));
 		},
 	});
 }

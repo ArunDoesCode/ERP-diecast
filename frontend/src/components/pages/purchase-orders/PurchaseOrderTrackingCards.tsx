@@ -10,7 +10,6 @@ import { ConfirmPoDialog } from "@/components/pages/purchase-orders/ConfirmPoDia
 import { DelayPoDialog } from "@/components/pages/purchase-orders/DelayPoDialog";
 import { EditPOModal } from "@/components/pages/purchase-orders/EditPOModal";
 import { LogPoCommunicationDialog } from "@/components/pages/purchase-orders/LogPoCommunicationDialog";
-import { MarkPoInvoicedDialog } from "@/components/pages/purchase-orders/MarkPoInvoicedDialog";
 import { PoDetailPanel } from "@/components/pages/purchase-orders/PoDetailPanel";
 import { ShortClosePoAlert } from "@/components/pages/purchase-orders/ShortClosePoAlert";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -41,7 +40,6 @@ import { formatDate, formatMoney } from "@/lib/format";
 import {
 	canCancelPurchaseOrder,
 	canClosePurchaseOrder,
-	canMarkPurchaseOrderInvoiced,
 	canShortClosePurchaseOrder,
 	PO_IN_TRANSIT_STATUSES,
 	PO_TERMINAL_STATUSES,
@@ -53,7 +51,7 @@ import {
 } from "@/types/purchase-orders";
 
 type PoTrackingDialogState = {
-	type: "send" | "reminder" | "escalate" | "delay" | "confirm" | "invoice";
+	type: "send" | "reminder" | "escalate" | "delay" | "confirm";
 	po: PurchaseOrder;
 };
 
@@ -336,16 +334,6 @@ export function PurchaseOrderTrackingCards({
 												</Button>
 											</>
 										) : null}
-										{canMarkPurchaseOrderInvoiced(po.status) ? (
-											<Button
-												type="button"
-												size="sm"
-												variant="outline"
-												onClick={() => setDialogState({ type: "invoice", po })}
-											>
-												Mark Invoiced
-											</Button>
-										) : null}
 										{canClosePurchaseOrder(po.status) ? (
 											<ClosePoAlert poId={po.id} poNumber={po.poNumber} />
 										) : null}
@@ -455,18 +443,6 @@ export function PurchaseOrderTrackingCards({
 						if (!open) setDialogState(null);
 					}}
 					onConfirmed={() => setDialogState(null)}
-				/>
-			) : null}
-
-			{dialogState?.type === "invoice" ? (
-				<MarkPoInvoicedDialog
-					poId={dialogState.po.id}
-					poNumber={dialogState.po.poNumber}
-					open={dialogState !== null}
-					onOpenChange={(open) => {
-						if (!open) setDialogState(null);
-					}}
-					onInvoiced={() => setDialogState(null)}
 				/>
 			) : null}
 		</>

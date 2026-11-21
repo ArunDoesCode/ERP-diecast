@@ -18,10 +18,11 @@ import { ConfirmPoDialog } from "@/components/pages/purchase-orders/ConfirmPoDia
 import { DelayPoDialog } from "@/components/pages/purchase-orders/DelayPoDialog";
 import { EditPOModal } from "@/components/pages/purchase-orders/EditPOModal";
 import { LogPoCommunicationDialog } from "@/components/pages/purchase-orders/LogPoCommunicationDialog";
-import { MarkPoInvoicedDialog } from "@/components/pages/purchase-orders/MarkPoInvoicedDialog";
 import { PoDetailPanel } from "@/components/pages/purchase-orders/PoDetailPanel";
 import { ShortClosePoAlert } from "@/components/pages/purchase-orders/ShortClosePoAlert";
 import { CancelPrLineDialog } from "@/components/pages/purchase-requisitions/CancelPrLineDialog";
+import { EnterInvoiceButton } from "@/components/pages/supplier-invoices/EnterInvoiceButton";
+import { InvoicesCard } from "@/components/pages/supplier-invoices/InvoicesCard";
 import { DetailHeader } from "@/components/shared/DetailHeader";
 import { DocumentFlow } from "@/components/shared/DocumentFlow";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -97,8 +98,8 @@ import { formatDate, formatMoney } from "@/lib/format";
 import {
 	canCancelPurchaseOrder,
 	canClosePurchaseOrder,
-	canMarkPurchaseOrderInvoiced,
 	canShortClosePurchaseOrder,
+	PO_BILLABLE_STATUSES,
 	PO_IN_TRANSIT_STATUSES,
 	PO_TERMINAL_STATUSES,
 } from "@/lib/po-status-badge";
@@ -483,7 +484,6 @@ type LinkedPoDialogState =
 	| { type: "send" | "reminder" | "escalate"; poId: number; poNumber: string }
 	| { type: "delay"; poId: number; poNumber: string }
 	| { type: "confirm"; poId: number; poNumber: string }
-	| { type: "invoice"; poId: number; poNumber: string }
 	| { type: "cancel" | "close" | "shortClose"; poId: number; poNumber: string };
 
 function LinkedPOs({
@@ -624,22 +624,6 @@ function LinkedPOs({
 														</Button>
 													</>
 												) : null}
-												{canMarkPurchaseOrderInvoiced(po.status) ? (
-													<Button
-														type="button"
-														size="sm"
-														variant="outline"
-														onClick={() =>
-															setDialogState({
-																type: "invoice",
-																poId: po.id,
-																poNumber: po.poNumber,
-															})
-														}
-													>
-														Mark Invoiced
-													</Button>
-												) : null}
 											</>
 										) : null}
 										{canManagePO ? (
@@ -670,10 +654,18 @@ function LinkedPOs({
 												Receive goods
 											</Button>
 										) : null}
+										{/* invoice.manage is checked inside; independent of po.manage. */}
+										<EnterInvoiceButton
+											poId={po.id}
+											enabled={PO_BILLABLE_STATUSES.has(po.status)}
+										/>
 									</div>
 								</StatusFlashRow>
 								<PoApprovalHistory poId={po.id} />
 								<PoDetails poId={po.id} />
+								{PO_BILLABLE_STATUSES.has(po.status) ? (
+									<InvoicesCard poId={po.id} />
+								) : null}
 							</div>
 						))}
 					</div>
@@ -775,18 +767,6 @@ function LinkedPOs({
 					onOpenChange={(open) => {
 						if (!open) setDialogState(null);
 					}}
-				/>
-			) : null}
-
-			{dialogState?.type === "invoice" ? (
-				<MarkPoInvoicedDialog
-					poId={dialogState.poId}
-					poNumber={dialogState.poNumber}
-					open={dialogState !== null}
-					onOpenChange={(open) => {
-						if (!open) setDialogState(null);
-					}}
-					onInvoiced={() => setDialogState(null)}
 				/>
 			) : null}
 		</Card>

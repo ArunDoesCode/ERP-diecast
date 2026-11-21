@@ -2,6 +2,7 @@
 
 import { CompanySettingsForm } from "@/components/pages/subcontracting/CompanySettingsForm";
 import { CompanySettingsHistory } from "@/components/pages/subcontracting/CompanySettingsHistory";
+import { InvoiceToleranceCard } from "@/components/pages/supplier-invoices/InvoiceToleranceCard";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCan } from "@/hooks/use-can";
@@ -31,6 +32,7 @@ export function CompanySettingsView() {
 					settings={query.data?.data ?? null}
 				/>
 			)}
+			<InvoiceToleranceCard />
 			{canView || canEdit ? <CompanySettingsHistory /> : null}
 		</div>
 	);

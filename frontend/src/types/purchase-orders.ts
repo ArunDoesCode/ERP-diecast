@@ -1,4 +1,3 @@
-import { z } from "zod";
 import type {
 	ApiResult,
 	PaginatedResponse,
@@ -212,12 +211,6 @@ export type UpdatePoDelayPayload = {
 	delayReason?: string;
 };
 export type ConfirmPoPayload = { confirmationMethod: string; note?: string };
-export type MarkPoInvoicedPayload = {
-	invoiceNumber: string;
-	invoiceDate: string;
-	billedAmountPaise: number;
-	dueDate?: string;
-};
 export type ClosePoPayload = { note?: string };
 export type ShortClosePoPayload = { reason: string };
 
@@ -225,18 +218,7 @@ export type ShortClosePoPayload = { reason: string };
 export type POSendResult = ApiResult<PurchaseOrder>;
 export type PODelayResult = ApiResult<PurchaseOrder>;
 export type POConfirmResult = ApiResult<PurchaseOrder>;
-export type POInvoiceResult = ApiResult<PurchaseOrder>;
 export type POCloseResult = ApiResult<PurchaseOrder>;
 export type POShortCloseResult = ApiResult<PurchaseOrder>;
 export type POCommunicationsResult = ApiResult<PoCommunication[]>;
 export type POCommunicationResult = ApiResult<PoCommunication>;
-
-export const markPoInvoicedSchema = z.object({
-	invoiceNumber: z.string().min(1, "Invoice number is required"),
-	invoiceDate: z.string().min(1, "Invoice date is required"),
-	billedAmountRupees: z.coerce
-		.number()
-		.nonnegative("Amount cannot be negative"),
-	dueDate: z.string().optional(),
-});
-export type MarkPoInvoicedFormInput = z.infer<typeof markPoInvoicedSchema>;

@@ -27,6 +27,8 @@ export type StatusDoc =
 	| "grnQa"
 	| "purchaseReturn"
 	| "debitNote"
+	| "supplierInvoice"
+	| "supplierInvoiceMatch"
 	| "sco"
 	| "bom"
 	| "bomNode"
@@ -126,6 +128,24 @@ const MAP: Record<StatusDoc, Record<string, Entry>> = Object.assign(
 		debitNote: table({
 			issued: ["Issued", "success"],
 			cancelled: ["Cancelled", "closed"],
+		}),
+		supplierInvoice: table({
+			draft: ["Draft", "neutral"],
+			blocked: ["Blocked", "warning"],
+			approved: ["Payable", "success"],
+			cancelled: ["Cancelled", "closed"],
+			legacy: ["Legacy", "closed"],
+			overdue: ["Overdue", "danger"],
+		}),
+		supplierInvoiceMatch: table({
+			ok: ["OK", "success"],
+			qty: ["Qty", "danger"],
+			price: ["Price", "danger"],
+			tax: ["Tax", "danger"],
+			tax_rate: ["Tax rate", "danger"],
+			total: ["Total", "danger"],
+			charge: ["Charge not on PO", "danger"],
+			below_po_rate: ["Below PO rate", "info"],
 		}),
 		sco: table({
 			draft: ["Draft", "neutral"],

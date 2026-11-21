@@ -5,7 +5,6 @@ import type {
 	ConfirmPoPayload,
 	LastRateResult,
 	LogPoCommunicationPayload,
-	MarkPoInvoicedPayload,
 	POCancelResult,
 	POCloseResult,
 	POCommunicationResult,
@@ -14,7 +13,6 @@ import type {
 	POCreatePayload,
 	POCreateResult,
 	PODelayResult,
-	POInvoiceResult,
 	POListResult,
 	POSendResult,
 	POShortCloseResult,
@@ -156,16 +154,6 @@ export function updatePurchaseOrderDelay(
 export function confirmPurchaseOrder(poId: number, payload: ConfirmPoPayload) {
 	return api.post<POConfirmResult, ConfirmPoPayload>(
 		API_ROUTES.purchaseOrders.confirm(poId),
-		payload,
-	);
-}
-
-export function markPurchaseOrderInvoiced(
-	poId: number,
-	payload: MarkPoInvoicedPayload,
-) {
-	return api.post<POInvoiceResult, MarkPoInvoicedPayload>(
-		API_ROUTES.purchaseOrders.invoice(poId),
 		payload,
 	);
 }
