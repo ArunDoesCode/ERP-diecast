@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { db } from "../../src/db/client";
 import { locations } from "../../src/db/schemas/02_procurement-catalog";
-import { customers } from "../../src/db/schemas/05_sales";
+import { customers, salesAuditLog } from "../../src/db/schemas/05_sales";
 import { istDay, makeDispatchFx } from "../helpers/dispatchFixtures";
 
 const fx = makeDispatchFx("dspd");
@@ -764,6 +764,53 @@ describe("edit a draft (BR-DSP-03..09, 22, 36)", () => {
   test("BR-DSP-22 an edit of a missing note is 404", async () => {
     expect((await edit(999_999_999, { remarks: "x" })).status).toBe(404);
   });
+
+  test("BR-DSP-36 the dispatch.edit audit row carries before and after of the changed header field and no prices", async () => {
+    const { so, n } = await mk();
+    expect((await edit(n.id, { remarks: "first" })).status).toBe(200);
+    expect((await edit(n.id, { remarks: "second" })).status).toBe(200);
+    const rows = (
+      await db
+        .select()
+        .from(salesAuditLog)
+        .where(eq(salesAuditLog.soId, so.soId))
+    ).filter((r) => r.action === "dispatch.edit");
+    expect(rows.length).toBeGreaterThanOrEqual(2);
+    const last = rows[rows.length - 1];
+    // biome-ignore lint/suspicious/noExplicitAny: jsonb columns
+    const before = last?.before as any;
+    // biome-ignore lint/suspicious/noExplicitAny: jsonb columns
+    const after = last?.after as any;
+    expect(before?.remarks).toBe("first");
+    expect(after?.remarks).toBe("second");
+    for (const row of rows) {
+      expect(JSON.stringify([row.before, row.after])).not.toMatch(
+        /price|taxable|gst|valuePaise|totalPaise/i,
+      );
+    }
+  });
+});
+
+describe("draft of an SO that is no longer confirmed (BR-DSP-11)", () => {
+  for (const op of ["hold", "close", "cancel"] as const) {
+    test(`BR-DSP-11 a draft of an SO after ${op} cannot be edited (409 DISPATCH_SO_NOT_CONFIRMED) but can be cancelled`, async () => {
+      const s = await fx.scenario();
+      await fx.soOp(s.so.soId, op);
+      const e = await fx.dsp(
+        "floor_supervisor",
+        "PATCH",
+        `/notes/${s.note.id}`,
+        {
+          remarks: "late change",
+        },
+      );
+      expect(e.status).toBe(409);
+      expect(e.json.code).toBe("DISPATCH_SO_NOT_CONFIRMED");
+      const c = await fx.cancelDraft(s.note.id, "order stopped");
+      expect(c.status).toBe(200);
+      expect(c.json.data.status).toBe("cancelled");
+    });
+  }
 });
 
 describe("cancel a draft (BR-DSP-29, 33, 36)", () => {

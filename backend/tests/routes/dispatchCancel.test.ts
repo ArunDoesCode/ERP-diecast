@@ -330,6 +330,26 @@ describe("transport after posting (BR-DSP-25, 26, 27, 36)", () => {
     );
   });
 
+  test("BR-DSP-27 clearing a field records new value null in the history, and a previously unset old value is null", async () => {
+    const s = await posted();
+    const r = await patch(s.note.id, {
+      vehicleNo: null,
+      transporterId: "27ABCDE1234F1Z5",
+    });
+    expect(r.status).toBe(200);
+    const h = (await history(s.note.id)) as Array<{
+      field: string;
+      oldValue: string | null;
+      newValue: string | null;
+    }>;
+    const veh = h.find((x) => x.field === "vehicleNo");
+    expect(veh?.oldValue).toBe("MH12AB1234");
+    expect(veh?.newValue).toBeNull();
+    const tid = h.find((x) => x.field === "transporterId");
+    expect(tid?.oldValue).toBeNull();
+    expect(tid?.newValue).toBe("27ABCDE1234F1Z5");
+  });
+
   test("BR-DSP-27 clearing the vehicle is allowed when a transporter ID is set in the same change", async () => {
     const s = await posted();
     const r = await patch(s.note.id, {
