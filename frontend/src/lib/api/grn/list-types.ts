@@ -8,7 +8,7 @@ export type GrnQaSummary = "pending" | "passed" | "failed" | "mixed";
 export type GrnListRowV2 = GrnListRow & {
 	supplierName: string | null;
 	lineCount: number;
-	qaSummary: GrnQaSummary;
+	qaSummary: GrnQaSummary | null;
 	/** Caller holds po.manage: the PO number may be a link (BR-FF-03). */
 	poCanOpen: boolean;
 };
