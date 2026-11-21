@@ -20,6 +20,7 @@ export const END_POINTS = {
     createItem: "/items",
     updateItem: "/items/:id",
     lastRate: "/items/:itemId/last-rate",
+    lastRates: "/items/last-rates",
     listServices: "/services",
     createService: "/services",
     updateService: "/services/:id",

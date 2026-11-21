@@ -274,6 +274,15 @@ export const assetRepository = {
     return choices.get(itemId);
   },
 
+  // PERF-01: same chain for many items at once (unknown items left out).
+  async getLastRates(
+    itemIds: number[],
+    supplierId: number,
+    opts: { onDate: string; includeContract: boolean },
+  ) {
+    return findRateChoices(db, supplierId, itemIds, opts);
+  },
+
   async listServices(params: assetServiceListQuerySchemaType) {
     const sortColumn =
       params.sortBy && params.sortBy in serviceSortColumns

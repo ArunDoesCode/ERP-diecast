@@ -148,6 +148,30 @@ export const assetLastRateSchema = z.object({
 });
 export type assetLastRateSchemaType = z.infer<typeof assetLastRateSchema>;
 
+// GET /asset/items/last-rates (PERF-01): the last-rate chain for many items of one supplier.
+export const assetLastRatesQuerySchema = z.object({
+  supplierId: z.coerce.number().int().positive(),
+  itemIds: z
+    .string()
+    .regex(/^\d+(,\d+)*$/, "Use comma separated item ids")
+    .transform((v) => [...new Set(v.split(",").map(Number))])
+    .refine((ids) => ids.length <= 200 && ids.every((id) => id > 0), {
+      message: "Between 1 and 200 positive item ids",
+    }),
+  onDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD")
+    .optional(),
+});
+export type assetLastRatesQuerySchemaType = z.infer<
+  typeof assetLastRatesQuerySchema
+>;
+
+// Unknown items are left out of the list.
+export const assetLastRatesSchema = z.array(
+  assetLastRateSchema.extend({ itemId: z.number().int() }),
+);
+
 export const assetItemUpdateSchema = z
   .object({
     sku: z.string().trim().min(1).max(50).optional(),

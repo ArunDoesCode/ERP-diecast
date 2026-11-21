@@ -740,6 +740,15 @@ export const rfqService = {
       if (rfq.status !== "draft" && rfq.status !== "sent") {
         throw invalidStatus(rfq.status, "cancelled");
       }
+      // SEC-01/02: cancelling submitted quotes needs rfq.award, as in BR-RFQ-19
+      if (!can(actor, "rfq.award")) {
+        const quotes = await rfqRepository.quoteHeaders(id, tx);
+        if (quotes.some((q) => q.status === "submitted")) {
+          throw new ForbiddenError("Permission denied", "PERMISSION_DENIED", {
+            key: "rfq.award",
+          });
+        }
+      }
       await rfqRepository.dropOpenLines(id, tx);
       await rfqRepository.cancelDraftQuotes(id, actor.id, tx, [
         "draft",
@@ -968,7 +977,7 @@ export const rfqService = {
         );
       }
       const lines = await rfqRepository.quoteLines(quoteId, tx);
-      if (!lines.some((l) => l.isQuoted)) {
+      if (!lines.some((l) => l.isQuoted && l.lineStatus === "open")) {
         throw new BadRequestError(
           "A quote needs at least one priced line",
           "QUOTE_EMPTY",
@@ -1104,7 +1113,11 @@ export const rfqService = {
           : qi.validTill < today
             ? ("expired" as const)
             : ("priced" as const);
-        const eligible = state === "priced" && qi.quoteStatus === "submitted";
+        // A-44: lines already awarded or dropped show their quotes but are never eligible
+        const eligible =
+          state === "priced" &&
+          qi.quoteStatus === "submitted" &&
+          line.lineStatus === "open";
         return {
           cell: {
             ...base,
@@ -1351,20 +1364,18 @@ export const rfqService = {
       // flip the awarded lines first (BR-RFQ-02 exception), drop lines whose PR line
       // was cancelled (BR-RFQ-11)
       const now = new Date();
-      for (const pick of picks) {
-        await rfqRepository.markLineAwarded(
-          pick.line.id,
-          {
-            quoteItemId: pick.chosen.quoteItemId,
-            actorId: actor.id,
-            reason: pick.reason,
-            lowestLandedPaise: pick.lowestLanded,
-            chosenLandedPaise: pick.chosen.landedRatePaise ?? 0,
-            at: now,
-          },
-          tx,
-        );
-      }
+      await rfqRepository.markLinesAwarded(
+        picks.map((pick) => ({
+          id: pick.line.id,
+          quoteItemId: pick.chosen.quoteItemId,
+          actorId: actor.id,
+          reason: pick.reason,
+          lowestLandedPaise: pick.lowestLanded,
+          chosenLandedPaise: pick.chosen.landedRatePaise ?? 0,
+          at: now,
+        })),
+        tx,
+      );
       const awardedIds = new Set(picks.map((p) => p.line.id));
       await rfqRepository.markLinesDropped(
         openLines
@@ -1393,6 +1404,7 @@ export const rfqService = {
         supplierId: number;
         lineCount: number;
       }[] = [];
+      const poLinks: { id: number; poItemId: number }[] = [];
       const awards: {
         rfqItemId: number;
         poId: number;
@@ -1435,7 +1447,7 @@ export const rfqService = {
         for (const [index, pick] of group.entries()) {
           const item = items[index];
           if (!item) continue;
-          await rfqRepository.setPoItem(pick.line.id, item.id, tx);
+          poLinks.push({ id: pick.line.id, poItemId: item.id });
           awards.push({
             rfqItemId: pick.line.id,
             poId: po.id,
@@ -1446,6 +1458,10 @@ export const rfqService = {
           });
         }
       }
+
+      await rfqRepository.setPoItems(poLinks, tx);
+
+      await rfqRepository.setPoItems(poLinks, tx);
 
       // BR-RFQ-34, 38: the RFQ is awarded when no line is open any more
       const stillOpen = await rfqRepository.countOpenLines(rfqId, tx);

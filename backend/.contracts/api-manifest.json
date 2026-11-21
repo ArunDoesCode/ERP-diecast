@@ -749,6 +749,32 @@
       }
     },
     {
+      "id": "GET /api/asset/items/last-rates",
+      "method": "GET",
+      "path": "/api/asset/items/last-rates",
+      "tags": [
+        "asset"
+      ],
+      "summary": "Batched last-rate lookup: the same chain and visibility rules as the single item endpoint, for up to 200 comma separated itemIds of one supplier. Unknown items are left out.",
+      "auth": {
+        "type": "permission",
+        "key": "inventory.view"
+      },
+      "request": {
+        "query": {
+          "supplierId": "integer.positive.required",
+          "itemIds": "unrepresentable.required",
+          "onDate": "string.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required"
+        }
+      }
+    },
+    {
       "id": "GET /api/asset/services",
       "method": "GET",
       "path": "/api/asset/services",

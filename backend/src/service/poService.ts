@@ -490,8 +490,15 @@ async function resolveUpdatedLines(
               at: existing.rateOverrideAt,
             }
           : null;
+      // CR-04: contract A -> newer B with the old rate sent back unchanged = no rate typed
+      const rateTyped =
+        existing.contractItemId !== null &&
+        existing.contractItemId !== choice.contractItemId &&
+        update.unitPricePaise === existing.unitPricePaise
+          ? { ...update, unitPricePaise: undefined }
+          : update;
       const applied = applyContract(
-        { ...update, fromQuote: false },
+        { ...rateTyped, fromQuote: false },
         choice,
         actor,
         keep,
@@ -760,10 +767,18 @@ export const poService = {
       const existingItems = await poRepository.findPoItemsByPoId(poId, tx);
       const existingById = new Map(existingItems.map((row) => [row.id, row]));
       const deleteIds = [...new Set(input.deletes.map((del) => del.id))];
+      const deleted = new Set(deleteIds);
       for (const id of [...deleteIds, ...input.updates.map((u) => u.id)]) {
         if (!existingById.has(id)) {
           throw new NotFoundError(`PO item not found for id ${id}`);
         }
+      }
+      // A-43: a line made by an award cannot be removed; cancel the PO to undo it.
+      if (deleteIds.some((id) => existingById.get(id)?.quoteItemId != null)) {
+        throw new ConflictError(
+          "A line made by an award cannot be removed; cancel the purchase order instead",
+          "PO_LINE_FROM_AWARD",
+        );
       }
       if (existingItems.length - deleteIds.length + inserts.length === 0) {
         throw new BadRequestError(
@@ -776,7 +791,7 @@ export const poService = {
         tx,
         actor,
         locked.supplierId,
-        input.updates,
+        input.updates.filter((u) => !deleted.has(u.id)),
         existingById,
         today,
       );
@@ -824,7 +839,6 @@ export const poService = {
 
       // BR-RFQ-52: the contract cap over the lines this PO will have after the edit
       // (lock order: PR lines above, contract lines here, nothing else after).
-      const deleted = new Set(deleteIds);
       const resolvedById = new Map(resolvedUpdates.map((u) => [u.id, u]));
       await assertContractLines(
         tx,

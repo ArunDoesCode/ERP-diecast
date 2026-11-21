@@ -320,34 +320,54 @@ export const rfqRepository = {
       .where(inArray(rfqItems.id, ids));
   },
 
-  async markLineAwarded(
-    id: number,
-    data: {
+  // PERF-03: one UPDATE ... FROM (VALUES ...) for all awarded lines.
+  async markLinesAwarded(
+    rows: {
+      id: number;
       quoteItemId: number;
       actorId: number;
       reason: string | null;
       lowestLandedPaise: number;
       chosenLandedPaise: number;
       at: Date;
-    },
+    }[],
     tx: DbTransaction,
   ) {
-    await tx
-      .update(rfqItems)
-      .set({
-        lineStatus: "awarded",
-        awardedQuoteItemId: data.quoteItemId,
-        awardedBy: data.actorId,
-        awardedAt: data.at,
-        awardReason: data.reason,
-        awardLowestLandedPaise: data.lowestLandedPaise,
-        awardChosenLandedPaise: data.chosenLandedPaise,
-      })
-      .where(eq(rfqItems.id, id));
+    if (rows.length === 0) return;
+    const values = sql.join(
+      rows.map(
+        (r) =>
+          sql`(${r.id}::int, ${r.quoteItemId}::int, ${r.actorId}::int, ${r.reason}::text, ${r.lowestLandedPaise}::bigint, ${r.chosenLandedPaise}::bigint, ${r.at.toISOString()}::timestamp)`,
+      ),
+      sql`, `,
+    );
+    await tx.execute(sql`
+      update ${rfqItems} as ri set
+        line_status = 'awarded',
+        awarded_quote_item_id = v.quote_item_id,
+        awarded_by = v.actor_id,
+        awarded_at = v.at,
+        award_reason = v.reason,
+        award_lowest_landed_paise = v.lowest,
+        award_chosen_landed_paise = v.chosen
+      from (values ${values}) as v(id, quote_item_id, actor_id, reason, lowest, chosen, at)
+      where ri.id = v.id`);
   },
 
-  async setPoItem(id: number, poItemId: number, tx: DbTransaction) {
-    await tx.update(rfqItems).set({ poItemId }).where(eq(rfqItems.id, id));
+  // PERF-03: one UPDATE ... FROM (VALUES ...) for all PO line links.
+  async setPoItems(
+    rows: { id: number; poItemId: number }[],
+    tx: DbTransaction,
+  ) {
+    if (rows.length === 0) return;
+    const values = sql.join(
+      rows.map((r) => sql`(${r.id}::int, ${r.poItemId}::int)`),
+      sql`, `,
+    );
+    await tx.execute(sql`
+      update ${rfqItems} as ri set po_item_id = v.po_item_id
+      from (values ${values}) as v(id, po_item_id)
+      where ri.id = v.id`);
   },
 
   async countOpenLines(rfqId: number, tx: DbTransaction) {
@@ -645,6 +665,7 @@ export const rfqRepository = {
         itemName: itemMaster.name,
         qty: rfqItems.qty,
         uom: rfqItems.uom,
+        lineStatus: rfqItems.lineStatus,
         isQuoted: rfqQuoteItems.isQuoted,
         ratePaise: rfqQuoteItems.ratePaise,
         gstPercent: rfqQuoteItems.gstPercent,

@@ -557,11 +557,6 @@ export const poRepository = {
         ),
       );
     }
-    // BR-RFQ-31: an awarded RFQ line keeps its award but loses the PO line it pointed at
-    await tx
-      .update(rfqItems)
-      .set({ poItemId: null })
-      .where(inArray(rfqItems.poItemId, poItemIds));
     const deleted = await tx
       .delete(purchaseOrderItems)
       .where(

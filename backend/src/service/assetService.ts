@@ -17,6 +17,7 @@ import type {
   assetItemListQuerySchemaType,
   assetItemUpdateSchemaType,
   assetLastRateQuerySchemaType,
+  assetLastRatesQuerySchemaType,
   assetLocationCreateSchemaType,
   assetLocationListQuerySchemaType,
   assetLocationUpdateSchemaType,
@@ -148,6 +149,59 @@ function assertReorderFieldsFitUnit(
   }
 }
 
+type LastRateChoice = NonNullable<
+  Awaited<ReturnType<typeof assetRepository.getLastRate>>
+>;
+
+// One fulfilment lookup for every contract-sourced choice (cap - ordered = qtyLeft).
+async function shapeLastRates(entries: [number, LastRateChoice][]) {
+  const lineIds = entries.flatMap(([, r]) =>
+    r.source === "contract" &&
+    r.agreedQty !== null &&
+    r.agreedQty !== undefined &&
+    r.contractItemId !== undefined
+      ? [r.contractItemId]
+      : [],
+  );
+  const fulfilment =
+    lineIds.length > 0
+      ? await rateContractRepository.fulfilmentByLine(db, lineIds)
+      : new Map<number, { ordered: number }>();
+  return entries.map(([itemId, result]) => {
+    if (result.source !== "contract") {
+      return { itemId, ratePaise: result.ratePaise, source: result.source };
+    }
+    let qtyLeft: number | null = null;
+    if (result.agreedQty !== null && result.agreedQty !== undefined) {
+      const ordered = round3(
+        fulfilment.get(result.contractItemId ?? 0)?.ordered ?? 0,
+      );
+      qtyLeft = round3(
+        contractCapQty(result.agreedQty, result.allowancePercent ?? 0) -
+          ordered,
+      );
+    }
+    return {
+      itemId,
+      ratePaise: result.ratePaise,
+      source: result.source,
+      ...(result.contractItemId !== undefined
+        ? { contractItemId: result.contractItemId }
+        : {}),
+      ...(result.contractId !== undefined
+        ? { contractId: result.contractId }
+        : {}),
+      ...(result.contractNumber !== undefined
+        ? { contractNumber: result.contractNumber }
+        : {}),
+      ...(result.gstPercent !== undefined
+        ? { gstPercent: result.gstPercent }
+        : {}),
+      qtyLeft,
+    };
+  });
+}
+
 export const assetService = {
   async listItems(params: assetItemListQuerySchemaType) {
     const { rows, total } = await assetRepository.listItems(params);
@@ -263,37 +317,25 @@ export const assetService = {
     if (!result) {
       throw new NotFoundError("Item not found.");
     }
-    if (result.source !== "contract") {
-      return { ratePaise: result.ratePaise, source: result.source };
+    const [shaped] = await shapeLastRates([[itemId, result]]);
+    const { itemId: _omit, ...rest } = shaped as NonNullable<typeof shaped>;
+    return rest;
+  },
+
+  // PERF-01: batched last rates, same visibility rules (BR-RFQ-56).
+  async getLastRates(params: assetLastRatesQuerySchemaType, actor: Actor) {
+    if (params.onDate !== undefined && !isRealDay(params.onDate)) {
+      throw new BadRequestError("onDate is not a valid date");
     }
-    let qtyLeft: number | null = null;
-    if (result.agreedQty !== null && result.agreedQty !== undefined) {
-      const f = await rateContractRepository.fulfilmentByLine(db, [
-        result.contractItemId ?? 0,
-      ]);
-      const ordered = round3(f.get(result.contractItemId ?? 0)?.ordered ?? 0);
-      qtyLeft = round3(
-        contractCapQty(result.agreedQty, result.allowancePercent ?? 0) -
-          ordered,
-      );
-    }
-    return {
-      ratePaise: result.ratePaise,
-      source: result.source,
-      ...(result.contractItemId !== undefined
-        ? { contractItemId: result.contractItemId }
-        : {}),
-      ...(result.contractId !== undefined
-        ? { contractId: result.contractId }
-        : {}),
-      ...(result.contractNumber !== undefined
-        ? { contractNumber: result.contractNumber }
-        : {}),
-      ...(result.gstPercent !== undefined
-        ? { gstPercent: result.gstPercent }
-        : {}),
-      qtyLeft,
-    };
+    const choices = await assetRepository.getLastRates(
+      params.itemIds,
+      params.supplierId,
+      {
+        onDate: params.onDate ?? istDayKey(),
+        includeContract: can(actor, "po.manage") || can(actor, "contract.view"),
+      },
+    );
+    return shapeLastRates([...choices.entries()]);
   },
 
   async listServices(params: assetServiceListQuerySchemaType) {

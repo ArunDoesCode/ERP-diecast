@@ -705,18 +705,6 @@ export const approvalService = {
       }
 
       const chain = request.chainSnapshot;
-      // BR-RFQ-52, 72: last-level approve re-checks the contract qty cap under the
-      // contract-line lock, so two POs can't both pass it.
-      if (
-        request.docType === "po" &&
-        input.action === "approve" &&
-        request.currentLevel >= request.totalLevels
-      ) {
-        await rateContractService.assertPoContractsForApprove(
-          tx,
-          request.docId,
-        );
-      }
       if (input.action === "withdraw") {
         if (request.requestedBy !== actorId) {
           throw new ForbiddenError(
@@ -747,6 +735,18 @@ export const approvalService = {
         }
       }
 
+      // BR-RFQ-52, 72: last-level approve re-checks the contract qty cap under the
+      // contract-line lock, so two POs can't both pass it.
+      if (
+        request.docType === "po" &&
+        input.action === "approve" &&
+        request.currentLevel >= request.totalLevels
+      ) {
+        await rateContractService.assertPoContractsForApprove(
+          tx,
+          request.docId,
+        );
+      }
       let nextStatus: ApprovalRequestStatus = request.status;
       let nextLevel = request.currentLevel;
       let completionTime: Date | null = null;

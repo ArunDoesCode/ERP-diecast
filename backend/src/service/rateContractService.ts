@@ -474,6 +474,13 @@ export const rateContractService = {
         tx,
       );
       const current = await loadForChange(id, tx);
+      // SEC-01: the supplier changed between the pre-read and the row lock; serialise on the current one
+      if (current.supplierId !== pre.supplierId) {
+        await rateContractRepository.lockSupplierForActivation(
+          current.supplierId,
+          tx,
+        );
+      }
       if (current.status !== "draft") {
         throw new ConflictError(
           `A contract in status ${current.status} cannot be activated`,

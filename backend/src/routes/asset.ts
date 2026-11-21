@@ -19,6 +19,8 @@ import {
   assetItemUpdateSchema,
   assetLastRateQuerySchema,
   assetLastRateSchema,
+  assetLastRatesQuerySchema,
+  assetLastRatesSchema,
   assetLocationCreateSchema,
   assetLocationListQuerySchema,
   assetLocationSchema,
@@ -163,6 +165,24 @@ register({
   auth: { type: "permission", key: "inventory.view" },
   request: { query: assetLastRateQuerySchema },
   responses: { "200": successResponse(assetLastRateSchema) },
+});
+
+assetRouter.get(
+  ASSET_ROUTES.lastRates,
+  requirePermission("inventory.view"),
+  asyncHandler(assetController.getLastRates),
+);
+register({
+  method: "GET",
+  path: `${ASSET_BASE_PATH}${ASSET_ROUTES.lastRates}`,
+  tags: ["asset"],
+  summary:
+    "Batched last-rate lookup: the same chain and visibility rules as the single " +
+    "item endpoint, for up to 200 comma separated itemIds of one supplier. " +
+    "Unknown items are left out.",
+  auth: { type: "permission", key: "inventory.view" },
+  request: { query: assetLastRatesQuerySchema },
+  responses: { "200": successResponse(assetLastRatesSchema) },
 });
 
 assetRouter.get(
