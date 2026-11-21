@@ -145,6 +145,8 @@ export const createPrSchema = prCreateBaseSchema
   .extend({
     items: z.array(createPrItemSchema).min(1).max(500),
   })
+  // BR-RO-17: an unknown key (reorderRunId included) is a 400
+  .strict()
   .superRefine((data, ctx) => {
     if (data.type === "maintenance" && data.assetId == null) {
       ctx.addIssue({
@@ -225,6 +227,8 @@ export const updatePrSchema = prUpdateBaseSchema
       .nullish()
       .transform((v) => v ?? []),
   })
+  // BR-RO-17: an unknown key (reorderRunId included) is a 400
+  .strict()
   .superRefine((data, ctx) => {
     const hasUpdateField =
       data.type !== undefined ||

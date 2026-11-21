@@ -4,8 +4,10 @@ import { createApp } from "./app";
 import { connectDb, disconnectDb } from "./db/client";
 import { env } from "./lib/env";
 import { seedGrants, syncCatalog } from "./lib/permissions-sync";
+import { startReorderScheduler } from "./service/reorderScheduler";
 
 const app = createApp();
+let stopReorderScheduler: (() => void) | undefined;
 
 const startServer = async () => {
   await connectDb();
@@ -24,6 +26,9 @@ const startServer = async () => {
       console.log(`Backend listening on http://localhost:${info.port}`);
     },
   );
+
+  // BR-RO-10: daily reorder timer; never started from createApp(), so tests do not run it.
+  stopReorderScheduler = startReorderScheduler();
 };
 
 let isShuttingDown = false;
@@ -37,6 +42,7 @@ const shutdown = async (signal: NodeJS.Signals) => {
   console.log(`${signal} received, disconnecting database...`);
 
   try {
+    stopReorderScheduler?.();
     await disconnectDb();
     console.log("Database disconnected");
     process.exit(0);

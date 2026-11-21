@@ -1,4 +1,14 @@
-import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  sql,
+} from "drizzle-orm";
 
 import { alias } from "drizzle-orm/pg-core";
 
@@ -32,6 +42,7 @@ const purchaseRequestColumns = {
   approvedBy: purchaseRequests.approvedBy,
   currentApprovalLevel: purchaseRequests.currentApprovalLevel,
   totalApprovalLevels: purchaseRequests.totalApprovalLevels,
+  reorderRunId: purchaseRequests.reorderRunId,
   notes: purchaseRequests.notes,
   estimatedAmountPaise: purchaseRequests.estimatedAmountPaise,
   cancelledBy: purchaseRequests.cancelledBy,
@@ -78,7 +89,10 @@ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 export type CreatePrData = Pick<
   PurchaseRequestInsert,
   "type" | "saleOrderId" | "assetId" | "notes" | "requestedBy"
->;
+> & {
+  // BR-RO-17: set only by the reorder run, never from a PR endpoint body.
+  reorderRunId?: number | null;
+};
 
 export type CreatePrItemData = Pick<
   PurchaseRequestItemInsert,
@@ -182,6 +196,15 @@ export const prRepository = {
     const searchFilters = [
       safeSearch(params.q, purchaseRequests.prNumber, purchaseRequests.notes),
       params.type ? eq(purchaseRequests.type, params.type) : undefined,
+      // BR-RO-17: raised by a reorder run, or from one particular run
+      params.raisedByReorder === undefined
+        ? undefined
+        : params.raisedByReorder
+          ? isNotNull(purchaseRequests.reorderRunId)
+          : isNull(purchaseRequests.reorderRunId),
+      params.reorderRunId !== undefined
+        ? eq(purchaseRequests.reorderRunId, params.reorderRunId)
+        : undefined,
     ];
     const filters = [
       ...searchFilters,
@@ -395,69 +418,77 @@ export const prRepository = {
     return new Map(rows.map((row) => [row.id, row]));
   },
 
-  // `outerTx`: the caller's transaction (sale-order drafts, BR-SO-46); without
-  // it the PR gets its own.
+  // The body of a PR create, inside the caller's transaction (sale-order
+  // drafts BR-SO-46, reorder run BR-RO-16).
+  async createWithItemsTx(
+    tx: Tx,
+    data: CreatePrData,
+    items: CreatePrItemData[],
+  ) {
+    const { periodKey, seq } = await allocateDocumentSequence(
+      tx,
+      "pr",
+      data.requestedBy,
+    );
+    const prNumber = `PR-${periodKey}-${seq}`;
+    const estimatedAmountPaise = await calculateEstimatedAmountPaiseByItems(
+      tx,
+      items,
+    );
+
+    const [createdPr] = await tx
+      .insert(purchaseRequests)
+      .values({
+        prNumber,
+        type: data.type,
+        saleOrderId: data.saleOrderId,
+        assetId: data.assetId,
+        reorderRunId: data.reorderRunId ?? null,
+        status: "draft",
+        requestedBy: data.requestedBy,
+        currentApprovalLevel: 0,
+        totalApprovalLevels: 0,
+        notes: data.notes,
+        estimatedAmountPaise,
+      })
+      .returning(purchaseRequestColumns);
+
+    if (!createdPr) {
+      throw new AppError(
+        "Failed to create purchase request",
+        500,
+        "PR_CREATE_FAILED",
+      );
+    }
+
+    const createdItems = await tx
+      .insert(purchaseRequestItems)
+      .values(
+        items.map((item) => ({
+          prId: createdPr.id,
+          itemId: item.itemId,
+          requestedQty: item.requestedQty,
+          uom: item.uom,
+          expectedDate: item.expectedDate,
+        })),
+      )
+      .returning(purchaseRequestItemWriteColumns);
+
+    return {
+      pr: createdPr,
+      items: createdItems,
+    };
+  },
+
+  // `outerTx`: the caller's transaction; without it the PR gets its own.
   async createWithItems(
     data: CreatePrData,
     items: CreatePrItemData[],
     outerTx?: Tx,
   ) {
-    const run = async (tx: Tx) => {
-      const { periodKey, seq } = await allocateDocumentSequence(
-        tx,
-        "pr",
-        data.requestedBy,
-      );
-      const prNumber = `PR-${periodKey}-${seq}`;
-      const estimatedAmountPaise = await calculateEstimatedAmountPaiseByItems(
-        tx,
-        items,
-      );
-
-      const [createdPr] = await tx
-        .insert(purchaseRequests)
-        .values({
-          prNumber,
-          type: data.type,
-          saleOrderId: data.saleOrderId,
-          assetId: data.assetId,
-          status: "draft",
-          requestedBy: data.requestedBy,
-          currentApprovalLevel: 0,
-          totalApprovalLevels: 0,
-          notes: data.notes,
-          estimatedAmountPaise,
-        })
-        .returning(purchaseRequestColumns);
-
-      if (!createdPr) {
-        throw new AppError(
-          "Failed to create purchase request",
-          500,
-          "PR_CREATE_FAILED",
-        );
-      }
-
-      const createdItems = await tx
-        .insert(purchaseRequestItems)
-        .values(
-          items.map((item) => ({
-            prId: createdPr.id,
-            itemId: item.itemId,
-            requestedQty: item.requestedQty,
-            uom: item.uom,
-            expectedDate: item.expectedDate,
-          })),
-        )
-
-        .returning(purchaseRequestItemWriteColumns);
-
-      return {
-        pr: createdPr,
-        items: createdItems,
-      };
-    };
-    return outerTx ? run(outerTx) : db.transaction(run);
+    return outerTx
+      ? this.createWithItemsTx(outerTx, data, items)
+      : db.transaction((tx) => this.createWithItemsTx(tx, data, items));
   },
 
   async updatePrById(prId: number, data: UpdatePrData, tx?: Tx) {

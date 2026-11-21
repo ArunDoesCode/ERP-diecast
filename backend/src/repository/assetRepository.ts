@@ -212,6 +212,9 @@ export const assetRepository = {
         sku: string;
         uom: string;
         reorderLevel: number;
+        reorderQty: number;
+        minOrderQty: number;
+        orderMultiple: number;
       },
       isInUse: () => Promise<boolean>,
     ) => ItemUpdateData | Promise<ItemUpdateData>,
@@ -222,6 +225,9 @@ export const assetRepository = {
           sku: itemMaster.sku,
           uom: itemMaster.uom,
           reorderLevel: itemMaster.reorderLevel,
+          reorderQty: itemMaster.reorderQty,
+          minOrderQty: itemMaster.minOrderQty,
+          orderMultiple: itemMaster.orderMultiple,
         })
         .from(itemMaster)
         .where(eq(itemMaster.id, id))

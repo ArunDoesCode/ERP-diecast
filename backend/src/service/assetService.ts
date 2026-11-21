@@ -134,6 +134,16 @@ function assertReorderLevelFitsUnit(reorderLevel: number, uom: string) {
   }
 }
 
+// BR-RO-09: reorder qty, min order qty and order multiple follow the same unit rule.
+function assertReorderFieldsFitUnit(
+  fields: { reorderQty: number; minOrderQty: number; orderMultiple: number },
+  uom: string,
+) {
+  for (const value of Object.values(fields)) {
+    assertReorderLevelFitsUnit(value, uom);
+  }
+}
+
 export const assetService = {
   async listItems(params: assetItemListQuerySchemaType) {
     const { rows, total } = await assetRepository.listItems(params);
@@ -145,6 +155,14 @@ export const assetService = {
 
   async createItem(input: assetItemCreateSchemaType, actorId: number) {
     assertReorderLevelFitsUnit(input.reorderLevel ?? 0, input.uom);
+    assertReorderFieldsFitUnit(
+      {
+        reorderQty: input.reorderQty ?? 0,
+        minOrderQty: input.minOrderQty ?? 0,
+        orderMultiple: input.orderMultiple ?? 0,
+      },
+      input.uom,
+    );
     try {
       const created = await assetRepository.createItem(input, actorId);
       if (!created) {
@@ -183,6 +201,21 @@ export const assetService = {
           if (input.reorderLevel !== undefined || uomChanges) {
             assertReorderLevelFitsUnit(
               input.reorderLevel ?? current.reorderLevel,
+              input.uom ?? current.uom,
+            );
+          }
+          if (
+            input.reorderQty !== undefined ||
+            input.minOrderQty !== undefined ||
+            input.orderMultiple !== undefined ||
+            uomChanges
+          ) {
+            assertReorderFieldsFitUnit(
+              {
+                reorderQty: input.reorderQty ?? current.reorderQty,
+                minOrderQty: input.minOrderQty ?? current.minOrderQty,
+                orderMultiple: input.orderMultiple ?? current.orderMultiple,
+              },
               input.uom ?? current.uom,
             );
           }
