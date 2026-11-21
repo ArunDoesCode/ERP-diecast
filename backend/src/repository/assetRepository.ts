@@ -25,6 +25,7 @@ import {
   supplierItems,
   supplierMaster,
 } from "../db/schemas/02_procurement";
+import { bomLines, boms } from "../db/schemas/02_procurement-bom";
 import { BadRequestError, ConflictError, NotFoundError } from "../lib/errors";
 import { istDayStartInstant, istNextDayStartInstant } from "../lib/ist-day";
 import { safeSearch, safeSearchSql } from "../lib/safe-search";
@@ -129,7 +130,8 @@ type MachineUpdateData = PartialUpdate<
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-// BR-INV-04: any ledger row, PR line, PO line or supplier-item line.
+// BR-INV-04: any ledger row, PR line, PO line or supplier-item line; BR-BOM-20:
+// any BOM revision (any status) that uses the item as part, line, sent item or alloy.
 async function itemInUse(tx: Tx, itemId: number) {
   const [row] = await tx.execute<{ used: boolean }>(sql`
     select (
@@ -137,6 +139,8 @@ async function itemInUse(tx: Tx, itemId: number) {
       or exists (select 1 from ${purchaseRequestItems} where ${purchaseRequestItems.itemId} = ${itemId})
       or exists (select 1 from ${purchaseOrderItems} where ${purchaseOrderItems.itemId} = ${itemId})
       or exists (select 1 from ${supplierItems} where ${supplierItems.itemId} = ${itemId})
+      or exists (select 1 from ${boms} where ${boms.partId} = ${itemId} or ${boms.sentItemId} = ${itemId} or ${boms.alloyItemId} = ${itemId})
+      or exists (select 1 from ${bomLines} where ${bomLines.componentItemId} = ${itemId})
     ) as used`);
   return row?.used === true;
 }

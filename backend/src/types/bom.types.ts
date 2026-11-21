@@ -33,6 +33,7 @@ export const BOM_NEXT_STEPS = [
   "release",
   "waiting_for_release",
   "start_revision",
+  "open_draft",
   "open_active",
 ] as const;
 
@@ -293,6 +294,9 @@ export const bomDetailSchema = z.object({
   nextStep: z.enum(BOM_NEXT_STEPS),
   nextRevision: z.string().nullable(),
   activeBomId: z.number().int().nullable(),
+  // BR-BOM-24: the part's open draft, for "Open draft <rev>"
+  openDraftId: z.number().int().nullable(),
+  openDraftRevision: z.string().nullable(),
 });
 
 // GET /api/bom/:id/tree: recursive, so the type is declared by hand.
@@ -418,6 +422,13 @@ export const bomWhereUsedRowSchema = z.object({
   qtyPerPiece: z.number(),
   buyAsIs: z.boolean().nullable(),
   returnQty: z.number().int().nullable(),
+});
+
+// The item asked about, so the retire dialog can name it (top-level `part`, next to data / meta).
+export const bomWhereUsedPartSchema = z.object({
+  id: z.number().int(),
+  sku: z.string(),
+  name: z.string(),
 });
 
 // GET /api/bom/parts/:partId/history (BR-BOM-23)

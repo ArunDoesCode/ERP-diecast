@@ -99,3 +99,70 @@ export function shotCoversNet(
     toScaled(shotWeightKg, 3) >= toScaled(netWeightKg, 3) * BigInt(cavities)
   );
 }
+
+// --- Needs maths (BR-BOM-18): whole numbers in, whole numbers out, rounded up ---
+
+/** Ceiling of a / b for non-negative bigints. */
+export function ceilDiv(a: bigint, b: bigint): bigint {
+  return (a + b - 1n) / b;
+}
+
+/** BR-BOM-18: pour = ceil(Q / (1 - reject)). */
+export function pourQty(qty: number, castingRejectPct: number | null): number {
+  const keepBp = 10000n - toScaled(castingRejectPct ?? 0, 2);
+  return Number(ceilDiv(BigInt(qty) * 10000n, keepBp));
+}
+
+/**
+ * BR-BOM-18: alloy kg = Q x net + pour x poured weight x melt loss, rounded up
+ * to the gram (3 decimals). Null while net / shot / cavities are missing.
+ */
+export function alloyKg(
+  qty: number,
+  pour: number,
+  c: {
+    netWeightKg: number | null;
+    shotWeightKg: number | null;
+    cavities: number | null;
+    meltLossPct: number | null;
+  },
+): number | null {
+  if (c.netWeightKg === null || c.shotWeightKg === null) return null;
+  if (c.cavities === null || c.cavities < 1) return null;
+  const net = toScaled(c.netWeightKg, 3);
+  const shot = toScaled(c.shotWeightKg, 3);
+  const cav = BigInt(c.cavities);
+  const meltBp = toScaled(c.meltLossPct ?? 0, 2);
+  const denominator = cav * 10000n;
+  const milli = ceilDiv(
+    BigInt(qty) * net * denominator + BigInt(pour) * shot * meltBp,
+    denominator,
+  );
+  return Number(milli) / 1000;
+}
+
+/** BR-BOM-18: send = ceil(ceil(Q / (1 - loss)) x send / return). */
+export function sendNeed(
+  qty: number,
+  jobWorkLossPct: number | null,
+  sendQty: number,
+  returnQty: number,
+): number {
+  const keepBp = 10000n - toScaled(jobWorkLossPct ?? 0, 2);
+  const afterLoss = ceilDiv(BigInt(qty) * 10000n, keepBp);
+  return Number(ceilDiv(afterLoss * BigInt(sendQty), BigInt(returnQty)));
+}
+
+/**
+ * BR-BOM-18: a child's need = base qty x qty per piece, rounded up on its own:
+ * whole for pcs / set, 3 decimals for kg / ltr / m.
+ */
+export function childNeed(
+  baseQty: number,
+  qtyPerPiece: number,
+  unit: string,
+): number {
+  const milli = BigInt(baseQty) * toScaled(qtyPerPiece, 3);
+  if (unit === "pcs" || unit === "set") return Number(ceilDiv(milli, 1000n));
+  return Number(milli) / 1000;
+}

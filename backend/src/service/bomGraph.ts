@@ -43,7 +43,7 @@ export function isGraphError(error: unknown): error is AppError {
   );
 }
 
-function tooDeep() {
+export function tooDeep() {
   return new AppError(
     `A BOM may nest at most ${MAX_BOM_LEVELS} levels`,
     400,
@@ -51,7 +51,7 @@ function tooDeep() {
   );
 }
 
-function tooLarge() {
+export function tooLarge() {
   return new AppError(
     `A BOM tree may hold at most ${MAX_BOM_NODES} nodes`,
     400,
@@ -59,7 +59,7 @@ function tooLarge() {
   );
 }
 
-async function loopError(
+export async function loopError(
   executor: Executor,
   pathIds: number[],
 ): Promise<AppError> {

@@ -33,6 +33,7 @@ import type {
   BomStatus,
   bomHistoryQuerySchema,
 } from "../types/bom.types";
+import { findActiveVendorServiceRows } from "./vendorServiceRepository";
 
 export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 export type Executor = typeof db | Tx;
@@ -121,18 +122,12 @@ export const bomRepository = {
     serviceId: number,
     executor: Executor = db,
   ) {
-    const [row] = await executor
-      .select({ id: supplierServices.id })
-      .from(supplierServices)
-      .where(
-        and(
-          eq(supplierServices.supplierId, workerId),
-          eq(supplierServices.serviceId, serviceId),
-          eq(supplierServices.isActive, true),
-        ),
-      )
-      .limit(1);
-    return row !== undefined;
+    const rows = await findActiveVendorServiceRows(
+      workerId,
+      [serviceId],
+      executor,
+    );
+    return rows.length > 0;
   },
 
   // --- Locks and counters (BR-BOM-02, 17) ---
@@ -283,6 +278,125 @@ export const bomRepository = {
             )
             .orderBy(asc(bomLines.bomId), asc(bomLines.lineNo));
     return { boms: bomRows, lines: lineRows };
+  },
+
+  // --- Needs (BR-BOM-18): one level of the active graph ---
+
+  /** Active revisions (full rows) of these parts, with their lines. */
+  async listActiveFullByParts(partIds: number[], executor: Executor = db) {
+    if (partIds.length === 0) {
+      return { boms: [] as BomRow[], lines: [] as BomLineRow[] };
+    }
+    const bomRows = await executor
+      .select()
+      .from(boms)
+      .where(and(inArray(boms.partId, partIds), eq(boms.status, "active")));
+    const lineRows =
+      bomRows.length === 0
+        ? []
+        : await executor
+            .select()
+            .from(bomLines)
+            .where(
+              inArray(
+                bomLines.bomId,
+                bomRows.map((b) => b.id),
+              ),
+            )
+            .orderBy(asc(bomLines.bomId), asc(bomLines.lineNo));
+    return { boms: bomRows, lines: lineRows };
+  },
+
+  /** Items with unit, active flag and "has an active BOM" (one statement, EXISTS). */
+  async findItemsWithActiveBom(ids: number[], executor: Executor = db) {
+    if (ids.length === 0) return [];
+    return executor
+      .select({
+        id: itemMaster.id,
+        sku: itemMaster.sku,
+        uom: itemMaster.uom,
+        isActive: itemMaster.isActive,
+        hasActiveBom: sql<boolean>`exists (select 1 from ${boms} where ${boms.partId} = ${itemMaster.id} and ${boms.status} = 'active')`,
+      })
+      .from(itemMaster)
+      .where(inArray(itemMaster.id, ids));
+  },
+
+  // --- Where-used (BR-BOM-19): three roles, one UNION ALL plus the count ---
+
+  async whereUsed(
+    itemId: number,
+    query: {
+      page: number;
+      pageSize: number;
+      sortBy?: string | undefined;
+      sortDir: string;
+    },
+  ) {
+    const union = sql`
+      select b.id as bom_id, b.part_id, b.revision_no, 'line' as role,
+             l.qty_per_piece::float8 as qty_per_piece, l.buy_as_is as buy_as_is,
+             null::int as return_qty
+        from ${bomLines} l join ${boms} b on b.id = l.bom_id
+       where l.component_item_id = ${itemId} and b.status = 'active'
+      union all
+      select b.id, b.part_id, b.revision_no, 'sent_item',
+             b.send_qty::float8, null::boolean, b.return_qty
+        from ${boms} b
+       where b.sent_item_id = ${itemId} and b.status = 'active'
+      union all
+      select b.id, b.part_id, b.revision_no, 'alloy',
+             null::float8, null::boolean, null::int
+        from ${boms} b
+       where b.alloy_item_id = ${itemId} and b.status = 'active'`;
+    const dir = query.sortDir === "desc" ? sql`desc` : sql`asc`;
+    const primary =
+      query.sortBy === "revisionNo"
+        ? sql`u.revision_no ${dir}, i.sku asc`
+        : sql`i.sku ${dir}, u.revision_no desc`;
+    const [rows, totals] = await Promise.all([
+      db.execute<{
+        bom_id: number;
+        part_id: number;
+        revision_no: number;
+        role: "line" | "sent_item" | "alloy";
+        qty_per_piece: number | null;
+        buy_as_is: boolean | null;
+        return_qty: number | null;
+        part_sku: string;
+        part_name: string;
+        net_weight_kg: string | null;
+        shot_weight_kg: string | null;
+        cavities: number | null;
+        melt_loss_pct: string | null;
+        casting_reject_pct: string | null;
+      }>(sql`
+      select u.bom_id, u.part_id, u.revision_no, u.role, u.qty_per_piece,
+             u.buy_as_is, u.return_qty, i.sku as part_sku, i.name as part_name,
+             bb.net_weight_kg, bb.shot_weight_kg, bb.cavities, bb.melt_loss_pct,
+             bb.casting_reject_pct
+        from (${union}) u
+        join ${itemMaster} i on i.id = u.part_id
+        join ${boms} bb on bb.id = u.bom_id
+       order by ${primary}, u.bom_id asc, u.role asc
+       limit ${query.pageSize} offset ${(query.page - 1) * query.pageSize}`),
+      db.execute<{ total: string }>(
+        sql`select count(*) as total from (${union}) u`,
+      ),
+    ]);
+    return {
+      rows: Array.from(rows),
+      total: Number(totals[0]?.total ?? 0),
+    };
+  },
+
+  async itemExists(id: number, executor: Executor = db) {
+    const [row] = await executor
+      .select({ id: itemMaster.id })
+      .from(itemMaster)
+      .where(eq(itemMaster.id, id))
+      .limit(1);
+    return row !== undefined;
   },
 
   // --- Reads for the API ---

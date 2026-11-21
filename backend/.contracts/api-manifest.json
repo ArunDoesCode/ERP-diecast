@@ -1414,6 +1414,11 @@
             "pageSize": "integer.nonnegative.required",
             "total": "integer.nonnegative.required",
             "totalPages": "integer.nonnegative.required"
+          },
+          "part": {
+            "id": "integer.required",
+            "sku": "string.required",
+            "name": "string.required"
           }
         }
       },
@@ -1586,9 +1591,11 @@
             "createdAt": "unrepresentable.required",
             "lastUpdatedByName": "unknown.required",
             "lastUpdatedAt": "unrepresentable.required",
-            "nextStep": "enum:create,release,waiting_for_release,start_revision,open_active.required",
+            "nextStep": "enum:create,release,waiting_for_release,start_revision,open_draft,open_active.required",
             "nextRevision": "unknown.required",
-            "activeBomId": "integer.nullable.required"
+            "activeBomId": "integer.nullable.required",
+            "openDraftId": "integer.nullable.required",
+            "openDraftRevision": "unknown.required"
           }
         }
       }

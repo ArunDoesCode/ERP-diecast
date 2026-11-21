@@ -24,10 +24,12 @@ import {
   type Tx,
 } from "../repository/bomRepository";
 import type {
+  BOM_NEXT_STEPS,
   BomKind,
   BomListQuery,
   BomStatus,
   bomHistoryQuerySchema,
+  bomWhereUsedQuerySchema,
   CreateBomInput,
   ReleaseBomInput,
   RetireBomInput,
@@ -666,20 +668,18 @@ export const bomService = {
     const openDraft = revisions.find((r) => r.status === "draft");
     const canManage = can(actor, "bom.manage");
     const canRelease = can(actor, "bom.release");
-    let nextStep:
-      | "release"
-      | "waiting_for_release"
-      | "start_revision"
-      | "open_active";
+    let nextStep: (typeof BOM_NEXT_STEPS)[number];
     let nextRevision: string | null = null;
     if (bom.status === "draft") {
       nextStep = canRelease ? "release" : "waiting_for_release";
+    } else if (openDraft) {
+      nextStep = "open_draft"; // a link, shown to every reader
     } else if (bom.status === "active") {
-      nextStep = canManage && !openDraft ? "start_revision" : "open_active";
+      nextStep = canManage ? "start_revision" : "open_active";
     } else if (active) {
       nextStep = "open_active";
     } else {
-      nextStep = canManage && !openDraft ? "start_revision" : "open_active";
+      nextStep = canManage ? "start_revision" : "open_active";
     }
     if (nextStep === "start_revision") {
       nextRevision = revisionLetter(
@@ -747,6 +747,50 @@ export const bomService = {
       nextStep,
       nextRevision,
       activeBomId: active?.id ?? null,
+      openDraftId: openDraft?.id ?? null,
+      openDraftRevision: openDraft
+        ? revisionLetter(openDraft.revisionNo)
+        : null,
+    };
+  },
+
+  // BR-BOM-19, 16: parts whose ACTIVE revision uses the item (line, sent item, alloy)
+  async whereUsed(
+    itemId: number,
+    query: z.infer<typeof bomWhereUsedQuerySchema>,
+  ) {
+    const [item] = await bomRepository.findItemsByIds([itemId]);
+    if (!item) throw new NotFoundError("Item not found");
+    const { rows, total } = await bomRepository.whereUsed(itemId, query);
+    const data = rows.map((r) => {
+      const alloyPerPiece =
+        r.role === "alloy"
+          ? castingFigures({
+              netWeightKg: num(r.net_weight_kg),
+              shotWeightKg: num(r.shot_weight_kg),
+              cavities: r.cavities,
+              meltLossPct: num(r.melt_loss_pct),
+              castingRejectPct: num(r.casting_reject_pct),
+            }).alloyPerGoodPieceKg
+          : null;
+      return {
+        bomId: r.bom_id,
+        number: bomNumber(r.part_sku, r.revision_no),
+        partId: r.part_id,
+        partSku: r.part_sku,
+        partName: r.part_name,
+        revision: revisionLetter(r.revision_no),
+        role: r.role,
+        qtyPerPiece:
+          r.role === "alloy" ? (alloyPerPiece ?? 0) : Number(r.qty_per_piece),
+        buyAsIs: r.role === "line" ? r.buy_as_is : null,
+        returnQty: r.role === "sent_item" ? r.return_qty : null,
+      };
+    });
+    return {
+      data,
+      meta: toPaginatedMeta(query.page, query.pageSize, total),
+      part: { id: item.id, sku: item.sku, name: item.name },
     };
   },
 

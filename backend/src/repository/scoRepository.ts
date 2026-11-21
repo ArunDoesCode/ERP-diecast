@@ -22,10 +22,7 @@ import {
   subcontractingOrderItems,
   subcontractingOrders,
 } from "../db/schemas/02_procurement-purchasing";
-import {
-  supplierMaster,
-  supplierServices,
-} from "../db/schemas/02_procurement-suppliers";
+import { supplierMaster } from "../db/schemas/02_procurement-suppliers";
 import { employees } from "../db/schemas/03_hcm";
 import { allocateDocumentSequence } from "../lib/document-number";
 import { istMonthKey } from "../lib/ist-day";
@@ -35,6 +32,7 @@ import type {
   scoListQuerySchemaType,
   scoResponseSchemaType,
 } from "../types/sco.types";
+import { findActiveVendorServiceRows } from "./vendorServiceRepository";
 
 export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type ScoInsert = typeof subcontractingOrders.$inferInsert;
@@ -238,22 +236,7 @@ export const scoRepository = {
 
   // The vendor's active price-list rows for these services (BR-SCO-02).
   async findVendorServiceRows(vendorId: number, serviceIds: number[], tx?: Tx) {
-    if (serviceIds.length === 0) return [];
-    const executor = tx ?? db;
-    return executor
-      .select({
-        serviceId: supplierServices.serviceId,
-        serviceUnitPricePaise: supplierServices.serviceUnitPricePaise,
-        taxPercentage: supplierServices.taxPercentage,
-      })
-      .from(supplierServices)
-      .where(
-        and(
-          eq(supplierServices.supplierId, vendorId),
-          inArray(supplierServices.serviceId, serviceIds),
-          eq(supplierServices.isActive, true),
-        ),
-      );
+    return findActiveVendorServiceRows(vendorId, serviceIds, tx ?? db);
   },
 
   async insertOrder(

@@ -24,6 +24,7 @@ import {
   bomPartIdParamSchema,
   bomReleaseResultSchema,
   bomTreeNodeSchema,
+  bomWhereUsedPartSchema,
   bomWhereUsedQuerySchema,
   bomWhereUsedRowSchema,
   bomWriteResultSchema,
@@ -114,7 +115,11 @@ register({
     alsoKeys: ["bom.manage", "bom.release"],
   },
   request: { params: bomItemIdParamSchema, query: bomWhereUsedQuerySchema },
-  responses: { "200": paginatedResponse(bomWhereUsedRowSchema) },
+  responses: {
+    "200": paginatedResponse(bomWhereUsedRowSchema).extend({
+      part: bomWhereUsedPartSchema,
+    }),
+  },
   pagination: {
     sortableFields: ["partSku", "revisionNo"],
     searchable: false,

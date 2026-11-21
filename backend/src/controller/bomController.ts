@@ -2,12 +2,16 @@ import type { Context } from "hono";
 
 import { UnauthorizedError } from "../lib/errors";
 import type { AppEnv } from "../lib/types";
+import { bomNeedsService } from "../service/bomNeedsService";
 import { bomService } from "../service/bomService";
 import {
   bomHistoryQuerySchema,
   bomIdParamSchema,
+  bomItemIdParamSchema,
   bomListQuerySchema,
+  bomNeedsQuerySchema,
   bomPartIdParamSchema,
+  bomWhereUsedQuerySchema,
   createBomSchema,
   releaseBomSchema,
   retireBomSchema,
@@ -28,14 +32,6 @@ const parsePartId = (c: Context<AppEnv>) =>
   bomPartIdParamSchema.parse(c.req.param()).partId;
 const queryOf = (c: Context<AppEnv>) =>
   Object.fromEntries(new URL(c.req.url).searchParams);
-
-// S3 (needs, where-used) is not built yet: those two still answer 501.
-function notImplemented(c: Context<AppEnv>) {
-  return c.json(
-    { success: false, message: "Not implemented", code: "NOT_IMPLEMENTED" },
-    501,
-  );
-}
 
 export const bomController = {
   async list(c: Context<AppEnv>) {
@@ -59,8 +55,18 @@ export const bomController = {
     return c.json({ success: true, data });
   },
 
-  needs: notImplemented,
-  whereUsed: notImplemented,
+  async needs(c: Context<AppEnv>) {
+    const query = bomNeedsQuerySchema.parse(queryOf(c));
+    const data = await bomNeedsService.preview(query);
+    return c.json({ success: true, data });
+  },
+
+  async whereUsed(c: Context<AppEnv>) {
+    const { itemId } = bomItemIdParamSchema.parse(c.req.param());
+    const query = bomWhereUsedQuerySchema.parse(queryOf(c));
+    const { data, meta, part } = await bomService.whereUsed(itemId, query);
+    return c.json({ success: true, data, meta, part });
+  },
 
   async partHistory(c: Context<AppEnv>) {
     const query = bomHistoryQuerySchema.parse(queryOf(c));
