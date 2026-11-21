@@ -126,9 +126,14 @@ export function ApprovalInboxTable({
 			table={table}
 			isLoading={isLoading}
 			hidePagination
+			tight
 			onRowClick={splitView ? onSelect : undefined}
 			errorState={errorState}
-			rowClassName={(row) => (row.id === selectedId ? "bg-muted" : undefined)}
+			rowClassName={(row) =>
+				row.id === selectedId
+					? "bg-neutral-subtle hover:bg-neutral-subtle"
+					: undefined
+			}
 			emptyState={
 				<EmptyState
 					icon={IconInbox}

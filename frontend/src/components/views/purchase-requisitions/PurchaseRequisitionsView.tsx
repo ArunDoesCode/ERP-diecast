@@ -354,6 +354,7 @@ export function PurchaseRequisitionsView() {
 				table={table}
 				isLoading={requisitionsQuery.isLoading}
 				hidePagination
+				tight
 				emptyState={emptyState}
 				errorState={
 					requisitionsQuery.isError ? (

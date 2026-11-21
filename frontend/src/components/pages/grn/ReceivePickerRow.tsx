@@ -59,7 +59,7 @@ export function ReceivePickerRow({
 				>
 					{formatDocNo(po.poNumber)}
 				</Link>
-				<p className="truncate text-sm text-muted-foreground">
+				<p className="text-sm break-words text-muted-foreground">
 					{po.supplierName ?? "–"}
 				</p>
 			</div>

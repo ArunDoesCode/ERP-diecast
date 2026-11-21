@@ -97,6 +97,7 @@ export function SearchableSelect({
 						value={searchValue}
 						onChange={(event) => onSearchChange(event.target.value)}
 						placeholder={searchPlaceholder}
+						aria-label={searchPlaceholder}
 					/>
 
 					{isLoading ? (

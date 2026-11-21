@@ -232,6 +232,26 @@ export function PurchaseOrderFormView({ poId }: { poId: number }) {
 		);
 	}
 
+	if (po.status !== "draft") {
+		return (
+			<div className="flex flex-col gap-4">
+				<PageHeader
+					title={title}
+					actions={<StatusBadge doc="po" status={po.status} />}
+				/>
+				<p className="text-sm text-muted-foreground">
+					Only a draft order can be changed.{" "}
+					<Link
+						href={`${LIST_HREF}/${po.id}`}
+						className="text-brand-accent hover:underline"
+					>
+						Back to the order
+					</Link>
+				</p>
+			</div>
+		);
+	}
+
 	return (
 		<div className="flex w-full flex-col gap-4">
 			<PageHeader
@@ -239,9 +259,7 @@ export function PurchaseOrderFormView({ poId }: { poId: number }) {
 				description={
 					canEdit
 						? "Change the draft, or send it for approval."
-						: po.status !== "draft"
-							? "Only a draft order can be changed."
-							: "Only the person who made this order can change it."
+						: "Only the person who made this order can change it."
 				}
 				actions={
 					<>

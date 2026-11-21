@@ -289,6 +289,7 @@ export function GrnView() {
 				table={table}
 				isLoading={grnQuery.isLoading}
 				hidePagination
+				tight
 				emptyState={emptyState}
 				errorState={
 					grnQuery.isError ? (

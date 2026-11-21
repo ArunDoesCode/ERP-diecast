@@ -111,7 +111,7 @@ export function GrnLinesTable({
 										{item.receivedQty} {item.uom}
 									</TableCell>
 									<TableCell className="tabular-nums">
-										{item.acceptedQty}
+										{item.acceptedQty} {item.uom}
 										{item.correctedQty > 0 ? (
 											<span className="block text-sm text-muted-foreground">
 												{item.correctedQty} corrected, net {item.netAcceptedQty}
@@ -119,7 +119,7 @@ export function GrnLinesTable({
 										) : null}
 									</TableCell>
 									<TableCell className="tabular-nums">
-										{item.rejectedQty ?? 0}
+										{item.rejectedQty ?? 0} {item.uom}
 									</TableCell>
 									<TableCell>
 										<StatusBadge

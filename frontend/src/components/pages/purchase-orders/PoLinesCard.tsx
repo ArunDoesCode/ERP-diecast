@@ -31,7 +31,7 @@ export function PoLinesCard({ items }: { items: PoPageItem[] }) {
 				<CardTitle>Lines</CardTitle>
 			</CardHeader>
 			<CardContent>
-				<Table>
+				<Table className="[&_td]:px-2 [&_th]:px-2">
 					<TableHeader>
 						<TableRow>
 							<TableHead>Item</TableHead>

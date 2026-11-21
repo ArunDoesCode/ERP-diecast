@@ -331,6 +331,7 @@ export function PurchaseOrdersView() {
 				table={table}
 				isLoading={poQuery.isLoading}
 				hidePagination
+				tight
 				emptyState={emptyState}
 				errorState={
 					poQuery.isError ? (

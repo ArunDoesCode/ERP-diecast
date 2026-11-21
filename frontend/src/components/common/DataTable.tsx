@@ -40,6 +40,8 @@ type DataTableProps<TData extends RowData> = {
 	skeletonRows?: number;
 	/** Hide the built-in pager when the view renders the shared `Pagination`. */
 	hidePagination?: boolean;
+	/** Narrower cell padding so a wide table fits a narrow area; the area still scrolls sideways. */
+	tight?: boolean;
 };
 
 // Render-only: owns header/body/skeleton/pagination markup for any TanStack Table
@@ -54,13 +56,17 @@ export function DataTable<TData extends RowData>({
 	errorState,
 	skeletonRows = SKELETON_ROWS,
 	hidePagination,
+	tight,
 }: DataTableProps<TData>) {
 	const rows = table.getRowModel().rows;
 	const leafColumns = table.getVisibleLeafColumns();
 
 	return (
 		<>
-			<Table aria-busy={isLoading ? true : undefined}>
+			<Table
+				aria-busy={isLoading ? true : undefined}
+				className={tight ? "[&_td]:px-2 [&_th]:px-2" : undefined}
+			>
 				<TableHeader className="[&_tr]:bg-table-header [&_tr]:hover:bg-table-header">
 					{table.getHeaderGroups().map((headerGroup) => (
 						<TableRow key={headerGroup.id}>
