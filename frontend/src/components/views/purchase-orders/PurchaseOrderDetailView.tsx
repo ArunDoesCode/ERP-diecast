@@ -663,7 +663,8 @@ function LinkedPOs({
 								</StatusFlashRow>
 								<PoApprovalHistory poId={po.id} />
 								<PoDetails poId={po.id} />
-								{PO_BILLABLE_STATUSES.has(po.status) ? (
+								{PO_BILLABLE_STATUSES.has(po.status) ||
+								po.status === "invoiced" ? (
 									<InvoicesCard poId={po.id} />
 								) : null}
 							</div>

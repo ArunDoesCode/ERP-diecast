@@ -12,16 +12,11 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCan } from "@/hooks/use-can";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { ApiClientError } from "@/lib/api/client";
 import { useGrnDetailQuery } from "@/lib/api/grn/queries";
 import { usePurchaseOrdersQuery } from "@/lib/api/purchase-orders/queries";
@@ -38,38 +33,78 @@ import { useBreadcrumbLast } from "@/lib/shell/breadcrumb-last";
 const DEFAULT_PRICE_TOL = 0;
 const DEFAULT_WEIGHT_TOL = 0.5;
 
+const PO_PICK_PAGE_SIZE = 10;
+
 function PoPicker() {
 	const router = useRouter();
-	const [value, setValue] = useState("");
+	const [search, setSearch] = useState("");
+	const [open, setOpen] = useState(false);
+	const [picked, setPicked] = useState<{ id: number; label: string } | null>(
+		null,
+	);
+	const debounced = useDebouncedValue(search, 300);
 	const pos = usePurchaseOrdersQuery({
 		page: 1,
-		pageSize: 100,
+		pageSize: PO_PICK_PAGE_SIZE,
 		sortBy: "createdAt",
 		sortDir: "desc",
 		status: ["partial_received", "fully_received", "closed"],
+		q: debounced.trim() || undefined,
 	});
+	const rows = pos.data?.data ?? [];
 	return (
 		<div className="flex w-full flex-col gap-4">
 			<PageHeader
 				title="Enter supplier invoice"
 				description="Pick the purchase order the bill is for."
 			/>
-			<div className="max-w-sm min-h-19 space-y-1">
+			<div className="relative max-w-sm min-h-19 space-y-1">
 				<Label htmlFor="sinv-po-pick">Purchase order *</Label>
-				<Select value={value} onValueChange={setValue}>
-					<SelectTrigger id="sinv-po-pick">
-						<SelectValue
-							placeholder={pos.isLoading ? "Loading…" : "Choose a PO"}
-						/>
-					</SelectTrigger>
-					<SelectContent>
-						{(pos.data?.data ?? []).map((po) => (
-							<SelectItem key={po.id} value={String(po.id)}>
-								{po.poNumber} · {po.supplierName}
-							</SelectItem>
-						))}
-					</SelectContent>
-				</Select>
+				<Input
+					id="sinv-po-pick"
+					placeholder="Search by PO number or supplier"
+					autoComplete="off"
+					value={search}
+					onChange={(event) => {
+						setSearch(event.target.value);
+						setPicked(null);
+						setOpen(true);
+					}}
+					onFocus={() => setOpen(true)}
+					onBlur={() => setOpen(false)}
+				/>
+				{open ? (
+					<div className="absolute z-50 mt-1 w-full rounded-lg bg-popover p-1 text-sm text-popover-foreground shadow-md ring-1 ring-foreground/10">
+						{pos.isLoading ? (
+							<p className="p-2 text-muted-foreground">Loading…</p>
+						) : rows.length === 0 ? (
+							<p className="p-2 text-muted-foreground">
+								No purchase orders found.
+							</p>
+						) : (
+							<div className="flex max-h-56 flex-col gap-0.5 overflow-y-auto">
+								{rows.map((po) => {
+									const label = `${po.poNumber} · ${po.supplierName}`;
+									return (
+										<button
+											key={po.id}
+											type="button"
+											onMouseDown={(event) => event.preventDefault()}
+											onClick={() => {
+												setPicked({ id: po.id, label });
+												setSearch(label);
+												setOpen(false);
+											}}
+											className="flex w-full items-center rounded-md px-2 py-1.5 text-left hover:bg-accent hover:text-accent-foreground"
+										>
+											{label}
+										</button>
+									);
+								})}
+							</div>
+						)}
+					</div>
+				) : null}
 				{pos.isError ? (
 					<p className="text-[13px] text-destructive">
 						The PO list could not be loaded.
@@ -82,8 +117,10 @@ function PoPicker() {
 				</Button>
 				<Button
 					type="button"
-					disabled={value === ""}
-					onClick={() => router.push(`/supplier-invoices/new?poId=${value}`)}
+					disabled={picked === null}
+					onClick={() =>
+						picked && router.push(`/supplier-invoices/new?poId=${picked.id}`)
+					}
 				>
 					Continue
 				</Button>
@@ -159,6 +196,7 @@ export function SupplierInvoiceFormView({
 				poNumber: existing.poNumber,
 				supplier: existing.supplier,
 				paymentTermsDays: existing.paymentTermsDays,
+				prId: existing.prId,
 				catalog: [...own, ...extra],
 			};
 		}
@@ -168,6 +206,7 @@ export function SupplierInvoiceFormView({
 				poNumber: billable.po.poNumber,
 				supplier: billable.supplier,
 				paymentTermsDays: billable.po.paymentTermsDays,
+				prId: billable.po.prId,
 				catalog: billable.lines.map<CatalogLine>((line) => ({ ...line })),
 			};
 		}
@@ -226,7 +265,7 @@ export function SupplierInvoiceFormView({
 	if (!source) return null;
 
 	if (!existing && source.catalog.length === 0) {
-		return <NothingToBill grnId={grnId} />;
+		return <NothingToBill grnId={grnId} prId={source.prId} />;
 	}
 
 	return (
@@ -249,9 +288,11 @@ export function SupplierInvoiceFormView({
 function NothingToBill({
 	message,
 	grnId,
+	prId,
 }: {
 	message?: string;
 	grnId?: number;
+	prId?: number | null;
 }) {
 	return (
 		<EmptyState
@@ -259,8 +300,20 @@ function NothingToBill({
 			description={message}
 			action={
 				<Button type="button" variant="outline" size="sm" asChild>
-					<Link href={grnId ? `/grn/${grnId}` : "/purchase-orders/tracking"}>
-						{grnId ? "Back to the GRN" : "Back to purchase orders"}
+					<Link
+						href={
+							grnId
+								? `/grn/${grnId}`
+								: prId
+									? `/purchase-orders/${prId}`
+									: "/purchase-orders/tracking"
+						}
+					>
+						{grnId
+							? "Back to the GRN"
+							: prId
+								? "Back to the PO"
+								: "Back to purchase orders"}
 					</Link>
 				</Button>
 			}

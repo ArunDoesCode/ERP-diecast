@@ -59,7 +59,10 @@ function flowSteps(inv: SinvDetail): DocumentFlowStep[] {
 		label: "Purchase order",
 		docNo: inv.flow.po.number,
 		// PO detail is keyed by its requisition.
-		href: inv.flow.pr[0] ? `/purchase-orders/${inv.flow.pr[0].id}` : undefined,
+		href:
+			(inv.prId ?? inv.flow.pr[0]?.id)
+				? `/purchase-orders/${inv.prId ?? inv.flow.pr[0]?.id}`
+				: undefined,
 		status: <StatusBadge doc="po" status={inv.flow.po.status} />,
 		state: "done",
 	});

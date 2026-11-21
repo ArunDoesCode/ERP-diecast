@@ -52,7 +52,13 @@ export const supplierInvoiceKeys = {
  * detail (BR-SINV-29, 38), so those caches go stale with it.
  */
 function invalidateAfterInvoice(queryClient: QueryClient) {
-	void queryClient.invalidateQueries({ queryKey: supplierInvoiceKeys.all });
+	void queryClient.invalidateQueries({ queryKey: supplierInvoiceKeys.lists() });
+	void queryClient.invalidateQueries({
+		queryKey: ["supplier-invoices", "detail"],
+	});
+	void queryClient.invalidateQueries({
+		queryKey: ["supplier-invoices", "billable"],
+	});
 	void queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.cards() });
 	void queryClient.invalidateQueries({
 		queryKey: ["purchase-orders", "detail"],

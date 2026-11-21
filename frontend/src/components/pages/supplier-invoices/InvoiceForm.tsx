@@ -68,6 +68,8 @@ export type InvoiceFormSource = {
 	poNumber: string;
 	supplier: { id: number; name: string; gstin: string | null };
 	paymentTermsDays: number;
+	/** Parent PR id for the "Back to PO" link; null falls back to tracking. */
+	prId?: number | null;
 	catalog: CatalogLine[];
 };
 
@@ -356,7 +358,9 @@ export function InvoiceForm({
 			next.link = grnId
 				? { href: `/grn/${grnId}`, label: "Back to the GRN" }
 				: {
-						href: "/purchase-orders/tracking",
+						href: source.prId
+							? `/purchase-orders/${source.prId}`
+							: "/purchase-orders/tracking",
 						label: "Back to purchase orders",
 					};
 		}

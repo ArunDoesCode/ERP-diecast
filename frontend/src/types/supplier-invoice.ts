@@ -120,6 +120,7 @@ export type SinvBillable = {
 		poNumber: string;
 		status: string;
 		paymentTermsDays: number;
+		prId: number | null;
 	};
 	supplier: { id: number; name: string; gstin: string | null };
 	lines: SinvBillableLine[];
@@ -195,6 +196,8 @@ export type SinvDetail = {
 	status: SinvStatus;
 	poId: number;
 	poNumber: string;
+	/** Parent PR id: the PO page route is /purchase-orders/[prId]. Null when unknown. */
+	prId: number | null;
 	supplier: { id: number; name: string; gstin: string | null };
 	billedAmountPaise: number;
 	printed: SinvPrinted;

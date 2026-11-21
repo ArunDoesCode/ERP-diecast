@@ -55,6 +55,8 @@ function invalidateAfterReturn(
 	opts: { id?: number; stock?: boolean } = {},
 ) {
 	void queryClient.invalidateQueries({ queryKey: purchaseReturnKeys.all });
+	// Billable qty and debit-note links on supplier invoices change too (BR-PRT-44/45).
+	void queryClient.invalidateQueries({ queryKey: ["supplier-invoices"] });
 	void queryClient.invalidateQueries({ queryKey: grnKeys.list() });
 	void queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.cards() });
 	const cached =

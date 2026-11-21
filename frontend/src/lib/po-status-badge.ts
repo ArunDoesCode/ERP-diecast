@@ -23,11 +23,10 @@ export function canShortClosePurchaseOrder(status: POStatus) {
 	return status === "partial_received";
 }
 
-/** POs that can carry supplier invoices (BR-SINV-04); "Invoiced" is set by the invoice service. */
+/** POs that can take a NEW supplier invoice (BR-SINV-04). "Invoiced" is set by the invoice service and is not billable again. */
 export const PO_BILLABLE_STATUSES: ReadonlySet<POStatus> = new Set([
 	"partial_received",
 	"fully_received",
-	"invoiced",
 	"closed",
 ]);
 
