@@ -165,6 +165,26 @@ export const PERMISSIONS = {
     "Release and retire BOMs",
     "Release a draft BOM to active and retire an active BOM",
   ),
+  "so.view": p(
+    "sale-order",
+    "View sale orders",
+    "See customers, sale orders and BOM explosions (prices included)",
+  ),
+  "so.manage": p(
+    "sale-order",
+    "Manage sale orders",
+    "Create, edit, confirm, hold, resume, close and cancel sale orders",
+  ),
+  "so.explode": p(
+    "sale-order",
+    "Explode sale orders",
+    "Run the BOM explosion and create draft PRs and SCOs from it",
+  ),
+  "customer.manage": p(
+    "sale-order",
+    "Manage customers",
+    "Create and edit customers, activate and deactivate them",
+  ),
   "company.manage": p(
     "company",
     "Manage company settings",
@@ -236,6 +256,8 @@ export const SCREENS = {
     "Procurement",
   ),
   bom: s("/bom", "bom.view", "BOM (Bill of Materials)", 175, "Inventory"),
+  "sale-orders": s("/sale-orders", "so.view", "Sale Orders", 120, "Sales"),
+  customers: s("/customers", "so.view", "Customers", 125, "Sales"),
 } as const satisfies Record<string, ScreenDef>;
 
 export type ScreenKey = keyof typeof SCREENS;
@@ -278,6 +300,10 @@ export const SEED_GRANTS: Record<RoleSeedName, PermissionKey[]> = {
     "bom.view",
     "bom.manage",
     "bom.release",
+    "so.view",
+    "so.manage",
+    "so.explode",
+    "customer.manage",
     "company.manage",
   ],
   back_office: [
@@ -304,6 +330,10 @@ export const SEED_GRANTS: Record<RoleSeedName, PermissionKey[]> = {
     "sco.qa_decide",
     "bom.view",
     "bom.manage",
+    "so.view",
+    "so.manage",
+    "so.explode",
+    "customer.manage",
   ],
   floor_supervisor: [
     "inventory.view",

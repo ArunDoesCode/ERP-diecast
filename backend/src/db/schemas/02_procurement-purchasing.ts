@@ -1,4 +1,6 @@
+import { sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   bigint,
   boolean,
   doublePrecision,
@@ -14,6 +16,7 @@ import {
 import { itemMaster, serviceMaster } from "./02_procurement-catalog";
 import { supplierMaster } from "./02_procurement-suppliers";
 import { employees } from "./03_hcm";
+import { saleOrders } from "./05_sales";
 
 // 1. Define the Enum
 export const prTypeEnum = pgEnum("pr_type", [
@@ -43,7 +46,10 @@ export const purchaseRequests = pgTable(
     prNumber: text("pr_number").unique().notNull(),
     // no-index: low-card used with the indexed status filter
     type: prTypeEnum("type").notNull(),
-    saleOrderId: integer("sale_order_id"), // Null if stock_reorder or someother option
+    // Null if stock_reorder or some other option. BR-SO-48: names a confirmed SO (service check).
+    saleOrderId: integer("sale_order_id").references(
+      (): AnyPgColumn => saleOrders.id,
+    ),
     assetId: integer("asset_id"), // Only populated if type is 'maintenance' or 'tooling' (Optional: link to a specific machine/die)
     status: prStatusEnum("status").default("draft").notNull(),
     // no-index: audit no "my PRs" filter exists
@@ -69,6 +75,10 @@ export const purchaseRequests = pgTable(
   },
   (table) => ({
     statusIdx: index("idx_purchase_requests_status").on(table.status),
+    // BR-SO-14, 19: PRs of one SO; serves the FK
+    saleOrderIdx: index("idx_purchase_requests_sale_order_id").on(
+      table.saleOrderId,
+    ),
     // List `q` search (ilike %q%, #54): pg_trgm GIN indexes
     prNumberTrgm: index("idx_purchase_requests_pr_number_trgm").using(
       "gin",
@@ -113,6 +123,10 @@ export const purchaseRequestItems = pgTable(
   (table) => ({
     prIdIdx: index("idx_pr_items_pr_id").on(table.prId),
     statusIdx: index("idx_pr_items_status").on(table.status),
+    // open-PR supply read of the SO explosion (BR-SO-31)
+    itemOpenIdx: index("idx_pr_items_item_open")
+      .on(table.itemId)
+      .where(sql`${table.status} in ('pending', 'po_draft')`),
     itemIdIdx: index("idx_pr_items_item_id").on(table.itemId),
   }),
 );

@@ -5,9 +5,11 @@ import { assetRoutes } from "./asset";
 import { authRoutes } from "./auth";
 import { bomRoutes } from "./bom";
 import { companyRoutes } from "./company";
+import { customerRoutes } from "./customer";
 import { grnRoutes } from "./grn";
 import { poRoutes } from "./po";
 import { prRoutes } from "./pr";
+import { saleOrderRoutes } from "./saleOrder";
 import { scoRoutes } from "./sco";
 import { setupRoutes } from "./setup";
 import { supplierRoutes } from "./supplier";
@@ -24,6 +26,8 @@ const MAIN_ROUTES = {
   sco: "/sco",
   bom: "/bom",
   company: "/company",
+  customer: "/customers",
+  saleOrder: "/sale-orders",
 } as const;
 
 export { authRoutes } from "./auth";
@@ -41,3 +45,5 @@ mainRouter.route(MAIN_ROUTES.approval, approvalRoutes);
 mainRouter.route(MAIN_ROUTES.sco, scoRoutes);
 mainRouter.route(MAIN_ROUTES.bom, bomRoutes);
 mainRouter.route(MAIN_ROUTES.company, companyRoutes);
+mainRouter.route(MAIN_ROUTES.customer, customerRoutes);
+mainRouter.route(MAIN_ROUTES.saleOrder, saleOrderRoutes);

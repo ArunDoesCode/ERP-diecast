@@ -1953,6 +1953,164 @@
       }
     },
     {
+      "id": "GET /api/customers",
+      "method": "GET",
+      "path": "/api/customers",
+      "tags": [
+        "customers"
+      ],
+      "summary": "List customers, paginated (BR-SO-03). Filters `q` (name), `isActive`, `stateCode`; also the customer combobox (`?isActive=true&q=`).",
+      "auth": {
+        "type": "permission",
+        "key": "so.view",
+        "alsoKeys": [
+          "customer.manage"
+        ]
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "sortBy": "enum:name,createdAt.required",
+          "sortDir": "enum:asc,desc.required",
+          "q": "string.optional",
+          "isActive": "unrepresentable.optional",
+          "stateCode": "string.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "name",
+          "createdAt"
+        ],
+        "searchable": true
+      }
+    },
+    {
+      "id": "GET /api/customers/:id",
+      "method": "GET",
+      "path": "/api/customers/:id",
+      "tags": [
+        "customers"
+      ],
+      "summary": "One customer (BR-SO-03). 404 when missing.",
+      "auth": {
+        "type": "permission",
+        "key": "so.view",
+        "alsoKeys": [
+          "customer.manage"
+        ]
+      },
+      "request": {
+        "params": {
+          "id": "integer.nonnegative.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "name": "string.required",
+            "stateCode": "string.required",
+            "address": "string.required",
+            "gstin": "unknown.required",
+            "isActive": "boolean.required",
+            "createdAt": "string.required",
+            "lastUpdatedAt": "string.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/customers",
+      "method": "POST",
+      "path": "/api/customers",
+      "tags": [
+        "customers"
+      ],
+      "summary": "Create a customer (BR-SO-01, 03). 400 bad GSTIN or GSTIN / state mismatch; 409 CUSTOMER_NAME_EXISTS.",
+      "auth": {
+        "type": "permission",
+        "key": "customer.manage"
+      },
+      "request": {
+        "body": {
+          "name": "string.nonempty.required",
+          "stateCode": "string.required",
+          "address": "string.nonempty.required",
+          "gstin": "string.optional"
+        }
+      },
+      "responses": {
+        "201": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "name": "string.required",
+            "stateCode": "string.required",
+            "address": "string.required",
+            "gstin": "unknown.required",
+            "isActive": "boolean.required",
+            "createdAt": "string.required",
+            "lastUpdatedAt": "string.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "PATCH /api/customers/:id",
+      "method": "PATCH",
+      "path": "/api/customers/:id",
+      "tags": [
+        "customers"
+      ],
+      "summary": "Edit a customer, activate / deactivate with `isActive` (BR-SO-01, 02). At least one field. 409 CUSTOMER_NAME_EXISTS.",
+      "auth": {
+        "type": "permission",
+        "key": "customer.manage"
+      },
+      "request": {
+        "body": {
+          "name": "string.nonempty.optional",
+          "stateCode": "string.optional",
+          "address": "string.nonempty.optional",
+          "gstin": "string.nullable.optional",
+          "isActive": "boolean.optional"
+        },
+        "params": {
+          "id": "integer.nonnegative.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "name": "string.required",
+            "stateCode": "string.required",
+            "address": "string.required",
+            "gstin": "unknown.required",
+            "isActive": "boolean.required",
+            "createdAt": "string.required",
+            "lastUpdatedAt": "string.required"
+          }
+        }
+      }
+    },
+    {
       "id": "GET /api/grn/getgrns",
       "method": "GET",
       "path": "/api/grn/getgrns",
@@ -3353,6 +3511,797 @@
               "expectedDate": "unrepresentable.nullable.required",
               "status": "enum:pending,po_draft,ordered,closed,cancelled.required"
             }
+          }
+        }
+      }
+    },
+    {
+      "id": "GET /api/sale-orders",
+      "method": "GET",
+      "path": "/api/sale-orders",
+      "tags": [
+        "sale-orders"
+      ],
+      "summary": "List sale orders, paginated (BR-SO-04). Filters `q` (SO no., customer PO no., customer name), `status` (CSV, unknown value 400), `customerId`, `orderDateFrom`, `orderDateTo`, `deliveryBefore`. `meta.statusCounts` ignores the `status` filter.",
+      "auth": {
+        "type": "permission",
+        "key": "so.view"
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "sortBy": "enum:soNumber,orderDate,createdAt,totalAmountPaise.required",
+          "sortDir": "enum:asc,desc.required",
+          "q": "string.optional",
+          "status": "array<enum:draft,confirmed,on_hold,closed,cancelled>.optional",
+          "customerId": "integer.nonnegative.optional",
+          "orderDateFrom": "string.optional",
+          "orderDateTo": "string.optional",
+          "deliveryBefore": "string.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required",
+            "statusCounts": {
+              "draft": "integer.required",
+              "confirmed": "integer.required",
+              "on_hold": "integer.required",
+              "closed": "integer.required",
+              "cancelled": "integer.required"
+            }
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "soNumber",
+          "orderDate",
+          "createdAt",
+          "totalAmountPaise"
+        ],
+        "searchable": true
+      }
+    },
+    {
+      "id": "GET /api/sale-orders/:id",
+      "method": "GET",
+      "path": "/api/sale-orders/:id",
+      "tags": [
+        "sale-orders"
+      ],
+      "summary": "One sale order: header, lines, raisedDocuments (explosion-linked live PR / SCO), current snapshot summary (BR-SO-19, 51).",
+      "auth": {
+        "type": "permission",
+        "key": "so.view"
+      },
+      "request": {
+        "params": {
+          "id": "integer.nonnegative.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "soNumber": "string.required",
+            "customerId": "integer.required",
+            "customerName": "string.required",
+            "status": "enum:draft,confirmed,on_hold,closed,cancelled.required",
+            "orderDate": "string.required",
+            "customerPoNumber": "unknown.required",
+            "customerPoDate": "unknown.required",
+            "shipToAddress": "unknown.required",
+            "shipToStateCode": "unknown.required",
+            "notes": "unknown.required",
+            "totalAmountPaise": "integer.required",
+            "editVersion": "integer.required",
+            "closeKind": "enum:manual,fully_delivered.nullable.required",
+            "holdReason": "unknown.required",
+            "closeReason": "unknown.required",
+            "cancelReason": "unknown.required",
+            "confirmedAt": "unknown.required",
+            "createdByName": "string.required",
+            "createdAt": "string.required",
+            "lastUpdatedAt": "string.required",
+            "lines": "array<object>.required",
+            "raisedDocuments": "array<object>.required",
+            "currentSnapshot": {
+              "id": "integer.required",
+              "runNo": "integer.required",
+              "number": "string.required",
+              "outOfDate": "boolean.required",
+              "rowCount": "integer.required",
+              "flaggedCount": "integer.required",
+              "createdAt": "string.required"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/sale-orders",
+      "method": "POST",
+      "path": "/api/sale-orders",
+      "tags": [
+        "sale-orders"
+      ],
+      "summary": "Create a draft SO with lines in one transaction (BR-SO-05..08, 56, 57). 400 inactive customer / item, bad qty / price / dates, same item + date twice; 409 CUSTOMER_PO_EXISTS.",
+      "auth": {
+        "type": "permission",
+        "key": "so.manage"
+      },
+      "request": {
+        "body": {
+          "customerId": "integer.positive.required",
+          "orderDate": "string.required",
+          "customerPoNumber": "string.nonempty.optional",
+          "customerPoDate": "string.optional",
+          "shipToAddress": "string.nonempty.optional",
+          "shipToStateCode": "string.optional",
+          "notes": "string.nonempty.optional",
+          "lines": "array<object>.required"
+        }
+      },
+      "responses": {
+        "201": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "soNumber": "string.required",
+            "customerId": "integer.required",
+            "customerName": "string.required",
+            "status": "enum:draft,confirmed,on_hold,closed,cancelled.required",
+            "orderDate": "string.required",
+            "customerPoNumber": "unknown.required",
+            "customerPoDate": "unknown.required",
+            "shipToAddress": "unknown.required",
+            "shipToStateCode": "unknown.required",
+            "notes": "unknown.required",
+            "totalAmountPaise": "integer.required",
+            "editVersion": "integer.required",
+            "closeKind": "enum:manual,fully_delivered.nullable.required",
+            "holdReason": "unknown.required",
+            "closeReason": "unknown.required",
+            "cancelReason": "unknown.required",
+            "confirmedAt": "unknown.required",
+            "createdByName": "string.required",
+            "createdAt": "string.required",
+            "lastUpdatedAt": "string.required",
+            "lines": "array<object>.required",
+            "raisedDocuments": "array<object>.required",
+            "currentSnapshot": {
+              "id": "integer.required",
+              "runNo": "integer.required",
+              "number": "string.required",
+              "outOfDate": "boolean.required",
+              "rowCount": "integer.required",
+              "flaggedCount": "integer.required",
+              "createdAt": "string.required"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "PATCH /api/sale-orders/:id",
+      "method": "PATCH",
+      "path": "/api/sale-orders/:id",
+      "tags": [
+        "sale-orders"
+      ],
+      "summary": "Edit an SO: draft fully, confirmed limited; needs `editVersion` (BR-SO-09, 10, 13, 14, 59, 60). 409 STALE_VERSION / SO_NOT_EDITABLE / SO_FIELD_LOCKED / QTY_BELOW_DELIVERED / SO_LINE_DELIVERED / LIVE_DOCUMENTS_LINKED / CUSTOMER_PO_EXISTS.",
+      "auth": {
+        "type": "permission",
+        "key": "so.manage"
+      },
+      "request": {
+        "body": {
+          "editVersion": "integer.nonnegative.required",
+          "customerId": "integer.positive.optional",
+          "orderDate": "string.optional",
+          "customerPoNumber": "string.nonempty.nullable.optional",
+          "customerPoDate": "string.nullable.optional",
+          "shipToAddress": "string.nonempty.nullable.optional",
+          "shipToStateCode": "string.nullable.optional",
+          "notes": "string.nonempty.nullable.optional",
+          "lines": "array<object>.optional",
+          "removeLineIds": "array<integer.positive>.optional"
+        },
+        "params": {
+          "id": "integer.nonnegative.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "soNumber": "string.required",
+            "customerId": "integer.required",
+            "customerName": "string.required",
+            "status": "enum:draft,confirmed,on_hold,closed,cancelled.required",
+            "orderDate": "string.required",
+            "customerPoNumber": "unknown.required",
+            "customerPoDate": "unknown.required",
+            "shipToAddress": "unknown.required",
+            "shipToStateCode": "unknown.required",
+            "notes": "unknown.required",
+            "totalAmountPaise": "integer.required",
+            "editVersion": "integer.required",
+            "closeKind": "enum:manual,fully_delivered.nullable.required",
+            "holdReason": "unknown.required",
+            "closeReason": "unknown.required",
+            "cancelReason": "unknown.required",
+            "confirmedAt": "unknown.required",
+            "createdByName": "string.required",
+            "createdAt": "string.required",
+            "lastUpdatedAt": "string.required",
+            "lines": "array<object>.required",
+            "raisedDocuments": "array<object>.required",
+            "currentSnapshot": {
+              "id": "integer.required",
+              "runNo": "integer.required",
+              "number": "string.required",
+              "outOfDate": "boolean.required",
+              "rowCount": "integer.required",
+              "flaggedCount": "integer.required",
+              "createdAt": "string.required"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/sale-orders/:id/confirm",
+      "method": "POST",
+      "path": "/api/sale-orders/:id/confirm",
+      "tags": [
+        "sale-orders"
+      ],
+      "summary": "Confirm a draft SO (BR-SO-12). 400 inactive customer / item or past delivery date; 409 wrong status / STALE_VERSION.",
+      "auth": {
+        "type": "permission",
+        "key": "so.manage"
+      },
+      "request": {
+        "body": {
+          "editVersion": "integer.nonnegative.required"
+        },
+        "params": {
+          "id": "integer.nonnegative.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "soNumber": "string.required",
+            "customerId": "integer.required",
+            "customerName": "string.required",
+            "status": "enum:draft,confirmed,on_hold,closed,cancelled.required",
+            "orderDate": "string.required",
+            "customerPoNumber": "unknown.required",
+            "customerPoDate": "unknown.required",
+            "shipToAddress": "unknown.required",
+            "shipToStateCode": "unknown.required",
+            "notes": "unknown.required",
+            "totalAmountPaise": "integer.required",
+            "editVersion": "integer.required",
+            "closeKind": "enum:manual,fully_delivered.nullable.required",
+            "holdReason": "unknown.required",
+            "closeReason": "unknown.required",
+            "cancelReason": "unknown.required",
+            "confirmedAt": "unknown.required",
+            "createdByName": "string.required",
+            "createdAt": "string.required",
+            "lastUpdatedAt": "string.required",
+            "lines": "array<object>.required",
+            "raisedDocuments": "array<object>.required",
+            "currentSnapshot": {
+              "id": "integer.required",
+              "runNo": "integer.required",
+              "number": "string.required",
+              "outOfDate": "boolean.required",
+              "rowCount": "integer.required",
+              "flaggedCount": "integer.required",
+              "createdAt": "string.required"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/sale-orders/:id/hold",
+      "method": "POST",
+      "path": "/api/sale-orders/:id/hold",
+      "tags": [
+        "sale-orders"
+      ],
+      "summary": "Hold a confirmed SO, reason 3-500 chars (BR-SO-16). 409 wrong status / STALE_VERSION.",
+      "auth": {
+        "type": "permission",
+        "key": "so.manage"
+      },
+      "request": {
+        "body": {
+          "reason": "string.nonempty.required",
+          "editVersion": "integer.nonnegative.required"
+        },
+        "params": {
+          "id": "integer.nonnegative.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "soNumber": "string.required",
+            "customerId": "integer.required",
+            "customerName": "string.required",
+            "status": "enum:draft,confirmed,on_hold,closed,cancelled.required",
+            "orderDate": "string.required",
+            "customerPoNumber": "unknown.required",
+            "customerPoDate": "unknown.required",
+            "shipToAddress": "unknown.required",
+            "shipToStateCode": "unknown.required",
+            "notes": "unknown.required",
+            "totalAmountPaise": "integer.required",
+            "editVersion": "integer.required",
+            "closeKind": "enum:manual,fully_delivered.nullable.required",
+            "holdReason": "unknown.required",
+            "closeReason": "unknown.required",
+            "cancelReason": "unknown.required",
+            "confirmedAt": "unknown.required",
+            "createdByName": "string.required",
+            "createdAt": "string.required",
+            "lastUpdatedAt": "string.required",
+            "lines": "array<object>.required",
+            "raisedDocuments": "array<object>.required",
+            "currentSnapshot": {
+              "id": "integer.required",
+              "runNo": "integer.required",
+              "number": "string.required",
+              "outOfDate": "boolean.required",
+              "rowCount": "integer.required",
+              "flaggedCount": "integer.required",
+              "createdAt": "string.required"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/sale-orders/:id/resume",
+      "method": "POST",
+      "path": "/api/sale-orders/:id/resume",
+      "tags": [
+        "sale-orders"
+      ],
+      "summary": "Resume an on-hold SO to confirmed (BR-SO-16). 409 wrong status / STALE_VERSION.",
+      "auth": {
+        "type": "permission",
+        "key": "so.manage"
+      },
+      "request": {
+        "body": {
+          "editVersion": "integer.nonnegative.required"
+        },
+        "params": {
+          "id": "integer.nonnegative.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "soNumber": "string.required",
+            "customerId": "integer.required",
+            "customerName": "string.required",
+            "status": "enum:draft,confirmed,on_hold,closed,cancelled.required",
+            "orderDate": "string.required",
+            "customerPoNumber": "unknown.required",
+            "customerPoDate": "unknown.required",
+            "shipToAddress": "unknown.required",
+            "shipToStateCode": "unknown.required",
+            "notes": "unknown.required",
+            "totalAmountPaise": "integer.required",
+            "editVersion": "integer.required",
+            "closeKind": "enum:manual,fully_delivered.nullable.required",
+            "holdReason": "unknown.required",
+            "closeReason": "unknown.required",
+            "cancelReason": "unknown.required",
+            "confirmedAt": "unknown.required",
+            "createdByName": "string.required",
+            "createdAt": "string.required",
+            "lastUpdatedAt": "string.required",
+            "lines": "array<object>.required",
+            "raisedDocuments": "array<object>.required",
+            "currentSnapshot": {
+              "id": "integer.required",
+              "runNo": "integer.required",
+              "number": "string.required",
+              "outOfDate": "boolean.required",
+              "rowCount": "integer.required",
+              "flaggedCount": "integer.required",
+              "createdAt": "string.required"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/sale-orders/:id/close",
+      "method": "POST",
+      "path": "/api/sale-orders/:id/close",
+      "tags": [
+        "sale-orders"
+      ],
+      "summary": "Close a confirmed / on-hold SO by hand, reason 3-500 chars; releases reservations (BR-SO-17). 409 wrong status / STALE_VERSION.",
+      "auth": {
+        "type": "permission",
+        "key": "so.manage"
+      },
+      "request": {
+        "body": {
+          "reason": "string.nonempty.required",
+          "editVersion": "integer.nonnegative.required"
+        },
+        "params": {
+          "id": "integer.nonnegative.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "soNumber": "string.required",
+            "customerId": "integer.required",
+            "customerName": "string.required",
+            "status": "enum:draft,confirmed,on_hold,closed,cancelled.required",
+            "orderDate": "string.required",
+            "customerPoNumber": "unknown.required",
+            "customerPoDate": "unknown.required",
+            "shipToAddress": "unknown.required",
+            "shipToStateCode": "unknown.required",
+            "notes": "unknown.required",
+            "totalAmountPaise": "integer.required",
+            "editVersion": "integer.required",
+            "closeKind": "enum:manual,fully_delivered.nullable.required",
+            "holdReason": "unknown.required",
+            "closeReason": "unknown.required",
+            "cancelReason": "unknown.required",
+            "confirmedAt": "unknown.required",
+            "createdByName": "string.required",
+            "createdAt": "string.required",
+            "lastUpdatedAt": "string.required",
+            "lines": "array<object>.required",
+            "raisedDocuments": "array<object>.required",
+            "currentSnapshot": {
+              "id": "integer.required",
+              "runNo": "integer.required",
+              "number": "string.required",
+              "outOfDate": "boolean.required",
+              "rowCount": "integer.required",
+              "flaggedCount": "integer.required",
+              "createdAt": "string.required"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/sale-orders/:id/cancel",
+      "method": "POST",
+      "path": "/api/sale-orders/:id/cancel",
+      "tags": [
+        "sale-orders"
+      ],
+      "summary": "Cancel an SO, reason 3-500 chars (BR-SO-18, 19, 20). 409 HAS_DELIVERIES / LIVE_DOCUMENTS_LINKED / wrong status / STALE_VERSION.",
+      "auth": {
+        "type": "permission",
+        "key": "so.manage"
+      },
+      "request": {
+        "body": {
+          "reason": "string.nonempty.required",
+          "editVersion": "integer.nonnegative.required"
+        },
+        "params": {
+          "id": "integer.nonnegative.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "soNumber": "string.required",
+            "customerId": "integer.required",
+            "customerName": "string.required",
+            "status": "enum:draft,confirmed,on_hold,closed,cancelled.required",
+            "orderDate": "string.required",
+            "customerPoNumber": "unknown.required",
+            "customerPoDate": "unknown.required",
+            "shipToAddress": "unknown.required",
+            "shipToStateCode": "unknown.required",
+            "notes": "unknown.required",
+            "totalAmountPaise": "integer.required",
+            "editVersion": "integer.required",
+            "closeKind": "enum:manual,fully_delivered.nullable.required",
+            "holdReason": "unknown.required",
+            "closeReason": "unknown.required",
+            "cancelReason": "unknown.required",
+            "confirmedAt": "unknown.required",
+            "createdByName": "string.required",
+            "createdAt": "string.required",
+            "lastUpdatedAt": "string.required",
+            "lines": "array<object>.required",
+            "raisedDocuments": "array<object>.required",
+            "currentSnapshot": {
+              "id": "integer.required",
+              "runNo": "integer.required",
+              "number": "string.required",
+              "outOfDate": "boolean.required",
+              "rowCount": "integer.required",
+              "flaggedCount": "integer.required",
+              "createdAt": "string.required"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "GET /api/sale-orders/:id/audit",
+      "method": "GET",
+      "path": "/api/sale-orders/:id/audit",
+      "tags": [
+        "sale-orders"
+      ],
+      "summary": "Audit trail of the SO: who, when, before -> after; paginated, newest first (BR-SO-52).",
+      "auth": {
+        "type": "permission",
+        "key": "so.view"
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "sortBy": "enum:at.required",
+          "sortDir": "enum:asc,desc.required",
+          "action": "string.nonempty.optional"
+        },
+        "params": {
+          "id": "integer.nonnegative.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "at"
+        ],
+        "searchable": false
+      }
+    },
+    {
+      "id": "POST /api/sale-orders/:id/explosions",
+      "method": "POST",
+      "path": "/api/sale-orders/:id/explosions",
+      "tags": [
+        "sale-orders"
+      ],
+      "summary": "Run the BOM explosion of a confirmed SO: new numbered snapshot, older one superseded (BR-SO-21..38). 409 SO_NOT_CONFIRMED / EXPLOSION_IN_PROGRESS / EXPLOSION_BUSY; 400 EXPLOSION_TOO_LARGE.",
+      "auth": {
+        "type": "permission",
+        "key": "so.explode"
+      },
+      "request": {
+        "body": {},
+        "params": {
+          "id": "integer.nonnegative.required"
+        }
+      },
+      "responses": {
+        "201": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "runNo": "integer.required",
+            "number": "string.required",
+            "createdAt": "string.required",
+            "rowCount": "integer.required",
+            "flaggedCount": "integer.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "GET /api/sale-orders/:id/explosions",
+      "method": "GET",
+      "path": "/api/sale-orders/:id/explosions",
+      "tags": [
+        "sale-orders"
+      ],
+      "summary": "List the snapshots of an SO, paginated (BR-SO-21).",
+      "auth": {
+        "type": "permission",
+        "key": "so.view"
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "sortBy": "enum:runNo,createdAt.required",
+          "sortDir": "enum:asc,desc.required",
+          "status": "enum:current,superseded.optional"
+        },
+        "params": {
+          "id": "integer.nonnegative.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "runNo",
+          "createdAt"
+        ],
+        "searchable": false
+      }
+    },
+    {
+      "id": "GET /api/sale-orders/:id/explosions/:eid",
+      "method": "GET",
+      "path": "/api/sale-orders/:id/explosions/:eid",
+      "tags": [
+        "sale-orders"
+      ],
+      "summary": "Snapshot header, totals, `outOfDate` and reasons; 404 when the snapshot is not of this SO (BR-SO-38, 51). No prices.",
+      "auth": {
+        "type": "permission",
+        "key": "so.view"
+      },
+      "request": {
+        "params": {
+          "id": "integer.nonnegative.required",
+          "eid": "integer.nonnegative.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "runNo": "integer.required",
+            "number": "string.required",
+            "status": "enum:current,superseded.required",
+            "outOfDate": "boolean.required",
+            "outOfDateReasons": "array<enum:so_changed,bom_changed,delivery_changed>.required",
+            "createdBy": "integer.required",
+            "createdByName": "string.required",
+            "createdAt": "string.required",
+            "supersededAt": "unknown.required",
+            "totals": {
+              "rowCount": "integer.required",
+              "flaggedCount": "integer.required",
+              "shortCount": "integer.required",
+              "raisedCount": "integer.required"
+            },
+            "bomRevisions": "array<object>.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "GET /api/sale-orders/:id/explosions/:eid/rows",
+      "method": "GET",
+      "path": "/api/sale-orders/:id/explosions/:eid/rows",
+      "tags": [
+        "sale-orders"
+      ],
+      "summary": "Rows of a snapshot, paginated (BR-SO-50, 51). Filters `type`, `net=short`, `flagged`. Job-worker candidates only for `so.explode` holders. No prices.",
+      "auth": {
+        "type": "permission",
+        "key": "so.view"
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "sortBy": "enum:level,sku,netQty,type.required",
+          "sortDir": "enum:asc,desc.required",
+          "type": "enum:cast,job_work,assemble,buy.optional",
+          "net": "enum:short.optional",
+          "flagged": "unrepresentable.optional"
+        },
+        "params": {
+          "id": "integer.nonnegative.required",
+          "eid": "integer.nonnegative.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "level",
+          "sku",
+          "netQty",
+          "type"
+        ],
+        "searchable": false
+      }
+    },
+    {
+      "id": "POST /api/sale-orders/:id/explosions/:eid/drafts",
+      "method": "POST",
+      "path": "/api/sale-orders/:id/explosions/:eid/drafts",
+      "tags": [
+        "sale-orders"
+      ],
+      "summary": "Create draft PRs and SCOs from picked rows of the current snapshot, all or nothing (BR-SO-39..48). Also needs `pr.manage` / `sco.manage` per picked row (service check, 403). 409 SNAPSHOT_SUPERSEDED / SNAPSHOT_OUT_OF_DATE / ROW_ALREADY_RAISED / SO_NOT_CONFIRMED; 400 PICK_OVER_NET.",
+      "auth": {
+        "type": "permission",
+        "key": "so.explode"
+      },
+      "request": {
+        "body": {
+          "rows": "array<object>.required"
+        },
+        "params": {
+          "id": "integer.nonnegative.required",
+          "eid": "integer.nonnegative.required"
+        }
+      },
+      "responses": {
+        "201": {
+          "success": "boolean.required",
+          "data": {
+            "prs": "array<object>.required",
+            "scos": "array<object>.required",
+            "rows": "array<object>.required"
           }
         }
       }
