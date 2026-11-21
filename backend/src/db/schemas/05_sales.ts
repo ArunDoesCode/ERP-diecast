@@ -459,6 +459,7 @@ export const salesAuditLog = pgTable(
     action: text("action").notNull(),
     // customer | sale_order | explosion
     targetType: text("target_type").notNull(),
+    // no-index: covered:idx_sales_audit_log_target filtered with target_type, which leads that index
     targetId: integer("target_id").notNull(),
     soId: integer("so_id").references(() => saleOrders.id),
     before: jsonb("before"),

@@ -74,6 +74,7 @@ export const deliveryNotes = pgTable(
     gstPaise: bigint("gst_paise", { mode: "number" }).notNull().default(0),
     valuePaise: bigint("value_paise", { mode: "number" }).notNull().default(0),
     // BR-DSP-23: recomputed on every draft save and at post
+    // no-index: covered:idx_delivery_notes_eway_missing partial index on this predicate
     ewayRequired: boolean("eway_required").notNull().default(false),
     transportMode: text("transport_mode"),
     vehicleNo: text("vehicle_no"),

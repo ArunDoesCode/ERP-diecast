@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { stockTransferStatusEnum } from "../db/schemas/02_procurement-catalog";
+import { istDayKey } from "../lib/ist-day";
 import { paginatedResponse, successResponse } from "../lib/response-schemas";
 
 // Quantity: > 0, <= 1e9, at most 3 decimals (BR-STR-04, 05). The whole-number rule
@@ -18,7 +19,7 @@ const isoDate = z
   .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD")
   .refine((v) => {
     const d = new Date(`${v}T00:00:00.000Z`);
-    return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v;
+    return !Number.isNaN(d.getTime()) && istDayKey(d) === v;
   }, "Not a real calendar date");
 
 export const stockTransferStatusSchema = z.enum(

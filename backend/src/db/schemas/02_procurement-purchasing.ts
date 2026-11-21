@@ -641,6 +641,7 @@ export const grnItems = pgTable(
     rejectedQty: doublePrecision("rejected_qty").default(0),
 
     // Standard QA
+    // no-index: low-card four values, always filtered with the GRN or PO id
     qaStatus: text("qa_status").default("pending"), // 'pending', 'passed', 'failed', 'waived'
 
     // FAST-TRACK / BYPASS LOGIC
@@ -664,7 +665,7 @@ export const grnItems = pgTable(
     rejectedReturnedQty: qty3Col("rejected_returned_qty").default(0).notNull(),
     acceptedReturnedQty: qty3Col("accepted_returned_qty").default(0).notNull(),
     // Supplier rating: arrival fallback when the GRN has no received_date (CR-01)
-    // no-index: never filtered or sorted on
+    // never filtered or sorted on
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => ({
@@ -972,6 +973,7 @@ export const purchaseDebitNotes = pgTable(
       .notNull()
       .unique(),
     debitNoteDate: timestamp("debit_note_date").notNull(),
+    // no-index: low-card two or three states
     status: debitNoteStatusEnum("status").default("issued").notNull(),
     taxablePaise: bigint("taxable_paise", { mode: "number" }).notNull(),
     cgstPaise: bigint("cgst_paise", { mode: "number" }).notNull(),
@@ -1080,10 +1082,12 @@ export const supplierInvoices = pgTable(
     // SINV-<YYYY-MM>-<seq> (BR-SINV-11); old rows LEGACY-<id>
     ourNumber: text("our_number").unique().notNull(),
     // supplier's own bill number: trimmed, upper-cased, 1-16 of A-Z 0-9 - / (BR-SINV-05)
+    // no-index: covered:uq_supplier_invoice_live_number always filtered with supplier_id, which leads it
     invoiceNumber: text("invoice_number").notNull(),
     // IST calendar day (BR-SINV-07)
     invoiceDate: date("invoice_date").notNull(),
     // financial year of invoice_date, "26-27" (BR-SINV-06)
+    // no-index: covered:uq_supplier_invoice_live_number always filtered with supplier_id, which leads it
     fy: text("fy").generatedAlwaysAs(
       sql`lpad((((extract(year from invoice_date)::int - (case when extract(month from invoice_date) < 4 then 1 else 0 end)) % 100))::text, 2, '0') || '-' || lpad((((extract(year from invoice_date)::int - (case when extract(month from invoice_date) < 4 then 1 else 0 end) + 1) % 100))::text, 2, '0')`,
     ),
@@ -1267,6 +1271,7 @@ export const supplierInvoiceHistory = pgTable(
     }),
     // snapshot, survives a delete
     ourNumber: text("our_number").notNull(),
+    // no-index: covered:idx_sinv_history_invoice_id always filtered with invoice_id, which leads it
     action: supplierInvoiceHistoryActionEnum("action").notNull(),
     fromStatus: supplierInvoiceStatusEnum("from_status"),
     toStatus: supplierInvoiceStatusEnum("to_status"),

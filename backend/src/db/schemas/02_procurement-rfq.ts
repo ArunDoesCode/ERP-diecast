@@ -147,6 +147,7 @@ export const rfqItems = pgTable(
     // PR line requestedQty - issuedQty at add time; never editable (BR-RFQ-03)
     qty: qty3Col("qty").notNull(),
     uom: text("uom").notNull(),
+    // no-index: covered:uq_rfq_items_open_pr_item partial index where line_status = open, filtered with pr_item_id
     lineStatus: rfqLineStatusEnum("line_status").default("open").notNull(),
     // The single award (BR-RFQ-25). No FK: rfq_items <-> rfq_quote_items would be
     // circular; the service checks the quote line belongs to this line.
@@ -197,6 +198,7 @@ export const rfqQuotes = pgTable(
       .references((): AnyPgColumn => supplierMaster.id)
       .notNull(),
     // "awarded" is derived from rfq_items.awarded_quote_item_id
+    // no-index: covered:idx_rfq_quotes_rfq_status always filtered with rfq_id, which leads it
     status: rfqQuoteStatusEnum("status").default("draft").notNull(),
     supplierQuoteRef: text("supplier_quote_ref").notNull(),
     quoteDate: date("quote_date").notNull(),
@@ -245,6 +247,7 @@ export const rfqQuoteItems = pgTable(
       .references((): AnyPgColumn => rfqItems.id)
       .notNull(),
     // false = "not quoted"; the value columns are then null
+    // no-index: low-card boolean, always filtered with the quote id
     isQuoted: boolean("is_quoted").notNull(),
     // paise per item uom, >= 1
     ratePaise: bigint("rate_paise", { mode: "number" }),

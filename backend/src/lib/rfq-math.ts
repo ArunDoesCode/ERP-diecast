@@ -1,4 +1,5 @@
 import { BadRequestError } from "./errors";
+import { istDayKey } from "./ist-day";
 import { toMilli } from "./milli";
 import {
   AMOUNT_TOO_LARGE,
@@ -83,7 +84,7 @@ export function percentOf(part: number, whole: number | null) {
 export function isRealDay(value: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const d = new Date(`${value}T00:00:00.000Z`);
-  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === value;
+  return !Number.isNaN(d.getTime()) && istDayKey(d) === value;
 }
 
 /** Whole rupees with Indian grouping, 2 decimals: 200000 paise -> "2,000.00". */

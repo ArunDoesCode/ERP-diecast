@@ -30,7 +30,7 @@ const iso = (d: Date | null) => (d ? d.toISOString() : null);
 const addDays = (day: string, days: number) => {
   const d = new Date(`${day}T00:00:00.000Z`);
   d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
+  return istDayKey(d);
 };
 
 /** Stored status, or "expired" for an active contract past its valid-to (BR-RFQ-47). */

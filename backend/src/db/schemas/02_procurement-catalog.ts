@@ -172,6 +172,7 @@ export const locations = pgTable(
     id: serial("id").primaryKey(),
     name: text("name").notNull(),
     type: locationTypeEnum("type").notNull(),
+    // no-index: low-card boolean on a small locations table
     isVirtual: boolean("is_virtual").default(false).notNull(),
     linkedVendorId: integer("linked_vendor_id").references(
       () => supplierMaster.id,
