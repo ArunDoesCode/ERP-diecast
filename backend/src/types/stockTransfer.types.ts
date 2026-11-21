@@ -13,7 +13,13 @@ const qty3 = z
   .refine((v) => v <= 1e9, { message: "Quantity is too large" });
 
 const idSchema = z.number().int().positive();
-const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
+const isoDate = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD")
+  .refine((v) => {
+    const d = new Date(`${v}T00:00:00.000Z`);
+    return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v;
+  }, "Not a real calendar date");
 
 export const stockTransferStatusSchema = z.enum(
   stockTransferStatusEnum.enumValues,

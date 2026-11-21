@@ -303,18 +303,26 @@ export const stockTransferRepository = {
       .values(lines.map((line) => ({ ...line, transferId })));
   },
 
-  async setLinePostedCost(
-    lineId: number,
-    unitCostPaise: number,
-    valuePaise: number,
+  // One UPDATE ... FROM (VALUES ...) for all lines (PERF-03).
+  async setLinesPostedCost(
+    rows: { lineId: number; unitCostPaise: number; valuePaise: number }[],
     tx: Tx,
   ) {
-    await tx
-      .update(stockTransferItems)
-      .set({
-        postedUnitCostPaise: unitCostPaise,
-        postedValuePaise: valuePaise,
-      })
-      .where(eq(stockTransferItems.id, lineId));
+    if (rows.length === 0) {
+      return;
+    }
+    const values = sql.join(
+      rows.map(
+        (r) =>
+          sql`(${r.lineId}::int, ${r.unitCostPaise}::bigint, ${r.valuePaise}::bigint)`,
+      ),
+      sql`, `,
+    );
+    await tx.execute(sql`
+      update stock_transfer_items as sti
+      set posted_unit_cost_paise = v.unit_cost, posted_value_paise = v.value
+      from (values ${values}) as v(id, unit_cost, value)
+      where sti.id = v.id
+    `);
   },
 };

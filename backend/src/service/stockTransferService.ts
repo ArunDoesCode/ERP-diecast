@@ -99,18 +99,23 @@ async function checkItems(
     lock,
   );
   const byId = new Map(items.map((i) => [i.id, i]));
-  for (const line of lines) {
+  lines.forEach((line, index) => {
+    const n = index + 1;
     const item = byId.get(line.itemId);
     if (!item) {
-      throw new NotFoundError(`Item ${line.itemId} not found`);
+      throw new NotFoundError(`Line ${n}: item not found or not a stock item`);
     }
     if (!item.isActive) {
-      throw new BadRequestError(`Item ${item.sku} is inactive`);
+      throw new BadRequestError(
+        `Line ${n}: item ${item.sku} is inactive`,
+        "STR_ITEM_INACTIVE",
+      );
     }
     const uom = item.uom.trim().toLowerCase();
     if (WHOLE_NUMBER_UNITS.includes(uom) && !Number.isInteger(line.qty)) {
       throw new BadRequestError(
-        `Qty must be a whole number for items in ${uom}`,
+        `Line ${n}: qty must be a whole number for items in ${uom}`,
+        "STR_QTY_WHOLE",
       );
     }
     if (item.averageCostPaise <= 0) {
@@ -119,7 +124,7 @@ async function checkItems(
         "STR_ZERO_COST",
       );
     }
-  }
+  });
   return byId;
 }
 
@@ -261,7 +266,12 @@ export const stockTransferService = {
       const destinationId =
         input.destinationLocationId ?? header.destinationLocationId;
       assertSameLocationRule(sourceId, destinationId);
-      await checkLocations(sourceId, destinationId, tx);
+      if (
+        input.sourceLocationId !== undefined ||
+        input.destinationLocationId !== undefined
+      ) {
+        await checkLocations(sourceId, destinationId, tx);
+      }
       if (input.lines) {
         await checkItems(input.lines, tx);
       }
@@ -387,12 +397,6 @@ export const stockTransferService = {
             throw new InternalServerError("Ledger row was not written");
           }
           const valuePaise = Math.abs(out.totalValueChangePaise);
-          await repo.setLinePostedCost(
-            line.lineId,
-            unitCostPaise,
-            valuePaise,
-            tx,
-          );
           posted.push({
             lineId: line.lineId,
             itemId: line.itemId,
@@ -401,6 +405,8 @@ export const stockTransferService = {
             valuePaise,
           });
         }
+
+        await repo.setLinesPostedCost(posted, tx);
 
         const now = new Date();
         await repo.updateHeader(
@@ -450,6 +456,12 @@ export const stockTransferService = {
               "STR_LOCATION_INACTIVE",
             ); // BR-STR-22
           }
+          if (location.type === "vendor_premise") {
+            throw new ConflictError(
+              "Use a job work challan",
+              "STR_VENDOR_LOCATION",
+            ); // BR-STR-22, A-54
+          }
         }
         const destination = locationRows.find(
           (l) => l.id === header.destinationLocationId,
@@ -482,12 +494,17 @@ export const stockTransferService = {
 
         const note = `Reversal of stock transfer ${header.transferNumber}`;
         for (const line of lines) {
+          if (line.postedUnitCostPaise === null) {
+            throw new InternalServerError(
+              `Posted cost missing on line ${line.lineId}`,
+            );
+          }
           const common = {
             itemId: line.itemId,
             referenceType: "stock_transfer_reversal" as const,
             referenceId: id,
             referenceLineId: line.lineId,
-            unitCostPaise: line.postedUnitCostPaise ?? 0,
+            unitCostPaise: line.postedUnitCostPaise,
             averageEffect: "none" as const,
             notes: note,
             createdBy: actorId,
