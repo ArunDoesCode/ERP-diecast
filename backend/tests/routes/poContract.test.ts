@@ -785,7 +785,52 @@ describe("CR-02 an ineligible approver gets 403, not a contract-cap 409", () => 
 });
 
 describe("A-46 batched last-rate endpoint", () => {
-  // TODO: GET /api/asset/items/last-rates is not in backend/.contracts/api-manifest.json yet.
-  // When present: one call returns each item's rate choice; contract data hidden without po.manage / contract.view.
-  test.skip("A-46 batched last-rates: one call returns each item's rate choice; contract hidden without po.manage / contract.view", () => {});
+  type Row = { itemId: number } & Json;
+  const batch = (who: Actor, supplierId: number, ids: number[]) =>
+    fx.call(
+      "GET",
+      `/api/asset/items/last-rates?supplierId=${supplierId}&itemIds=${ids.join(",")}`,
+      who,
+    );
+  const rowOf = (json: Json, itemId: number) =>
+    (json.data as Row[]).find((r) => r.itemId === itemId);
+
+  test("A-46 one call returns each item's choice: contract first with contractNumber and qtyLeft for po.manage", async () => {
+    const x = await ctx();
+    await ordered(x, 3000);
+    const y = await ctx();
+    const unknownId = 2147000000;
+    const r = await batch(await fx.bo(), x.supplierId, [x.itemId, unknownId]);
+    expect(r.status).toBe(200);
+    const row = rowOf(r.json, x.itemId);
+    expect(row?.source).toBe("contract");
+    expect(row?.ratePaise).toBe(24400);
+    expect(row?.contractNumber).toBe(x.contract.contractNumber);
+    expect(Number(row?.qtyLeft)).toBe(2000);
+    // BR-RFQ-50: an item with no contract for this supplier is not served from the contract
+    const other = await batch(await fx.bo(), x.supplierId, [y.itemId]);
+    expect(rowOf(other.json, y.itemId)?.source).not.toBe("contract");
+  });
+
+  test("BR-RFQ-56 inventory.view only: same call hides contract data", async () => {
+    const x = await ctx();
+    const who = await fx.actor("invOnly3", ["inventory.view"]);
+    const r = await batch(who, x.supplierId, [x.itemId]);
+    expect(r.status).toBe(200);
+    const row = rowOf(r.json, x.itemId);
+    expect(row?.source).not.toBe("contract");
+    expect(row?.contractNumber).toBeUndefined();
+    expect(row?.qtyLeft).toBeUndefined();
+    expect(JSON.stringify(r.json)).not.toContain(x.contract.contractNumber);
+    expect(JSON.stringify(r.json)).not.toContain("24400");
+  });
+
+  test("A-46 an unknown item is omitted from the result", async () => {
+    const x = await ctx();
+    const unknownId = 2147000001;
+    const r = await batch(await fx.bo(), x.supplierId, [x.itemId, unknownId]);
+    expect(r.status).toBe(200);
+    expect(rowOf(r.json, unknownId)).toBeUndefined();
+    expect(rowOf(r.json, x.itemId)).toBeDefined();
+  });
 });
