@@ -32,6 +32,10 @@ export type StatusDoc =
 	| "soSnapshot"
 	| "customer"
 	| "soRowTag"
+	| "reorderRun"
+	| "reorderItem"
+	| "reorderOutcome"
+	| "prSource"
 	| "challanDue"
 	| "approval"
 	| "supplier"
@@ -151,6 +155,26 @@ const MAP: Record<StatusDoc, Record<string, Entry>> = Object.assign(
 			buy_as_is: ["Buy as is", "neutral"],
 			inactive: ["Inactive item", "closed"],
 			loop: ["BOM loop", "danger"],
+		}),
+		reorderRun: table({
+			running: ["Running", "info"],
+			done: ["Done", "success"],
+			failed: ["Failed", "danger"],
+		}),
+		reorderItem: table({
+			will_be_ordered: ["Will be ordered", "warning"],
+			covered: ["Covered", "info"],
+			needs_reorder_qty: ["Needs a reorder qty", "warning"],
+			ok: ["OK", "success"],
+		}),
+		reorderOutcome: table({
+			raised: ["Raised", "success"],
+			needs_reorder_qty: ["Needs a reorder qty", "neutral"],
+			invalid_line: ["Invalid line", "neutral"],
+			deferred: ["Deferred to next run", "neutral"],
+		}),
+		prSource: table({
+			reorder: ["Reorder", "neutral"],
 		}),
 		challanDue: table({
 			ok: ["On time", "success"],

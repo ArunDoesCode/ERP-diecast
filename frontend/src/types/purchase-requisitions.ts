@@ -82,6 +82,8 @@ export interface PurchaseRequisition {
 	cancelledByName?: string | null;
 	cancelledAt?: string | null;
 	cancelReason?: string | null;
+	/** Reorder run number that raised this PR; null for hand-made PRs. Read-only. */
+	reorderRunId?: number | null;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -142,6 +144,8 @@ export type PurchaseRequisitionListParams = {
 	status?: PRStatus | PRStatus[];
 	type?: PRType;
 	q?: string;
+	raisedByReorder?: boolean;
+	reorderRunId?: number;
 };
 
 /** Local calendar date as YYYY-MM-DD (matches <input type="date">). */

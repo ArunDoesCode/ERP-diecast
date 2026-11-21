@@ -89,6 +89,10 @@ export interface AssetItem {
 	category: string;
 	uom: string;
 	reorderLevel: number | null;
+	/** Reorder fields (BR-RO-09); 0 = not set. */
+	reorderQty?: number;
+	minOrderQty?: number;
+	orderMultiple?: number;
 	currentStock: number | null;
 	averageCostPaise: number | null;
 	standardRatePaise: number;
@@ -377,6 +381,17 @@ export type AssetMovementCreatePayload = z.infer<
 
 const MAX_PAISE = MAX_MONEY_PAISE;
 
+// Reorder quantities: >= 0, <= 1 000 000 000, at most 3 decimals (whole for pcs/set is checked by the server).
+const reorderQtyField = z
+	.number({ message: "Enter a number" })
+	.min(0, "Must be 0 or more")
+	.max(1_000_000_000, "Too large")
+	.refine(
+		(value) => Math.abs(value * 1000 - Math.round(value * 1000)) < 1e-6,
+		"At most 3 decimals",
+	)
+	.optional();
+
 // Wire shape: POST /items is strict (no isActive / stock fields).
 export const assetItemCreateSchema = z.object({
 	sku: z.string().trim().min(1, "SKU is required"),
@@ -385,6 +400,9 @@ export const assetItemCreateSchema = z.object({
 	category: z.enum(assetItemCategoryValues),
 	uom: z.enum(assetItemUomValues),
 	reorderLevel: z.number().nonnegative().optional(),
+	reorderQty: reorderQtyField,
+	minOrderQty: reorderQtyField,
+	orderMultiple: reorderQtyField,
 	standardRatePaise: z.number().int().min(1).max(MAX_PAISE),
 });
 
@@ -408,6 +426,9 @@ export const assetItemFormSchema = z.object({
 	}),
 	uom: z.enum(assetItemUomValues, { message: "Select a unit" }),
 	reorderLevel: z.number().nonnegative().optional(),
+	reorderQty: reorderQtyField,
+	minOrderQty: reorderQtyField,
+	orderMultiple: reorderQtyField,
 	// Edit only: the create endpoint does not take an HSN code.
 	hsnCode: z
 		.string()

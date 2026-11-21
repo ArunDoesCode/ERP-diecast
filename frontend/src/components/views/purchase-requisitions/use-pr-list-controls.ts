@@ -11,6 +11,7 @@ export function usePRListControls() {
 	const [search, setSearch] = useState("");
 	const [statusFilter, setStatusFilter] = useState<"all" | PRStatus>("all");
 	const [typeFilter, setTypeFilter] = useState<"all" | PRType>("all");
+	const [raisedByReorder, setRaisedByReorder] = useState(false);
 	const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
 	const debouncedSearch = useDebouncedValue(search, 350);
@@ -18,7 +19,10 @@ export function usePRListControls() {
 	const status = statusFilter === "all" ? undefined : statusFilter;
 	const type = typeFilter === "all" ? undefined : typeFilter;
 	const filtersActive =
-		statusFilter !== "all" || typeFilter !== "all" || search.trim() !== "";
+		statusFilter !== "all" ||
+		typeFilter !== "all" ||
+		search.trim() !== "" ||
+		raisedByReorder;
 
 	function onSearchChange(value: string) {
 		setSearch(value);
@@ -32,6 +36,11 @@ export function usePRListControls() {
 
 	function onTypeFilterChange(value: "all" | PRType) {
 		setTypeFilter(value);
+		setPage(1);
+	}
+
+	function onRaisedByReorderChange(value: boolean) {
+		setRaisedByReorder(value);
 		setPage(1);
 	}
 
@@ -49,6 +58,7 @@ export function usePRListControls() {
 		setSearch("");
 		setStatusFilter("all");
 		setTypeFilter("all");
+		setRaisedByReorder(false);
 		setPage(1);
 	}
 
@@ -62,6 +72,8 @@ export function usePRListControls() {
 		type,
 		typeFilter,
 		sortDir,
+		raisedByReorder,
+		onRaisedByReorderChange,
 		filtersActive,
 		setPage,
 		onPageSizeChange,

@@ -89,6 +89,9 @@ function buildItemWirePayload(
 		category: values.category,
 		uom: values.uom,
 		reorderLevel: values.reorderLevel,
+		reorderQty: values.reorderQty,
+		minOrderQty: values.minOrderQty,
+		orderMultiple: values.orderMultiple,
 		standardRatePaise: Math.round(values.standardRate * 100),
 	};
 }
@@ -111,6 +114,10 @@ function toUpdatePayload(
 		next.reorderLevel !== (item.reorderLevel ?? undefined)
 	)
 		payload.reorderLevel = next.reorderLevel;
+	for (const key of ["reorderQty", "minOrderQty", "orderMultiple"] as const) {
+		const value = next[key];
+		if (value !== undefined && value !== (item[key] ?? 0)) payload[key] = value;
+	}
 	if (next.standardRatePaise !== item.standardRatePaise)
 		payload.standardRatePaise = next.standardRatePaise;
 	const nextHsn = values.hsnCode?.trim() ? values.hsnCode.trim() : null;
@@ -157,6 +164,9 @@ function ItemEditorForm({ mode, item, onDone }: ItemEditorFormProps) {
 						category: asCategory(item.category),
 						uom: asUom(item.uom),
 						reorderLevel: item.reorderLevel ?? undefined,
+						reorderQty: item.reorderQty ?? 0,
+						minOrderQty: item.minOrderQty ?? 0,
+						orderMultiple: item.orderMultiple ?? 0,
 						standardRate:
 							item.standardRatePaise > 0
 								? item.standardRatePaise / 100
@@ -171,6 +181,9 @@ function ItemEditorForm({ mode, item, onDone }: ItemEditorFormProps) {
 						category: undefined,
 						uom: undefined,
 						reorderLevel: undefined,
+						reorderQty: undefined,
+						minOrderQty: undefined,
+						orderMultiple: undefined,
 						standardRate: undefined,
 						isActive: true,
 					},
@@ -358,6 +371,108 @@ function ItemEditorForm({ mode, item, onDone }: ItemEditorFormProps) {
 										}}
 									/>
 								</FormControl>
+								<FormMessage />
+							</FormItem>
+						)}
+					/>
+
+					<FormField
+						control={form.control}
+						name="reorderQty"
+						render={({ field }) => (
+							<FormItem className="min-h-19 gap-1.5">
+								<FormLabel htmlFor="item-reorder-qty">
+									Reorder qty (optional)
+								</FormLabel>
+								<FormControl>
+									<Input
+										id="item-reorder-qty"
+										type="number"
+										step="0.001"
+										min="0"
+										className="text-right"
+										name={field.name}
+										value={field.value ?? ""}
+										onBlur={field.onBlur}
+										ref={field.ref}
+										onChange={(event) => {
+											const value = event.target.value;
+											field.onChange(
+												value === "" ? undefined : event.target.valueAsNumber,
+											);
+										}}
+									/>
+								</FormControl>
+								<p className="text-[13px] text-muted-foreground">
+									0 = never raised automatically
+								</p>
+								<FormMessage />
+							</FormItem>
+						)}
+					/>
+
+					<FormField
+						control={form.control}
+						name="minOrderQty"
+						render={({ field }) => (
+							<FormItem className="min-h-19 gap-1.5">
+								<FormLabel htmlFor="item-min-order-qty">
+									Min order qty (optional)
+								</FormLabel>
+								<FormControl>
+									<Input
+										id="item-min-order-qty"
+										type="number"
+										step="0.001"
+										min="0"
+										className="text-right"
+										name={field.name}
+										value={field.value ?? ""}
+										onBlur={field.onBlur}
+										ref={field.ref}
+										onChange={(event) => {
+											const value = event.target.value;
+											field.onChange(
+												value === "" ? undefined : event.target.valueAsNumber,
+											);
+										}}
+									/>
+								</FormControl>
+								<FormMessage />
+							</FormItem>
+						)}
+					/>
+
+					<FormField
+						control={form.control}
+						name="orderMultiple"
+						render={({ field }) => (
+							<FormItem className="min-h-19 gap-1.5">
+								<FormLabel htmlFor="item-order-multiple">
+									Order multiple (optional)
+								</FormLabel>
+								<FormControl>
+									<Input
+										id="item-order-multiple"
+										type="number"
+										step="0.001"
+										min="0"
+										className="text-right"
+										name={field.name}
+										value={field.value ?? ""}
+										onBlur={field.onBlur}
+										ref={field.ref}
+										onChange={(event) => {
+											const value = event.target.value;
+											field.onChange(
+												value === "" ? undefined : event.target.valueAsNumber,
+											);
+										}}
+									/>
+								</FormControl>
+								<p className="text-[13px] text-muted-foreground">
+									0 = any amount
+								</p>
 								<FormMessage />
 							</FormItem>
 						)}

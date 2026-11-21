@@ -22,6 +22,8 @@ export type SearchableSelectOption = {
 };
 
 type SearchableSelectProps = {
+	/** Id of the trigger button, so a `<Label htmlFor>` can point at it. */
+	id?: string;
 	value?: string;
 	options: SearchableSelectOption[];
 	onValueChange: (value: string) => void;
@@ -39,6 +41,7 @@ type SearchableSelectProps = {
 };
 
 export function SearchableSelect({
+	id,
 	value,
 	options,
 	onValueChange,
@@ -78,6 +81,7 @@ export function SearchableSelect({
 		<Popover open={open} onOpenChange={setOpen}>
 			<PopoverTrigger asChild>
 				<Button
+					id={id}
 					type="button"
 					variant="outline"
 					className={cn("w-full justify-between font-normal", className)}

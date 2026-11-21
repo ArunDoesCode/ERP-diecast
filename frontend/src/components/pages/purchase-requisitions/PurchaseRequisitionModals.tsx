@@ -3,6 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { IconTrash } from "@tabler/icons-react";
 import { useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import {
 	type BaseSyntheticEvent,
 	useEffect,
@@ -61,6 +62,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { TableCell } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { useCan } from "@/hooks/use-can";
 import {
 	useActOnApprovalRequestMutation,
 	useCurrentApprovalByDocQuery,
@@ -456,6 +458,7 @@ export function EditPurchaseRequisitionModal({
 	canLinkMachine: boolean;
 }) {
 	const queryClient = useQueryClient();
+	const canViewRun = useCan("inventory.view");
 	const [activeStep, setActiveStep] = useState<FormStep>("details");
 	const [submitAction, setSubmitAction] = useState<"save" | "submit">("save");
 	const [itemLookupSearch, setItemLookupSearch] = useState("");
@@ -688,6 +691,23 @@ export function EditPurchaseRequisitionModal({
 									<div className="flex items-center justify-between">
 										<div className="text-sm text-muted-foreground">
 											<p>PR: {pr.prNumber}</p>
+											{pr.reorderRunId ? (
+												<p>
+													Raised by:{" "}
+													{canViewRun ? (
+														<Link
+															href={`/inventory/reorder/runs/${pr.reorderRunId}`}
+															className="font-mono text-brand-accent hover:underline"
+														>
+															Run {pr.reorderRunId}
+														</Link>
+													) : (
+														<span className="font-mono">
+															Run {pr.reorderRunId}
+														</span>
+													)}
+												</p>
+											) : null}
 											<p>Estimate: {formatMoney(pr.estimatedAmountPaise)}</p>
 											{detail.items.some((item) => item.noCostHistory) ? (
 												<p className="text-sm">
@@ -702,7 +722,12 @@ export function EditPurchaseRequisitionModal({
 												</p>
 											) : null}
 										</div>
-										<StatusBadge doc="pr" status={pr.status} />
+										<div className="flex items-center gap-2">
+											{pr.reorderRunId ? (
+												<StatusBadge doc="prSource" status="reorder" />
+											) : null}
+											<StatusBadge doc="pr" status={pr.status} />
+										</div>
 									</div>
 
 									{pr.status === "cancelled" ? (

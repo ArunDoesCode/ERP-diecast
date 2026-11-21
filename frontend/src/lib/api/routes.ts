@@ -11,6 +11,7 @@ const API_Header = {
 	bom: "/bom",
 	customers: "/customers",
 	saleOrders: "/sale-orders",
+	reorder: "/reorder",
 	company: "/company",
 };
 export const API_ROUTES = {
@@ -181,6 +182,14 @@ export const API_ROUTES = {
 		create: API_Header.customers,
 		detail: (customerId: number) => `${API_Header.customers}/${customerId}`,
 		update: (customerId: number) => `${API_Header.customers}/${customerId}`,
+	},
+	reorder: {
+		items: `${API_Header.reorder}/items`,
+		runs: `${API_Header.reorder}/runs`,
+		runDetail: (runId: number) => `${API_Header.reorder}/runs/${runId}`,
+		checkNow: `${API_Header.reorder}/check-now`,
+		settings: `${API_Header.reorder}/settings`,
+		ownerCandidates: `${API_Header.reorder}/owner-candidates`,
 	},
 	saleOrders: {
 		list: API_Header.saleOrders,

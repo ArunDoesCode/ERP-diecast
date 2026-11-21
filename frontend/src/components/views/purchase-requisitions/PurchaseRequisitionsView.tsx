@@ -3,6 +3,7 @@
 import { IconFileOff, IconPlus, IconSearch } from "@tabler/icons-react";
 import { useTable } from "@tanstack/react-table";
 import dynamic from "next/dynamic";
+import { parseAsInteger, useQueryState } from "nuqs";
 import { useMemo, useState } from "react";
 import { DataTable } from "@/components/common/DataTable";
 import {
@@ -54,6 +55,7 @@ export function PurchaseRequisitionsView() {
 	const {
 		filtersActive,
 		onPageSizeChange,
+		onRaisedByReorderChange,
 		onSearchChange,
 		onSortDirectionChange,
 		onStatusFilterChange,
@@ -61,6 +63,7 @@ export function PurchaseRequisitionsView() {
 		page,
 		pageSize,
 		q,
+		raisedByReorder,
 		resetFilters,
 		search,
 		setPage,
@@ -72,8 +75,12 @@ export function PurchaseRequisitionsView() {
 	} = usePRListControls();
 
 	const [createOpen, setCreateOpen] = useState(false);
-	const [selectedPrId, setSelectedPrId] = useState<number | null>(null);
+	// ?prId=<id> opens that PR (links from reorder runs); closing the modal clears it.
+	const [linkedPrId, setLinkedPrId] = useQueryState("prId", parseAsInteger);
+	const [pickedPrId, setSelectedPrId] = useState<number | null>(null);
 	const [editOpen, setEditOpen] = useState(false);
+	const selectedPrId = pickedPrId ?? linkedPrId;
+	const modalOpen = editOpen || linkedPrId !== null;
 	const canLinkMachine = useCan("pr.link_machine");
 
 	const requisitionsQuery = usePurchaseRequisitionsQuery({
@@ -82,6 +89,7 @@ export function PurchaseRequisitionsView() {
 		q,
 		status,
 		type,
+		raisedByReorder: raisedByReorder ? true : undefined,
 		sortBy: "createdAt",
 		sortDir,
 	});
@@ -192,8 +200,12 @@ export function PurchaseRequisitionsView() {
 			/>
 
 			<FilterBar
-				value="all"
-				onChange={() => {}}
+				quick={[
+					{ key: "all", label: "All" },
+					{ key: "reorder", label: "Raised by reorder" },
+				]}
+				value={raisedByReorder ? "reorder" : "all"}
+				onChange={(key) => onRaisedByReorderChange(key === "reorder")}
 				onReset={resetFilters}
 				filtersActive={filtersActive}
 			>
@@ -296,14 +308,15 @@ export function PurchaseRequisitionsView() {
 				/>
 			) : null}
 
-			{editOpen && selectedPrId != null ? (
+			{modalOpen && selectedPrId != null ? (
 				<EditPurchaseRequisitionModal
 					prId={selectedPrId}
-					open={editOpen}
+					open={modalOpen}
 					onOpenChange={(nextOpen) => {
 						setEditOpen(nextOpen);
 						if (!nextOpen) {
 							setSelectedPrId(null);
+							void setLinkedPrId(null);
 						}
 					}}
 					canLinkMachine={canLinkMachine}
