@@ -343,8 +343,8 @@ export function PurchaseRequisitionForm({
 											return (
 												<FormItem className="min-h-19 content-start gap-1.5">
 													<FormLabel>Quantity</FormLabel>
-													<FormControl>
-														<div className="relative">
+													<div className="relative">
+														<FormControl>
 															<Input
 																type="number"
 																step="0.001"
@@ -367,16 +367,16 @@ export function PurchaseRequisitionForm({
 																	);
 																}}
 															/>
-															{uom ? (
-																<span
-																	aria-hidden="true"
-																	className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm text-muted-foreground"
-																>
-																	{uom}
-																</span>
-															) : null}
-														</div>
-													</FormControl>
+														</FormControl>
+														{uom ? (
+															<span
+																aria-hidden="true"
+																className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm text-muted-foreground"
+															>
+																{uom}
+															</span>
+														) : null}
+													</div>
 													<FormMessage />
 												</FormItem>
 											);

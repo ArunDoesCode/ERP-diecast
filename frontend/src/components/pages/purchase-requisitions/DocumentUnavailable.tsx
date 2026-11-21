@@ -40,7 +40,7 @@ export function DocumentUnavailable({
 		);
 	}
 	if (statuses.includes(404)) {
-		return <EmptyState title="This document does not exist" action={back} />;
+		return <EmptyState title="Document not found" action={back} />;
 	}
 	return (
 		<ErrorState
