@@ -255,6 +255,21 @@ export const PERMISSIONS = {
     "Manage sale orders",
     "Create, edit, confirm, hold, resume, close and cancel sale orders",
   ),
+  "dispatch.view": p(
+    "dispatch",
+    "View dispatch",
+    "See delivery notes, the pending-dispatch list and the note print (prices need so.view)",
+  ),
+  "dispatch.manage": p(
+    "dispatch",
+    "Manage dispatch",
+    "Create and edit draft delivery notes, post them, cancel a draft, update transport after posting",
+  ),
+  "dispatch.cancel": p(
+    "dispatch",
+    "Cancel posted delivery notes",
+    "Cancel a posted delivery note (puts the stock back)",
+  ),
   "so.explode": p(
     "sale-order",
     "Explode sale orders",
@@ -392,6 +407,20 @@ export const SCREENS = {
   ),
   "sale-orders": s("/sale-orders", "so.view", "Sale Orders", 120, "Sales"),
   customers: s("/customers", "so.view", "Customers", 125, "Sales"),
+  "delivery-notes-pending": s(
+    "/delivery-notes/pending",
+    "dispatch.view",
+    "Pending dispatch",
+    130,
+    "Dispatch",
+  ),
+  "delivery-notes": s(
+    "/delivery-notes",
+    "dispatch.view",
+    "Delivery notes",
+    135,
+    "Dispatch",
+  ),
 } as const satisfies Record<string, ScreenDef>;
 
 export type ScreenKey = keyof typeof SCREENS;
@@ -454,6 +483,9 @@ export const SEED_GRANTS: Record<RoleSeedName, PermissionKey[]> = {
     "so.manage",
     "so.explode",
     "customer.manage",
+    "dispatch.view",
+    "dispatch.manage",
+    "dispatch.cancel",
     "reorder.manage",
     "company.manage",
   ],
@@ -498,6 +530,8 @@ export const SEED_GRANTS: Record<RoleSeedName, PermissionKey[]> = {
     "so.manage",
     "so.explode",
     "customer.manage",
+    "dispatch.view",
+    "dispatch.manage",
     "reorder.manage",
   ],
   floor_supervisor: [
@@ -512,6 +546,8 @@ export const SEED_GRANTS: Record<RoleSeedName, PermissionKey[]> = {
     "sco.view",
     "sco.issue_receive",
     "bom.view",
+    "dispatch.view",
+    "dispatch.manage",
   ],
   qa_inspector: [
     "grn.view",

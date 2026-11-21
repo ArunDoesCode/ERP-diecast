@@ -51,7 +51,7 @@ register({
   path: `${COMPANY_BASE_PATH}${COMPANY_ROUTES.settings}`,
   tags: ["company"],
   summary:
-    "Create or replace the single company-settings row (owner only, BR-SCO-09). All four fields required.",
+    "Create or replace the single company-settings row (owner only, BR-SCO-09). All four fields required; optional ewayIntraLimitPaise (paise, 1..10,000,000,000; omitted = unchanged, BR-DSP-42).",
   auth: { type: "permission", key: "company.manage" },
   request: { body: companySettingsUpsertSchema },
   responses: { "200": successResponse(companySettingsSchema) },

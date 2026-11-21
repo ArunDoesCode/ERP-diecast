@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  bigint,
   check,
   index,
   integer,
@@ -24,6 +25,10 @@ export const companySettings = pgTable(
     // supplier-invoice BR-SINV-32: match tolerances in basis points (50 = 0.5%), 0-10%.
     priceToleranceBp: integer("price_tolerance_bp").notNull().default(0),
     weightToleranceBp: integer("weight_tolerance_bp").notNull().default(50),
+    // dispatch BR-DSP-23: same-state e-way bill limit in paise (default Rs 50,000)
+    ewayIntraLimitPaise: bigint("eway_intra_limit_paise", { mode: "number" })
+      .notNull()
+      .default(5000000),
     // no-index: audit one row
     updatedBy: integer("updated_by").references(() => employees.id),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -33,6 +38,10 @@ export const companySettings = pgTable(
     priceTolRange: check(
       "company_settings_price_tol_range",
       sql`${t.priceToleranceBp} between 0 and 1000`,
+    ),
+    ewayLimitRange: check(
+      "company_settings_eway_limit_range",
+      sql`${t.ewayIntraLimitPaise} between 1 and 10000000000`,
     ),
     weightTolRange: check(
       "company_settings_weight_tol_range",
@@ -47,7 +56,7 @@ export const companySettingsHistory = pgTable(
   "company_settings_history",
   {
     id: serial("id").primaryKey(),
-    // name | address | gstin | stateCode | priceToleranceBp | weightToleranceBp
+    // name | address | gstin | stateCode | priceToleranceBp | weightToleranceBp | ewayIntraLimitPaise
     field: text("field").notNull(),
     // null on the first save (nothing before it)
     oldValue: text("old_value"),

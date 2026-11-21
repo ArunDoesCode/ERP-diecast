@@ -154,6 +154,8 @@ export const inventoryRefTypeEnum = pgEnum("inventory_ref_type", [
   "sco_loss", // Loss at a subcontractor (BR-SCO-19)
   "stock_transfer", // Move between two of our locations (BR-STR-11)
   "stock_transfer_reversal", // Counter rows of a reversed transfer (BR-STR-20)
+  "delivery_note", // Stock out of a posted delivery note (BR-DSP-12)
+  "delivery_note_cancel", // Counter row of a cancelled posted delivery note (BR-DSP-31)
 ]);
 
 export const locationTypeEnum = pgEnum("location_type", [

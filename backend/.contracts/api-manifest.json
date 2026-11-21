@@ -969,7 +969,7 @@
             "locationId": "unrepresentable.required",
             "batchNumber": "unknown.required",
             "transactionType": "enum:in,out,adjustment.required",
-            "referenceType": "enum:grn,grn_bypass,pro,pro_cancel,sco_issue,sco_receipt,job_order_issue,scrap_dispatch,stock_adjustment,grn_correction,opening_stock,sco_loss,stock_transfer,stock_transfer_reversal.required",
+            "referenceType": "enum:grn,grn_bypass,pro,pro_cancel,sco_issue,sco_receipt,job_order_issue,scrap_dispatch,stock_adjustment,grn_correction,opening_stock,sco_loss,stock_transfer,stock_transfer_reversal,delivery_note,delivery_note_cancel.required",
             "referenceId": "unrepresentable.required",
             "referenceLineId": "unrepresentable.nullable.required",
             "quantityChange": "unrepresentable.required",
@@ -1926,6 +1926,7 @@
             "stateCode": "string.required",
             "priceToleranceBp": "unrepresentable.required",
             "weightToleranceBp": "unrepresentable.required",
+            "ewayIntraLimitPaise": "unrepresentable.required",
             "updatedBy": "unrepresentable.nullable.required",
             "updatedAt": "unrepresentable.required"
           }
@@ -1939,7 +1940,7 @@
       "tags": [
         "company"
       ],
-      "summary": "Create or replace the single company-settings row (owner only, BR-SCO-09). All four fields required.",
+      "summary": "Create or replace the single company-settings row (owner only, BR-SCO-09). All four fields required; optional ewayIntraLimitPaise (paise, 1..10,000,000,000; omitted = unchanged, BR-DSP-42).",
       "auth": {
         "type": "permission",
         "key": "company.manage"
@@ -1949,7 +1950,8 @@
           "name": "string.nonempty.required",
           "address": "string.nonempty.required",
           "gstin": "string.required",
-          "stateCode": "string.required"
+          "stateCode": "string.required",
+          "ewayIntraLimitPaise": "integer.nonnegative.optional"
         }
       },
       "responses": {
@@ -1963,6 +1965,7 @@
             "stateCode": "string.required",
             "priceToleranceBp": "unrepresentable.required",
             "weightToleranceBp": "unrepresentable.required",
+            "ewayIntraLimitPaise": "unrepresentable.required",
             "updatedBy": "unrepresentable.nullable.required",
             "updatedAt": "unrepresentable.required"
           }
@@ -2208,6 +2211,872 @@
             "isActive": "boolean.required",
             "createdAt": "string.required",
             "lastUpdatedAt": "string.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "GET /api/dispatch/pending",
+      "method": "GET",
+      "path": "/api/dispatch/pending",
+      "tags": [
+        "dispatch"
+      ],
+      "summary": "Pending-dispatch list: confirmed SO lines with open qty > 0, paginated (BR-DSP-39). Filter customerId/itemId/soId/locationId. meta adds customers, items (filter options) and, with soId, so (header for the note form). No prices.",
+      "auth": {
+        "type": "permission",
+        "key": "dispatch.view"
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "sortBy": "enum:soDate,customerName,itemSku,openQty.optional",
+          "sortDir": "enum:asc,desc.optional",
+          "customerId": "integer.positive.optional",
+          "itemId": "integer.positive.optional",
+          "soId": "integer.positive.optional",
+          "locationId": "integer.positive.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required",
+            "customers": "array<object>.required",
+            "items": "array<object>.required",
+            "so": {
+              "soNumber": "string.required",
+              "customerPoNumber": "unknown.required",
+              "customer": {
+                "id": "integer.required",
+                "name": "string.required",
+                "address": "string.required",
+                "stateCode": "string.required",
+                "gstin": "unknown.required"
+              },
+              "shipTo": {
+                "address": "string.required",
+                "stateCode": "string.required"
+              }
+            }
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "soDate",
+          "customerName",
+          "itemSku",
+          "openQty"
+        ],
+        "searchable": false
+      }
+    },
+    {
+      "id": "GET /api/dispatch/settings",
+      "method": "GET",
+      "path": "/api/dispatch/settings",
+      "tags": [
+        "dispatch"
+      ],
+      "summary": "E-way limit (paise) and plant state code for the live e-way hint (BR-DSP-23).",
+      "auth": {
+        "type": "permission",
+        "key": "dispatch.view"
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "ewayIntraLimitPaise": "integer.required",
+            "plantStateCode": "unknown.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "GET /api/dispatch/notes",
+      "method": "GET",
+      "path": "/api/dispatch/notes",
+      "tags": [
+        "dispatch"
+      ],
+      "summary": "Delivery note register, paginated (BR-DSP-40). Filter dateFrom/dateTo/customerId/soId/status/ewayMissing. valuePaise only with so.view; sortBy=valuePaise without so.view is 400. meta adds customers.",
+      "auth": {
+        "type": "permission",
+        "key": "dispatch.view"
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "sortBy": "enum:noteDate,dnNumber,customerName,status,valuePaise.optional",
+          "sortDir": "enum:asc,desc.optional",
+          "dateFrom": "string.optional",
+          "dateTo": "string.optional",
+          "customerId": "integer.positive.optional",
+          "soId": "integer.positive.optional",
+          "status": "enum:draft,posted,cancelled.optional",
+          "ewayMissing": "unrepresentable.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required",
+            "customers": "array<object>.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "noteDate",
+          "dnNumber",
+          "customerName",
+          "status",
+          "valuePaise"
+        ],
+        "searchable": false
+      }
+    },
+    {
+      "id": "GET /api/dispatch/notes/:id",
+      "method": "GET",
+      "path": "/api/dispatch/notes/:id",
+      "tags": [
+        "dispatch"
+      ],
+      "summary": "Delivery note detail, also the print data (BR-DSP-38, 41). Price, tax and value fields only with so.view; ewayNeeded and ewayLimitPaise always.",
+      "auth": {
+        "type": "permission",
+        "key": "dispatch.view"
+      },
+      "request": {
+        "params": {
+          "id": "integer.positive.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "soStatus": "string.required",
+            "activity": "array<object>.required",
+            "id": "integer.required",
+            "dnNumber": "unknown.required",
+            "status": "enum:draft,posted,cancelled.required",
+            "soId": "integer.required",
+            "soNumber": "string.required",
+            "customerPoNumber": "unknown.required",
+            "customer": {
+              "id": "integer.required",
+              "name": "string.required",
+              "address": "string.required",
+              "gstin": "unknown.required",
+              "stateCode": "string.required"
+            },
+            "shipTo": {
+              "address": "string.required",
+              "stateCode": "string.required"
+            },
+            "noteDate": "string.required",
+            "sourceLocation": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "remarks": "unknown.required",
+            "lines": "array<object>.required",
+            "packages": "array<object>.required",
+            "transport": {
+              "mode": "enum:road,rail,air,ship.nullable.required",
+              "vehicleNo": "unknown.required",
+              "transporterId": "unknown.required",
+              "transporterName": "unknown.required",
+              "transportDocNo": "unknown.required",
+              "transportDocDate": "unknown.required",
+              "distanceKm": "integer.nullable.required",
+              "ewayBillNo": "unknown.required",
+              "ewayBillDate": "unknown.required"
+            },
+            "ewayValidUntil": "unknown.required",
+            "ewayExpired": "boolean.required",
+            "ewayNeeded": "boolean.required",
+            "ewayLimitPaise": "integer.required",
+            "company": {
+              "name": "unknown.required",
+              "address": "unknown.required",
+              "gstin": "unknown.required",
+              "stateCode": "unknown.required"
+            },
+            "taxablePaise": "integer.optional",
+            "gstPaise": "integer.optional",
+            "valuePaise": "integer.optional",
+            "postedBy": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "postedAt": "unknown.required",
+            "cancelReason": "unknown.required",
+            "cancelledBy": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "cancelledAt": "unknown.required",
+            "createdBy": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "createdAt": "string.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/dispatch/notes",
+      "method": "POST",
+      "path": "/api/dispatch/notes",
+      "tags": [
+        "dispatch"
+      ],
+      "summary": "Create a draft delivery note from a confirmed SO (BR-DSP-01..09). Strict body: customer, price or status keys are 400.",
+      "auth": {
+        "type": "permission",
+        "key": "dispatch.manage"
+      },
+      "request": {
+        "body": {
+          "soId": "integer.positive.required",
+          "noteDate": "string.optional",
+          "sourceLocationId": "integer.positive.optional",
+          "remarks": "string.optional",
+          "lines": "array<object>.required",
+          "packages": "array<object>.optional",
+          "transport": {
+            "mode": "enum:road,rail,air,ship.nullable.optional",
+            "vehicleNo": "string.nullable.optional",
+            "transporterId": "string.nullable.optional",
+            "transporterName": "string.nonempty.nullable.optional",
+            "transportDocNo": "string.nonempty.nullable.optional",
+            "transportDocDate": "string.nullable.optional",
+            "ewayBillNo": "string.nullable.optional",
+            "ewayBillDate": "string.nullable.optional",
+            "distanceKm": "integer.nonnegative.nullable.optional"
+          }
+        }
+      },
+      "responses": {
+        "201": {
+          "success": "boolean.required",
+          "data": {
+            "soStatus": "string.required",
+            "activity": "array<object>.required",
+            "id": "integer.required",
+            "dnNumber": "unknown.required",
+            "status": "enum:draft,posted,cancelled.required",
+            "soId": "integer.required",
+            "soNumber": "string.required",
+            "customerPoNumber": "unknown.required",
+            "customer": {
+              "id": "integer.required",
+              "name": "string.required",
+              "address": "string.required",
+              "gstin": "unknown.required",
+              "stateCode": "string.required"
+            },
+            "shipTo": {
+              "address": "string.required",
+              "stateCode": "string.required"
+            },
+            "noteDate": "string.required",
+            "sourceLocation": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "remarks": "unknown.required",
+            "lines": "array<object>.required",
+            "packages": "array<object>.required",
+            "transport": {
+              "mode": "enum:road,rail,air,ship.nullable.required",
+              "vehicleNo": "unknown.required",
+              "transporterId": "unknown.required",
+              "transporterName": "unknown.required",
+              "transportDocNo": "unknown.required",
+              "transportDocDate": "unknown.required",
+              "distanceKm": "integer.nullable.required",
+              "ewayBillNo": "unknown.required",
+              "ewayBillDate": "unknown.required"
+            },
+            "ewayValidUntil": "unknown.required",
+            "ewayExpired": "boolean.required",
+            "ewayNeeded": "boolean.required",
+            "ewayLimitPaise": "integer.required",
+            "company": {
+              "name": "unknown.required",
+              "address": "unknown.required",
+              "gstin": "unknown.required",
+              "stateCode": "unknown.required"
+            },
+            "taxablePaise": "integer.optional",
+            "gstPaise": "integer.optional",
+            "valuePaise": "integer.optional",
+            "postedBy": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "postedAt": "unknown.required",
+            "cancelReason": "unknown.required",
+            "cancelledBy": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "cancelledAt": "unknown.required",
+            "createdBy": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "createdAt": "string.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "PATCH /api/dispatch/notes/:id",
+      "method": "PATCH",
+      "path": "/api/dispatch/notes/:id",
+      "tags": [
+        "dispatch"
+      ],
+      "summary": "Edit a draft: header, lines, packages, transport (BR-DSP-22). lines and packages, if sent, replace the whole list.",
+      "auth": {
+        "type": "permission",
+        "key": "dispatch.manage"
+      },
+      "request": {
+        "body": {
+          "noteDate": "string.optional",
+          "sourceLocationId": "integer.positive.optional",
+          "remarks": "string.nullable.optional",
+          "lines": "array<object>.optional",
+          "packages": "array<object>.optional",
+          "transport": {
+            "mode": "enum:road,rail,air,ship.nullable.optional",
+            "vehicleNo": "string.nullable.optional",
+            "transporterId": "string.nullable.optional",
+            "transporterName": "string.nonempty.nullable.optional",
+            "transportDocNo": "string.nonempty.nullable.optional",
+            "transportDocDate": "string.nullable.optional",
+            "ewayBillNo": "string.nullable.optional",
+            "ewayBillDate": "string.nullable.optional",
+            "distanceKm": "integer.nonnegative.nullable.optional"
+          }
+        },
+        "params": {
+          "id": "integer.positive.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "soStatus": "string.required",
+            "activity": "array<object>.required",
+            "id": "integer.required",
+            "dnNumber": "unknown.required",
+            "status": "enum:draft,posted,cancelled.required",
+            "soId": "integer.required",
+            "soNumber": "string.required",
+            "customerPoNumber": "unknown.required",
+            "customer": {
+              "id": "integer.required",
+              "name": "string.required",
+              "address": "string.required",
+              "gstin": "unknown.required",
+              "stateCode": "string.required"
+            },
+            "shipTo": {
+              "address": "string.required",
+              "stateCode": "string.required"
+            },
+            "noteDate": "string.required",
+            "sourceLocation": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "remarks": "unknown.required",
+            "lines": "array<object>.required",
+            "packages": "array<object>.required",
+            "transport": {
+              "mode": "enum:road,rail,air,ship.nullable.required",
+              "vehicleNo": "unknown.required",
+              "transporterId": "unknown.required",
+              "transporterName": "unknown.required",
+              "transportDocNo": "unknown.required",
+              "transportDocDate": "unknown.required",
+              "distanceKm": "integer.nullable.required",
+              "ewayBillNo": "unknown.required",
+              "ewayBillDate": "unknown.required"
+            },
+            "ewayValidUntil": "unknown.required",
+            "ewayExpired": "boolean.required",
+            "ewayNeeded": "boolean.required",
+            "ewayLimitPaise": "integer.required",
+            "company": {
+              "name": "unknown.required",
+              "address": "unknown.required",
+              "gstin": "unknown.required",
+              "stateCode": "unknown.required"
+            },
+            "taxablePaise": "integer.optional",
+            "gstPaise": "integer.optional",
+            "valuePaise": "integer.optional",
+            "postedBy": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "postedAt": "unknown.required",
+            "cancelReason": "unknown.required",
+            "cancelledBy": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "cancelledAt": "unknown.required",
+            "createdBy": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "createdAt": "string.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/dispatch/notes/:id/post",
+      "method": "POST",
+      "path": "/api/dispatch/notes/:id/post",
+      "tags": [
+        "dispatch"
+      ],
+      "summary": "Post a draft: stock out through the ledger, SO delivered qty, DN number (BR-DSP-10..19). Body must be {}.",
+      "auth": {
+        "type": "permission",
+        "key": "dispatch.manage"
+      },
+      "request": {
+        "body": {},
+        "params": {
+          "id": "integer.positive.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "soStatus": "string.required",
+            "activity": "array<object>.required",
+            "id": "integer.required",
+            "dnNumber": "unknown.required",
+            "status": "enum:draft,posted,cancelled.required",
+            "soId": "integer.required",
+            "soNumber": "string.required",
+            "customerPoNumber": "unknown.required",
+            "customer": {
+              "id": "integer.required",
+              "name": "string.required",
+              "address": "string.required",
+              "gstin": "unknown.required",
+              "stateCode": "string.required"
+            },
+            "shipTo": {
+              "address": "string.required",
+              "stateCode": "string.required"
+            },
+            "noteDate": "string.required",
+            "sourceLocation": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "remarks": "unknown.required",
+            "lines": "array<object>.required",
+            "packages": "array<object>.required",
+            "transport": {
+              "mode": "enum:road,rail,air,ship.nullable.required",
+              "vehicleNo": "unknown.required",
+              "transporterId": "unknown.required",
+              "transporterName": "unknown.required",
+              "transportDocNo": "unknown.required",
+              "transportDocDate": "unknown.required",
+              "distanceKm": "integer.nullable.required",
+              "ewayBillNo": "unknown.required",
+              "ewayBillDate": "unknown.required"
+            },
+            "ewayValidUntil": "unknown.required",
+            "ewayExpired": "boolean.required",
+            "ewayNeeded": "boolean.required",
+            "ewayLimitPaise": "integer.required",
+            "company": {
+              "name": "unknown.required",
+              "address": "unknown.required",
+              "gstin": "unknown.required",
+              "stateCode": "unknown.required"
+            },
+            "taxablePaise": "integer.optional",
+            "gstPaise": "integer.optional",
+            "valuePaise": "integer.optional",
+            "postedBy": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "postedAt": "unknown.required",
+            "cancelReason": "unknown.required",
+            "cancelledBy": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "cancelledAt": "unknown.required",
+            "createdBy": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "createdAt": "string.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/dispatch/notes/:id/cancel-draft",
+      "method": "POST",
+      "path": "/api/dispatch/notes/:id/cancel-draft",
+      "tags": [
+        "dispatch"
+      ],
+      "summary": "Cancel a draft with a reason of 3..500 characters (BR-DSP-29). Nothing posts.",
+      "auth": {
+        "type": "permission",
+        "key": "dispatch.manage"
+      },
+      "request": {
+        "body": {
+          "reason": "string.nonempty.required"
+        },
+        "params": {
+          "id": "integer.positive.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "soStatus": "string.required",
+            "activity": "array<object>.required",
+            "id": "integer.required",
+            "dnNumber": "unknown.required",
+            "status": "enum:draft,posted,cancelled.required",
+            "soId": "integer.required",
+            "soNumber": "string.required",
+            "customerPoNumber": "unknown.required",
+            "customer": {
+              "id": "integer.required",
+              "name": "string.required",
+              "address": "string.required",
+              "gstin": "unknown.required",
+              "stateCode": "string.required"
+            },
+            "shipTo": {
+              "address": "string.required",
+              "stateCode": "string.required"
+            },
+            "noteDate": "string.required",
+            "sourceLocation": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "remarks": "unknown.required",
+            "lines": "array<object>.required",
+            "packages": "array<object>.required",
+            "transport": {
+              "mode": "enum:road,rail,air,ship.nullable.required",
+              "vehicleNo": "unknown.required",
+              "transporterId": "unknown.required",
+              "transporterName": "unknown.required",
+              "transportDocNo": "unknown.required",
+              "transportDocDate": "unknown.required",
+              "distanceKm": "integer.nullable.required",
+              "ewayBillNo": "unknown.required",
+              "ewayBillDate": "unknown.required"
+            },
+            "ewayValidUntil": "unknown.required",
+            "ewayExpired": "boolean.required",
+            "ewayNeeded": "boolean.required",
+            "ewayLimitPaise": "integer.required",
+            "company": {
+              "name": "unknown.required",
+              "address": "unknown.required",
+              "gstin": "unknown.required",
+              "stateCode": "unknown.required"
+            },
+            "taxablePaise": "integer.optional",
+            "gstPaise": "integer.optional",
+            "valuePaise": "integer.optional",
+            "postedBy": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "postedAt": "unknown.required",
+            "cancelReason": "unknown.required",
+            "cancelledBy": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "cancelledAt": "unknown.required",
+            "createdBy": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "createdAt": "string.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/dispatch/notes/:id/cancel",
+      "method": "POST",
+      "path": "/api/dispatch/notes/:id/cancel",
+      "tags": [
+        "dispatch"
+      ],
+      "summary": "Cancel a posted note with a reason of 3..500 characters: stock comes back at the out cost, SO delivered qty reopens (BR-DSP-30..33).",
+      "auth": {
+        "type": "permission",
+        "key": "dispatch.cancel"
+      },
+      "request": {
+        "body": {
+          "reason": "string.nonempty.required"
+        },
+        "params": {
+          "id": "integer.positive.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "soStatus": "string.required",
+            "activity": "array<object>.required",
+            "id": "integer.required",
+            "dnNumber": "unknown.required",
+            "status": "enum:draft,posted,cancelled.required",
+            "soId": "integer.required",
+            "soNumber": "string.required",
+            "customerPoNumber": "unknown.required",
+            "customer": {
+              "id": "integer.required",
+              "name": "string.required",
+              "address": "string.required",
+              "gstin": "unknown.required",
+              "stateCode": "string.required"
+            },
+            "shipTo": {
+              "address": "string.required",
+              "stateCode": "string.required"
+            },
+            "noteDate": "string.required",
+            "sourceLocation": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "remarks": "unknown.required",
+            "lines": "array<object>.required",
+            "packages": "array<object>.required",
+            "transport": {
+              "mode": "enum:road,rail,air,ship.nullable.required",
+              "vehicleNo": "unknown.required",
+              "transporterId": "unknown.required",
+              "transporterName": "unknown.required",
+              "transportDocNo": "unknown.required",
+              "transportDocDate": "unknown.required",
+              "distanceKm": "integer.nullable.required",
+              "ewayBillNo": "unknown.required",
+              "ewayBillDate": "unknown.required"
+            },
+            "ewayValidUntil": "unknown.required",
+            "ewayExpired": "boolean.required",
+            "ewayNeeded": "boolean.required",
+            "ewayLimitPaise": "integer.required",
+            "company": {
+              "name": "unknown.required",
+              "address": "unknown.required",
+              "gstin": "unknown.required",
+              "stateCode": "unknown.required"
+            },
+            "taxablePaise": "integer.optional",
+            "gstPaise": "integer.optional",
+            "valuePaise": "integer.optional",
+            "postedBy": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "postedAt": "unknown.required",
+            "cancelReason": "unknown.required",
+            "cancelledBy": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "cancelledAt": "unknown.required",
+            "createdBy": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "createdAt": "string.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "PATCH /api/dispatch/notes/:id/transport",
+      "method": "PATCH",
+      "path": "/api/dispatch/notes/:id/transport",
+      "tags": [
+        "dispatch"
+      ],
+      "summary": "Change transport or add the e-way no after posting (BR-DSP-25..27). Locked key is 409 DISPATCH_NOTE_FIELD_LOCKED. Each change writes a history row.",
+      "auth": {
+        "type": "permission",
+        "key": "dispatch.manage"
+      },
+      "request": {
+        "body": {
+          "mode": "enum:road,rail,air,ship.nullable.optional",
+          "vehicleNo": "string.nullable.optional",
+          "transporterId": "string.nullable.optional",
+          "transporterName": "string.nonempty.nullable.optional",
+          "transportDocNo": "string.nonempty.nullable.optional",
+          "transportDocDate": "string.nullable.optional",
+          "ewayBillNo": "string.nullable.optional",
+          "ewayBillDate": "string.nullable.optional",
+          "distanceKm": "integer.nonnegative.nullable.optional"
+        },
+        "params": {
+          "id": "integer.positive.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "soStatus": "string.required",
+            "activity": "array<object>.required",
+            "id": "integer.required",
+            "dnNumber": "unknown.required",
+            "status": "enum:draft,posted,cancelled.required",
+            "soId": "integer.required",
+            "soNumber": "string.required",
+            "customerPoNumber": "unknown.required",
+            "customer": {
+              "id": "integer.required",
+              "name": "string.required",
+              "address": "string.required",
+              "gstin": "unknown.required",
+              "stateCode": "string.required"
+            },
+            "shipTo": {
+              "address": "string.required",
+              "stateCode": "string.required"
+            },
+            "noteDate": "string.required",
+            "sourceLocation": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "remarks": "unknown.required",
+            "lines": "array<object>.required",
+            "packages": "array<object>.required",
+            "transport": {
+              "mode": "enum:road,rail,air,ship.nullable.required",
+              "vehicleNo": "unknown.required",
+              "transporterId": "unknown.required",
+              "transporterName": "unknown.required",
+              "transportDocNo": "unknown.required",
+              "transportDocDate": "unknown.required",
+              "distanceKm": "integer.nullable.required",
+              "ewayBillNo": "unknown.required",
+              "ewayBillDate": "unknown.required"
+            },
+            "ewayValidUntil": "unknown.required",
+            "ewayExpired": "boolean.required",
+            "ewayNeeded": "boolean.required",
+            "ewayLimitPaise": "integer.required",
+            "company": {
+              "name": "unknown.required",
+              "address": "unknown.required",
+              "gstin": "unknown.required",
+              "stateCode": "unknown.required"
+            },
+            "taxablePaise": "integer.optional",
+            "gstPaise": "integer.optional",
+            "valuePaise": "integer.optional",
+            "postedBy": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "postedAt": "unknown.required",
+            "cancelReason": "unknown.required",
+            "cancelledBy": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "cancelledAt": "unknown.required",
+            "createdBy": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "createdAt": "string.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "GET /api/dispatch/notes/:id/transport-history",
+      "method": "GET",
+      "path": "/api/dispatch/notes/:id/transport-history",
+      "tags": [
+        "dispatch"
+      ],
+      "summary": "Transport change history of one note, newest first, paginated (BR-DSP-27).",
+      "auth": {
+        "type": "permission",
+        "key": "dispatch.view"
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required"
+        },
+        "params": {
+          "id": "integer.positive.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
           }
         }
       }
@@ -2477,7 +3346,8 @@
             "overReceiptReason": "unknown.required",
             "overReceiptBy": "unrepresentable.nullable.required",
             "rejectedReturnedQty": "number.required",
-            "acceptedReturnedQty": "number.required"
+            "acceptedReturnedQty": "number.required",
+            "createdAt": "unrepresentable.required"
           }
         }
       }
@@ -2523,7 +3393,8 @@
             "overReceiptReason": "unknown.required",
             "overReceiptBy": "unrepresentable.nullable.required",
             "rejectedReturnedQty": "number.required",
-            "acceptedReturnedQty": "number.required"
+            "acceptedReturnedQty": "number.required",
+            "createdAt": "unrepresentable.required"
           }
         }
       }
@@ -2555,7 +3426,7 @@
             "locationId": "unrepresentable.required",
             "batchNumber": "unknown.required",
             "transactionType": "enum:in,out,adjustment.required",
-            "referenceType": "enum:grn,grn_bypass,pro,pro_cancel,sco_issue,sco_receipt,job_order_issue,scrap_dispatch,stock_adjustment,grn_correction,opening_stock,sco_loss,stock_transfer,stock_transfer_reversal.required",
+            "referenceType": "enum:grn,grn_bypass,pro,pro_cancel,sco_issue,sco_receipt,job_order_issue,scrap_dispatch,stock_adjustment,grn_correction,opening_stock,sco_loss,stock_transfer,stock_transfer_reversal,delivery_note,delivery_note_cancel.required",
             "referenceId": "unrepresentable.required",
             "referenceLineId": "unrepresentable.nullable.required",
             "quantityChange": "unrepresentable.required",
@@ -6539,6 +7410,7 @@
               "stateCode": "string.required",
               "priceToleranceBp": "unrepresentable.required",
               "weightToleranceBp": "unrepresentable.required",
+              "ewayIntraLimitPaise": "unrepresentable.required",
               "updatedBy": "unrepresentable.nullable.required",
               "updatedAt": "unrepresentable.required"
             },

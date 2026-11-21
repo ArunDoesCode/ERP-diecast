@@ -230,6 +230,20 @@ export const END_POINTS = {
     explosionRows: "/:id/explosions/:eid/rows",
     createDrafts: "/:id/explosions/:eid/drafts",
   },
+  // Dispatch, REST style (design/api.md). Static first segments only, no clashes.
+  dispatch: {
+    pending: "/pending",
+    settings: "/settings",
+    list: "/notes",
+    details: "/notes/:id",
+    create: "/notes",
+    update: "/notes/:id",
+    post: "/notes/:id/post",
+    cancelDraft: "/notes/:id/cancel-draft",
+    cancel: "/notes/:id/cancel",
+    transport: "/notes/:id/transport",
+    transportHistory: "/notes/:id/transport-history",
+  },
   supplierRating: {
     list: "/list",
     card: "/:supplierId/card",

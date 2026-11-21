@@ -6,6 +6,7 @@ import { authRoutes } from "./auth";
 import { bomRoutes } from "./bom";
 import { companyRoutes } from "./company";
 import { customerRoutes } from "./customer";
+import { dispatchRoutes } from "./deliveryNote";
 import { grnRoutes } from "./grn";
 import { poRoutes } from "./po";
 import { prRoutes } from "./pr";
@@ -39,6 +40,7 @@ const MAIN_ROUTES = {
   bom: "/bom",
   company: "/company",
   customer: "/customers",
+  dispatch: "/dispatch",
   saleOrder: "/sale-orders",
   reorder: "/reorder",
   supplierRating: "/supplier-rating",
@@ -65,6 +67,7 @@ mainRouter.route(MAIN_ROUTES.sco, scoRoutes);
 mainRouter.route(MAIN_ROUTES.bom, bomRoutes);
 mainRouter.route(MAIN_ROUTES.company, companyRoutes);
 mainRouter.route(MAIN_ROUTES.customer, customerRoutes);
+mainRouter.route(MAIN_ROUTES.dispatch, dispatchRoutes);
 mainRouter.route(MAIN_ROUTES.saleOrder, saleOrderRoutes);
 mainRouter.route(MAIN_ROUTES.reorder, reorderRoutes);
 mainRouter.route(MAIN_ROUTES.supplierRating, supplierRatingRoutes);
