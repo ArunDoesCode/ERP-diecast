@@ -854,3 +854,76 @@ describe("BR-RFQ-70 quote endpoints are guarded", () => {
     expect((await quoteRow(q.quoteId)).status).toBe("draft");
   });
 });
+
+describe("A-44 quote lines on RFQ lines already awarded", () => {
+  async function partlyAwarded() {
+    const rfq = await fx.mkRfq({ qtys: [10, 20], suppliers: 2 });
+    const [s1, s2] = rfq.supplierIds as [number, number];
+    const q1 = await fx.mkQuote(rfq, s1, {
+      lines: [{ rate: 100 }, { rate: 100 }],
+    });
+    const who = await fx.bo();
+    const a = await fx.award(
+      rfq,
+      [{ line: 0, quoteItemId: q1.quoteItemIds[0]! }],
+      who,
+    );
+    expect(a.status).toBe(201);
+    return { rfq, s2, who };
+  }
+
+  test("A-44 a quote may price an awarded line: saved", async () => {
+    const { rfq, s2 } = await partlyAwarded();
+    const r = await fx.enterQuote(rfq, s2, {
+      lines: [{ rate: 90 }, { rate: 90 }],
+    });
+    expect(r.status).toBe(201);
+    expect(r.json.data.lines).toHaveLength(2);
+  });
+
+  test("A-44 a quote line on an awarded line is never award-eligible", async () => {
+    const { rfq, s2, who } = await partlyAwarded();
+    const q2 = await fx.mkQuote(rfq, s2, {
+      lines: [{ rate: 90 }, { rate: 90 }],
+    });
+    const r = await fx.award(
+      rfq,
+      [{ line: 0, quoteItemId: q2.quoteItemIds[0]! }],
+      who,
+    );
+    expect(r.status).toBe(409);
+    expect(r.json.code).toBe("RFQ_LINE_AWARDED");
+  });
+
+  test("BR-RFQ-18 a quote whose only priced line is an awarded line cannot be submitted -> 400 QUOTE_EMPTY", async () => {
+    const { rfq, s2 } = await partlyAwarded();
+    const q = await fx.mkQuote(rfq, s2, {
+      submit: false,
+      lines: [{ rate: 90 }, { quoted: false }],
+    });
+    const r = await fx.rfqApi(
+      "POST",
+      `/quotes/${q.quoteId}/submit`,
+      await fx.bo(),
+      {},
+    );
+    expect(r.status).toBe(400);
+    expect(r.json.code).toBe("QUOTE_EMPTY");
+    expect((await quoteRow(q.quoteId)).status).toBe("draft");
+  });
+
+  test("BR-RFQ-18 a quote that also prices a still-open line can be submitted", async () => {
+    const { rfq, s2 } = await partlyAwarded();
+    const q = await fx.mkQuote(rfq, s2, {
+      submit: false,
+      lines: [{ rate: 90 }, { rate: 90 }],
+    });
+    const r = await fx.rfqApi(
+      "POST",
+      `/quotes/${q.quoteId}/submit`,
+      await fx.bo(),
+      {},
+    );
+    expect(r.status).toBe(200);
+  });
+});

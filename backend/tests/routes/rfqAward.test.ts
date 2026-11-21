@@ -831,3 +831,55 @@ describe("BR-RFQ-70..72 permissions, audit, races", () => {
     expect(r.status).toBe(404);
   });
 });
+
+describe("A-43 / A-45 award leftovers", () => {
+  test("A-43 removing a line from a draft PO made by an award -> 409 PO_LINE_FROM_AWARD, line kept", async () => {
+    const rfq = await fx.mkRfq({ qtys: [10, 20], suppliers: 1 });
+    const q = await fx.mkQuote(rfq, rfq.supplierIds[0]!, {
+      lines: [{ rate: 100 }, { rate: 100 }],
+    });
+    const who = await fx.bo();
+    const r = await fx.award(
+      rfq,
+      [
+        { line: 0, quoteItemId: q.quoteItemIds[0]! },
+        { line: 1, quoteItemId: q.quoteItemIds[1]! },
+      ],
+      who,
+    );
+    expect(r.status).toBe(201);
+    const poId = r.json.data.pos[0].poId as number;
+    const before = await poLines(poId);
+    expect(before).toHaveLength(2);
+    const del = await fx.poApi("PATCH", "/updatepo", who, {
+      poId,
+      inserts: [],
+      updates: [],
+      deletes: [{ id: before[0]!.id }],
+    });
+    expect(del.status).toBe(409);
+    expect(del.json.code).toBe("PO_LINE_FROM_AWARD");
+    expect(await poLines(poId)).toHaveLength(2);
+  });
+
+  test("A-45 re-award of an awarded line on an awarded RFQ -> 409 RFQ_LINE_AWARDED", async () => {
+    const rfq = await fx.mkRfq({ qtys: [10], suppliers: 1 });
+    const q = await fx.mkQuote(rfq, rfq.supplierIds[0]!, {
+      lines: [{ rate: 100 }],
+    });
+    const who = await fx.bo();
+    const first = await fx.award(
+      rfq,
+      [{ line: 0, quoteItemId: q.quoteItemIds[0]! }],
+      who,
+    );
+    expect(first.json.data.rfq.status).toBe("awarded");
+    const again = await fx.award(
+      rfq,
+      [{ line: 0, quoteItemId: q.quoteItemIds[0]! }],
+      who,
+    );
+    expect(again.status).toBe(409);
+    expect(again.json.code).toBe("RFQ_LINE_AWARDED");
+  });
+});

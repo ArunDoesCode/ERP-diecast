@@ -879,3 +879,58 @@ describe("BR-RFQ-73 / schema: unknown keys and bad ids", () => {
     expect(r.status).toBe(400);
   });
 });
+
+describe("A-46 list extras", () => {
+  test("A-46 getrfqs prId returns the RFQs of that PR in any status", async () => {
+    const who = await fx.bo();
+    const rfq = await fx.mkRfq({ suppliers: 1, send: false });
+    const c = await fx.rfqApi("POST", `/${rfq.id}/cancel`, who, {
+      reason: "not needed now",
+    });
+    expect(c.status).toBe(200);
+    const r = await fx.rfqApi("GET", `/getrfqs?prId=${rfq.prId}`, who);
+    expect(r.status).toBe(200);
+    expect(r.json.data.map((x: { id: number }) => x.id)).toEqual([rfq.id]);
+    expect(r.json.data[0].status).toBe("cancelled");
+    const other = await fx.mkRfq({ suppliers: 1 });
+    const r2 = await fx.rfqApi("GET", `/getrfqs?prId=${other.prId}`, who);
+    expect(r2.json.data.map((x: { id: number }) => x.id)).toEqual([other.id]);
+  });
+
+  test("A-46 list rows carry createdByName", async () => {
+    const who = await fx.bo();
+    const rfq = await fx.mkRfq({ suppliers: 1 });
+    const r = await fx.rfqApi("GET", `/getrfqs?q=${rfq.rfqNumber}`, who);
+    const row = r.json.data.find((x: { id: number }) => x.id === rfq.id);
+    expect(row.createdByName).toBe(who.userName);
+  });
+});
+
+describe("SEC-02 cancelling an RFQ with submitted quotes needs rfq.award", () => {
+  test("SEC-02 rfq.manage without rfq.award, RFQ has a submitted quote -> 403 naming rfq.award, RFQ unchanged", async () => {
+    const who = await fx.actor("mgrOnly", ["rfq.view", "rfq.manage"]);
+    const rfq = await fx.mkRfq({ suppliers: 1 });
+    const q = await fx.mkQuote(rfq, rfq.supplierIds[0]!);
+    const r = await fx.rfqApi("POST", `/${rfq.id}/cancel`, who, {
+      reason: "not needed now",
+    });
+    expect(r.status).toBe(403);
+    expect(r.json.code).toBe("PERMISSION_DENIED");
+    expect(r.json.key).toBe("rfq.award");
+    expect((await rfqRow(rfq.id)).status).toBe("sent");
+    const [row] = await db
+      .select()
+      .from(rfqQuotes)
+      .where(eq(rfqQuotes.id, q.quoteId));
+    expect(row!.status).toBe("submitted");
+  });
+
+  test("SEC-02 the same user cancels an RFQ with no submitted quote -> 200", async () => {
+    const who = await fx.actor("mgrOnly", ["rfq.view", "rfq.manage"]);
+    const rfq = await fx.mkRfq({ suppliers: 1 });
+    const r = await fx.rfqApi("POST", `/${rfq.id}/cancel`, who, {
+      reason: "not needed now",
+    });
+    expect(r.status).toBe(200);
+  });
+});

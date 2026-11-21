@@ -725,3 +725,67 @@ describe("BR-RFQ-74 PO line limits", () => {
     expect(r.status).toBe(400);
   });
 });
+
+describe("A-46 last-rate contract source carries contractNumber and qtyLeft", () => {
+  const lastRate = (who: Actor, x: Ctx) =>
+    fx.call(
+      "GET",
+      `/api/asset/items/${x.itemId}/last-rate?supplierId=${x.supplierId}`,
+      who,
+    );
+
+  test("A-46 contract source: contractId, contractNumber, gstPercent and qtyLeft = cap - ordered (5000 - 3000)", async () => {
+    const x = await ctx();
+    await ordered(x, 3000);
+    const r = await lastRate(await fx.bo(), x);
+    expect(r.status).toBe(200);
+    expect(r.json.data.source).toBe("contract");
+    expect(r.json.data.contractId).toBe(x.contract.id);
+    expect(r.json.data.contractNumber).toBe(x.contract.contractNumber);
+    expect(Number(r.json.data.gstPercent)).toBe(18);
+    expect(Number(r.json.data.qtyLeft)).toBe(2000);
+  });
+
+  test("A-46 qtyLeft counts the allowance (5000 + 10 % - 0 = 5500)", async () => {
+    const x = await ctx({ allowance: 10 });
+    const r = await lastRate(await fx.bo(), x);
+    expect(Number(r.json.data.qtyLeft)).toBe(5500);
+  });
+
+  test("A-46 no contract number or qtyLeft for a caller without po.manage / contract.view", async () => {
+    const x = await ctx();
+    const who = await fx.actor("invOnly2", ["inventory.view"]);
+    const r = await lastRate(who, x);
+    expect(r.status).toBe(200);
+    expect(r.json.data.contractNumber).toBeUndefined();
+    expect(r.json.data.qtyLeft).toBeUndefined();
+    expect(JSON.stringify(r.json)).not.toContain(x.contract.contractNumber);
+  });
+});
+
+describe("CR-02 an ineligible approver gets 403, not a contract-cap 409", () => {
+  test("CR-02 cap is full: a user who is not the approver acting on the PO -> 403", async () => {
+    await ensurePolicy();
+    const x = await ctx({ qty: 3000, prType: "maintenance" });
+    const second = await morePr(x, 3000, "maintenance");
+    const bo = await fx.bo();
+    const p1 = await mkPo(bo, x, x.prItemId);
+    const p2 = await mkPo(bo, x, second);
+    const s1 = await fx.submitPo(bo, p1);
+    const s2 = await fx.submitPo(bo, p2);
+    expect((await fx.approve(await fx.owner2(), s1.json.data.id)).status).toBe(
+      200,
+    );
+    // cap (5000) now has only 2000 left; the second PO of 3000 would exceed it
+    const wrong = await fx.approve(await fx.floor(), s2.json.data.id);
+    expect(wrong.status).toBe(403);
+    expect(wrong.json.code).not.toBe("CONTRACT_QTY_EXCEEDED");
+    expect(await poStatus(p2)).toBe("pending_approval");
+  });
+});
+
+describe("A-46 batched last-rate endpoint", () => {
+  // TODO: GET /api/asset/items/last-rates is not in backend/.contracts/api-manifest.json yet.
+  // When present: one call returns each item's rate choice; contract data hidden without po.manage / contract.view.
+  test.skip("A-46 batched last-rates: one call returns each item's rate choice; contract hidden without po.manage / contract.view", () => {});
+});
