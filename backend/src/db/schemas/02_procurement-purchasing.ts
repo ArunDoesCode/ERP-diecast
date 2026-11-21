@@ -651,6 +651,9 @@ export const grnItems = pgTable(
     // Posted purchase returns only (BR-PRT-19, 38); caps read purchase_return_items.
     rejectedReturnedQty: qty3Col("rejected_returned_qty").default(0).notNull(),
     acceptedReturnedQty: qty3Col("accepted_returned_qty").default(0).notNull(),
+    // Supplier rating: arrival fallback when the GRN has no received_date (CR-01)
+    // no-index: never filtered or sorted on
+    createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => ({
     grnIdIdx: index("idx_grn_items_grn_id").on(table.grnId),

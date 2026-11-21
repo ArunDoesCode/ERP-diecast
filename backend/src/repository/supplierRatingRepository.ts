@@ -8,7 +8,8 @@ import type {
 } from "../types/supplierRating.types";
 
 // Supplier rating (BR-SRT-01..41): live SQL, no stored score. Each endpoint is
-// one statement over the same CTE chain, so one snapshot. All dates are IST
+// one statement over the same CTE chain (a list or lines page is a rows
+// statement plus a count statement, not one snapshot). All dates are IST
 // plant days (D-022): timestamps are stored as UTC wall time.
 
 type Dir = "asc" | "desc";
@@ -18,6 +19,11 @@ type RejectionSort = (typeof RATING_LINES_SORT_FIELDS.rejection)[number];
 type PriceSort = (typeof RATING_LINES_SORT_FIELDS.price)[number];
 
 const rowsOf = <T>(result: unknown) => result as unknown as T[];
+
+/** Arrival timestamp of a GRN line: a NULL received_date falls back to the line's created_at. */
+const arrived = (g: string, gi: string) =>
+  `coalesce(${g}.received_date, ${gi}.created_at)`;
+const ARRIVED = arrived("g", "gi");
 
 /** IST plant day of a `timestamp` column. */
 const IST = (col: string) =>
@@ -66,15 +72,15 @@ po_lines as (
       or po.cancelled_at >= p.wfrom - 2
       or exists (
         select 1 from grn_items gx join grns g2 on g2.id = gx.grn_id
-        where gx.po_item_id = poi.id and g2.received_date >= p.wfrom - 2)
+        where gx.po_item_id = poi.id and ${sql.raw(arrived("g2", "gx"))} >= p.wfrom - 2)
     )
 ),
 arr_rows as (
   select pl.po_item_id, pl.ordered,
-    ${sql.raw(IST("g.received_date"))} as arr_day,
+    ${sql.raw(IST(ARRIVED))} as arr_day,
     round(gi.received_qty::numeric, 3) as q,
     sum(round(gi.received_qty::numeric, 3)) over (
-      partition by pl.po_item_id order by g.received_date, g.id, gi.id) as running
+      partition by pl.po_item_id order by ${sql.raw(ARRIVED)}, g.id, gi.id) as running
   from po_lines pl
   join grn_items gi on gi.po_item_id = pl.po_item_id
   join grns g on g.id = gi.grn_id and g.po_id = pl.po_id
@@ -91,7 +97,9 @@ jl1 as (
       when a.completion is not null then 'complete'
       when pl.short_closed and coalesce(a.arrived, 0) < pl.ordered
            and pl.closed_day is not null then 'short_closed'
-      when pl.cancelled and pl.cancel_day is not null then 'cancelled_after_dispatch'
+      -- BR-SRT-04 / A-42: cancelled after the due date = late; on or before = ignored
+      when pl.cancelled and pl.cancel_day > pl.due then 'cancelled_after_dispatch'
+      when pl.cancelled then 'ignored'
       when pl.due + 1 <= p.today then 'open_past_due'
       else 'open'
     end as state
@@ -118,11 +126,12 @@ jv as (
          when j.state not in ('no_due_date', 'open') and j.jdate > j.due then j.jdate - j.due
     end as days_late
   from jl2 j cross join params p
+  where j.state <> 'ignored'
 ),
 rej_facts as (
   select gi.id as grn_item_id, g.grn_number, po.po_number, po.supplier_id, im.sku,
     poi.uom, poi.unit_price_paise as rate,
-    ${sql.raw(IST("g.received_date"))} as rday,
+    ${sql.raw(IST(ARRIVED))} as rday,
     round(gi.received_qty::numeric, 3) as recv,
     round(coalesce(gi.rejected_qty, 0)::numeric, 3) as rej,
     case
@@ -137,7 +146,7 @@ rej_facts as (
   join grns g on g.id = gi.grn_id and g.po_id = po.id
   join item_master im on im.id = poi.item_id
   cross join params p
-  where g.status <> 'draft' and g.received_date >= p.wfrom - 2
+  where g.status <> 'draft' and ${sql.raw(ARRIVED)} >= p.wfrom - 2
 ),
 price_facts as (
   select pl.po_item_id, pl.po_number, pl.supplier_id, pl.po_date, im.sku, pl.uom,
@@ -343,6 +352,25 @@ type Paging = { page: number; pageSize: number };
 const offsetOf = ({ page, pageSize }: Paging) => (page - 1) * pageSize;
 const dirSql = (dir: Dir) => sql.raw(dir === "asc" ? "asc" : "desc");
 
+/**
+ * Rows carry `total_count` (count(*) over ()). A page past the end has no rows,
+ * so the total comes from a separate count then.
+ */
+async function pageOf<T>(
+  result: unknown,
+  paging: Paging,
+  countQuery: () => SQL,
+) {
+  const all = rowsOf<T & { total_count?: number }>(result);
+  let total = Number(all[0]?.total_count ?? 0);
+  if (all.length === 0 && paging.page > 1) {
+    const totals = await db.execute(countQuery());
+    total = Number(rowsOf<{ total: number }>(totals)[0]?.total ?? 0);
+  }
+  const rows = all.map(({ total_count: _t, ...rest }) => rest);
+  return { rows: rows as unknown as T[], total };
+}
+
 export const supplierRatingRepository = {
   async supplierExists(supplierId: number) {
     const [row] = await db
@@ -457,9 +485,8 @@ export const supplierRatingRepository = {
       join item_master im on im.id = j.item_id
       cross join params p
       where j.jdate between p.wfrom and p.today and ${verdictFilter}`;
-    const [rows, totals] = await Promise.all([
-      db.execute(sql`with ${baseCtes(today, where)}
-        select j.po_item_id, j.po_number, im.sku, im.name as item_name, j.uom,
+    const rows = await db.execute(sql`with ${baseCtes(today, where)}
+        select count(*) over ()::int as total_count, j.po_item_id, j.po_number, im.sku, im.name as item_name, j.uom,
           j.ordered::text as ordered_qty, round(j.arrived, 3)::text as arrived_qty,
           to_char(j.due, 'YYYY-MM-DD') as due, to_char(j.revised, 'YYYY-MM-DD') as revised,
           to_char(j.completion, 'YYYY-MM-DD') as completion,
@@ -467,15 +494,13 @@ export const supplierRatingRepository = {
           j.verdict, j.days_late, j.state
         ${from}
         order by ${sql.raw(sortColumn[query.sortBy])} ${dirSql(query.sortDir)} nulls last, j.po_item_id asc
-        limit ${query.pageSize} offset ${offsetOf(query)}`),
-      db.execute(
+        limit ${query.pageSize} offset ${offsetOf(query)}`);
+    return pageOf<OnTimeLineRow>(
+      rows,
+      query,
+      () =>
         sql`with ${baseCtes(today, where)} select count(*)::int as total ${from}`,
-      ),
-    ]);
-    return {
-      rows: rowsOf<OnTimeLineRow>(rows),
-      total: Number(rowsOf<{ total: number }>(totals)[0]?.total ?? 0),
-    };
+    );
   },
 
   async rejectionLines(
@@ -492,24 +517,21 @@ export const supplierRatingRepository = {
     const where = eq(supplierMaster.id, supplierId);
     const from = sql`from rej_facts f cross join params p
       where f.rday between p.wfrom and p.today and f.insp in ('decided', 'not_inspected')`;
-    const [rows, totals] = await Promise.all([
-      db.execute(sql`with ${baseCtes(today, where)}
-        select f.grn_item_id, f.grn_number, f.po_number, f.sku,
+    const rows = await db.execute(sql`with ${baseCtes(today, where)}
+        select count(*) over ()::int as total_count, f.grn_item_id, f.grn_number, f.po_number, f.sku,
           to_char(f.rday, 'YYYY-MM-DD') as received_date,
           f.recv::text as arrived_qty, f.rej::text as rejected_qty, f.uom, f.rate,
           round(f.rej * f.rate)::bigint as rejected_value,
           round(f.recv * f.rate)::bigint as arrived_value, f.insp as inspection
         ${from}
         order by ${sql.raw(sortColumn[query.sortBy])} ${dirSql(query.sortDir)} nulls last, f.grn_item_id asc
-        limit ${query.pageSize} offset ${offsetOf(query)}`),
-      db.execute(
+        limit ${query.pageSize} offset ${offsetOf(query)}`);
+    return pageOf<RejectionLineRow>(
+      rows,
+      query,
+      () =>
         sql`with ${baseCtes(today, where)} select count(*)::int as total ${from}`,
-      ),
-    ]);
-    return {
-      rows: rowsOf<RejectionLineRow>(rows),
-      total: Number(rowsOf<{ total: number }>(totals)[0]?.total ?? 0),
-    };
+    );
   },
 
   async priceLines(
@@ -524,9 +546,8 @@ export const supplierRatingRepository = {
       itemSku: "f.sku",
     };
     const where = eq(supplierMaster.id, supplierId);
-    const [rows, totals] = await Promise.all([
-      db.execute(sql`with ${baseCtes(today, where)}
-        select f.po_item_id, f.po_number, to_char(f.po_date, 'YYYY-MM-DD') as po_date,
+    const rows = await db.execute(sql`with ${baseCtes(today, where)}
+        select count(*) over ()::int as total_count, f.po_item_id, f.po_number, to_char(f.po_date, 'YYYY-MM-DD') as po_date,
           f.sku, f.uom, f.qty::text as qty, f.rate,
           f.ref_rate, f.ref_source,
           case when f.compared then f.rate - f.ref_rate end as variance,
@@ -535,14 +556,12 @@ export const supplierRatingRepository = {
           f.compared, f.reason
         from pf f
         order by ${sql.raw(sortColumn[query.sortBy])} ${dirSql(query.sortDir)} nulls last, f.po_item_id asc
-        limit ${query.pageSize} offset ${offsetOf(query)}`),
-      db.execute(
+        limit ${query.pageSize} offset ${offsetOf(query)}`);
+    return pageOf<PriceLineRow>(
+      rows,
+      query,
+      () =>
         sql`with ${baseCtes(today, where)} select count(*)::int as total from pf`,
-      ),
-    ]);
-    return {
-      rows: rowsOf<PriceLineRow>(rows),
-      total: Number(rowsOf<{ total: number }>(totals)[0]?.total ?? 0),
-    };
+    );
   },
 };

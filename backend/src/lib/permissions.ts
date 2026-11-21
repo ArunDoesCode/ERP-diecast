@@ -379,7 +379,7 @@ export const SCREENS = {
   "stock-transfers": s(
     "/inventory/stock-transfers",
     "inventory.view",
-    "Stock Transfers",
+    "Stock transfers",
     183,
     "Inventory",
   ),
