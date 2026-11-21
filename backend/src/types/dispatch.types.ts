@@ -469,7 +469,7 @@ export const transportHistoryRowSchema = z.object({
     "distanceKm",
   ]),
   oldValue: z.string().nullable(),
-  newValue: z.string(),
+  newValue: z.string().nullable(),
   changedBy: z.number().int(),
   changedByName: z.string().nullable(),
   changedAt: z.string(),
