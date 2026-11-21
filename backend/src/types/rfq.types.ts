@@ -283,6 +283,9 @@ export const rfqQuoteHeaderSchema = z.object({
   validTill: z.string(),
   paymentTermsDays: z.number().int(),
   isLate: z.boolean(),
+  // DES-26: count of priced lines and landed total (line value + freight, capped)
+  linesPriced: z.number().int(),
+  totalLandedPaise: z.number().int(),
   submittedAt: tsNull,
   cancelledByName: z.string().nullable(),
   cancelledAt: tsNull,

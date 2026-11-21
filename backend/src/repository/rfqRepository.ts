@@ -39,6 +39,7 @@ import {
 } from "../db/schemas/02_procurement-suppliers";
 import { employees } from "../db/schemas/03_hcm";
 import { istDayStartInstant, istNextDayStartInstant } from "../lib/ist-day";
+import { MAX_MONEY_PAISE } from "../lib/money";
 import { safeSearch } from "../lib/safe-search";
 import type { PrLinesQuery, RfqListQuery } from "../types/rfq.types";
 import type { DbExecutor, DbTransaction } from "./executor";
@@ -573,6 +574,20 @@ export const rfqRepository = {
       )
       .where(eq(rfqQuotes.rfqId, rfqId))
       .orderBy(asc(rfqQuotes.id));
+  },
+
+  /** DES-26: priced-line count and landed total (value + freight) per quote, one query. */
+  async quoteTotals(rfqId: number, executor: DbExecutor = db) {
+    return executor
+      .select({
+        quoteId: rfqQuoteItems.quoteId,
+        linesPriced: sql<number>`count(*)::int`,
+        totalLandedPaise: sql<number>`least(coalesce(sum(${rfqQuoteItems.lineValuePaise} + ${rfqQuoteItems.freightPaise}), 0), ${MAX_MONEY_PAISE})::float8`,
+      })
+      .from(rfqQuoteItems)
+      .innerJoin(rfqQuotes, eq(rfqQuotes.id, rfqQuoteItems.quoteId))
+      .where(and(eq(rfqQuotes.rfqId, rfqId), eq(rfqQuoteItems.isQuoted, true)))
+      .groupBy(rfqQuoteItems.quoteId);
   },
 
   async quoteHeader(quoteId: number, executor: DbExecutor = db) {

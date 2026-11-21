@@ -10,7 +10,7 @@ import {
   NotFoundError,
 } from "../lib/errors";
 import { istDayKey, istMonthKey } from "../lib/ist-day";
-import { assertMoneyInRange } from "../lib/money";
+import { assertMoneyInRange, MAX_MONEY_PAISE } from "../lib/money";
 import {
   assertFreightInRange,
   computeLinePaise,
@@ -214,8 +214,11 @@ async function buildCreated(rfqId: number, executor: DbExecutor) {
 
 function mapQuoteHeader(
   q: Awaited<ReturnType<typeof rfqRepository.quoteHeaders>>[number],
+  totals?: { linesPriced: number; totalLandedPaise: number },
 ) {
   return {
+    linesPriced: totals?.linesPriced ?? 0,
+    totalLandedPaise: totals?.totalLandedPaise ?? 0,
     id: q.id,
     quoteNumber: q.quoteNumber,
     supplierId: q.supplierId,
@@ -239,7 +242,19 @@ async function buildQuoteDetails(quoteId: number, executor: DbExecutor) {
   if (!q) throw new NotFoundError("Quote not found");
   const lines = await rfqRepository.quoteLines(quoteId, executor);
   return {
-    ...mapQuoteHeader(q),
+    ...mapQuoteHeader(q, {
+      linesPriced: lines.filter((l) => l.isQuoted).length,
+      totalLandedPaise: Math.min(
+        lines.reduce(
+          (sum, l) =>
+            l.isQuoted
+              ? sum + (l.lineValuePaise ?? 0) + (l.freightPaise ?? 0)
+              : sum,
+          0,
+        ),
+        MAX_MONEY_PAISE,
+      ),
+    }),
     rfqId: q.rfqId,
     rfqNumber: q.rfqNumber,
     rfqStatus: q.rfqStatus,
@@ -445,11 +460,13 @@ export const rfqService = {
   async details(id: number, actor: Actor) {
     const header = await rfqRepository.header(id);
     if (!header) throw new NotFoundError("RFQ not found");
-    const [suppliers, lines, quotes] = await Promise.all([
+    const [suppliers, lines, quotes, totals] = await Promise.all([
       rfqRepository.suppliersOfRfq(id),
       rfqRepository.detailedLines(id),
       rfqRepository.quoteHeaders(id),
+      rfqRepository.quoteTotals(id),
     ]);
+    const totalsByQuote = new Map(totals.map((t) => [t.quoteId, t]));
     const base = {
       rfq: mapHeader(header),
       suppliers: suppliers.map((s) => ({
@@ -483,7 +500,7 @@ export const rfqService = {
         poNumber: l.poNumber,
         poStatus: l.poStatus,
       })),
-      quotes: quotes.map(mapQuoteHeader),
+      quotes: quotes.map((q) => mapQuoteHeader(q, totalsByQuote.get(q.id))),
     };
     if (!canSeeRates(actor)) return base;
     const itemIds = [...new Set(lines.map((l) => l.itemId))];
@@ -1458,8 +1475,6 @@ export const rfqService = {
           });
         }
       }
-
-      await rfqRepository.setPoItems(poLinks, tx);
 
       await rfqRepository.setPoItems(poLinks, tx);
 

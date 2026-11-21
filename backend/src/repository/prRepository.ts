@@ -23,6 +23,7 @@ import {
   purchaseRequestItems,
   purchaseRequests,
 } from "../db/schemas/02_procurement";
+import { rfqItems } from "../db/schemas/02_procurement-rfq";
 import { supplierMaster } from "../db/schemas/02_procurement-suppliers";
 import { employees } from "../db/schemas/03_hcm";
 import { allocateDocumentSequence } from "../lib/document-number";
@@ -219,7 +220,20 @@ export const prRepository = {
     );
     const [rows, [totalRow], countRows] = await Promise.all([
       db
-        .select(purchaseRequestColumns)
+        .select({
+          ...purchaseRequestColumns,
+          // DES-34: pending lines with stock still to buy that are on no open RFQ
+          linesFreeForRfq: sql<number>`(
+            select count(*)::int from ${purchaseRequestItems} pri
+            where pri.pr_id = ${purchaseRequests.id}
+              and pri.status = 'pending'
+              and pri.requested_qty - coalesce(pri.issued_qty, 0) > 0
+              and not exists (
+                select 1 from ${rfqItems} ri
+                where ri.pr_item_id = pri.id and ri.line_status = 'open'
+              )
+          )`,
+        })
         .from(purchaseRequests)
         .where(whereClause)
         .orderBy(orderFn(sortColumn), asc(purchaseRequests.id))
