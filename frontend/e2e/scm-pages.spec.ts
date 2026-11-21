@@ -165,9 +165,11 @@ test("BR-DSP-37 / BR-SO-49 open a confirmed sale order from the list: the Dispat
 		page.getByRole("heading", { level: 1, name: s.soNumber }),
 	).toBeVisible();
 	// A confirmed order with open qty: "Dispatch" sits beside the order's own next step.
-	await expect(page.getByRole("link", { name: "Dispatch" })).toBeVisible();
+	await expect(
+		page.getByRole("link", { name: "Dispatch", exact: true }),
+	).toBeVisible();
 
-	await page.getByRole("link", { name: "Dispatch" }).click();
+	await page.getByRole("link", { name: "Dispatch", exact: true }).click();
 	await expect(page).toHaveURL(
 		new RegExp(`/delivery-notes/new\\?so=${s.soId}`),
 	);
