@@ -3,9 +3,9 @@
 > Single entry point for "where are we and what's next". Updated by `/feature` (in the docs commit of every
 > PR), `/watch-prs` (merges), `/status` (on demand) and `/wrap`. Humans: read this, then run `/status`.
 
-**Updated:** 2026-11-19 · **Milestone:** M1 Procurement hardening and M2 Subcontracting are merged. UAT-1 at the factory has not started. BOM and Sale Order have no spec, tables or code.
-**Now:** Branch `claude/cranky-payne-f2bc8a` pushed as one commit: design review + GRN screens, BR-GRN-45/46, BR-PO-24..26, BR-SCO-26..29, BR-AUTH-27..31, flow-run bug fixes, every open issue (#15–#109), design roll-out to all modules, golden-path e2e, dependency majors. Waiting for your review and merge.
-**Next action:** merge the branch PR; then, in a new session, `/brief landing-dashboard` (pilot) and `/brief bom-explosion`. In parallel: prepare UAT-1 (import the factory item and supplier lists, company details, HSN codes).
+**Updated:** 2026-11-21 · **Milestone:** M1 Procurement hardening and M2 Subcontracting are merged. UAT-1 at the factory has not started. SCM epic (`epic/scm`) in progress.
+**Now:** SCM epic — bom, sale-order and reorder built and green on `feature/scm-reorder` (2271 backend tests pass). Maps written for all three.
+**Next action:** next SCM sub-feature `purchase-returns` (spec frozen v1). Later in the epic: rfq, supplier-invoice, supplier-rating, dispatch.
 
 ## Modules
 | Module | Spec | Map | Code | State |
@@ -21,14 +21,17 @@
 | subcontracting | frozen v4 | [map](modules/subcontracting.md) | full — incl. IST day | merged (PR #14, #86) → UAT-1 |
 | db-migrations | frozen v1 | — | full — baseline + `db:migrate` | merged (PR #86) |
 | design-system | frozen v2 | [map](modules/design-system.md) | full — v2 look (graphite + indigo, 14 px, 36 px controls, 44 px rows, label-above fields) app-wide | v1 merged (PR #108); v2 epic PR open, waiting for your merge |
-| bom | none | — | none | after workflow v2 (first customer of the new flow) |
-| sale-order | none | — | none | after bom |
+| bom | frozen v1 | [map](modules/bom.md) | full | built, green — epic/scm |
+| sale-order | frozen v1 | [map](modules/sale-order.md) | full (dispatch hooks only, no dispatch screens) | built, green — epic/scm |
+| reorder | frozen v1 | [map](modules/reorder.md) | full | built, green — epic/scm |
+| purchase-returns | frozen v1 | — | none | next in epic/scm |
 
 Legend — Code: none / schema only / partial / full. Tests per module: see each map's **Tests** table.
 
 ## Active work
 | Item | Branch | Phase | PR | Waiting on |
 |---|---|---|---|---|
+| SCM epic: bom, sale-order, reorder | feature/scm-reorder (epic/scm) | built, green (2271 backend tests) | none yet | next sub-feature: purchase-returns |
 | Design-review fixes, GRN on shared patterns, BR-GRN-45 (#109) | claude/cranky-payne-f2bc8a | done, local | none yet | you: push, open PR, merge |
 
 ## Waiting on you
@@ -41,6 +44,7 @@ Legend — Code: none / schema only / partial / full. Tests per module: see each
 - [ ] Open issues: 57, none P1 (`gh issue list`). P2 defects: #34 (inactive item on a new PO), #41 (PO supplier picker lists inactive suppliers). Date/guard follow-ups: #82, #83, #84, #85.
 
 ## Recently done
+- 2026-11-21 — SCM epic: BOM (BR-BOM-01..28), sale order + customers + explosion + draft PR/SCO (BR-SO-01..62), automatic reorder (BR-RO) built; 2271 backend tests pass. Migration `20261121063850` nulls old PR `sale_order_id` values (note kept on the PR). Module maps added.
 - 2026-11-19 — All 57 open issues fixed on `claude/cranky-payne-f2bc8a`; full flow run (purchase, GRN, subcontracting) passes in the browser; 1773 backend + 301 frontend tests, 7 golden-path e2e on desktop + tablet. Frontend TypeScript stays 6.0.3 until a Next.js upgrade (TS 7 breaks `next build` on 16.2). Deploy note: everyone signs in once; operator QR badges must be regenerated.
 - 2026-11-20 — Design system v2 built (epic `epic/design-system-v2`): new colours, bigger type and controls on every screen, one field look; one push and one PR at the end (owner).
 - 2026-11-19 — Design review of PO + GRN screens (light/dark, desktop/tablet, axe): DES-001..012 fixed; GRN list + detail on the shared patterns; BR-GRN-45 PO/PR numbers + document flow on GRN (#109). Closed #16, #44, #63 (fixed by PR #86) and duplicates #88, #89, #90.
