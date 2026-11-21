@@ -28,6 +28,10 @@ export type StatusDoc =
 	| "sco"
 	| "bom"
 	| "bomNode"
+	| "so"
+	| "soSnapshot"
+	| "customer"
+	| "soRowTag"
 	| "challanDue"
 	| "approval"
 	| "supplier"
@@ -128,6 +132,25 @@ const MAP: Record<StatusDoc, Record<string, Entry>> = Object.assign(
 			no_bom: ["No BOM", "neutral"],
 			inactive: ["Inactive", "closed"],
 			loop: ["Loop", "danger"],
+		}),
+		so: table({
+			draft: ["Draft", "neutral"],
+			confirmed: ["Confirmed", "info"],
+			on_hold: ["On hold", "warning"],
+			closed: ["Closed", "closed"],
+			cancelled: ["Cancelled", "closed"],
+		}),
+		soSnapshot: table({
+			current: ["Current", "success"],
+			out_of_date: ["Out of date", "warning"],
+			superseded: ["Superseded", "closed"],
+		}),
+		customer: ACTIVE,
+		soRowTag: table({
+			no_bom: ["No BOM", "neutral"],
+			buy_as_is: ["Buy as is", "neutral"],
+			inactive: ["Inactive item", "closed"],
+			loop: ["BOM loop", "danger"],
 		}),
 		challanDue: table({
 			ok: ["On time", "success"],

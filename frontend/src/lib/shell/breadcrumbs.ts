@@ -21,6 +21,8 @@ const LIST_LABELS: Record<string, string> = {
 	inventory: "Inventory",
 	subcontracting: "Subcontracting",
 	bom: "Bills of materials",
+	"sale-orders": "Sale orders",
+	customers: "Customers",
 	"employee-directory": "Employee directory",
 	setup: "Setup",
 };

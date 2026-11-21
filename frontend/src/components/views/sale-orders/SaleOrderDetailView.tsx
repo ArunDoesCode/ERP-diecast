@@ -1,0 +1,341 @@
+"use client";
+
+import { IconDots } from "@tabler/icons-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import {
+	SoCustomerCard,
+	SoNotesCard,
+} from "@/components/pages/sale-orders/SoInfoCards";
+import { SoLinesCard } from "@/components/pages/sale-orders/SoLinesCard";
+import { SoReasonDialog } from "@/components/pages/sale-orders/SoReasonDialog";
+import {
+	SoActivityPanel,
+	SoExplosionPanel,
+	SoRaisedPanel,
+} from "@/components/pages/sale-orders/SoSidePanels";
+import { raisedDocHref } from "@/components/pages/sale-orders/so-format";
+import { DetailHeader } from "@/components/shared/DetailHeader";
+import {
+	DocumentFlow,
+	type DocumentFlowStep,
+} from "@/components/shared/DocumentFlow";
+import { ErrorState } from "@/components/shared/ErrorState";
+import { StatusBadge } from "@/components/shared/StatusBadge";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useCan } from "@/hooks/use-can";
+import {
+	type SoReasonAction,
+	soErrorMessage,
+	useConfirmSaleOrderMutation,
+	useResumeSaleOrderMutation,
+	useRunSoExplosionMutation,
+	useSaleOrderQuery,
+} from "@/lib/api/sale-order/queries";
+import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
+import { useBreadcrumbLast } from "@/lib/shell/breadcrumb-last";
+import type { SoDetail } from "@/types/sale-order";
+
+const DOC_LABEL = {
+	pr: "Purchase requisition",
+	sco: "Subcontract order",
+} as const;
+
+function flowSteps(so: SoDetail): DocumentFlowStep[] {
+	const steps: DocumentFlowStep[] = [
+		{
+			label: "Sale order",
+			docNo: so.soNumber,
+			status: <StatusBadge doc="so" status={so.status} />,
+			state: so.status === "draft" ? "current" : "done",
+		},
+	];
+	if (so.status === "draft" || so.status === "cancelled") return steps;
+
+	const snapshot = so.currentSnapshot;
+	steps.push({
+		label: "Explosion",
+		docNo: snapshot?.number,
+		href: snapshot ? `/sale-orders/${so.id}/explosion` : undefined,
+		status: snapshot ? (
+			<StatusBadge
+				doc="soSnapshot"
+				status={snapshot.outOfDate ? "out_of_date" : "current"}
+			/>
+		) : undefined,
+		state: snapshot && !snapshot.outOfDate ? "done" : "current",
+	});
+	const seen = new Map<string, number>();
+	for (const doc of so.raisedDocuments) {
+		const base = DOC_LABEL[doc.type];
+		const count = (seen.get(base) ?? 0) + 1;
+		seen.set(base, count);
+		steps.push({
+			label: count === 1 ? base : `${base} (${count})`,
+			docNo: doc.number,
+			href: raisedDocHref(doc),
+			status: <StatusBadge doc={doc.type} status={doc.status} />,
+			state: "done",
+		});
+	}
+	// Delivery notes come with the dispatch screens; until then a plain "not yet" step.
+	steps.push({ label: "Delivery note", state: "todo" });
+	return steps;
+}
+
+export function SaleOrderDetailView({ soId }: { soId: number }) {
+	const router = useRouter();
+	const canManage = useCan("so.manage");
+	const canExplode = useCan("so.explode");
+	const query = useSaleOrderQuery(soId);
+	const so = query.data?.data;
+	useBreadcrumbLast(so?.soNumber);
+
+	const confirm = useConfirmSaleOrderMutation(soId);
+	const resume = useResumeSaleOrderMutation(soId);
+	const explode = useRunSoExplosionMutation(soId);
+	const [confirmOpen, setConfirmOpen] = useState(false);
+	const [reasonAction, setReasonAction] = useState<SoReasonAction | null>(null);
+	const [lastAction, setLastAction] = useState<SoReasonAction>("hold");
+
+	const back = { backHref: "/sale-orders", backLabel: "sale orders" };
+
+	if (query.isLoading) {
+		return (
+			<div className="flex flex-col gap-4">
+				<DetailHeader docNo="" status={null} loading {...back} />
+				<Skeleton className="h-48" />
+				<Skeleton className="h-48" />
+			</div>
+		);
+	}
+	if (query.isError || !so) {
+		return (
+			<div className="flex flex-col gap-4">
+				<DetailHeader docNo="" status={null} loading {...back} />
+				<ErrorState
+					message={soErrorMessage(query.error, "Sale order not found")}
+					onRetry={() => {
+						void query.refetch();
+					}}
+					retrying={query.isRefetching}
+				/>
+			</div>
+		);
+	}
+
+	function onExplode() {
+		explode.mutate(undefined, {
+			onSuccess: () => router.push(`/sale-orders/${soId}/explosion`),
+		});
+	}
+
+	function nextStep(order: SoDetail) {
+		const waiting = (text: string) => (
+			<span className="text-sm text-muted-foreground">{text}</span>
+		);
+		switch (order.status) {
+			case "draft":
+				return canManage ? (
+					<Button type="button" size="sm" onClick={() => setConfirmOpen(true)}>
+						Confirm
+					</Button>
+				) : (
+					waiting("Waiting for confirmation")
+				);
+			case "on_hold":
+				return canManage ? (
+					<Button
+						type="button"
+						size="sm"
+						disabled={resume.isPending}
+						onClick={() => resume.mutate({ editVersion: order.editVersion })}
+					>
+						{resume.isPending ? "Resuming…" : "Resume"}
+					</Button>
+				) : null;
+			case "confirmed": {
+				const snapshot = order.currentSnapshot;
+				if (snapshot && !snapshot.outOfDate) {
+					return canExplode ? (
+						<Button type="button" size="sm" asChild>
+							<Link href={`/sale-orders/${order.id}/explosion`}>
+								Create draft PRs / SCOs
+							</Link>
+						</Button>
+					) : null;
+				}
+				return canExplode ? (
+					<Button
+						type="button"
+						size="sm"
+						disabled={explode.isPending}
+						onClick={onExplode}
+					>
+						{explode.isPending ? "Exploding…" : "Explode BOM"}
+					</Button>
+				) : (
+					waiting("Waiting for explosion")
+				);
+			}
+			default:
+				return null;
+		}
+	}
+
+	const editable = so.status === "draft" || so.status === "confirmed";
+	const canHold = so.status === "confirmed";
+	const canClose = so.status === "confirmed" || so.status === "on_hold";
+	const canCancel = so.status !== "closed" && so.status !== "cancelled";
+	const hasMore = canManage && (editable || canHold || canClose || canCancel);
+
+	function openReason(action: SoReasonAction) {
+		setLastAction(action);
+		setReasonAction(action);
+	}
+
+	let banner: string | null = null;
+	if (so.status === "closed") {
+		banner =
+			so.closeKind === "fully_delivered"
+				? "Closed — fully delivered"
+				: `Closed by hand: ${so.closeReason ?? "–"} (${formatDateTime(so.lastUpdatedAt)})`;
+	} else if (so.status === "cancelled") {
+		banner = `Cancelled: ${so.cancelReason ?? "–"} (${formatDateTime(so.lastUpdatedAt)})`;
+	} else if (so.status === "on_hold") {
+		banner = `On hold: ${so.holdReason ?? "–"} (${formatDateTime(so.lastUpdatedAt)})`;
+	}
+
+	return (
+		<div className="flex w-full flex-col gap-4">
+			<DetailHeader
+				docNo={so.soNumber}
+				status={<StatusBadge doc="so" status={so.status} />}
+				meta={[
+					{ label: "Customer", value: so.customerName },
+					{ label: "Customer PO", value: so.customerPoNumber ?? "–" },
+					{ label: "Ordered", value: formatDate(so.orderDate) },
+					{ label: "Value", value: formatMoney(so.totalAmountPaise) },
+				]}
+				actions={
+					<>
+						{nextStep(so)}
+						{hasMore ? (
+							<DropdownMenu>
+								<DropdownMenuTrigger asChild>
+									<Button type="button" size="sm" variant="outline">
+										<IconDots />
+										More
+									</Button>
+								</DropdownMenuTrigger>
+								<DropdownMenuContent align="end">
+									{editable ? (
+										<DropdownMenuItem asChild>
+											<Link href={`/sale-orders/${so.id}/edit`}>Edit</Link>
+										</DropdownMenuItem>
+									) : null}
+									{canHold ? (
+										<DropdownMenuItem onSelect={() => openReason("hold")}>
+											Hold
+										</DropdownMenuItem>
+									) : null}
+									{canClose ? (
+										<DropdownMenuItem onSelect={() => openReason("close")}>
+											Close
+										</DropdownMenuItem>
+									) : null}
+									{canCancel ? (
+										<DropdownMenuItem onSelect={() => openReason("cancel")}>
+											Cancel
+										</DropdownMenuItem>
+									) : null}
+								</DropdownMenuContent>
+							</DropdownMenu>
+						) : null}
+					</>
+				}
+				{...back}
+			/>
+
+			<DocumentFlow steps={flowSteps(so)} />
+
+			{banner ? (
+				<output className="block rounded-md bg-neutral-subtle px-3 py-2 text-sm text-neutral">
+					{banner}
+				</output>
+			) : null}
+
+			<div className="grid gap-4 min-[1280px]:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
+				<div className="flex min-w-0 flex-col gap-4">
+					<SoLinesCard so={so} />
+					<SoNotesCard so={so} />
+					<SoCustomerCard so={so} />
+				</div>
+				<div className="flex min-w-0 flex-col gap-4">
+					<SoExplosionPanel so={so} />
+					<SoRaisedPanel so={so} />
+					<SoActivityPanel soId={so.id} />
+				</div>
+			</div>
+
+			<AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Confirm {so.soNumber}?</AlertDialogTitle>
+						<AlertDialogDescription>
+							A confirmed order can be exploded into purchase and job-work
+							needs. Customer and items can no longer be changed.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					<AlertDialogFooter>
+						<AlertDialogCancel disabled={confirm.isPending}>
+							Cancel
+						</AlertDialogCancel>
+						<AlertDialogAction
+							disabled={confirm.isPending}
+							onClick={(event) => {
+								event.preventDefault();
+								confirm.mutate(
+									{ editVersion: so.editVersion },
+									{ onSuccess: () => setConfirmOpen(false) },
+								);
+							}}
+						>
+							{confirm.isPending ? "Confirming…" : "Confirm"}
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+
+			<SoReasonDialog
+				key={lastAction}
+				open={reasonAction !== null}
+				onOpenChange={(open) => {
+					if (!open) setReasonAction(null);
+				}}
+				action={lastAction}
+				soId={so.id}
+				soNumber={so.soNumber}
+				editVersion={so.editVersion}
+			/>
+		</div>
+	);
+}

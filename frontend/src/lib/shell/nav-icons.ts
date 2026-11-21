@@ -6,10 +6,12 @@ import {
 	IconId,
 	IconLayoutDashboard,
 	IconPackage,
+	IconReceipt,
 	IconSettings,
 	IconShoppingCart,
 	IconSitemap,
 	IconStack2,
+	IconUserCircle,
 	IconUsers,
 } from "@tabler/icons-react";
 
@@ -23,6 +25,8 @@ const ICONS: Record<string, Icon> = {
 	inventory: IconStack2,
 	subcontracting: IconArrowsExchange,
 	bom: IconSitemap,
+	"sale-orders": IconReceipt,
+	customers: IconUserCircle,
 	"employee-directory": IconId,
 	setup: IconSettings,
 };

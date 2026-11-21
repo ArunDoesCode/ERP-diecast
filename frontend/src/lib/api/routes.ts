@@ -9,6 +9,8 @@ const API_Header = {
 	grn: "/grn",
 	sco: "/sco",
 	bom: "/bom",
+	customers: "/customers",
+	saleOrders: "/sale-orders",
 	company: "/company",
 };
 export const API_ROUTES = {
@@ -173,6 +175,31 @@ export const API_ROUTES = {
 		history: (partId: number) => `${API_Header.bom}/parts/${partId}/history`,
 		startRevision: (partId: number) =>
 			`${API_Header.bom}/parts/${partId}/revisions`,
+	},
+	customers: {
+		list: API_Header.customers,
+		create: API_Header.customers,
+		detail: (customerId: number) => `${API_Header.customers}/${customerId}`,
+		update: (customerId: number) => `${API_Header.customers}/${customerId}`,
+	},
+	saleOrders: {
+		list: API_Header.saleOrders,
+		create: API_Header.saleOrders,
+		detail: (soId: number) => `${API_Header.saleOrders}/${soId}`,
+		update: (soId: number) => `${API_Header.saleOrders}/${soId}`,
+		confirm: (soId: number) => `${API_Header.saleOrders}/${soId}/confirm`,
+		hold: (soId: number) => `${API_Header.saleOrders}/${soId}/hold`,
+		resume: (soId: number) => `${API_Header.saleOrders}/${soId}/resume`,
+		close: (soId: number) => `${API_Header.saleOrders}/${soId}/close`,
+		cancel: (soId: number) => `${API_Header.saleOrders}/${soId}/cancel`,
+		audit: (soId: number) => `${API_Header.saleOrders}/${soId}/audit`,
+		explosions: (soId: number) => `${API_Header.saleOrders}/${soId}/explosions`,
+		explosion: (soId: number, eid: number) =>
+			`${API_Header.saleOrders}/${soId}/explosions/${eid}`,
+		explosionRows: (soId: number, eid: number) =>
+			`${API_Header.saleOrders}/${soId}/explosions/${eid}/rows`,
+		explosionDrafts: (soId: number, eid: number) =>
+			`${API_Header.saleOrders}/${soId}/explosions/${eid}/drafts`,
 	},
 	subcontracting: {
 		list: `${API_Header.sco}/getscos`,
