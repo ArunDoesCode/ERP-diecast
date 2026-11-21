@@ -213,6 +213,21 @@ html[data-density="compact"] {
 	}
 }
 
+/* Delivery challan: A4 portrait, 12 mm margins; a named page so other print sheets keep their margins. */
+@page dn-print {
+	size: A4 portrait;
+	margin: 12mm;
+}
+
+@media print {
+	.dn-print-sheet {
+		page: dn-print;
+	}
+	.dn-print-sheet tr {
+		break-inside: avoid;
+	}
+}
+
 @keyframes skeleton-sweep {
 	from {
 		transform: translateX(-100%);

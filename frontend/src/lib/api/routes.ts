@@ -14,6 +14,7 @@ const API_Header = {
 	bom: "/bom",
 	customers: "/customers",
 	saleOrders: "/sale-orders",
+	dispatch: "/dispatch",
 	reorder: "/reorder",
 	company: "/company",
 	supplierInvoice: "/supplier-invoice",
@@ -228,6 +229,19 @@ export const API_ROUTES = {
 			`${API_Header.purchaseReturn}/${id}/cancel-draft`,
 		post: (id: number) => `${API_Header.purchaseReturn}/${id}/post`,
 		cancel: (id: number) => `${API_Header.purchaseReturn}/${id}/cancel`,
+	},
+	dispatch: {
+		pending: `${API_Header.dispatch}/pending`,
+		settings: `${API_Header.dispatch}/settings`,
+		notes: `${API_Header.dispatch}/notes`,
+		note: (id: number) => `${API_Header.dispatch}/notes/${id}`,
+		post: (id: number) => `${API_Header.dispatch}/notes/${id}/post`,
+		cancelDraft: (id: number) =>
+			`${API_Header.dispatch}/notes/${id}/cancel-draft`,
+		cancel: (id: number) => `${API_Header.dispatch}/notes/${id}/cancel`,
+		transport: (id: number) => `${API_Header.dispatch}/notes/${id}/transport`,
+		transportHistory: (id: number) =>
+			`${API_Header.dispatch}/notes/${id}/transport-history`,
 	},
 	stockTransfers: {
 		list: API_Header.stockTransfer,

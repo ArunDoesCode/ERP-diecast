@@ -3,6 +3,7 @@ import {
 	IconArrowsExchange,
 	IconArrowsRightLeft,
 	IconChecklist,
+	IconClipboardList,
 	IconFileCertificate,
 	IconFileInvoice,
 	IconFileSearch,
@@ -17,6 +18,7 @@ import {
 	IconSitemap,
 	IconStack2,
 	IconStarHalf,
+	IconTruckDelivery,
 	IconUserCircle,
 	IconUsers,
 } from "@tabler/icons-react";
@@ -37,6 +39,7 @@ const ICONS: Record<string, Icon> = {
 	subcontracting: IconArrowsExchange,
 	bom: IconSitemap,
 	"sale-orders": IconReceipt,
+	"delivery-notes": IconTruckDelivery,
 	customers: IconUserCircle,
 	"employee-directory": IconId,
 	setup: IconSettings,
@@ -45,6 +48,7 @@ const ICONS: Record<string, Icon> = {
 /** Nested screens that must not share their parent's icon (Reorder keeps the Inventory icon). */
 const NESTED_ICONS: Record<string, Icon> = {
 	"/inventory/stock-transfers": IconArrowsRightLeft,
+	"/delivery-notes/pending": IconClipboardList,
 };
 
 /** Sidebar labels shown in sentence case when the screen list sends title case. */

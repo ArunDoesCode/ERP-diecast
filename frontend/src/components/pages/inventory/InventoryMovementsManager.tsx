@@ -83,6 +83,8 @@ const REFERENCE_TYPE_LABEL: Record<AssetReferenceType, string> = {
 	stock_adjustment: "Stock-take",
 	stock_transfer: "Stock transfer",
 	stock_transfer_reversal: "Transfer reversal",
+	delivery_note: "Delivery note",
+	delivery_note_cancel: "Delivery note cancelled",
 };
 
 const MANUAL_REFERENCE_LABEL = {
@@ -111,7 +113,10 @@ function SourceCell({ movement }: { movement: AssetMovement }) {
 	const isTransfer =
 		movement.referenceType === "stock_transfer" ||
 		movement.referenceType === "stock_transfer_reversal";
-	if (!(isReturn || isTransfer) || !source || source.id === 0) {
+	const isDispatch =
+		movement.referenceType === "delivery_note" ||
+		movement.referenceType === "delivery_note_cancel";
+	if (!(isReturn || isTransfer || isDispatch) || !source || source.id === 0) {
 		return <>{sourceLabel(movement)}</>;
 	}
 	const id = source.id || movement.referenceId;
@@ -122,7 +127,9 @@ function SourceCell({ movement }: { movement: AssetMovement }) {
 				href={
 					isTransfer
 						? `/inventory/stock-transfers/${id}`
-						: `/purchase-returns/${id}`
+						: isDispatch
+							? `/delivery-notes/${id}`
+							: `/purchase-returns/${id}`
 				}
 				className="font-mono text-brand-accent hover:underline"
 			>

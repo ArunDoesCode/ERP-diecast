@@ -7,8 +7,8 @@ import type {
 	ChallanListResult,
 	CompanySettings,
 	CompanySettingsHistoryResult,
-	CompanySettingsPayload,
 	CompanySettingsResult,
+	CompanySettingsSavePayload,
 	LossLogParams,
 	LossLogResult,
 	OpenChallanParams,
@@ -89,8 +89,8 @@ export function getCompanySettingsHistory() {
 	);
 }
 
-export function saveCompanySettings(payload: CompanySettingsPayload) {
-	return api.patch<ApiResult<CompanySettings>, CompanySettingsPayload>(
+export function saveCompanySettings(payload: CompanySettingsSavePayload) {
+	return api.patch<ApiResult<CompanySettings>, CompanySettingsSavePayload>(
 		API_ROUTES.company.settings,
 		payload,
 	);

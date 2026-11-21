@@ -34,6 +34,9 @@ export function CompanySettingsForm({
 			address: settings?.address ?? "",
 			gstin: settings?.gstin ?? "",
 			stateCode: settings?.stateCode ?? "",
+			ewayIntraLimitRupees: String(
+				(settings?.ewayIntraLimitPaise ?? 5_000_000) / 100,
+			),
 		},
 	});
 
@@ -41,7 +44,13 @@ export function CompanySettingsForm({
 		<Form {...form}>
 			<form
 				className="max-w-xl space-y-4"
-				onSubmit={form.handleSubmit((values) => mutation.mutate(values))}
+				onSubmit={form.handleSubmit((values) => {
+					const { ewayIntraLimitRupees, ...rest } = values;
+					mutation.mutate({
+						...rest,
+						ewayIntraLimitPaise: Math.round(Number(ewayIntraLimitRupees) * 100),
+					});
+				})}
 			>
 				<FormField
 					control={form.control}
@@ -97,6 +106,30 @@ export function CompanySettingsForm({
 						)}
 					/>
 				</div>
+				<FormField
+					control={form.control}
+					name="ewayIntraLimitRupees"
+					render={({ field }) => (
+						<FormItem className="min-h-19 gap-1.5">
+							<FormLabel htmlFor="company-eway-limit">
+								E-way bill limit, same state (₹)
+							</FormLabel>
+							<FormControl>
+								<Input
+									{...field}
+									id="company-eway-limit"
+									inputMode="decimal"
+									className="text-right tabular-nums sm:max-w-48"
+								/>
+							</FormControl>
+							<p className="text-[13px] text-muted-foreground">
+								A delivery note at or above this value needs an e-way bill.
+								Other-state sales always need one.
+							</p>
+							<FormMessage />
+						</FormItem>
+					)}
+				/>
 				<Button type="submit" disabled={mutation.isPending}>
 					{mutation.isPending ? "Saving..." : "Save"}
 				</Button>

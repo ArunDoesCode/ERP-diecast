@@ -28,6 +28,8 @@ export type StatusDoc =
 	| "purchaseReturn"
 	| "st"
 	| "debitNote"
+	| "dn"
+	| "dnTag"
 	| "supplierInvoice"
 	| "supplierInvoiceMatch"
 	| "rfq"
@@ -137,6 +139,18 @@ const MAP: Record<StatusDoc, Record<string, Entry>> = Object.assign(
 			posted: ["Posted", "success"],
 			cancelled: ["Cancelled", "closed"],
 			reversed: ["Reversed", "closed"],
+		}),
+		dn: table({
+			draft: ["Draft", "neutral"],
+			posted: ["Posted", "success"],
+			cancelled: ["Cancelled", "closed"],
+		}),
+		dnTag: table({
+			eway_needed: ["E-way needed", "warning"],
+			eway_missing: ["E-way missing", "warning"],
+			eway_optional: ["E-way optional", "neutral"],
+			eway_expired: ["E-way expired", "danger"],
+			short_stock: ["Short stock", "warning"],
 		}),
 		debitNote: table({
 			issued: ["Issued", "success"],

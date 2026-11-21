@@ -16,7 +16,8 @@ import {
 	useSaleOrderAuditQuery,
 	useSoExplosionsQuery,
 } from "@/lib/api/sale-order/queries";
-import { formatDateTime } from "@/lib/format";
+import { formatDate, formatDateTime, formatQty } from "@/lib/format";
+import type { DnListRow } from "@/types/delivery-note";
 import type { SoDetail } from "@/types/sale-order";
 
 export function SoExplosionPanel({ so }: { so: SoDetail }) {
@@ -80,6 +81,58 @@ export function SoExplosionPanel({ so }: { so: SoDetail }) {
 						))}
 					</ul>
 				) : null}
+			</CardContent>
+		</Card>
+	);
+}
+
+/** Notes shipped against this order (BR-DSP-38), above "Raised documents". Needs `dispatch.view`. */
+export function SoDeliveryNotesPanel({
+	notes,
+	loading,
+	failed,
+}: {
+	notes: DnListRow[] | undefined;
+	loading: boolean;
+	failed: boolean;
+}) {
+	return (
+		<Card size="sm">
+			<CardHeader>
+				<CardTitle>Delivery notes</CardTitle>
+			</CardHeader>
+			<CardContent className="text-sm">
+				{loading ? (
+					<Skeleton className="h-4 w-32" />
+				) : failed ? (
+					<p className="text-muted-foreground">
+						The delivery notes could not be loaded.
+					</p>
+				) : !notes || notes.length === 0 ? (
+					<p className="text-muted-foreground">Nothing shipped yet.</p>
+				) : (
+					<ul className="flex flex-col gap-2">
+						{notes.map((note) => (
+							<li key={note.id} className="flex flex-wrap items-center gap-2">
+								<Link
+									href={`/delivery-notes/${note.id}`}
+									className="font-mono text-brand-accent hover:underline"
+								>
+									{note.dnNumber ?? "Draft"}
+								</Link>
+								<span className="text-[13px] text-muted-foreground">
+									{formatDate(note.noteDate)} ·{" "}
+									{formatQty(
+										note.totalQty,
+										null,
+										Number.isInteger(note.totalQty) ? 0 : 3,
+									)}
+								</span>
+								<StatusBadge doc="dn" status={note.status} />
+							</li>
+						))}
+					</ul>
+				)}
 			</CardContent>
 		</Card>
 	);

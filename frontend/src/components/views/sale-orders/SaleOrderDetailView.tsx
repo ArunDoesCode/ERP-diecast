@@ -12,6 +12,7 @@ import { SoLinesCard } from "@/components/pages/sale-orders/SoLinesCard";
 import { SoReasonDialog } from "@/components/pages/sale-orders/SoReasonDialog";
 import {
 	SoActivityPanel,
+	SoDeliveryNotesPanel,
 	SoExplosionPanel,
 	SoRaisedPanel,
 } from "@/components/pages/sale-orders/SoSidePanels";
@@ -42,6 +43,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCan } from "@/hooks/use-can";
+import { useDeliveryNotesQuery } from "@/lib/api/delivery-note/queries";
 import {
 	type SoReasonAction,
 	soErrorMessage,
@@ -52,6 +54,7 @@ import {
 } from "@/lib/api/sale-order/queries";
 import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
 import { useBreadcrumbLast } from "@/lib/shell/breadcrumb-last";
+import type { DnListRow } from "@/types/delivery-note";
 import type { SoDetail } from "@/types/sale-order";
 
 const DOC_LABEL = {
@@ -59,7 +62,7 @@ const DOC_LABEL = {
 	sco: "Subcontract order",
 } as const;
 
-function flowSteps(so: SoDetail): DocumentFlowStep[] {
+function flowSteps(so: SoDetail, notes: DnListRow[]): DocumentFlowStep[] {
 	const steps: DocumentFlowStep[] = [
 		{
 			label: "Sale order",
@@ -96,8 +99,21 @@ function flowSteps(so: SoDetail): DocumentFlowStep[] {
 			state: "done",
 		});
 	}
-	// Delivery notes come with the dispatch screens; until then a plain "not yet" step.
-	steps.push({ label: "Delivery note", state: "todo" });
+	// One step per note that has not been cancelled (BR-DSP-38); none yet = a plain "not yet" step.
+	const live = notes.filter((note) => note.status !== "cancelled");
+	if (live.length === 0) {
+		steps.push({ label: "Delivery note", state: "todo" });
+		return steps;
+	}
+	for (const note of live) {
+		steps.push({
+			label: "Delivery note",
+			docNo: note.dnNumber ?? "Draft",
+			href: `/delivery-notes/${note.id}`,
+			status: <StatusBadge doc="dn" status={note.status} />,
+			state: note.status === "posted" ? "done" : "todo",
+		});
+	}
 	return steps;
 }
 
@@ -105,7 +121,13 @@ export function SaleOrderDetailView({ soId }: { soId: number }) {
 	const router = useRouter();
 	const canManage = useCan("so.manage");
 	const canExplode = useCan("so.explode");
+	const canDispatchView = useCan("dispatch.view");
+	const canDispatch = useCan("dispatch.manage");
 	const query = useSaleOrderQuery(soId);
+	const notesQuery = useDeliveryNotesQuery(
+		{ soId, page: 1, pageSize: 100 },
+		canDispatchView,
+	);
 	const so = query.data?.data;
 	useBreadcrumbLast(so?.soNumber);
 
@@ -201,6 +223,14 @@ export function SaleOrderDetailView({ soId }: { soId: number }) {
 		}
 	}
 
+	// BR-DSP-37: a second action beside the SO's own next step, never inside "More". It is the
+	// primary only when this user has no other next step (no "Explode BOM" / "Create drafts").
+	const showDispatch =
+		canDispatch &&
+		so.status === "confirmed" &&
+		so.lines.some((line) => line.openQty > 0);
+	const hasOtherNextStep = so.status === "confirmed" && canExplode;
+
 	const editable = so.status === "draft" || so.status === "confirmed";
 	const canHold = so.status === "confirmed";
 	const canClose = so.status === "confirmed" || so.status === "on_hold";
@@ -238,6 +268,16 @@ export function SaleOrderDetailView({ soId }: { soId: number }) {
 				actions={
 					<>
 						{nextStep(so)}
+						{showDispatch ? (
+							<Button
+								type="button"
+								size="sm"
+								variant={hasOtherNextStep ? "outline" : "default"}
+								asChild
+							>
+								<Link href={`/delivery-notes/new?so=${so.id}`}>Dispatch</Link>
+							</Button>
+						) : null}
 						{hasMore ? (
 							<DropdownMenu>
 								<DropdownMenuTrigger asChild>
@@ -275,7 +315,7 @@ export function SaleOrderDetailView({ soId }: { soId: number }) {
 				{...back}
 			/>
 
-			<DocumentFlow steps={flowSteps(so)} />
+			<DocumentFlow steps={flowSteps(so, notesQuery.data?.data ?? [])} />
 
 			{banner ? (
 				<output className="block rounded-md bg-neutral-subtle px-3 py-2 text-sm text-neutral">
@@ -291,6 +331,13 @@ export function SaleOrderDetailView({ soId }: { soId: number }) {
 				</div>
 				<div className="flex min-w-0 flex-col gap-4">
 					<SoExplosionPanel so={so} />
+					{canDispatchView ? (
+						<SoDeliveryNotesPanel
+							notes={notesQuery.data?.data}
+							loading={notesQuery.isLoading}
+							failed={notesQuery.isError}
+						/>
+					) : null}
 					<SoRaisedPanel so={so} />
 					<SoActivityPanel soId={so.id} />
 				</div>

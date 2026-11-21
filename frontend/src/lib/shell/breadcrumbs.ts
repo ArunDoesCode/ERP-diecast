@@ -27,6 +27,7 @@ const LIST_LABELS: Record<string, string> = {
 	subcontracting: "Subcontracting",
 	bom: "Bills of materials",
 	"sale-orders": "Sale orders",
+	"delivery-notes": "Delivery notes",
 	customers: "Customers",
 	"employee-directory": "Employee directory",
 	setup: "Setup",
@@ -115,6 +116,36 @@ export function buildBreadcrumbs(
 			{ label: options?.docNumber ?? "Details", href: `/rfq/${segments[1]}` },
 			{ label: leaf[segments[2]] ?? labelFor(segments[2]) },
 		);
+		delete crumbs[crumbs.length - 1].href;
+		return crumbs;
+	}
+	if (segments[0] === "delivery-notes") {
+		// Dispatch > Pending dispatch | Delivery notes > (New delivery note | DN no. > Edit | Print).
+		if (options?.group) crumbs.push({ label: options.group });
+		if (segments[1] === "pending") {
+			crumbs.push({ label: "Pending dispatch" });
+			return crumbs;
+		}
+		crumbs.push({
+			label: LIST_LABELS["delivery-notes"],
+			href: "/delivery-notes",
+		});
+		if (segments[1] === "new") {
+			crumbs.push({ label: "New delivery note" });
+		} else if (segments.length > 1) {
+			const leaf: Record<string, string> = { edit: "Edit", print: "Print" };
+			if (segments[2]) {
+				crumbs.push(
+					{
+						label: options?.docNumber ?? "Details",
+						href: `/delivery-notes/${segments[1]}`,
+					},
+					{ label: leaf[segments[2]] ?? labelFor(segments[2]) },
+				);
+			} else {
+				crumbs.push({ label: options?.docNumber ?? "Details" });
+			}
+		}
 		delete crumbs[crumbs.length - 1].href;
 		return crumbs;
 	}

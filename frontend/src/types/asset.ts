@@ -186,6 +186,8 @@ export const assetReferenceTypeValues = [
 	"stock_adjustment",
 	"stock_transfer",
 	"stock_transfer_reversal",
+	"delivery_note",
+	"delivery_note_cancel",
 ] as const;
 
 export type AssetReferenceType = (typeof assetReferenceTypeValues)[number];

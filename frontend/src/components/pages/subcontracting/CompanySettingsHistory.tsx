@@ -14,7 +14,7 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { useCompanySettingsHistoryQuery } from "@/lib/api/subcontracting/queries";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, formatMoney } from "@/lib/format";
 
 const FIELD_LABEL: Record<string, string> = {
 	name: "Name",
@@ -23,11 +23,16 @@ const FIELD_LABEL: Record<string, string> = {
 	stateCode: "State",
 	priceToleranceBp: "Price tolerance",
 	weightToleranceBp: "Weight tolerance",
+	ewayIntraLimitPaise: "E-way bill limit",
 };
 
 // Tolerances are stored as basis points text; show them as a percent.
 function historyValue(field: string, value: string | null) {
 	if (!value) return "–";
+	if (field === "ewayIntraLimitPaise") {
+		const paise = Number(value);
+		return Number.isFinite(paise) ? formatMoney(paise) : value;
+	}
 	if (field !== "priceToleranceBp" && field !== "weightToleranceBp") {
 		return value;
 	}
