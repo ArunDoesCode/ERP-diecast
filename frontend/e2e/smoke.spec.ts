@@ -25,7 +25,7 @@ test("T-4 seeded admin logs in and sees at least one purchase requisition row", 
 	await page.getByLabel("Email").fill(EMAIL);
 	await page.getByLabel("Password").fill(PASSWORD);
 	await page.getByRole("button", { name: "Sign in" }).click();
-	await page.waitForURL("**/landing");
+	await page.waitForURL("**/home");
 
 	await page.goto("/purchase-requisitions");
 	await expect(page).toHaveURL(/\/purchase-requisitions/);

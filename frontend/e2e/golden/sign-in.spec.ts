@@ -9,11 +9,11 @@ test("T-5 (1) sign in, stay signed in after a reload, log out to the login page"
 	page,
 }) => {
 	await uiLogin(page, "back_office");
-	await expect(page).toHaveURL(/\/landing/);
+	await expect(page).toHaveURL(/\/home/);
 	await expect(page.getByText("Fixture back_office").first()).toBeVisible();
 
 	await page.reload();
-	await expect(page).toHaveURL(/\/landing/);
+	await expect(page).toHaveURL(/\/home/);
 	await expect(page.getByText("Fixture back_office").first()).toBeVisible();
 
 	await page.getByText("Fixture back_office").first().click();

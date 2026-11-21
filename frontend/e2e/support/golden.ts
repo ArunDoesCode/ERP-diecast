@@ -83,7 +83,7 @@ export async function api(
 	return json;
 }
 
-/** Sign in through the login screen and wait for the landing page. */
+/** Sign in through the login screen and wait for Home. */
 export async function uiLogin(page: Page, role: Role) {
 	await page.route(`${API_URL}/auth/login`, (route) =>
 		route.continue({
@@ -94,7 +94,7 @@ export async function uiLogin(page: Page, role: Role) {
 	await page.getByLabel("Email").fill(emailOf(role));
 	await page.getByLabel("Password").fill(SEED_PASSWORD);
 	await page.getByRole("button", { name: "Sign in" }).click();
-	await page.waitForURL("**/landing", { timeout: 20_000 });
+	await page.waitForURL("**/home", { timeout: 20_000 });
 }
 
 /** Tokens for the roles a path needs, logged in once per test through the API. */

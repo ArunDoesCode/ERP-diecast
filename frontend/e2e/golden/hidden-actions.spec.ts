@@ -36,10 +36,10 @@ test("T-5 (7) QA inspector sees no PO menu and no New SCO button; typed PO URL r
 	await expect(page.getByRole("link", { name: "New SCO" })).toHaveCount(0);
 	await expect(page.getByRole("button", { name: /^New/ })).toHaveCount(0);
 
-	// A typed PO URL does not open the PO screen; the user is sent home (the landing page).
+	// A typed PO URL does not open the PO screen; the user is sent home (Home).
 	await page.goto("/purchase-orders");
 	await expect(page.getByText("Purchase orders", { exact: true })).toHaveCount(
 		0,
 	);
-	await expect.soft(page).toHaveURL(/\/landing/);
+	await expect.soft(page).toHaveURL(/\/home/);
 });
