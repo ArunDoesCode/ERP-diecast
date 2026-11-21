@@ -226,6 +226,7 @@ export const inventoryReferenceTypeSchema = z.enum([
   "grn",
   "grn_bypass",
   "pro",
+  "pro_cancel",
   "sco_issue",
   "sco_receipt",
   "job_order_issue",
@@ -523,7 +524,7 @@ export const assetInventoryMovementListRowSchema =
     sourceDocument: z.object({
       type: inventoryReferenceTypeSchema,
       id: z.number().int(),
-      // document number, e.g. "GRN-2026-0001"; null for manual movements
+      // document number, e.g. "GRN-2026-0001" or the purchase return's pro_number; null for manual movements
       // (referenceId 0: the reason is in `notes`)
       number: z.string().nullable(),
     }),

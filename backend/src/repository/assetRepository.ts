@@ -21,6 +21,7 @@ import {
   purchaseOrderItems,
   purchaseOrders,
   purchaseRequestItems,
+  purchaseReturns,
   serviceMaster,
   supplierItems,
   supplierMaster,
@@ -64,7 +65,9 @@ const inventoryMovementColumns = {
   referenceType: inventoryLedger.referenceType,
   referenceId: inventoryLedger.referenceId,
   referenceLineId: inventoryLedger.referenceLineId,
-  sourceNumber: grns.grnNumber,
+  sourceNumber: sql<
+    string | null
+  >`coalesce(${grns.grnNumber}, ${purchaseReturns.proNumber})`,
   quantityChange: inventoryLedger.quantityChange,
   balanceAfter: inventoryLedger.balanceAfter,
   unitCostPaise: inventoryLedger.unitCostPaise,
@@ -431,6 +434,13 @@ export const assetRepository = {
               "grn_bypass",
               "grn_correction",
             ]),
+          ),
+        )
+        .leftJoin(
+          purchaseReturns,
+          and(
+            eq(purchaseReturns.id, inventoryLedger.referenceId),
+            inArray(inventoryLedger.referenceType, ["pro", "pro_cancel"]),
           ),
         )
         .where(whereClause)
