@@ -15,7 +15,7 @@ import type {
 } from "../types/reorder.types";
 
 // Run detail is not paged: at most this many item rows (api.md).
-const RUN_DETAIL_ITEM_LIMIT = 500;
+const RUN_DETAIL_ITEM_LIMIT = 5000;
 
 function toPaginatedMeta(page: number, pageSize: number, total: number) {
   return {

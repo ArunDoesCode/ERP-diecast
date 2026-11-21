@@ -1,4 +1,14 @@
-import { and, asc, count, desc, eq, inArray, type SQL, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  inArray,
+  lt,
+  type SQL,
+  sql,
+} from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import { db } from "../db/client";
@@ -266,7 +276,7 @@ export const reorderRepository = {
       .where(
         and(
           eq(reorderRuns.state, "running"),
-          sql`${reorderRuns.startedAt} < ${cutoff}`,
+          lt(reorderRuns.startedAt, cutoff),
         ),
       );
   },
