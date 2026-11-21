@@ -88,6 +88,8 @@ const SPEC: Record<string, R[]> = {
   // stock-transfer spec "Who can do what" (BR-STR-34)
   "stock_transfer.manage": ["ow", "bo"],
   "stock_transfer.reverse": ["ow", "bo"],
+  // supplier-rating spec "Who can do what" (BR-SRT-29)
+  "supplier.rating.view": ["ow", "bo"],
 };
 
 describe("BR-AUTH-06 permission catalog defined in code", () => {
@@ -247,6 +249,32 @@ describe("rfq and rate-contract keys and screens (BR-RFQ-70)", () => {
     ] as const)
       for (const k of KEYS)
         expect(SEED_GRANTS[role] as string[]).not.toContain(k);
+  });
+});
+
+describe("supplier-rating key and screen (BR-SRT-29, BR-SRT-40)", () => {
+  test("BR-SRT-29 supplier.rating.view is in the catalog", () => {
+    expect(PERMISSION_KEYS as string[]).toContain("supplier.rating.view");
+  });
+
+  test("BR-SRT-29 only owner and back_office hold supplier.rating.view", () => {
+    const holders = Object.entries(SEED_GRANTS)
+      .filter(([, ks]) => (ks as string[]).includes("supplier.rating.view"))
+      .map(([n]) => n)
+      .sort();
+    expect(holders).toEqual(["back_office", "owner"]);
+  });
+
+  test("BR-SRT-40 floor_supervisor holds supplier.view but not supplier.rating.view", () => {
+    expect(SEED_GRANTS.floor_supervisor as string[]).toContain("supplier.view");
+    expect(SEED_GRANTS.floor_supervisor as string[]).not.toContain(
+      "supplier.rating.view",
+    );
+  });
+
+  test("BR-SRT-29 the supplier-ratings screen is /supplier-ratings behind supplier.rating.view", () => {
+    expect(SCREENS["supplier-ratings"].path).toBe("/supplier-ratings");
+    expect(SCREENS["supplier-ratings"].permission).toBe("supplier.rating.view");
   });
 });
 
