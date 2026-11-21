@@ -12,7 +12,7 @@ only — never use it to learn what production code does.
 | The test DB is in memory: empty after a container restart. Rebuild with `bun run db:test:prepare` (never `db:reset`) | `docs/runbooks/test-db-reset.md` |
 | Real DB, no mocks. HTTP tests go through the full app: `createApp()` from `backend/src/app.ts` | every `tests/routes/*.test.ts` |
 | Tests live in `backend/tests/<layer>/` (`routes`, `service`, `repository`, `lib`, `types`, `scripts`; `scenarios` is created with the first scenario test) and import with `../../src/...` | folder layout |
-| **There are no shared helper files.** Each test file defines its own helpers at the top. Copy from the reference file below; do not import helpers from another test file | all files |
+| **One shared helper exists: `backend/tests/helpers/rfqFixtures.ts`** (section 3a), for the RFQ / rate-contract / PO-contract tests. Everywhere else each test file defines its own helpers at the top; copy from the reference files below and never import helpers from another test file | `tests/helpers/` |
 
 ## 2. What the test DB already holds (after `db:test:prepare`)
 Same as CI (`db:reset --no-fixtures`): schema, plus
@@ -37,6 +37,14 @@ row your test needs.
 | Approval flow | `backend/tests/routes/approval-requests.test.ts`, `approval-policies.test.ts` | policies with negative priorities, `act()` helper |
 | Smoke of the app + error mapping | `backend/tests/app.test.ts` | 401, 403, 404, validation |
 | Scripts run as a child process on a scratch DB | `backend/tests/scripts/*.test.ts` | `run()`, `withDb(url)`, `assertScratchOnly()`, sentinels |
+
+## 3a. Shared helper — `backend/tests/helpers/rfqFixtures.ts`
+Used by `rfq.test.ts`, `rfqQuotes.test.ts`, `rfqAward.test.ts`, `rateContract.test.ts`, `poContract.test.ts`.
+- `const fx = makeRfqFx("<tag>")` per file: its own `TEST_<tag>_<now>` prefix, its own rows, its own `fx.cleanup()` (call in `afterAll`). Files never share data.
+- Actors: `fx.owner()`, `owner2()`, `bo()`, `floor()`, `superAdmin()` (seed roles), or `fx.actor(key, ["rfq.view", …])` for a throw-away role with exactly those keys. Cached per key.
+- **`fx.call` signs a fresh token on every request**, so tests that move the clock with `setSystemTime(+N days)` stay authenticated (a token cached before the jump expires after 15 min of shifted time → 401).
+- Builders: `newSupplier`, `newItem`, `newPr` (approved PR + lines inserted straight into the tables — fixture shortcut), `mkRfq`, `quoteBody` / `enterQuote` / `mkQuote`, `award`, `mkContract`, `poLine` / `createPo`, `maintenancePoPolicy`, `submitPo`, `approve`, `poItems`; HTTP wrappers `rfqApi`, `rcApi`, `poApi`; `istDay(offset)`.
+- Extend this file for RFQ-area tests instead of copying it; for other modules the per-file rule still holds.
 
 ## 4. Helper patterns and their defaults
 - **Unique names.** `const RUN = \`TEST_<module>_${Date.now()}\`; let seq = 0; const uid = () => \`${RUN}_${++seq}\`;`
@@ -102,6 +110,6 @@ Also the run's `.pipeline/<id>/contract.md`. Things that were guessed wrong befo
 
 ## Not there yet
 - `frontend/e2e/` (Playwright) does not exist; this file gets a frontend section when it does.
-- No shared factory module. If the same helper is copied a fifth time, test-writer may propose
-  `backend/tests/helpers/` in its report; the coordinator opens an issue (it is a change to tests, so only
-  test-writer builds it).
+- No general shared factory module (only the RFQ-area `tests/helpers/rfqFixtures.ts`). If the same helper is
+  copied a fifth time elsewhere, test-writer may propose another `backend/tests/helpers/` file in its report;
+  the coordinator opens an issue (it is a change to tests, so only test-writer builds it).

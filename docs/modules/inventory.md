@@ -3,8 +3,8 @@ module: inventory
 spec: docs/specs/inventory.md (v1 frozen) + docs/specs/grn-stock.md (v1 frozen)
 last_verified_commit: eea4fb1
 last_verified_on: 2026-09-29
-partially_verified: de68fdf (2026-11-21) — posting row, ledger ref types, Known gaps
-depends_on: [suppliers, grn]
+partially_verified: 986ea76 (2026-11-21) — last-rate chain (repository/service rows, API rows, gotcha); de68fdf — posting row, ledger ref types, Known gaps
+depends_on: [suppliers, grn, rfq]
 ---
 
 # Inventory / Asset — as-built map
@@ -24,10 +24,11 @@ screen for stock-take and opening stock. All BR-INV-01..25 are built and tested
 | Layer | Path | Key symbols |
 |---|---|---|
 | schema | `backend/src/db/schemas/02_procurement-catalog.ts` | `itemMaster` (+ `standardRatePaise`, `lastUpdated*`), `serviceMaster`, `locations` (+ `isActive`, `lastUpdated*`), `machines` (+ `code`, `isActive`), `inventoryLedger`, enums; functional unique indexes `lower(btrim(x))`; partial unique: one `main_store`, one `vendor_premise` per supplier |
-| types | `backend/src/types/asset.types.ts` | item/service/location/machine create + update schemas (`.strict()`), `ITEM_CATEGORIES`, `ITEM_UOMS`, manual movement discriminated union (`countedQty` for stock-take, `qty` + `unitCostPaise` for opening), stock view + last-rate schemas |
-| repository | `backend/src/repository/assetRepository.ts` | `listItems`, `createItem`, `updateItemLocked`, `isItemInUse`, `getLastRate`, `listStock`, `listInventoryMovements`, `manualMovement`, `inventoryReconciliation`, location/service/machine CRUD, `likePattern` |
+| types | `backend/src/types/asset.types.ts` | item/service/location/machine create + update schemas (`.strict()`), `ITEM_CATEGORIES`, `ITEM_UOMS`, manual movement discriminated union (`countedQty` for stock-take, `qty` + `unitCostPaise` for opening), stock view + last-rate schemas (`onDate`, source `contract` + contract fields, `assetLastRatesQuerySchema` / `assetLastRatesSchema`) |
+| repository | `backend/src/repository/assetRepository.ts` | `listItems`, `createItem`, `updateItemLocked`, `isItemInUse`, `getLastRate` / `getLastRates` (both delegate to `rateChainRepository.findRateChoices`), `listStock`, `listInventoryMovements`, `manualMovement`, `inventoryReconciliation`, location/service/machine CRUD, `likePattern` |
+| rate chain | `backend/src/repository/rateChainRepository.ts` | `findRateChoices(executor, supplierId, itemIds, {onDate, includeContract, includeFallback?})` — the single last-rate chain, shared with `poRepository.findLastRates` and the RFQ award; `contractUsableOn`, `APPROVED_OR_LATER_PO_STATUSES` |
 | posting | `backend/src/repository/stockPostingRepository.ts` | `postStock` (locks item, refuses unknown 404 / inactive 400 location, `blockNegative` → 409 `INSUFFICIENT_STOCK`; row value and average in BigInt with `assertMoneyInRange` / `assertStockValueInRange`) |
-| service | `backend/src/service/assetService.ts` | validation not expressible in Zod: unit-dependent whole numbers (`assertReorderLevelFitsUnit`), in-use locks, main-store rules, `getConflictError` (unwraps drizzle `cause`) |
+| service | `backend/src/service/assetService.ts` | validation not expressible in Zod: unit-dependent whole numbers (`assertReorderLevelFitsUnit`), in-use locks, main-store rules, `getConflictError` (unwraps drizzle `cause`); `getLastRate(itemId, query, actor)`, `getLastRates(query, actor)`, `shapeLastRates` (one `fulfilmentByLine` call for `qtyLeft`) |
 | routes | `backend/src/routes/asset.ts` + `END_POINTS.asset` | guards `requirePermission(key)`; `GET /machines` is any signed-in user, service allows `asset.manage` or `pr.link_machine` (BR-AUTH-26) |
 | frontend | `frontend/src/lib/api/asset/{fetchers,queries}.ts`, `frontend/src/components/{pages,views}/inventory/*` (incl. `InventoryStockManager`, `InventoryStockView`, `inventory-format.ts`), `frontend/src/app/(protected)/inventory/stock/page.tsx`, `frontend/src/types/asset.ts` | UI gated by `useCan(key)` |
 
@@ -36,7 +37,8 @@ screen for stock-take and opening stock. All BR-INV-01..25 are built and tested
 |---|---|---|---|
 | GET | `/api/asset/items` | `inventory.view` (ow, bo, fs) | Items list |
 | POST / PATCH | `/api/asset/items`, `/items/:id` | `asset.manage` (bo) | Create / edit / (de)activate item |
-| GET | `/api/asset/items/:itemId/last-rate` | `inventory.view` | BR-INV-24 chain, returns `source` |
+| GET | `/api/asset/items/:itemId/last-rate` | `inventory.view` | Rate chain for one item; query `supplierId`, `onDate?` (IST day, default today); returns `ratePaise`, `source` (+ `contractItemId`, `contractId`, `contractNumber`, `gstPercent`, `qtyLeft` when `contract`) |
+| GET | `/api/asset/items/last-rates` | `inventory.view` | Same chain, batched: `supplierId`, `itemIds=1,2,3` (max 200), `onDate?`; `data: [{itemId, …}]`, unknown items left out |
 | GET / POST / PATCH | `/api/asset/services`, `/machines` | `asset.manage` (bo) | Masters. `GET /machines`: any login, service check `asset.manage` or `pr.link_machine` |
 | GET | `/api/asset/locations` | `asset.manage` or `inventory.view` (ow, bo, fs) | Read — pickers on stock view and stock-take form (auth-setup v10) |
 | POST / PATCH | `/api/asset/locations`, `/locations/:id` | `asset.manage` (bo) | Create / edit / (de)activate |
@@ -50,7 +52,9 @@ screen for stock-take and opening stock. All BR-INV-01..25 are built and tested
 - The only active `main_store` can't be deactivated (409, decided by Arun 2026-09-29; spec line pending BL-048). With the one-main_store index this means the main store is never deactivated.
 - `isVirtual` is derived from type (vendor_premise → true, else false); client value ignored.
 - Reorder level is whole for pcs/set (checked only when reorderLevel or unit changes).
-- Last rate: newest line with rate > 0 on an approved-or-later PO → catalog → average > 0 → standard rate. Legacy items with standard rate 0 return 0 (source `standard_rate`). Source `item_average` = item average (BR-INV-30, was `pr_estimate`).
+- Last rate (one chain, `findRateChoices`, BR-INV-24 + BR-RFQ-50): contract line usable on `onDate` (active or terminated, `validFrom` ≤ day ≤ coalesce(`terminatedOn`, `validTo`); newest contract line wins) → newest line with rate > 0 on an approved-or-later PO of this supplier → active catalog price → average > 0 → standard rate. Legacy items with standard rate 0 return 0 (source `standard_rate`). Source `item_average` = item average (BR-INV-30, was `pr_estimate`).
+- Contract visibility (BR-RFQ-56): the contract step is used only when the caller holds `po.manage` or `contract.view`; anyone else with `inventory.view` gets the next source as if no contract existed. `qtyLeft` = cap − ordered (null for rate-only lines), a UI hint only.
+- The frontend keys last-rate queries by IST date (`onDate`, CR-05); PO forms use the batched endpoint (`useItemsLastRatesQuery`).
 - `standard_rate_paise` defaults to 0 in the DB for old rows; the API requires > 0 on create.
 - Search uses `likePattern` (escapes `\ % _`); `ilike` on an enum column needs a `::text` cast.
 - drizzle wraps Postgres errors in `cause` — read the code/constraint from there for 23505 → 409.
@@ -65,6 +69,7 @@ screen for stock-take and opening stock. All BR-INV-01..25 are built and tested
 | `backend/tests/service/inventoryMasters.test.ts` | BR-INV-01..18, 24, 25 |
 | `backend/tests/service/inventoryStock.test.ts` | BR-INV-06, 07, 10, 19..23 |
 | `backend/tests/service/stockPosting.test.ts` | grn-stock BR-GRN-21..44 incl. manual movements |
+| `backend/tests/routes/poContract.test.ts` | last rate contract-first, visibility (BR-RFQ-50, 56), batched `last-rates` |
 
 ## Known gaps / debt
 - BR-INV-05 PO half (PR line approved before deactivation) → BL-046 (PO code, auth session). SCO part → subcontracting build.
@@ -91,3 +96,4 @@ screen for stock-take and opening stock. All BR-INV-01..25 are built and tested
 | 2026-09-29 | work/m1-stock e8f395c..6257268 | inventory v1 built: masters rules, stock view, stock-take/opening, last rate, indexes, tests |
 | 2026-09-29 | work/m1 da516f2..eea4fb1 | Merged into work/m1; routes on permission keys, `GET /machines` shared with `pr.link_machine`; inactive-item check for PR lines now from work/m1 |
 | 2026-11-21 | c0f73b0..de68fdf (partial) | Purchase returns write `pro` / `pro_cancel`; `postStock` code `INSUFFICIENT_STOCK`, BigInt value checks. Other changes since eea4fb1 not re-verified |
+| 2026-11-21 | df25886..986ea76 (partial) | One last-rate chain `rateChainRepository.findRateChoices` (contract first, `onDate`, visibility by key); batched `GET /asset/items/last-rates`. Rest not re-verified |

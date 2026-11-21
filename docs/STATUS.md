@@ -4,8 +4,8 @@
 > PR), `/watch-prs` (merges), `/status` (on demand) and `/wrap`. Humans: read this, then run `/status`.
 
 **Updated:** 2026-11-21 · **Milestone:** M1 Procurement hardening and M2 Subcontracting are merged. UAT-1 at the factory has not started. SCM epic (`epic/scm`) in progress.
-**Now:** SCM epic — bom, sale-order, reorder, purchase-returns and supplier-invoice built and green (2639 backend tests pass). Maps written for all five.
-**Next action:** next SCM sub-feature `rfq` (spec frozen v1). Later in the epic: supplier-rating, dispatch.
+**Now:** SCM epic — bom, sale-order, reorder, purchase-returns, supplier-invoice and rfq built and green (2919 backend tests pass). Maps written for all six.
+**Next action:** next SCM sub-feature `stock-transfer`. Later in the epic: supplier-rating, dispatch.
 
 ## Modules
 | Module | Spec | Map | Code | State |
@@ -26,14 +26,15 @@
 | reorder | frozen v1 | [map](modules/reorder.md) | full | built, green — epic/scm |
 | purchase-returns | frozen v1 | [map](modules/purchase-returns.md) | full | built, green — epic/scm |
 | supplier-invoice | frozen v1 | [map](modules/supplier-invoice.md) | full (no payments) | built, green — epic/scm |
-| rfq | frozen v1 | — | none | next in epic/scm |
+| rfq (RFQ, quotes, award, rate contracts) | frozen v1 | [map](modules/rfq.md) | full | built, green — epic/scm |
+| stock-transfer | — | — | none | next in epic/scm |
 
 Legend — Code: none / schema only / partial / full. Tests per module: see each map's **Tests** table.
 
 ## Active work
 | Item | Branch | Phase | PR | Waiting on |
 |---|---|---|---|---|
-| SCM epic: bom, sale-order, reorder, purchase-returns, supplier-invoice | feature/scm-supplier-invoice (epic/scm) | built, green (2639 backend tests) | none yet | next sub-feature: rfq |
+| SCM epic: bom, sale-order, reorder, purchase-returns, supplier-invoice, rfq | feature/scm-rfq (epic/scm) | built, green (2919 backend tests) | none yet | next sub-feature: stock-transfer |
 | Design-review fixes, GRN on shared patterns, BR-GRN-45 (#109) | claude/cranky-payne-f2bc8a | done, local | none yet | you: push, open PR, merge |
 
 ## Waiting on you
@@ -44,8 +45,11 @@ Legend — Code: none / schema only / partial / full. Tests per module: see each
 - [ ] Before UAT-1: run the subcontracting manual UI checklist (PR #14 body).
 - [ ] Dev DB: `brew install libpq` (for `pg_dump`), then `bun run db:reset` + `bun run seed` — a push-built dev DB cannot be migrated (BR-MIG-21).
 - [ ] Open issues: 57, none P1 (`gh issue list`). P2 defects: #34 (inactive item on a new PO), #41 (PO supplier picker lists inactive suppliers). Date/guard follow-ups: #82, #83, #84, #85.
+- [ ] Follow-up (no issue yet): `backend/scripts` is not in `bun run typecheck` (`tsconfig.json` includes only `src`, `tests`), so type drift there is not caught — pre-existing drift in `db-reset-fixtures.ts` / `db-reset.ts`. The rfq build found it when `poService.create` started taking an `Actor` and the fixtures reset crashed (fixed in 986ea76).
+- [ ] rfq build assumptions to confirm: A-43 (award PO lines can't be removed; cancel the PO instead), A-48 (cancelling an RFQ with submitted quotes needs `rfq.award`) — `docs/specs/rfq/assumptions.md`.
 
 ## Recently done
+- 2026-11-21 — SCM epic: RFQ + supplier quotes + comparison + award (one draft PO per winning supplier through the shared PO draft) and rate contracts (contract-first PO rate, locked GST, override with key + reason, qty cap at PO create / update / submit / approve), one last-rate chain with batched `GET /asset/items/last-rates` (BR-RFQ-01..57, 60, 61, 70..74); 2919 backend tests pass. Map `rfq` added; purchase-order, inventory, approval maps partly refreshed; shared test helper `tests/helpers/rfqFixtures.ts`.
 - 2026-11-21 — SCM epic: purchase returns (BR-PRT-01..47: draft/post/cancel, debit note + return challan, GRN correction floor) and supplier invoice with 3-way match (BR-SINV-01..41: match, release, cancel, PO `invoiced` set by the invoice service, debit-note links); manual PO "Record invoice" removed, old invoice rows kept as `legacy`; 2639 backend tests pass. Maps added; grn, purchase-order, inventory maps partly refreshed.
 - 2026-11-21 — SCM epic: BOM (BR-BOM-01..28), sale order + customers + explosion + draft PR/SCO (BR-SO-01..62), automatic reorder (BR-RO) built; 2271 backend tests pass. Migration `20261121063850` nulls old PR `sale_order_id` values (note kept on the PR). Module maps added.
 - 2026-11-19 — All 57 open issues fixed on `claude/cranky-payne-f2bc8a`; full flow run (purchase, GRN, subcontracting) passes in the browser; 1773 backend + 301 frontend tests, 7 golden-path e2e on desktop + tablet. Frontend TypeScript stays 6.0.3 until a Next.js upgrade (TS 7 breaks `next build` on 16.2). Deploy note: everyone signs in once; operator QR badges must be regenerated.
