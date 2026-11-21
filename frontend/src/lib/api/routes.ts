@@ -15,6 +15,8 @@ const API_Header = {
 	reorder: "/reorder",
 	company: "/company",
 	supplierInvoice: "/supplier-invoice",
+	rfq: "/rfq",
+	rateContract: "/rate-contract",
 };
 export const API_ROUTES = {
 	auth: {
@@ -258,6 +260,35 @@ export const API_ROUTES = {
 			`${API_Header.supplierInvoice}/${id}/back-to-draft`,
 		release: (id: number) => `${API_Header.supplierInvoice}/${id}/release`,
 		cancel: (id: number) => `${API_Header.supplierInvoice}/${id}/cancel`,
+	},
+	rfq: {
+		prLines: `${API_Header.rfq}/pr-lines`,
+		list: `${API_Header.rfq}/getrfqs`,
+		detail: (id: number) => `${API_Header.rfq}/getrfqdetails/${id}`,
+		create: `${API_Header.rfq}/createrfq`,
+		update: `${API_Header.rfq}/updaterfq`,
+		send: (id: number) => `${API_Header.rfq}/${id}/send`,
+		cancel: (id: number) => `${API_Header.rfq}/${id}/cancel`,
+		close: (id: number) => `${API_Header.rfq}/${id}/close`,
+		print: (id: number) => `${API_Header.rfq}/${id}/print`,
+		comparison: (id: number) => `${API_Header.rfq}/${id}/comparison`,
+		award: (id: number) => `${API_Header.rfq}/${id}/award`,
+		createQuote: (id: number) => `${API_Header.rfq}/${id}/quotes`,
+		quote: (quoteId: number) => `${API_Header.rfq}/quotes/${quoteId}`,
+		submitQuote: (quoteId: number) =>
+			`${API_Header.rfq}/quotes/${quoteId}/submit`,
+		cancelQuote: (quoteId: number) =>
+			`${API_Header.rfq}/quotes/${quoteId}/cancel`,
+	},
+	rateContracts: {
+		list: `${API_Header.rateContract}/getcontracts`,
+		detail: (id: number) =>
+			`${API_Header.rateContract}/getcontractdetails/${id}`,
+		create: `${API_Header.rateContract}/createcontract`,
+		update: `${API_Header.rateContract}/updatecontract`,
+		activate: (id: number) => `${API_Header.rateContract}/${id}/activate`,
+		terminate: (id: number) => `${API_Header.rateContract}/${id}/terminate`,
+		cancel: (id: number) => `${API_Header.rateContract}/${id}/cancel`,
 	},
 	company: {
 		invoiceTolerances: `${API_Header.company}/invoice-tolerances`,

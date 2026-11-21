@@ -20,6 +20,8 @@ const LIST_LABELS: Record<string, string> = {
 	grn: "Goods receipt",
 	"purchase-returns": "Purchase returns",
 	"supplier-invoices": "Supplier invoices",
+	rfq: "Requests for quotation",
+	"rate-contracts": "Rate contracts",
 	inventory: "Inventory",
 	subcontracting: "Subcontracting",
 	bom: "Bills of materials",
@@ -55,6 +57,27 @@ export function buildBreadcrumbs(
 				crumbs.push({ label: options?.docNumber ?? "Details" });
 			}
 		}
+		delete crumbs[crumbs.length - 1].href;
+		return crumbs;
+	}
+	if (
+		segments[0] === "rfq" &&
+		segments.length > 2 &&
+		/^\d+$/.test(segments[1])
+	) {
+		// Nested RFQ screens: RFQ > RFQ no. > Compare / Quote / Print.
+		const leaf: Record<string, string> = {
+			compare: "Compare",
+			quotes: "Quote",
+			print: "Print",
+			edit: "Edit",
+		};
+		if (options?.group) crumbs.push({ label: options.group });
+		crumbs.push(
+			{ label: LIST_LABELS.rfq, href: "/rfq" },
+			{ label: options?.docNumber ?? "Details", href: `/rfq/${segments[1]}` },
+			{ label: leaf[segments[2]] ?? labelFor(segments[2]) },
+		);
 		delete crumbs[crumbs.length - 1].href;
 		return crumbs;
 	}

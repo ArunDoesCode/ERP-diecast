@@ -3,6 +3,10 @@
 import { IconCurrencyRupee } from "@tabler/icons-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import {
+	ContractRateControls,
+	overrideReasonValid,
+} from "@/components/pages/purchase-orders/ContractRateControls";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -22,7 +26,9 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { useCan } from "@/hooks/use-can";
 import {
+	poErrorMessage,
 	usePurchaseOrderDetailQuery,
 	useSupplierPriceRowsQuery,
 	useUpdatePurchaseOrderMutation,
@@ -38,13 +44,15 @@ function GstSelect({
 	id,
 	value,
 	onChange,
+	disabled,
 }: {
 	id: string;
 	value: string;
 	onChange: (value: string) => void;
+	disabled?: boolean;
 }) {
 	return (
-		<Select value={value} onValueChange={onChange}>
+		<Select value={value} onValueChange={onChange} disabled={disabled}>
 			<SelectTrigger id={id} className="w-full" aria-label="GST percent">
 				<SelectValue placeholder="GST %" />
 			</SelectTrigger>
@@ -92,6 +100,13 @@ export function EditPOModal({
 	);
 	const [addedRates, setAddedRates] = useState<Record<number, string>>({});
 	const updateMutation = useUpdatePurchaseOrderMutation();
+	const canOverrideRate = useCan("contract.override_rate");
+	// Contract-linked lines: rate and GST are fixed; an override needs a reason (BR-RFQ-50, 51).
+	const [overrides, setOverrides] = useState<
+		Record<number, { on: boolean; reason: string }>
+	>({});
+	const [showOverrideErrors, setShowOverrideErrors] = useState(false);
+	const [submitError, setSubmitError] = useState<string | null>(null);
 	// GST % for newly added lines comes from the supplier's active price list,
 	// read for exactly the lines that can be added (#107: no 100-row cap).
 	const priceRowsQuery = useSupplierPriceRowsQuery(
@@ -120,6 +135,9 @@ export function EditPOModal({
 			setAddedLineIds(new Set());
 			setAddedRates({});
 			setAddedGsts({});
+			setOverrides({});
+			setShowOverrideErrors(false);
+			setSubmitError(null);
 			return;
 		}
 		if (!po || seededRef.current) return;
@@ -202,6 +220,16 @@ export function EditPOModal({
 
 	function onSubmit() {
 		if (!po) return;
+		setSubmitError(null);
+		setShowOverrideErrors(true);
+		if (
+			activeItems.some((item) => {
+				const entry = overrides[item.id];
+				return entry?.on && !overrideReasonValid(entry.reason);
+			})
+		) {
+			return;
+		}
 
 		const updates = activeItems
 			.filter(
@@ -214,6 +242,9 @@ export function EditPOModal({
 				id: item.id,
 				unitPricePaise: Math.round(Number(rates[item.id] || 0) * 100),
 				gstPercent: Number(gsts[item.id] ?? 0),
+				rateOverrideReason: overrides[item.id]?.on
+					? overrides[item.id].reason.trim()
+					: undefined,
 			}));
 		const deletes = [...removedIds].map((id) => ({ id }));
 		const inserts = addedLines.map((line) => ({
@@ -240,6 +271,8 @@ export function EditPOModal({
 				onSuccess: (result) => {
 					if (result.success) onSaved();
 				},
+				onError: (error) =>
+					setSubmitError(poErrorMessage(error, "Failed to update PO")),
 			},
 		);
 	}
@@ -308,66 +341,123 @@ export function EditPOModal({
 							</div>
 
 							<div className="space-y-2">
-								{activeItems.map((item) => (
-									<div
-										key={item.id}
-										className="grid gap-3 rounded-md border p-3 md:grid-cols-[1fr_7rem_7rem_8rem_auto] md:items-center"
-									>
-										<div className="min-w-0">
-											<span className="font-medium">
-												{item.itemName ?? "-"}
-											</span>
-											<p className="text-sm text-muted-foreground">
-												{item.qty} {item.uom ?? ""}
-											</p>
-										</div>
-										<div className="relative">
-											<IconCurrencyRupee className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-											<Input
-												aria-label={`Rate for ${item.itemName ?? "line"}`}
-												type="number"
-												min={0}
-												value={rates[item.id] ?? ""}
-												onChange={(event) =>
-													setRates((current) => ({
+								{activeItems.map((item) => {
+									const contractLinked = item.contractItemId != null;
+									const override = overrides[item.id];
+									const rateLocked = contractLinked && !override?.on;
+									return (
+										<div
+											key={item.id}
+											className="grid gap-3 rounded-md border p-3 md:grid-cols-[1fr_7rem_7rem_8rem_auto] md:items-center"
+										>
+											<div className="min-w-0">
+												<span className="font-medium">
+													{item.itemName ?? "-"}
+												</span>
+												<p className="text-sm text-muted-foreground">
+													{item.qty} {item.uom ?? ""}
+												</p>
+												{item.quoteNumber ? (
+													<p className="text-[13px] text-muted-foreground">
+														From quote {item.quoteNumber}
+													</p>
+												) : null}
+											</div>
+											<div className="relative">
+												<IconCurrencyRupee className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+												<Input
+													aria-label={`Rate for ${item.itemName ?? "line"}`}
+													type="number"
+													min={0}
+													readOnly={rateLocked}
+													value={rates[item.id] ?? ""}
+													onChange={(event) =>
+														setRates((current) => ({
+															...current,
+															[item.id]: event.target.value,
+														}))
+													}
+													className="pl-7 text-right tabular-nums"
+												/>
+											</div>
+											<GstSelect
+												id={`po-edit-line-gst-${item.id}`}
+												disabled={contractLinked}
+												value={gsts[item.id] ?? "0"}
+												onChange={(value) =>
+													setGsts((current) => ({
 														...current,
-														[item.id]: event.target.value,
+														[item.id]: value,
 													}))
 												}
-												className="pl-7 text-right tabular-nums"
 											/>
+											<div className="text-right font-medium tabular-nums">
+												{formatMoney(
+													Math.round(
+														Number(rates[item.id] || 0) * 100 * item.qty,
+													),
+												)}
+											</div>
+											<Button
+												type="button"
+												variant="ghost"
+												size="sm"
+												onClick={() =>
+													setRemovedIds((current) =>
+														new Set(current).add(item.id),
+													)
+												}
+											>
+												Remove
+											</Button>
+											{contractLinked ? (
+												<ContractRateControls
+													idPrefix={`po-edit-line-${item.id}`}
+													contractNumber={item.contractNumber}
+													canOverride={canOverrideRate}
+													overriding={override?.on ?? false}
+													onOverridingChange={(on) => {
+														setOverrides((current) => ({
+															...current,
+															[item.id]: {
+																on,
+																reason: on
+																	? (current[item.id]?.reason ?? "")
+																	: "",
+															},
+														}));
+														if (!on) {
+															setRates((current) => ({
+																...current,
+																[item.id]: String(item.unitPricePaise / 100),
+															}));
+														}
+													}}
+													reason={override?.reason ?? ""}
+													onReasonChange={(reason) =>
+														setOverrides((current) => ({
+															...current,
+															[item.id]: { on: true, reason },
+														}))
+													}
+													showReasonError={showOverrideErrors}
+												/>
+											) : null}
+											{item.rateOverrideReason ? (
+												<p className="text-[13px] text-muted-foreground md:col-span-full">
+													Override
+													{item.contractRatePaise != null
+														? ` · was ${formatMoney(item.contractRatePaise)}`
+														: ""}
+													{` · ${item.rateOverrideReason}`}
+													{item.rateOverrideByName
+														? ` · by ${item.rateOverrideByName}`
+														: ""}
+												</p>
+											) : null}
 										</div>
-										<GstSelect
-											id={`po-edit-line-gst-${item.id}`}
-											value={gsts[item.id] ?? "0"}
-											onChange={(value) =>
-												setGsts((current) => ({
-													...current,
-													[item.id]: value,
-												}))
-											}
-										/>
-										<div className="text-right font-medium tabular-nums">
-											{formatMoney(
-												Math.round(
-													Number(rates[item.id] || 0) * 100 * item.qty,
-												),
-											)}
-										</div>
-										<Button
-											type="button"
-											variant="ghost"
-											size="sm"
-											onClick={() =>
-												setRemovedIds((current) =>
-													new Set(current).add(item.id),
-												)
-											}
-										>
-											Remove
-										</Button>
-									</div>
-								))}
+									);
+								})}
 								{activeItems.length === 0 ? (
 									<p className="rounded-md border border-dashed p-3 text-center text-sm text-muted-foreground">
 										{pendingLines.length > 0
@@ -489,6 +579,15 @@ export function EditPOModal({
 								</div>
 							</div>
 						</div>
+
+						{submitError ? (
+							<div
+								role="alert"
+								className="mx-6 mb-3 rounded-md bg-destructive-subtle px-3 py-2 text-sm text-destructive"
+							>
+								{submitError}
+							</div>
+						) : null}
 
 						<DialogFooter className="border-t px-6 py-4">
 							<Button

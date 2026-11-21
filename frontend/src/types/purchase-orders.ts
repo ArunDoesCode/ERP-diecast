@@ -78,6 +78,17 @@ export interface PurchaseOrderItem {
 	prNumber?: string | null;
 	/** Qty sent back on posted purchase returns (BR-PRT-38). Absent until the backend sends it. */
 	returnedQty?: number;
+	// scm-rfq: contract / quote link and rate-override audit. Null for callers without po.manage / contract.view.
+	contractItemId?: number | null;
+	contractNumber?: string | null;
+	contractRatePaise?: number | null;
+	quoteItemId?: number | null;
+	quoteNumber?: string | null;
+	rateSource?: "contract" | "quote" | null;
+	rateOverrideReason?: string | null;
+	rateOverrideBy?: number | null;
+	rateOverrideByName?: string | null;
+	rateOverrideAt?: string | null;
 }
 
 export interface PurchaseOrderDetailPayload {
@@ -116,6 +127,8 @@ export type POCreatePayload = {
 		prItemId: number;
 		unitPricePaise: number;
 		gstPercent?: number;
+		/** Only with a rate different from the contract rate (needs `contract.override_rate`). */
+		rateOverrideReason?: string;
 	}>;
 };
 
@@ -136,8 +149,14 @@ export type POUpdatePayload = {
 		prItemId: number;
 		unitPricePaise: number;
 		gstPercent?: number;
+		rateOverrideReason?: string;
 	}>;
-	updates?: Array<{ id: number; unitPricePaise: number; gstPercent?: number }>;
+	updates?: Array<{
+		id: number;
+		unitPricePaise: number;
+		gstPercent?: number;
+		rateOverrideReason?: string;
+	}>;
 	deletes?: Array<{ id: number }>;
 };
 
@@ -150,6 +169,7 @@ export type POCancelResult = ApiResult<PurchaseOrder>;
 
 // inventory BR-INV-30: where the rate suggestion comes from.
 export type LastRateSource =
+	| "contract"
 	| "po_history"
 	| "supplier_catalog"
 	| "item_average"
@@ -157,6 +177,7 @@ export type LastRateSource =
 
 /** BR-PO-25: the label shown next to the rate suggestion. */
 export const LAST_RATE_SOURCE_LABEL: Record<LastRateSource, string> = {
+	contract: "Contract",
 	po_history: "Last PO",
 	supplier_catalog: "Price list",
 	item_average: "Item average",
@@ -175,6 +196,9 @@ export function suggestedRateInput(ratePaise: number | null | undefined) {
 export type LastRateResult = ApiResult<{
 	ratePaise: number;
 	source: LastRateSource;
+	/** Source "contract" only (inventory BR-INV-30): the line is bound to this contract line. */
+	contractItemId?: number;
+	gstPercent?: number;
 }>;
 
 export const poCommunicationChannelValues = [

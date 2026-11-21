@@ -60,9 +60,14 @@ export function createPurchaseOrder(payload: POCreatePayload) {
 	);
 }
 
-export function getItemLastRate(itemId: number, supplierId: number) {
+/** `onDate` (IST day) picks the contract in force on the PO date (BR-RFQ-50). */
+export function getItemLastRate(
+	itemId: number,
+	supplierId: number,
+	onDate?: string,
+) {
 	return api.get<LastRateResult>(
-		`${API_ROUTES.assets.itemLastRate(itemId)}${toQueryString({ supplierId })}`,
+		`${API_ROUTES.assets.itemLastRate(itemId)}${toQueryString({ supplierId, onDate })}`,
 	);
 }
 

@@ -29,6 +29,11 @@ export type StatusDoc =
 	| "debitNote"
 	| "supplierInvoice"
 	| "supplierInvoiceMatch"
+	| "rfq"
+	| "quote"
+	| "rfqLine"
+	| "rfqFlag"
+	| "contract"
 	| "sco"
 	| "bom"
 	| "bomNode"
@@ -146,6 +151,40 @@ const MAP: Record<StatusDoc, Record<string, Entry>> = Object.assign(
 			total: ["Total", "danger"],
 			charge: ["Charge not on PO", "danger"],
 			below_po_rate: ["Below PO rate", "info"],
+		}),
+		rfq: table({
+			draft: ["Draft", "neutral"],
+			sent: ["Sent", "info"],
+			partially_awarded: ["Partly awarded", "info"],
+			awarded: ["Awarded", "success"],
+			closed: ["Closed", "closed"],
+			cancelled: ["Cancelled", "closed"],
+		}),
+		quote: table({
+			draft: ["Draft", "neutral"],
+			submitted: ["Submitted", "info"],
+			awarded: ["Awarded", "success"],
+			not_awarded: ["Not awarded", "closed"],
+			cancelled: ["Cancelled", "closed"],
+		}),
+		rfqLine: table({
+			open: ["Open", "neutral"],
+			awarded: ["Awarded", "success"],
+			dropped: ["Dropped", "closed"],
+		}),
+		rfqFlag: table({
+			late: ["Late", "danger"],
+			lowest: ["Lowest", "success"],
+			expired: ["Expired", "closed"],
+			not_quoted: ["Not quoted", "closed"],
+			inactive: ["Supplier inactive", "closed"],
+		}),
+		contract: table({
+			draft: ["Draft", "neutral"],
+			active: ["Active", "success"],
+			expired: ["Expired", "warning"],
+			terminated: ["Terminated", "closed"],
+			cancelled: ["Cancelled", "closed"],
 		}),
 		sco: table({
 			draft: ["Draft", "neutral"],

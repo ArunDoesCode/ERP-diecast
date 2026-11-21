@@ -10,6 +10,7 @@ import { toast } from "sonner";
 
 import { ApiClientError } from "@/lib/api/client";
 import { purchaseRequisitionKeys } from "@/lib/api/purchase-requisitions/queries";
+import { istTodayIso } from "@/lib/ist-date";
 import type {
 	ClosePoPayload,
 	ConfirmPoPayload,
@@ -54,6 +55,13 @@ export const purchaseOrderKeys = {
 };
 
 const PO_ERROR_MESSAGES: Record<string, string> = {
+	PR_LINE_ON_OPEN_RFQ:
+		"A requisition line is on an open RFQ. Award, close or cancel the RFQ first.",
+	OVERRIDE_REASON_REQUIRED: "Give a reason for changing the contract rate.",
+	CONTRACT_LINE_LOCKED_FIELD:
+		"The GST % of a contract line is fixed by the contract.",
+	CONTRACT_NOT_ACTIVE:
+		"A contract on this PO is no longer active. Change the rate on that line to continue.",
 	PO_NOT_EDITABLE: "Only a draft PO can be edited.",
 	DOC_LOCKED_IN_APPROVAL:
 		"This PO is waiting for approval and cannot be changed. Withdraw it first.",
@@ -62,11 +70,21 @@ const PO_ERROR_MESSAGES: Record<string, string> = {
 
 function errorMessage(error: unknown, fallback: string) {
 	if (!(error instanceof ApiClientError)) return fallback;
+	if (error.code === "CONTRACT_QTY_EXCEEDED") {
+		const details = (error.body as { details?: Record<string, unknown> } | null)
+			?.details;
+		return details?.cap !== undefined
+			? `Over contract quantity: agreed ${String(details.agreed)}, ordered ${String(details.ordered)}, cap ${String(details.cap)}.`
+			: error.message;
+	}
 	if (error.code && PO_ERROR_MESSAGES[error.code]) {
 		return PO_ERROR_MESSAGES[error.code];
 	}
 	return error.message;
 }
+
+/** Plain-words PO error, for banners that show an error inline. */
+export const poErrorMessage = errorMessage;
 
 function normalize(value?: string | null) {
 	const trimmed = value?.trim();
@@ -104,7 +122,7 @@ export function useItemLastRateQuery(
 ) {
 	return useQuery({
 		queryKey: purchaseOrderKeys.lastRate(itemId, supplierId),
-		queryFn: () => getItemLastRate(itemId, supplierId),
+		queryFn: () => getItemLastRate(itemId, supplierId, istTodayIso()),
 		enabled:
 			enabled &&
 			Number.isFinite(itemId) &&
@@ -438,6 +456,7 @@ export function toPOCreatePayload(input: {
 		prItemId: number;
 		unitPriceRupees: number;
 		gstPercent?: number;
+		rateOverrideReason?: string;
 	}>;
 }): POCreatePayload {
 	return {
@@ -450,6 +469,7 @@ export function toPOCreatePayload(input: {
 			prItemId: line.prItemId,
 			unitPricePaise: Math.round(line.unitPriceRupees * 100),
 			gstPercent: line.gstPercent,
+			rateOverrideReason: normalize(line.rateOverrideReason),
 		})),
 	};
 }

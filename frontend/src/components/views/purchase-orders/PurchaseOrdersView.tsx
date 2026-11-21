@@ -43,6 +43,28 @@ import {
 
 const QUEUE_STATUSES: PRStatus[] = ["approved", "partial_ordered"];
 
+/** BR-RFQ-60: "Request quotes" next to the PR in the queue, only with rfq.manage. */
+function RequestQuotesCell({
+	prId,
+	prNumber,
+}: {
+	prId: number;
+	prNumber: string;
+}) {
+	const canManageRfq = useCan("rfq.manage");
+	if (!canManageRfq) return null;
+	return (
+		<Button type="button" size="sm" variant="outline" asChild>
+			<Link
+				href={`/rfq/new?pr=${prId}`}
+				aria-label={`Request quotes for ${prNumber}`}
+			>
+				Request quotes
+			</Link>
+		</Button>
+	);
+}
+
 const columns: DataTableColumnDef<PurchaseRequisition>[] = [
 	{
 		accessorKey: "prNumber",
@@ -81,6 +103,16 @@ const columns: DataTableColumnDef<PurchaseRequisition>[] = [
 		accessorKey: "createdAt",
 		header: "Created",
 		cell: ({ row }) => formatDate(row.original.createdAt),
+	},
+	{
+		id: "actions",
+		header: () => <span className="sr-only">Actions</span>,
+		cell: ({ row }) => (
+			<RequestQuotesCell
+				prId={row.original.id}
+				prNumber={row.original.prNumber}
+			/>
+		),
 	},
 ];
 

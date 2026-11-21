@@ -15,6 +15,10 @@ import { ApprovalHistoryPanel } from "@/components/pages/approval/ApprovalHistor
 import { CreateGrnModal } from "@/components/pages/grn/CreateGrnModal";
 import { ClosePoAlert } from "@/components/pages/purchase-orders/ClosePoAlert";
 import { ConfirmPoDialog } from "@/components/pages/purchase-orders/ConfirmPoDialog";
+import {
+	ContractRateControls,
+	overrideReasonValid,
+} from "@/components/pages/purchase-orders/ContractRateControls";
 import { DelayPoDialog } from "@/components/pages/purchase-orders/DelayPoDialog";
 import { EditPOModal } from "@/components/pages/purchase-orders/EditPOModal";
 import { LogPoCommunicationDialog } from "@/components/pages/purchase-orders/LogPoCommunicationDialog";
@@ -80,6 +84,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useCan } from "@/hooks/use-can";
 import { useSubmitApprovalRequestMutation } from "@/lib/api/approval/queries";
 import {
+	poErrorMessage,
 	toPOCreatePayload,
 	useCancelPurchaseOrderMutation,
 	useCreatePurchaseOrderMutation,
@@ -91,6 +96,7 @@ import {
 	purchaseRequisitionKeys,
 	usePurchaseRequisitionDetailQuery,
 } from "@/lib/api/purchase-requisitions/queries";
+import { usePrLinesQuery } from "@/lib/api/rfq/queries";
 import { useSupplierInvoicesQuery } from "@/lib/api/supplier-invoice/queries";
 import {
 	useSupplierDetailQuery,
@@ -155,6 +161,7 @@ function sameDefaultSupplier(lines: PurchaseRequisitionItem[]) {
 
 export function PurchaseOrderDetailView({ prId }: { prId: number }) {
 	const canManagePO = useCan("po.manage");
+	const canManageRfq = useCan("rfq.manage");
 	const [selectedLineIds, setSelectedLineIds] = useState<Set<number>>(
 		() => new Set(),
 	);
@@ -168,7 +175,23 @@ export function PurchaseOrderDetailView({ prId }: { prId: number }) {
 	const detailQuery = usePurchaseRequisitionDetailQuery(prId, prId > 0);
 	const detail = detailQuery.data?.success ? detailQuery.data.data : undefined;
 	const lines = detail?.items ?? [];
-	const selectedLines = lines.filter((line) => selectedLineIds.has(line.id));
+	// Lines on an open RFQ come from the RFQ screen (BR-RFQ-02); only rfq.manage can read them.
+	const rfqLinesQuery = usePrLinesQuery(
+		{ prId, pageSize: 100, sortBy: "id" },
+		canManageRfq && prId > 0,
+	);
+	const onRfq = useMemo(() => {
+		const map = new Map<number, { id: number; number: string }>();
+		for (const row of rfqLinesQuery.data?.data ?? []) {
+			if (row.onOpenRfq && row.openRfqId && row.openRfqNumber) {
+				map.set(row.id, { id: row.openRfqId, number: row.openRfqNumber });
+			}
+		}
+		return map;
+	}, [rfqLinesQuery.data]);
+	const selectedLines = lines.filter(
+		(line) => selectedLineIds.has(line.id) && !onRfq.has(line.id),
+	);
 	const pr = detail?.pr;
 	useBreadcrumbLast(pr?.prNumber);
 	// BR-PR-33: a pending line can be cancelled on its own while the PR is
@@ -195,7 +218,10 @@ export function PurchaseOrderDetailView({ prId }: { prId: number }) {
 		setSelectedLineIds(
 			new Set(
 				pendingLines(lines)
-					.filter((line) => line.defaultSupplierId === supplierId)
+					.filter(
+						(line) =>
+							line.defaultSupplierId === supplierId && !onRfq.has(line.id),
+					)
 					.map((line) => line.id),
 			),
 		);
@@ -225,8 +251,24 @@ export function PurchaseOrderDetailView({ prId }: { prId: number }) {
 				/>
 			) : (
 				<div className="flex min-w-0 flex-col gap-4">
-					<PrDetailHeader pr={pr} lines={lines} />
-					<PrDocumentFlow pr={pr} linkedPos={detail.linkedPos} />
+					<PrDetailHeader
+						pr={pr}
+						lines={lines}
+						canRequestQuotes={
+							canManageRfq &&
+							(pr.status === "approved" || pr.status === "partial_ordered") &&
+							pendingLines(lines).some((line) => !onRfq.has(line.id))
+						}
+					/>
+					<PrDocumentFlow
+						pr={pr}
+						linkedPos={detail.linkedPos}
+						rfqs={[
+							...new Map(
+								[...onRfq.values()].map((rfq) => [rfq.id, rfq] as const),
+							).values(),
+						]}
+					/>
 
 					<Card>
 						<CardHeader className="gap-3">
@@ -259,6 +301,7 @@ export function PurchaseOrderDetailView({ prId }: { prId: number }) {
 								selectedLineIds={selectedLineIds}
 								onToggleLine={toggleLine}
 								disabled={!canManagePO}
+								onRfq={onRfq}
 								onCancelLine={canCancelLines ? setCancelLine : undefined}
 							/>
 
@@ -319,9 +362,11 @@ export function PurchaseOrderDetailView({ prId }: { prId: number }) {
 function PrDetailHeader({
 	pr,
 	lines,
+	canRequestQuotes,
 }: {
 	pr: PurchaseRequisition;
 	lines: PurchaseRequisitionItem[];
+	canRequestQuotes: boolean;
 }) {
 	const pendingCount = pendingLines(lines).length;
 	return (
@@ -331,6 +376,13 @@ function PrDetailHeader({
 			status={<StatusBadge doc="pr" status={pr.status} />}
 			backHref="/purchase-orders"
 			backLabel="purchase orders"
+			actions={
+				canRequestQuotes ? (
+					<Button type="button" size="sm" variant="outline" asChild>
+						<Link href={`/rfq/new?pr=${pr.id}`}>Request quotes</Link>
+					</Button>
+				) : undefined
+			}
 			meta={[
 				{
 					label: "Raised by",
@@ -355,9 +407,12 @@ const RECEIVED_PO_STATUSES = new Set([
 function PrDocumentFlow({
 	pr,
 	linkedPos,
+	rfqs,
 }: {
 	pr: PurchaseRequisition;
 	linkedPos: PRLinkedPo[];
+	/** Open RFQs this requisition's lines are on (needs rfq.manage to read). */
+	rfqs: Array<{ id: number; number: string }>;
 }) {
 	const livePos = linkedPos.filter((po) => po.status !== "cancelled");
 	const firstPo = livePos[0];
@@ -393,6 +448,12 @@ function PrDocumentFlow({
 					status: <StatusBadge doc="pr" status={pr.status} />,
 					state: "done",
 				},
+				...rfqs.map((rfq) => ({
+					label: "RFQ",
+					docNo: rfq.number,
+					href: `/rfq/${rfq.id}`,
+					state: "done" as const,
+				})),
 				{
 					label: "Purchase order",
 					docNo: firstPo
@@ -434,14 +495,17 @@ function LinesTable({
 	selectedLineIds,
 	onToggleLine,
 	disabled,
+	onRfq,
 	onCancelLine,
 }: {
 	lines: PurchaseRequisitionItem[];
 	selectedLineIds: Set<number>;
 	onToggleLine: (lineId: number, checked: boolean) => void;
 	disabled?: boolean;
+	onRfq: Map<number, { id: number; number: string }>;
 	onCancelLine?: (line: PurchaseRequisitionItem) => void;
 }) {
+	const canViewRfq = useCan("rfq.view");
 	return (
 		<Table>
 			<TableHeader>
@@ -465,12 +529,13 @@ function LinesTable({
 			<TableBody>
 				{lines.map((line) => {
 					const isPending = line.status === "pending";
+					const rfq = isPending ? onRfq.get(line.id) : undefined;
 					return (
 						<TableRow key={line.id}>
 							<TableCell>
 								<Checkbox
-									checked={selectedLineIds.has(line.id)}
-									disabled={!isPending || disabled}
+									checked={selectedLineIds.has(line.id) && !rfq}
+									disabled={!isPending || disabled || Boolean(rfq)}
 									onCheckedChange={(checked) =>
 										onToggleLine(line.id, checked === true)
 									}
@@ -495,7 +560,25 @@ function LinesTable({
 							<TableCell>
 								<StatusBadge doc="prLine" status={line.status ?? "pending"} />
 							</TableCell>
-							<TableCell>{line.linkedPoNumber ?? "-"}</TableCell>
+							<TableCell>
+								{rfq ? (
+									<span>
+										On{" "}
+										{canViewRfq ? (
+											<Link
+												href={`/rfq/${rfq.id}`}
+												className="font-mono text-brand-accent hover:underline"
+											>
+												{rfq.number}
+											</Link>
+										) : (
+											<span className="font-mono">{rfq.number}</span>
+										)}
+									</span>
+								) : (
+									(line.linkedPoNumber ?? "-")
+								)}
+							</TableCell>
 							{onCancelLine ? (
 								<TableCell>
 									{isPending ? (
@@ -1056,6 +1139,13 @@ function CreatePOModal({
 	onCreated: () => void;
 }) {
 	const sharedDefaultSupplierId = sameDefaultSupplier(lines);
+	const canOverrideRate = useCan("contract.override_rate");
+	// Rate override per contract line (BR-RFQ-51): on + required reason.
+	const [overrides, setOverrides] = useState<
+		Record<number, { on: boolean; reason: string }>
+	>({});
+	const [showOverrideErrors, setShowOverrideErrors] = useState(false);
+	const [submitError, setSubmitError] = useState<string | null>(null);
 	const [supplierSearch, setSupplierSearch] = useState("");
 	const [supplierId, setSupplierId] = useState<number | undefined>(
 		sharedDefaultSupplierId,
@@ -1154,6 +1244,13 @@ function CreatePOModal({
 
 	function onSubmit() {
 		if (!supplierId) return;
+		setSubmitError(null);
+		setShowOverrideErrors(true);
+		const badOverride = lines.some((line) => {
+			const entry = overrides[line.id];
+			return entry?.on && !overrideReasonValid(entry.reason);
+		});
+		if (badOverride) return;
 
 		createMutation.mutate(
 			{
@@ -1168,6 +1265,9 @@ function CreatePOModal({
 						prItemId: line.id,
 						unitPriceRupees: Number(rates[line.id] || 0),
 						gstPercent: Number(gstFor(line)),
+						rateOverrideReason: overrides[line.id]?.on
+							? overrides[line.id].reason
+							: undefined,
 					})),
 				}),
 			},
@@ -1177,6 +1277,8 @@ function CreatePOModal({
 						onCreated();
 					}
 				},
+				onError: (error) =>
+					setSubmitError(poErrorMessage(error, "Failed to create PO")),
 			},
 		);
 	}
@@ -1273,9 +1375,28 @@ function CreatePOModal({
 								onGstChange={(value) =>
 									setGsts((current) => ({ ...current, [line.id]: value }))
 								}
+								canOverride={canOverrideRate}
+								overriding={overrides[line.id]?.on ?? false}
+								overrideReason={overrides[line.id]?.reason ?? ""}
+								onOverrideChange={(on, reason) =>
+									setOverrides((current) => ({
+										...current,
+										[line.id]: { on, reason },
+									}))
+								}
+								showOverrideError={showOverrideErrors}
 							/>
 						))}
 					</div>
+
+					{submitError ? (
+						<div
+							role="alert"
+							className="rounded-md bg-destructive-subtle px-3 py-2 text-sm text-destructive"
+						>
+							{submitError}
+						</div>
+					) : null}
 
 					<div className="grid gap-3 md:grid-cols-2">
 						<div>
@@ -1343,6 +1464,11 @@ function CreatePOLine({
 	onChange,
 	gst,
 	onGstChange,
+	canOverride,
+	overriding,
+	overrideReason,
+	onOverrideChange,
+	showOverrideError,
 }: {
 	line: PurchaseRequisitionItem;
 	supplierId?: number;
@@ -1351,40 +1477,61 @@ function CreatePOLine({
 	onChange: (value: string) => void;
 	gst: string;
 	onGstChange: (value: string) => void;
+	canOverride: boolean;
+	overriding: boolean;
+	overrideReason: string;
+	onOverrideChange: (on: boolean, reason: string) => void;
+	showOverrideError: boolean;
 }) {
-	// Rate-prefill priority: supplier catalog price (already fetched with the
-	// supplier) > PO-history/catalog lookup > PR estimate.
+	// Rate-prefill priority (BR-PO-03): contract > last PO > price list > item
+	// average / standard rate. The last-rate endpoint walks that chain; the price
+	// list already fetched with the supplier covers a missing or weaker answer.
 	const lastRateQuery = useItemLastRateQuery(
 		line.itemId,
 		supplierId ?? 0,
-		Boolean(supplierId) && catalogRatePaise == null,
+		Boolean(supplierId),
 	);
 	const lastRate = lastRateQuery.data?.success
 		? lastRateQuery.data.data
 		: undefined;
+	const isContract = lastRate?.source === "contract";
+	const catalogBeatsLastRate =
+		catalogRatePaise != null &&
+		(lastRate?.source === "item_average" ||
+			lastRate?.source === "standard_rate");
 	const referenceRate =
-		catalogRatePaise != null
+		lastRate && !catalogBeatsLastRate
 			? {
-					ratePaise: catalogRatePaise,
-					label: LAST_RATE_SOURCE_LABEL.supplier_catalog,
+					ratePaise: lastRate.ratePaise,
+					label: LAST_RATE_SOURCE_LABEL[lastRate.source],
 				}
-			: lastRate
+			: catalogRatePaise != null
 				? {
-						ratePaise: lastRate.ratePaise,
-						label: LAST_RATE_SOURCE_LABEL[lastRate.source],
+						ratePaise: catalogRatePaise,
+						label: LAST_RATE_SOURCE_LABEL.supplier_catalog,
 					}
 				: undefined;
-	const isReferenceRateLoading =
-		Boolean(supplierId) && catalogRatePaise == null && lastRateQuery.isLoading;
+	const isReferenceRateLoading = Boolean(supplierId) && lastRateQuery.isLoading;
 	const referenceRatePaise = referenceRate?.ratePaise;
+	const contractGst = isContract ? lastRate?.gstPercent : undefined;
 
 	const onChangeRef = useRef(onChange);
 	onChangeRef.current = onChange;
+	const onGstRef = useRef(onGstChange);
+	onGstRef.current = onGstChange;
 
 	useEffect(() => {
 		if (referenceRatePaise == null) return;
 		onChangeRef.current(suggestedRateInput(referenceRatePaise));
 	}, [referenceRatePaise]);
+
+	// A contract line takes its GST % from the contract (BR-RFQ-50).
+	useEffect(() => {
+		if (contractGst == null) return;
+		onGstRef.current(String(contractGst));
+	}, [contractGst]);
+
+	const rateLocked = isContract && !overriding;
 
 	return (
 		<div className="grid gap-3 rounded-md border p-3 md:grid-cols-[1fr_7rem_9rem_8rem_7rem_8rem] md:items-center">
@@ -1444,6 +1591,7 @@ function CreatePOLine({
 						min={0}
 						step={1}
 						value={value}
+						readOnly={rateLocked}
 						onChange={(event) => onChange(event.target.value)}
 						className="pl-7 text-right tabular-nums"
 					/>
@@ -1457,7 +1605,7 @@ function CreatePOLine({
 				>
 					GST %
 				</Label>
-				<Select value={gst} onValueChange={onGstChange}>
+				<Select value={gst} onValueChange={onGstChange} disabled={isContract}>
 					<SelectTrigger
 						id={`po-create-line-gst-${line.id}`}
 						className="w-full"
@@ -1480,6 +1628,23 @@ function CreatePOLine({
 				</p>
 				{formatMoney(Math.round(Number(value || 0) * 100 * line.requestedQty))}
 			</div>
+
+			{isContract ? (
+				<ContractRateControls
+					idPrefix={`po-create-line-${line.id}`}
+					canOverride={canOverride}
+					overriding={overriding}
+					onOverridingChange={(on) => {
+						onOverrideChange(on, on ? overrideReason : "");
+						if (!on && referenceRatePaise != null) {
+							onChange(suggestedRateInput(referenceRatePaise));
+						}
+					}}
+					reason={overrideReason}
+					onReasonChange={(reason) => onOverrideChange(overriding, reason)}
+					showReasonError={showOverrideError}
+				/>
+			) : null}
 		</div>
 	);
 }

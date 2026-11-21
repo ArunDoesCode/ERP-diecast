@@ -16,13 +16,49 @@ import {
 	usePurchaseOrderDetailQuery,
 } from "@/lib/api/purchase-orders/queries";
 import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
-import type { PoCommunicationType } from "@/types/purchase-orders";
+import type {
+	PoCommunicationType,
+	PurchaseOrderItem,
+} from "@/types/purchase-orders";
 
 const COMM_TYPE_LABEL: Record<PoCommunicationType, string> = {
 	po_sent: "PO sent",
 	reminder: "Reminder",
 	escalation: "Escalation",
 };
+
+const RATE_SOURCE_LABEL = { contract: "Contract", quote: "Quote" } as const;
+
+/** Contract no. and rate source of a line, plus a rate override and who did it (BR-RFQ-30, 51). */
+function RateSourceNote({ item }: { item: PurchaseOrderItem }) {
+	if (!item.rateSource && !item.contractNumber && !item.quoteNumber) {
+		return <span className="text-muted-foreground">–</span>;
+	}
+	return (
+		<span className="block">
+			{item.rateSource ? RATE_SOURCE_LABEL[item.rateSource] : null}
+			{item.contractNumber ? (
+				<span className="font-mono"> {item.contractNumber}</span>
+			) : null}
+			{item.quoteNumber ? (
+				<span className="font-mono"> {item.quoteNumber}</span>
+			) : null}
+			{item.rateOverrideReason ? (
+				<span className="block text-[13px] text-muted-foreground">
+					Override
+					{item.contractRatePaise != null
+						? ` · was ${formatMoney(item.contractRatePaise)}`
+						: ""}
+					{` · ${item.rateOverrideReason}`}
+					{item.rateOverrideByName ? ` · by ${item.rateOverrideByName}` : ""}
+					{item.rateOverrideAt
+						? `, ${formatDateTime(item.rateOverrideAt)}`
+						: ""}
+				</span>
+			) : null}
+		</span>
+	);
+}
 
 /** PO lines with GST, totals (BR-PO-04) and the communications log (BR-PO-17). */
 export function PoDetailPanel({ poId }: { poId: number }) {
@@ -70,6 +106,7 @@ export function PoDetailPanel({ poId }: { poId: number }) {
 						<TableHead>Qty</TableHead>
 						{showReturned ? <TableHead>Returned</TableHead> : null}
 						<TableHead>Rate</TableHead>
+						<TableHead>Rate source</TableHead>
 						<TableHead>GST %</TableHead>
 						<TableHead className="text-right">Value</TableHead>
 						<TableHead className="text-right">GST</TableHead>
@@ -88,6 +125,9 @@ export function PoDetailPanel({ poId }: { poId: number }) {
 								</TableCell>
 							) : null}
 							<TableCell>{formatMoney(item.unitPricePaise)}</TableCell>
+							<TableCell>
+								<RateSourceNote item={item} />
+							</TableCell>
 							<TableCell>{item.gstPercent ?? 0}%</TableCell>
 							<TableCell className="text-right">
 								{formatMoney(
