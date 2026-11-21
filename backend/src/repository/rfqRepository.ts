@@ -545,7 +545,7 @@ export const rfqRepository = {
         .where(
           and(
             inArray(rfqQuotes.rfqId, rfqIds),
-            eq(rfqQuotes.status, "submitted"),
+            inArray(rfqQuotes.status, ["submitted", "not_awarded"]),
           ),
         )
         .groupBy(rfqQuotes.rfqId),
