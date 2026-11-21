@@ -1306,8 +1306,12 @@ describe("db:test:prepare judges the DB the driver will really use (BR-MIG-11, S
     await q(SCRATCH, async (s) => {
       await s.unsafe(`CREATE TABLE public.mig_keep_sentinel (x int)`);
       await s.unsafe(`INSERT INTO public.mig_keep_sentinel VALUES (42)`);
-      // the 2nd migration is pending again and will fail: DROP TABLE on a view is an error
-      await removeLastJournalRow(s);
+      // the 2nd migration (and every later one) is pending again; the 2nd fails:
+      // DROP TABLE on a view is an error. Independent of which migration is newest.
+      const rows = await journal(s);
+      await s.unsafe(
+        `DELETE FROM drizzle.__drizzle_migrations WHERE id > ${rows[1].id - 1}`,
+      );
       await s.unsafe(`CREATE VIEW public.role_pages AS SELECT 1 AS x`);
     });
     const before = await snapshot(SCRATCH);
