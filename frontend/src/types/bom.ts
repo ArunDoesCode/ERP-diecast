@@ -15,6 +15,7 @@ export type BomNextStep =
 	| "release"
 	| "waiting_for_release"
 	| "start_revision"
+	| "open_draft"
 	| "open_active";
 export type BomTreatment =
 	| "cast"
@@ -152,6 +153,8 @@ export type BomDetail = {
 	nextStep: BomNextStep;
 	nextRevision: string | null;
 	activeBomId: number | null;
+	openDraftId: number | null;
+	openDraftRevision: string | null;
 };
 
 export type BomTreeNode = {
@@ -215,6 +218,10 @@ export type BomNeeds = {
 	revision: string;
 	rows: BomNeedsRow[];
 	toBuy: BomNeedsToBuy[];
+};
+
+export type BomWhereUsedResponse = PagedResponse<BomWhereUsedRow> & {
+	part: { id: number; sku: string; name: string };
 };
 
 export type BomWhereUsedParams = {

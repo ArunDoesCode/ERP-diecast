@@ -4,7 +4,7 @@ import { BomPartView } from "@/components/views/bom/BomPartView";
 
 type BomPartPageProps = {
 	params: Promise<{ itemId: string }>;
-	searchParams: Promise<{ rev?: string; sku?: string; name?: string }>;
+	searchParams: Promise<{ rev?: string }>;
 };
 
 export default async function BomPartPage({
@@ -13,8 +13,6 @@ export default async function BomPartPage({
 }: BomPartPageProps) {
 	const partId = Number((await params).itemId);
 	if (!Number.isInteger(partId) || partId <= 0) notFound();
-	const { rev, sku, name } = await searchParams;
-	return (
-		<BomPartView partId={partId} rev={rev} hintSku={sku} hintName={name} />
-	);
+	const { rev } = await searchParams;
+	return <BomPartView partId={partId} rev={rev} />;
 }

@@ -35,6 +35,7 @@ import {
 	bomErrorMessage,
 	useBomQuery,
 	useBomsQuery,
+	useBomWhereUsedQuery,
 	useDeleteBomMutation,
 	useStartBomRevisionMutation,
 } from "@/lib/api/bom/queries";
@@ -46,16 +47,13 @@ import { type BomDetail, bomKindLabels } from "@/types/bom";
 type Props = {
 	partId: number;
 	rev?: string;
-	/** Display hints from the link that opened the page; used only when the part has no BOM. */
-	hintSku?: string;
-	hintName?: string;
 };
 
 function partHref(partId: number, revision: string) {
 	return `/bom/part/${partId}?rev=${revision}`;
 }
 
-export function BomPartView({ partId, rev, hintSku, hintName }: Props) {
+export function BomPartView({ partId, rev }: Props) {
 	const router = useRouter();
 	const canManage = useCan("bom.manage");
 	const canRelease = useCan("bom.release");
@@ -80,6 +78,14 @@ export function BomPartView({ partId, rev, hintSku, hintName }: Props) {
 			revisions[0],
 		[revisions, rev],
 	);
+	// Same params as the Used in panel, so one cached request; `part` names an item with no BOM.
+	const whereUsedQuery = useBomWhereUsedQuery(partId, {
+		page: 1,
+		pageSize: 10,
+		sortBy: "partSku",
+		sortDir: "asc",
+	});
+	const hintPart = whereUsedQuery.data?.part;
 	const detailQuery = useBomQuery(selected?.id);
 	const bom = detailQuery.data?.data;
 
@@ -89,8 +95,8 @@ export function BomPartView({ partId, rev, hintSku, hintName }: Props) {
 	const startRevision = useStartBomRevisionMutation(partId);
 	const deleteMutation = useDeleteBomMutation(selected?.id ?? 0);
 
-	const partSku = bom?.part.sku ?? selected?.partSku ?? hintSku;
-	const partName = bom?.part.name ?? selected?.partName ?? hintName;
+	const partSku = bom?.part.sku ?? selected?.partSku ?? hintPart?.sku;
+	const partName = bom?.part.name ?? selected?.partName ?? hintPart?.name;
 	const docNo = selected?.number;
 	useBreadcrumbLast(docNo ?? partSku ?? `Item #${partId}`);
 
@@ -240,6 +246,14 @@ export function BomPartView({ partId, rev, hintSku, hintName }: Props) {
 							: `Start revision ${detail.nextRevision ?? ""}`.trim()}
 					</Button>
 				);
+			case "open_draft":
+				return detail.openDraftId ? (
+					<Button type="button" size="sm" asChild>
+						<Link href={partHref(partId, detail.openDraftRevision ?? "")}>
+							Open draft {detail.openDraftRevision ?? ""}
+						</Link>
+					</Button>
+				) : null;
 			case "open_active":
 				return detail.activeBomId ? (
 					<Button type="button" size="sm" asChild>

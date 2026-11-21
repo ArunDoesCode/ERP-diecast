@@ -17,7 +17,7 @@ import type {
 	BomTreeNode,
 	BomUpdatePayload,
 	BomWhereUsedParams,
-	BomWhereUsedRow,
+	BomWhereUsedResponse,
 	BomWriteResult,
 	DataResponse,
 	PagedResponse,
@@ -59,7 +59,7 @@ export function getBomNeeds(params: BomNeedsParams) {
 }
 
 export function getBomWhereUsed(itemId: number, params?: BomWhereUsedParams) {
-	return api.get<PagedResponse<BomWhereUsedRow>>(
+	return api.get<BomWhereUsedResponse>(
 		`${API_ROUTES.bom.whereUsed(itemId)}${toQueryString(params)}`,
 	);
 }
