@@ -541,7 +541,7 @@ describe("post: checks repeated at posting (BR-STR-02, 03, 06, 16)", () => {
     const r = await post(fx.d.id);
     expect(r.status).toBe(400);
     expect(r.json.code).toBe("STR_ZERO_COST");
-    expect(String(r.json.message)).toContain("Item has no cost");
+    expect(String(r.json.message)).toMatch(/^Line 1:.*item has no cost/i);
     expect(await transferLedger(fx.d.id)).toHaveLength(0);
   });
 });
@@ -582,6 +582,24 @@ describe("reverse (BR-STR-19..24)", () => {
     expect(got.reverseReason).toBe("wrong store");
     expect(got.reversedBy.id).toBe(await userFor("back_office"));
     expect(got.reversedAt).toBeTruthy();
+  });
+
+  test("BR-STR-22 reverse is 409 STR_VENDOR_LOCATION when a location became a vendor premise after posting", async () => {
+    const fx = await mkTransfer();
+    await mustPost(fx);
+    const [s] = await db
+      .insert(supplierMaster)
+      .values({ name: uid(), gstNumber: `27${uid().slice(-12)}` })
+      .returning({ id: supplierMaster.id });
+    supplierIds.push(s!.id);
+    await db
+      .update(locations)
+      .set({ type: "vendor_premise", linkedVendorId: s!.id })
+      .where(eq(locations.id, fx.b));
+    const r = await reverse(fx.d.id);
+    expect(r.status).toBe(409);
+    expect(r.json.code).toBe("STR_VENDOR_LOCATION");
+    expect((await detail(fx.d.id)).status).toBe("posted");
   });
 
   test("BR-STR-19 reversing a draft or a cancelled transfer is 409 STR_NOT_POSTED", async () => {

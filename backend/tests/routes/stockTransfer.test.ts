@@ -12,6 +12,7 @@ import {
   inventoryLedger,
   itemMaster,
   locations,
+  serviceMaster,
   stockTransferItems,
   stockTransfers,
 } from "../../src/db/schemas/02_procurement-catalog";
@@ -100,6 +101,7 @@ const asset = (method: string, path: string, role: Role, body?: unknown) =>
 const itemIds: number[] = [];
 const supplierIds: number[] = [];
 const transferIds: number[] = [];
+const serviceIds: number[] = [];
 
 async function mkItem(over: Partial<typeof itemMaster.$inferInsert> = {}) {
   const [i] = await db
@@ -232,6 +234,9 @@ afterAll(async () => {
   }
   if (itemIds.length) {
     await db.delete(itemMaster).where(inArray(itemMaster.id, itemIds));
+  }
+  if (serviceIds.length) {
+    await db.delete(serviceMaster).where(inArray(serviceMaster.id, serviceIds));
   }
   if (empIds.length) {
     await db.delete(locations).where(inArray(locations.createdBy, empIds));
@@ -453,6 +458,53 @@ describe("create: lines (BR-STR-04, 05, 06, 07, 16)", () => {
     expect(r.status).toBe(404);
   });
 
+  test("BR-STR-06 a line whose id is a service, not a stock item, is 404 naming the line", async () => {
+    const p = await pair();
+    const item = await mkItem({ averageCostPaise: 100 });
+    const svcId = 2_000_000_000 + Math.floor(Math.random() * 100_000);
+    await db.insert(serviceMaster).values({
+      id: svcId,
+      code: uid(),
+      name: `${RUN} service`,
+      defaultUom: "job",
+    });
+    serviceIds.push(svcId);
+    const r = await mkDraft({
+      ...p,
+      lines: [
+        { itemId: item, qty: 1 },
+        { itemId: svcId, qty: 1 },
+      ],
+    });
+    expect(r.status).toBe(404);
+    expect(String(r.json.message)).toContain("Line 2");
+  });
+
+  test("BR-STR-06 an unknown large item id is 404 naming the line", async () => {
+    const p = await pair();
+    const r = await mkDraft({ ...p, lines: [{ itemId: 2147483000, qty: 1 }] });
+    expect(r.status).toBe(404);
+    expect(String(r.json.message)).toContain("Line 1");
+  });
+
+  test("BR-STR-06 an inactive item is 400 STR_ITEM_INACTIVE naming the line", async () => {
+    const p = await pair();
+    const item = await mkItem({ isActive: false });
+    const r = await mkDraft({ ...p, lines: [{ itemId: item, qty: 1 }] });
+    expect(r.status).toBe(400);
+    expect(r.json.code).toBe("STR_ITEM_INACTIVE");
+    expect(String(r.json.message)).toContain("Line 1");
+  });
+
+  test("BR-STR-06 a decimal qty on a pcs item is 400 STR_QTY_WHOLE naming the line", async () => {
+    const p = await pair();
+    const item = await mkItem({ uom: "pcs" });
+    const r = await mkDraft({ ...p, lines: [{ itemId: item, qty: 2.5 }] });
+    expect(r.status).toBe(400);
+    expect(r.json.code).toBe("STR_QTY_WHOLE");
+    expect(String(r.json.message)).toContain("Line 1");
+  });
+
   test("BR-STR-07 a cost field on a line is 400", async () => {
     const p = await pair();
     const item = await mkItem();
@@ -484,7 +536,7 @@ describe("create: lines (BR-STR-04, 05, 06, 07, 16)", () => {
     const r = await mkDraft({ ...p, lines: [{ itemId: item, qty: 1 }] });
     expect(r.status).toBe(400);
     expect(r.json.code).toBe("STR_ZERO_COST");
-    expect(String(r.json.message)).toContain("Item has no cost");
+    expect(String(r.json.message)).toMatch(/^Line 1:.*item has no cost/i);
   });
 });
 
@@ -586,6 +638,23 @@ describe("edit a draft (BR-STR-09)", () => {
     expect(got.lines[0].itemId).toBe(i2);
     expect(got.lastUpdatedBy.id).toBe(await userFor("owner"));
     expect(got.transferNumber).toBe(d.transferNumber);
+  });
+
+  test("BR-STR-09 a notes-only edit succeeds after the source was deactivated; post is still refused", async () => {
+    const { a, d } = await draft();
+    await db
+      .update(locations)
+      .set({ isActive: false })
+      .where(eq(locations.id, a));
+    const r = await call("PATCH", `/${d.id}`, "back_office", {
+      notes: "still editable",
+    });
+    expect(r.status).toBe(200);
+    expect((await detail(d.id)).notes).toBe("still editable");
+    const p = await call("POST", `/${d.id}/post`, "back_office", {});
+    expect(p.status).toBe(400);
+    expect(p.json.code).toBe("STR_LOCATION_INACTIVE");
+    expect((await detail(d.id)).status).toBe("draft");
   });
 
   test("BR-STR-09 an edit with no field is 400", async () => {
@@ -841,6 +910,11 @@ describe("list (BR-STR-27)", () => {
       "owner",
     );
     expect(miss.json.meta.total).toBe(0);
+  });
+
+  test("BR-STR-27 an impossible date (2026-13-45) is 400", async () => {
+    const r = await call("GET", "/?fromDate=2026-13-45", "owner");
+    expect(r.status).toBe(400);
   });
 
   test("BR-STR-27 from-date after to-date is 400", async () => {
