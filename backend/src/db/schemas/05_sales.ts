@@ -68,10 +68,12 @@ export const customers = pgTable(
     id: serial("id").primaryKey(),
     name: text("name").notNull(),
     // 2-digit GST state code; GSTIN prefix must match (API check)
+    // no-index: low-card ~30 GST state codes, list filter on a small table
     stateCode: text("state_code").notNull(),
     address: text("address").notNull(),
     gstin: text("gstin"),
     // BR-SO-02: never deleted
+    // no-index: low-card two values, list filter on a small table
     isActive: boolean("is_active").notNull().default(true),
     // no-index: audit who-did-it column, read only by joining to employees
     createdBy: integer("created_by")
@@ -266,6 +268,7 @@ export const saleExplosions = pgTable(
       .notNull(),
     // shown <so_number>/E<run_no>
     runNo: integer("run_no").notNull(),
+    // no-index: low-card two values, covered by uq_sale_explosions_one_current
     status: explosionStatusEnum("status").notNull().default("current"),
     // sale_orders.need_version / delivery_version at run time (BR-SO-38)
     soNeedVersion: integer("so_need_version").notNull(),
@@ -401,6 +404,7 @@ export const saleReservations = pgTable(
     itemId: integer("item_id")
       .references(() => itemMaster.id)
       .notNull(),
+    // no-index: low-card four values, covered by idx_sale_reservations_stock_item
     kind: reservationKindEnum("kind").notNull(),
     prItemId: integer("pr_item_id").references(() => purchaseRequestItems.id),
     poItemId: integer("po_item_id").references(() => purchaseOrderItems.id),
@@ -450,6 +454,7 @@ export const salesAuditLog = pgTable(
     actorId: integer("actor_id")
       .references(() => employees.id)
       .notNull(),
+    // no-index: low-card few action names, filtered together with so_id
     action: text("action").notNull(),
     // customer | sale_order | explosion
     targetType: text("target_type").notNull(),

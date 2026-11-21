@@ -15,6 +15,7 @@ import type {
   prListQuerySchemaType,
   updatePrSchemaType,
 } from "../types/pr.types";
+import { saleOrderService } from "./saleOrderService";
 
 // BR-AUTH-26: saving a PR with a machine needs pr.link_machine.
 function assertCanLinkMachine(
@@ -91,6 +92,14 @@ async function assertHeaderValid(
   // BR-AUTH-26 (PR v2): the key is needed only when the machine is added or changed.
   if (input.assetId !== undefined && input.assetId !== existingPr.assetId) {
     assertCanLinkMachine(actor, input.assetId);
+  }
+
+  // BR-SO-48: checked when the link is set or changed, not on every edit.
+  if (
+    input.saleOrderId != null &&
+    input.saleOrderId !== existingPr.saleOrderId
+  ) {
+    await saleOrderService.assertConfirmedForPrLink(input.saleOrderId);
   }
 
   const targetType = input.type ?? existingPr.type;
@@ -284,6 +293,11 @@ export const prService = {
       if (!machine) {
         throw new BadRequestError("Invalid assetId");
       }
+    }
+
+    // BR-SO-48: a linked SO must exist and be confirmed.
+    if (input.saleOrderId != null) {
+      await saleOrderService.assertConfirmedForPrLink(input.saleOrderId);
     }
 
     const itemIds = [...new Set(input.items.map((item) => item.itemId))];
