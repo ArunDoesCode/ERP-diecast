@@ -884,7 +884,7 @@
           "pageSize": "integer.nonnegative.required",
           "itemId": "integer.positive.optional",
           "locationId": "integer.positive.optional",
-          "referenceType": "enum:grn,grn_bypass,pro,sco_issue,sco_receipt,job_order_issue,scrap_dispatch,stock_adjustment,grn_correction,opening_stock,sco_loss.optional",
+          "referenceType": "enum:grn,grn_bypass,pro,pro_cancel,sco_issue,sco_receipt,job_order_issue,scrap_dispatch,stock_adjustment,grn_correction,opening_stock,sco_loss.optional",
           "transactionType": "enum:in,out,adjustment.optional",
           "fromDate": "unrepresentable.optional",
           "toDate": "unrepresentable.optional",
@@ -3900,6 +3900,361 @@
       }
     },
     {
+      "id": "GET /api/rate-contract/getcontracts",
+      "method": "GET",
+      "path": "/api/rate-contract/getcontracts",
+      "tags": [
+        "rate-contract"
+      ],
+      "summary": "List rate contracts, paginated (default createdAt desc; validTo asc with endsWithinDays). Filters status (draft|active|expired|terminated|cancelled, expired is computed), supplierId, itemId, endsWithinDays, q.",
+      "auth": {
+        "type": "permission",
+        "key": "contract.view"
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "sortBy": "enum:id,contractNumber,validFrom,validTo,createdAt,status.optional",
+          "sortDir": "enum:asc,desc.optional",
+          "q": "string.optional",
+          "status": "enum:draft,active,terminated,cancelled,expired.optional",
+          "supplierId": "integer.positive.optional",
+          "itemId": "integer.positive.optional",
+          "endsWithinDays": "integer.nonnegative.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "id",
+          "contractNumber",
+          "validFrom",
+          "validTo",
+          "createdAt",
+          "status"
+        ],
+        "searchable": true
+      }
+    },
+    {
+      "id": "GET /api/rate-contract/getcontractdetails/:id",
+      "method": "GET",
+      "path": "/api/rate-contract/getcontractdetails/:id",
+      "tags": [
+        "rate-contract"
+      ],
+      "summary": "Contract details: header, status and effectiveStatus, lines with agreed / ordered / received qty, % ordered and cap, and the POs on the contract.",
+      "auth": {
+        "type": "permission",
+        "key": "contract.view"
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "contractNumber": "string.required",
+            "supplierId": "integer.required",
+            "supplierName": "string.required",
+            "status": "enum:draft,active,terminated,cancelled.required",
+            "effectiveStatus": "enum:draft,active,terminated,cancelled,expired.required",
+            "validFrom": "string.required",
+            "validTo": "string.required",
+            "allowancePercent": "number.required",
+            "notes": "unknown.required",
+            "createdBy": "integer.required",
+            "createdByName": "unknown.required",
+            "createdAt": "string.required",
+            "lastUpdatedAt": "unknown.required",
+            "activatedByName": "unknown.required",
+            "activatedAt": "unknown.required",
+            "terminatedOn": "unknown.required",
+            "terminatedByName": "unknown.required",
+            "terminatedAt": "unknown.required",
+            "terminateReason": "unknown.required",
+            "cancelledByName": "unknown.required",
+            "cancelledAt": "unknown.required",
+            "cancelReason": "unknown.required",
+            "lines": "array<object>.required",
+            "pos": "array<object>.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/rate-contract/createcontract",
+      "method": "POST",
+      "path": "/api/rate-contract/createcontract",
+      "tags": [
+        "rate-contract"
+      ],
+      "summary": "Create a draft rate contract (1-500 lines, each item once, active item and supplier).",
+      "auth": {
+        "type": "permission",
+        "key": "contract.manage"
+      },
+      "request": {
+        "body": {
+          "supplierId": "integer.positive.required",
+          "validFrom": "string.required",
+          "validTo": "string.required",
+          "allowancePercent": "number.nonnegative.optional",
+          "notes": "string.optional",
+          "lines": "array<object>.required"
+        }
+      },
+      "responses": {
+        "201": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "contractNumber": "string.required",
+            "supplierId": "integer.required",
+            "supplierName": "string.required",
+            "status": "enum:draft,active,terminated,cancelled.required",
+            "effectiveStatus": "enum:draft,active,terminated,cancelled,expired.required",
+            "validFrom": "string.required",
+            "validTo": "string.required",
+            "allowancePercent": "number.required",
+            "notes": "unknown.required",
+            "createdBy": "integer.required",
+            "createdByName": "unknown.required",
+            "createdAt": "string.required",
+            "lastUpdatedAt": "unknown.required",
+            "activatedByName": "unknown.required",
+            "activatedAt": "unknown.required",
+            "terminatedOn": "unknown.required",
+            "terminatedByName": "unknown.required",
+            "terminatedAt": "unknown.required",
+            "terminateReason": "unknown.required",
+            "cancelledByName": "unknown.required",
+            "cancelledAt": "unknown.required",
+            "cancelReason": "unknown.required",
+            "lines": "array<object>.required",
+            "pos": "array<object>.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "PATCH /api/rate-contract/updatecontract",
+      "method": "PATCH",
+      "path": "/api/rate-contract/updatecontract",
+      "tags": [
+        "rate-contract"
+      ],
+      "summary": "Edit a draft contract (id in body, full replacement of header fields and lines). 409 CONTRACT_NOT_EDITABLE unless draft.",
+      "auth": {
+        "type": "permission",
+        "key": "contract.manage"
+      },
+      "request": {
+        "body": {
+          "id": "integer.positive.required",
+          "supplierId": "integer.positive.required",
+          "validFrom": "string.required",
+          "validTo": "string.required",
+          "allowancePercent": "number.nonnegative.optional",
+          "notes": "string.optional",
+          "lines": "array<object>.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "contractNumber": "string.required",
+            "supplierId": "integer.required",
+            "supplierName": "string.required",
+            "status": "enum:draft,active,terminated,cancelled.required",
+            "effectiveStatus": "enum:draft,active,terminated,cancelled,expired.required",
+            "validFrom": "string.required",
+            "validTo": "string.required",
+            "allowancePercent": "number.required",
+            "notes": "unknown.required",
+            "createdBy": "integer.required",
+            "createdByName": "unknown.required",
+            "createdAt": "string.required",
+            "lastUpdatedAt": "unknown.required",
+            "activatedByName": "unknown.required",
+            "activatedAt": "unknown.required",
+            "terminatedOn": "unknown.required",
+            "terminatedByName": "unknown.required",
+            "terminatedAt": "unknown.required",
+            "terminateReason": "unknown.required",
+            "cancelledByName": "unknown.required",
+            "cancelledAt": "unknown.required",
+            "cancelReason": "unknown.required",
+            "lines": "array<object>.required",
+            "pos": "array<object>.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/rate-contract/:id/activate",
+      "method": "POST",
+      "path": "/api/rate-contract/:id/activate",
+      "tags": [
+        "rate-contract"
+      ],
+      "summary": "Activate a draft contract. 409 CONTRACT_OVERLAP (clashing contractNumber in details) when another active contract covers the same supplier, item and dates; 400 CONTRACT_DATES_INVALID when validTo is before today.",
+      "auth": {
+        "type": "permission",
+        "key": "contract.manage"
+      },
+      "request": {
+        "body": {}
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "contractNumber": "string.required",
+            "supplierId": "integer.required",
+            "supplierName": "string.required",
+            "status": "enum:draft,active,terminated,cancelled.required",
+            "effectiveStatus": "enum:draft,active,terminated,cancelled,expired.required",
+            "validFrom": "string.required",
+            "validTo": "string.required",
+            "allowancePercent": "number.required",
+            "notes": "unknown.required",
+            "createdBy": "integer.required",
+            "createdByName": "unknown.required",
+            "createdAt": "string.required",
+            "lastUpdatedAt": "unknown.required",
+            "activatedByName": "unknown.required",
+            "activatedAt": "unknown.required",
+            "terminatedOn": "unknown.required",
+            "terminatedByName": "unknown.required",
+            "terminatedAt": "unknown.required",
+            "terminateReason": "unknown.required",
+            "cancelledByName": "unknown.required",
+            "cancelledAt": "unknown.required",
+            "cancelReason": "unknown.required",
+            "lines": "array<object>.required",
+            "pos": "array<object>.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/rate-contract/:id/terminate",
+      "method": "POST",
+      "path": "/api/rate-contract/:id/terminate",
+      "tags": [
+        "rate-contract"
+      ],
+      "summary": "Terminate an active, not expired contract with a reason; terminatedOn defaults to today (IST) and must be today..validTo, else 400 CONTRACT_DATES_INVALID. 409 CONTRACT_INVALID_STATUS otherwise.",
+      "auth": {
+        "type": "permission",
+        "key": "contract.manage"
+      },
+      "request": {
+        "body": {
+          "reason": "string.nonempty.required",
+          "terminatedOn": "string.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "contractNumber": "string.required",
+            "supplierId": "integer.required",
+            "supplierName": "string.required",
+            "status": "enum:draft,active,terminated,cancelled.required",
+            "effectiveStatus": "enum:draft,active,terminated,cancelled,expired.required",
+            "validFrom": "string.required",
+            "validTo": "string.required",
+            "allowancePercent": "number.required",
+            "notes": "unknown.required",
+            "createdBy": "integer.required",
+            "createdByName": "unknown.required",
+            "createdAt": "string.required",
+            "lastUpdatedAt": "unknown.required",
+            "activatedByName": "unknown.required",
+            "activatedAt": "unknown.required",
+            "terminatedOn": "unknown.required",
+            "terminatedByName": "unknown.required",
+            "terminatedAt": "unknown.required",
+            "terminateReason": "unknown.required",
+            "cancelledByName": "unknown.required",
+            "cancelledAt": "unknown.required",
+            "cancelReason": "unknown.required",
+            "lines": "array<object>.required",
+            "pos": "array<object>.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/rate-contract/:id/cancel",
+      "method": "POST",
+      "path": "/api/rate-contract/:id/cancel",
+      "tags": [
+        "rate-contract"
+      ],
+      "summary": "Cancel a draft contract with a reason. 409 CONTRACT_NOT_EDITABLE unless draft.",
+      "auth": {
+        "type": "permission",
+        "key": "contract.manage"
+      },
+      "request": {
+        "body": {
+          "reason": "string.nonempty.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "contractNumber": "string.required",
+            "supplierId": "integer.required",
+            "supplierName": "string.required",
+            "status": "enum:draft,active,terminated,cancelled.required",
+            "effectiveStatus": "enum:draft,active,terminated,cancelled,expired.required",
+            "validFrom": "string.required",
+            "validTo": "string.required",
+            "allowancePercent": "number.required",
+            "notes": "unknown.required",
+            "createdBy": "integer.required",
+            "createdByName": "unknown.required",
+            "createdAt": "string.required",
+            "lastUpdatedAt": "unknown.required",
+            "activatedByName": "unknown.required",
+            "activatedAt": "unknown.required",
+            "terminatedOn": "unknown.required",
+            "terminatedByName": "unknown.required",
+            "terminatedAt": "unknown.required",
+            "terminateReason": "unknown.required",
+            "cancelledByName": "unknown.required",
+            "cancelledAt": "unknown.required",
+            "cancelReason": "unknown.required",
+            "lines": "array<object>.required",
+            "pos": "array<object>.required"
+          }
+        }
+      }
+    },
+    {
       "id": "GET /api/reorder/items",
       "method": "GET",
       "path": "/api/reorder/items",
@@ -4209,6 +4564,674 @@
         ],
         "searchable": true
       }
+    },
+    {
+      "id": "GET /api/rfq/pr-lines",
+      "method": "GET",
+      "path": "/api/rfq/pr-lines",
+      "tags": [
+        "rfq"
+      ],
+      "summary": "Pick list of pending PR lines (approved or partial_ordered PRs) for a new RFQ, with onOpenRfq / openRfqId / openRfqNumber. Filters prId, itemId, onOpenRfq, q.",
+      "auth": {
+        "type": "permission",
+        "key": "rfq.manage"
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "sortBy": "enum:prNumber,itemId,expectedDate,id.optional",
+          "sortDir": "enum:asc,desc.required",
+          "q": "string.optional",
+          "prId": "integer.positive.optional",
+          "itemId": "integer.positive.optional",
+          "onOpenRfq": "unrepresentable.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "prNumber",
+          "itemId",
+          "expectedDate",
+          "id"
+        ],
+        "searchable": true
+      }
+    },
+    {
+      "id": "GET /api/rfq/getrfqs",
+      "method": "GET",
+      "path": "/api/rfq/getrfqs",
+      "tags": [
+        "rfq"
+      ],
+      "summary": "List RFQs, paginated (default createdAt desc). Filters status, supplierId, from / to (created IST days), q (number, notes). Rows add supplierCount, quotedCount, lineCount.",
+      "auth": {
+        "type": "permission",
+        "key": "rfq.view"
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "sortBy": "enum:id,rfqNumber,dueDate,createdAt,status.optional",
+          "sortDir": "enum:asc,desc.required",
+          "q": "string.optional",
+          "status": "enum:draft,sent,partially_awarded,awarded,closed,cancelled.optional",
+          "supplierId": "integer.positive.optional",
+          "from": "string.optional",
+          "to": "string.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "id",
+          "rfqNumber",
+          "dueDate",
+          "createdAt",
+          "status"
+        ],
+        "searchable": true
+      }
+    },
+    {
+      "id": "GET /api/rfq/getrfqdetails/:id",
+      "method": "GET",
+      "path": "/api/rfq/getrfqdetails/:id",
+      "tags": [
+        "rfq"
+      ],
+      "summary": "RFQ details: header, suppliers, lines (award, PO number and status, PR-line-cancelled flag), quote headers. lineRates (last PO rate, contract rates) only for callers with po.manage or contract.view.",
+      "auth": {
+        "type": "permission",
+        "key": "rfq.view"
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "rfq": {
+              "id": "integer.required",
+              "rfqNumber": "string.required",
+              "status": "enum:draft,sent,partially_awarded,awarded,closed,cancelled.required",
+              "dueDate": "string.required",
+              "notes": "unknown.required",
+              "createdBy": "integer.required",
+              "createdByName": "unknown.required",
+              "createdAt": "string.required",
+              "lastUpdatedAt": "unknown.required",
+              "sentBy": "integer.nullable.required",
+              "sentByName": "unknown.required",
+              "sentAt": "unknown.required",
+              "completedAt": "unknown.required",
+              "closedBy": "integer.nullable.required",
+              "closedByName": "unknown.required",
+              "closedAt": "unknown.required",
+              "closeReason": "unknown.required",
+              "cancelledBy": "integer.nullable.required",
+              "cancelledByName": "unknown.required",
+              "cancelledAt": "unknown.required",
+              "cancelReason": "unknown.required"
+            },
+            "suppliers": "array<object>.required",
+            "lines": "array<object>.required",
+            "quotes": "array<object>.required",
+            "lineRates": "array<object>.optional"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/rfq/createrfq",
+      "method": "POST",
+      "path": "/api/rfq/createrfq",
+      "tags": [
+        "rfq"
+      ],
+      "summary": "Create a draft RFQ from pending PR lines and 1-10 suppliers. Qty, uom and item are copied from the PR line, never sent.",
+      "auth": {
+        "type": "permission",
+        "key": "rfq.manage"
+      },
+      "request": {
+        "body": {
+          "dueDate": "string.required",
+          "notes": "string.optional",
+          "supplierIds": "array<integer.positive>.required",
+          "prItemIds": "array<integer.positive>.required"
+        }
+      },
+      "responses": {
+        "201": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "rfqNumber": "string.required",
+            "status": "enum:draft,sent,partially_awarded,awarded,closed,cancelled.required",
+            "dueDate": "string.required",
+            "suppliers": "array<object>.required",
+            "lines": "array<object>.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "PATCH /api/rfq/updaterfq",
+      "method": "PATCH",
+      "path": "/api/rfq/updaterfq",
+      "tags": [
+        "rfq"
+      ],
+      "summary": "Edit a draft RFQ (id in body, at least one other field): dueDate, notes, add / remove suppliers and PR lines. 409 RFQ_NOT_EDITABLE unless draft.",
+      "auth": {
+        "type": "permission",
+        "key": "rfq.manage"
+      },
+      "request": {
+        "body": {
+          "id": "integer.positive.required",
+          "dueDate": "string.optional",
+          "notes": "string.nullable.optional",
+          "addSupplierIds": "array<integer.positive>.optional",
+          "removeSupplierIds": "array<integer.positive>.optional",
+          "addPrItemIds": "array<integer.positive>.optional",
+          "removePrItemIds": "array<integer.positive>.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "rfqNumber": "string.required",
+            "status": "enum:draft,sent,partially_awarded,awarded,closed,cancelled.required",
+            "dueDate": "string.required",
+            "suppliers": "array<object>.required",
+            "lines": "array<object>.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "GET /api/rfq/quotes/:quoteId",
+      "method": "GET",
+      "path": "/api/rfq/quotes/:quoteId",
+      "tags": [
+        "rfq"
+      ],
+      "summary": "One supplier quote with its lines (computed value, tax, landed rate).",
+      "auth": {
+        "type": "permission",
+        "key": "rfq.view"
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "quoteNumber": "string.required",
+            "supplierId": "integer.required",
+            "supplierName": "string.required",
+            "status": "enum:draft,submitted,cancelled,not_awarded.required",
+            "isAwarded": "boolean.required",
+            "supplierQuoteRef": "string.required",
+            "quoteDate": "string.required",
+            "validTill": "string.required",
+            "paymentTermsDays": "integer.required",
+            "isLate": "boolean.required",
+            "submittedAt": "unknown.required",
+            "cancelledByName": "unknown.required",
+            "cancelledAt": "unknown.required",
+            "cancelReason": "unknown.required",
+            "rfqId": "integer.required",
+            "rfqNumber": "string.required",
+            "rfqStatus": "enum:draft,sent,partially_awarded,awarded,closed,cancelled.required",
+            "lines": "array<object>.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "PATCH /api/rfq/quotes/:quoteId",
+      "method": "PATCH",
+      "path": "/api/rfq/quotes/:quoteId",
+      "tags": [
+        "rfq"
+      ],
+      "summary": "Edit a draft quote: replaces all its lines (no supplierId). 409 QUOTE_NOT_EDITABLE when submitted or cancelled.",
+      "auth": {
+        "type": "permission",
+        "key": "rfq.manage"
+      },
+      "request": {
+        "body": {
+          "supplierQuoteRef": "string.nonempty.required",
+          "quoteDate": "string.required",
+          "validTill": "string.required",
+          "paymentTermsDays": "integer.nonnegative.optional",
+          "lines": "array<object>.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "quoteNumber": "string.required",
+            "supplierId": "integer.required",
+            "supplierName": "string.required",
+            "status": "enum:draft,submitted,cancelled,not_awarded.required",
+            "isAwarded": "boolean.required",
+            "supplierQuoteRef": "string.required",
+            "quoteDate": "string.required",
+            "validTill": "string.required",
+            "paymentTermsDays": "integer.required",
+            "isLate": "boolean.required",
+            "submittedAt": "unknown.required",
+            "cancelledByName": "unknown.required",
+            "cancelledAt": "unknown.required",
+            "cancelReason": "unknown.required",
+            "rfqId": "integer.required",
+            "rfqNumber": "string.required",
+            "rfqStatus": "enum:draft,sent,partially_awarded,awarded,closed,cancelled.required",
+            "lines": "array<object>.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/rfq/quotes/:quoteId/submit",
+      "method": "POST",
+      "path": "/api/rfq/quotes/:quoteId/submit",
+      "tags": [
+        "rfq"
+      ],
+      "summary": "Submit a draft quote (draft to submitted). Sets isLate when the submit day is after the RFQ due date. 400 QUOTE_EMPTY when no line is quoted.",
+      "auth": {
+        "type": "permission",
+        "key": "rfq.manage"
+      },
+      "request": {
+        "body": {}
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "quoteNumber": "string.required",
+            "supplierId": "integer.required",
+            "supplierName": "string.required",
+            "status": "enum:draft,submitted,cancelled,not_awarded.required",
+            "isAwarded": "boolean.required",
+            "supplierQuoteRef": "string.required",
+            "quoteDate": "string.required",
+            "validTill": "string.required",
+            "paymentTermsDays": "integer.required",
+            "isLate": "boolean.required",
+            "submittedAt": "unknown.required",
+            "cancelledByName": "unknown.required",
+            "cancelledAt": "unknown.required",
+            "cancelReason": "unknown.required",
+            "rfqId": "integer.required",
+            "rfqNumber": "string.required",
+            "rfqStatus": "enum:draft,sent,partially_awarded,awarded,closed,cancelled.required",
+            "lines": "array<object>.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/rfq/quotes/:quoteId/cancel",
+      "method": "POST",
+      "path": "/api/rfq/quotes/:quoteId/cancel",
+      "tags": [
+        "rfq"
+      ],
+      "summary": "Cancel a quote with a reason. A submitted quote on a sent RFQ also needs rfq.award (checked in the service, 403 PERMISSION_DENIED with key). 409 QUOTE_AWARDED when any line is awarded.",
+      "auth": {
+        "type": "permission",
+        "key": "rfq.manage"
+      },
+      "request": {
+        "body": {
+          "reason": "string.nonempty.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "quoteNumber": "string.required",
+            "supplierId": "integer.required",
+            "supplierName": "string.required",
+            "status": "enum:draft,submitted,cancelled,not_awarded.required",
+            "isAwarded": "boolean.required",
+            "supplierQuoteRef": "string.required",
+            "quoteDate": "string.required",
+            "validTill": "string.required",
+            "paymentTermsDays": "integer.required",
+            "isLate": "boolean.required",
+            "submittedAt": "unknown.required",
+            "cancelledByName": "unknown.required",
+            "cancelledAt": "unknown.required",
+            "cancelReason": "unknown.required",
+            "rfqId": "integer.required",
+            "rfqNumber": "string.required",
+            "rfqStatus": "enum:draft,sent,partially_awarded,awarded,closed,cancelled.required",
+            "lines": "array<object>.required"
+          }
+        }
+      },
+      "notes": [
+        "Service-level key: rfq.award for a submitted quote after send."
+      ]
+    },
+    {
+      "id": "POST /api/rfq/:id/send",
+      "method": "POST",
+      "path": "/api/rfq/:id/send",
+      "tags": [
+        "rfq"
+      ],
+      "summary": "Send a draft RFQ (draft to sent). 409 RFQ_LINE_STALE / SUPPLIER_INACTIVE_STALE name the id in details; 409 RFQ_INVALID_STATUS otherwise.",
+      "auth": {
+        "type": "permission",
+        "key": "rfq.manage"
+      },
+      "request": {
+        "body": {}
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "rfqNumber": "string.required",
+            "status": "enum:draft,sent,partially_awarded,awarded,closed,cancelled.required",
+            "dueDate": "string.required",
+            "notes": "unknown.required",
+            "createdBy": "integer.required",
+            "createdByName": "unknown.required",
+            "createdAt": "string.required",
+            "lastUpdatedAt": "unknown.required",
+            "sentBy": "integer.nullable.required",
+            "sentByName": "unknown.required",
+            "sentAt": "unknown.required",
+            "completedAt": "unknown.required",
+            "closedBy": "integer.nullable.required",
+            "closedByName": "unknown.required",
+            "closedAt": "unknown.required",
+            "closeReason": "unknown.required",
+            "cancelledBy": "integer.nullable.required",
+            "cancelledByName": "unknown.required",
+            "cancelledAt": "unknown.required",
+            "cancelReason": "unknown.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/rfq/:id/cancel",
+      "method": "POST",
+      "path": "/api/rfq/:id/cancel",
+      "tags": [
+        "rfq"
+      ],
+      "summary": "Cancel an RFQ with a reason. 409 RFQ_HAS_AWARD when a line is awarded; 409 RFQ_INVALID_STATUS when final.",
+      "auth": {
+        "type": "permission",
+        "key": "rfq.manage"
+      },
+      "request": {
+        "body": {
+          "reason": "string.nonempty.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "rfqNumber": "string.required",
+            "status": "enum:draft,sent,partially_awarded,awarded,closed,cancelled.required",
+            "dueDate": "string.required",
+            "notes": "unknown.required",
+            "createdBy": "integer.required",
+            "createdByName": "unknown.required",
+            "createdAt": "string.required",
+            "lastUpdatedAt": "unknown.required",
+            "sentBy": "integer.nullable.required",
+            "sentByName": "unknown.required",
+            "sentAt": "unknown.required",
+            "completedAt": "unknown.required",
+            "closedBy": "integer.nullable.required",
+            "closedByName": "unknown.required",
+            "closedAt": "unknown.required",
+            "closeReason": "unknown.required",
+            "cancelledBy": "integer.nullable.required",
+            "cancelledByName": "unknown.required",
+            "cancelledAt": "unknown.required",
+            "cancelReason": "unknown.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/rfq/:id/close",
+      "method": "POST",
+      "path": "/api/rfq/:id/close",
+      "tags": [
+        "rfq"
+      ],
+      "summary": "Close an RFQ with a reason: open lines are dropped, draft quotes cancelled, submitted ones not_awarded. 409 RFQ_INVALID_STATUS when final.",
+      "auth": {
+        "type": "permission",
+        "key": "rfq.manage"
+      },
+      "request": {
+        "body": {
+          "reason": "string.nonempty.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "rfqNumber": "string.required",
+            "status": "enum:draft,sent,partially_awarded,awarded,closed,cancelled.required",
+            "dueDate": "string.required",
+            "notes": "unknown.required",
+            "createdBy": "integer.required",
+            "createdByName": "unknown.required",
+            "createdAt": "string.required",
+            "lastUpdatedAt": "unknown.required",
+            "sentBy": "integer.nullable.required",
+            "sentByName": "unknown.required",
+            "sentAt": "unknown.required",
+            "completedAt": "unknown.required",
+            "closedBy": "integer.nullable.required",
+            "closedByName": "unknown.required",
+            "closedAt": "unknown.required",
+            "closeReason": "unknown.required",
+            "cancelledBy": "integer.nullable.required",
+            "cancelledByName": "unknown.required",
+            "cancelledAt": "unknown.required",
+            "cancelReason": "unknown.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "GET /api/rfq/:id/print",
+      "method": "GET",
+      "path": "/api/rfq/:id/print",
+      "tags": [
+        "rfq"
+      ],
+      "summary": "Print data, one sheet per supplier with no rates and no other supplier. Allowed from sent onward; draft or cancelled gives 409 RFQ_INVALID_STATUS.",
+      "auth": {
+        "type": "permission",
+        "key": "rfq.view"
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "rfqNumber": "string.required",
+            "dueDate": "string.required",
+            "company": {
+              "name": "string.required",
+              "address": "unknown.required",
+              "gstin": "unknown.required"
+            },
+            "sheets": "array<object>.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/rfq/:id/quotes",
+      "method": "POST",
+      "path": "/api/rfq/:id/quotes",
+      "tags": [
+        "rfq"
+      ],
+      "summary": "Enter a draft quote for a supplier on a sent / partially_awarded RFQ. One entry per RFQ line (missing = not quoted). No value, tax or landed field is accepted; they are computed.",
+      "auth": {
+        "type": "permission",
+        "key": "rfq.manage"
+      },
+      "request": {
+        "body": {
+          "supplierId": "integer.positive.required",
+          "supplierQuoteRef": "string.nonempty.required",
+          "quoteDate": "string.required",
+          "validTill": "string.required",
+          "paymentTermsDays": "integer.nonnegative.optional",
+          "lines": "array<object>.required"
+        }
+      },
+      "responses": {
+        "201": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "quoteNumber": "string.required",
+            "supplierId": "integer.required",
+            "supplierName": "string.required",
+            "status": "enum:draft,submitted,cancelled,not_awarded.required",
+            "isAwarded": "boolean.required",
+            "supplierQuoteRef": "string.required",
+            "quoteDate": "string.required",
+            "validTill": "string.required",
+            "paymentTermsDays": "integer.required",
+            "isLate": "boolean.required",
+            "submittedAt": "unknown.required",
+            "cancelledByName": "unknown.required",
+            "cancelledAt": "unknown.required",
+            "cancelReason": "unknown.required",
+            "rfqId": "integer.required",
+            "rfqNumber": "string.required",
+            "rfqStatus": "enum:draft,sent,partially_awarded,awarded,closed,cancelled.required",
+            "lines": "array<object>.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "GET /api/rfq/:id/comparison",
+      "method": "GET",
+      "path": "/api/rfq/:id/comparison",
+      "tags": [
+        "rfq"
+      ],
+      "summary": "Comparison grid computed on read: lines x suppliers with landed rate, lowest flag, eligibility, last PO rate and contract rate (the last two only for po.manage or contract.view).",
+      "auth": {
+        "type": "permission",
+        "key": "rfq.view"
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "rfq": {
+              "id": "integer.required",
+              "rfqNumber": "string.required",
+              "status": "enum:draft,sent,partially_awarded,awarded,closed,cancelled.required",
+              "dueDate": "string.required"
+            },
+            "suppliers": "array<object>.required",
+            "rows": "array<object>.required",
+            "cancelledQuotes": "array<object>.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/rfq/:id/award",
+      "method": "POST",
+      "path": "/api/rfq/:id/award",
+      "tags": [
+        "rfq"
+      ],
+      "summary": "Award RFQ lines to quote lines and create the draft POs in one transaction (all or nothing). Needs rfq.award, then po.manage.",
+      "auth": {
+        "type": "permission",
+        "key": "rfq.award"
+      },
+      "request": {
+        "body": {
+          "lines": "array<object>.required"
+        }
+      },
+      "responses": {
+        "201": {
+          "success": "boolean.required",
+          "data": {
+            "rfq": {
+              "id": "integer.required",
+              "status": "enum:draft,sent,partially_awarded,awarded,closed,cancelled.required"
+            },
+            "pos": "array<object>.required",
+            "awards": "array<object>.required"
+          }
+        }
+      },
+      "notes": [
+        "Second route guard: po.manage (403 PERMISSION_DENIED with key po.manage). rfq.award is checked first."
+      ]
     },
     {
       "id": "GET /api/sale-orders",

@@ -20,6 +20,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { itemMaster, locations, serviceMaster } from "./02_procurement-catalog";
 import { reorderRuns } from "./02_procurement-reorder";
+import { rateContractItems, rfqQuoteItems } from "./02_procurement-rfq";
 import { supplierMaster } from "./02_procurement-suppliers";
 import { employees } from "./03_hcm";
 import { saleOrders } from "./05_sales";
@@ -269,10 +270,30 @@ export const purchaseOrderItems = pgTable(
     lineTaxPaise: bigint("line_tax_paise", { mode: "number" })
       .default(0)
       .notNull(),
+    // BR-RFQ-31: set only by the RFQ award, never by createpo
+    quoteItemId: integer("quote_item_id").references(
+      (): AnyPgColumn => rfqQuoteItems.id,
+    ),
+    // BR-RFQ-50, 52, 53: set by the server when the line is priced from a contract
+    contractItemId: integer("contract_item_id").references(
+      (): AnyPgColumn => rateContractItems.id,
+    ),
+    // BR-RFQ-51, 71: snapshot of the contract rate (paise per uom) when linked
+    contractRatePaise: bigint("contract_rate_paise", { mode: "number" }),
+    // BR-RFQ-51: required when unit_price_paise differs from contract_rate_paise
+    rateOverrideReason: text("rate_override_reason"),
+    // no-index: audit who-did-it column, read only by joining to employees
+    rateOverrideBy: integer("rate_override_by").references(() => employees.id),
+    rateOverrideAt: timestamp("rate_override_at"),
   },
   (table) => ({
     poIdIdx: index("idx_po_items_po_id").on(table.poId),
     itemIdIdx: index("idx_po_items_item_id").on(table.itemId),
+    // BR-RFQ-49, 52: ordered / received qty sum per contract line
+    contractItemIdx: index("idx_po_items_contract_item").on(
+      table.contractItemId,
+    ),
+    quoteItemIdx: index("idx_po_items_quote_item").on(table.quoteItemId),
   }),
 );
 

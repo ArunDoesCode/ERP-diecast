@@ -6,4 +6,5 @@ export * from "./02_procurement-bom";
 export * from "./02_procurement-catalog";
 export * from "./02_procurement-purchasing";
 export * from "./02_procurement-reorder";
+export * from "./02_procurement-rfq";
 export * from "./02_procurement-suppliers";

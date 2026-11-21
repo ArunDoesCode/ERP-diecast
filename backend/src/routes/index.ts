@@ -10,7 +10,9 @@ import { grnRoutes } from "./grn";
 import { poRoutes } from "./po";
 import { prRoutes } from "./pr";
 import { purchaseReturnRoutes } from "./purchaseReturn";
+import { rateContractRoutes } from "./rateContract";
 import { reorderRoutes } from "./reorder";
+import { rfqRoutes } from "./rfq";
 import { saleOrderRoutes } from "./saleOrder";
 import { scoRoutes } from "./sco";
 import { setupRoutes } from "./setup";
@@ -27,6 +29,8 @@ const MAIN_ROUTES = {
   grn: "/grn",
   purchaseReturn: "/purchase-return",
   supplierInvoice: "/supplier-invoice",
+  rfq: "/rfq",
+  rateContract: "/rate-contract",
   approval: "/approval",
   sco: "/sco",
   bom: "/bom",
@@ -49,6 +53,8 @@ mainRouter.route(MAIN_ROUTES.po, poRoutes);
 mainRouter.route(MAIN_ROUTES.grn, grnRoutes);
 mainRouter.route(MAIN_ROUTES.purchaseReturn, purchaseReturnRoutes);
 mainRouter.route(MAIN_ROUTES.supplierInvoice, supplierInvoiceRoutes);
+mainRouter.route(MAIN_ROUTES.rfq, rfqRoutes);
+mainRouter.route(MAIN_ROUTES.rateContract, rateContractRoutes);
 mainRouter.route(MAIN_ROUTES.approval, approvalRoutes);
 mainRouter.route(MAIN_ROUTES.sco, scoRoutes);
 mainRouter.route(MAIN_ROUTES.bom, bomRoutes);

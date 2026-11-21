@@ -75,6 +75,19 @@ export const poItemDetailSchema = poItemSchema
     prNumber: z.string().nullable(),
     // Posted purchase returns on this line (BR-PRT-20, 38).
     returnedQty: z.number(),
+    // BR-RFQ-31, 50, 51, 56: contract / quote link and override audit. The contract
+    // and quote fields are null for callers without po.manage or contract.view.
+    contractItemId: z.number().int().nullable(),
+    contractNumber: z.string().nullable(),
+    contractRatePaise: z.number().int().nullable(),
+    quoteItemId: z.number().int().nullable(),
+    quoteNumber: z.string().nullable(),
+    // Where the line rate came from; null = typed in or the normal suggestion.
+    rateSource: z.enum(["contract", "quote"]).nullable(),
+    rateOverrideReason: z.string().nullable(),
+    rateOverrideBy: z.number().int().nullable(),
+    rateOverrideByName: z.string().nullable(),
+    rateOverrideAt: z.string().nullable(),
   });
 export type poItemDetailSchemaType = z.infer<typeof poItemDetailSchema>;
 
@@ -101,6 +114,9 @@ export const poUpdateResultSchema = z.object({
 });
 export type poUpdateResultSchemaType = z.infer<typeof poUpdateResultSchema>;
 
+// BR-RFQ-51: override reason, trimmed 3-500 chars.
+const rateOverrideReasonSchema = z.string().trim().min(3).max(500);
+
 export const createPoSchema = z.object({
   supplierId: z.number().int().positive(),
   // BR-PO-23: whole days 0-365; omitted = copy the supplier's default terms.
@@ -117,6 +133,9 @@ export const createPoSchema = z.object({
         unitPricePaise: z.number().int().min(1).max(MAX_MONEY_PAISE).optional(),
         // BR-PO-04: omitted = supplier's active price-list GST % (else 0).
         gstPercent: gstPercentSchema.optional(),
+        // BR-RFQ-51, 55: 3-500 chars, required when the rate differs from the
+        // linked contract rate (and the caller holds contract.override_rate).
+        rateOverrideReason: rateOverrideReasonSchema.optional(),
       }),
     )
     .min(1)
@@ -129,6 +148,7 @@ export const updatePoInsertItemSchema = z.object({
   prItemId: z.number().int().positive(),
   unitPricePaise: z.number().int().min(1).max(MAX_MONEY_PAISE).optional(),
   gstPercent: gstPercentSchema.optional(),
+  rateOverrideReason: rateOverrideReasonSchema.optional(),
 });
 export type updatePoInsertItemSchemaType = z.infer<
   typeof updatePoInsertItemSchema
@@ -140,6 +160,7 @@ export const updatePoUpdateItemSchema = z.object({
   id: z.number().int().positive(),
   unitPricePaise: z.number().int().min(1).max(MAX_MONEY_PAISE).optional(),
   gstPercent: gstPercentSchema.optional(),
+  rateOverrideReason: rateOverrideReasonSchema.optional(),
 });
 export type updatePoUpdateItemSchemaType = z.infer<
   typeof updatePoUpdateItemSchema
