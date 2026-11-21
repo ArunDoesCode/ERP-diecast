@@ -86,6 +86,14 @@ export const grnDetailsSchema = z.object({
   grn: grnSchema,
   po: grnLinkedPoSchema.nullable(),
   prs: z.array(grnLinkedPrSchema),
+  // Purchase returns of this GRN (BR-PRT-38).
+  returns: z.array(
+    z.object({
+      id: z.number().int(),
+      proNumber: z.string(),
+      status: z.enum(["draft", "posted", "cancelled"]),
+    }),
+  ),
   items: z.array(grnItemDetailSchema),
 });
 export type grnDetailsSchemaType = z.infer<typeof grnDetailsSchema>;

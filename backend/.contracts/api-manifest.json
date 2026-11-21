@@ -2206,6 +2206,7 @@
               "status": "enum:draft,pending_approval,approved,dispatched,partial_received,fully_received,invoiced,closed,cancelled.required"
             },
             "prs": "array<object>.required",
+            "returns": "array<object>.required",
             "items": "array<object>.required"
           }
         }
@@ -2260,6 +2261,7 @@
               "status": "enum:draft,pending_approval,approved,dispatched,partial_received,fully_received,invoiced,closed,cancelled.required"
             },
             "prs": "array<object>.required",
+            "returns": "array<object>.required",
             "items": "array<object>.required"
           }
         }
@@ -2314,6 +2316,7 @@
               "status": "enum:draft,pending_approval,approved,dispatched,partial_received,fully_received,invoiced,closed,cancelled.required"
             },
             "prs": "array<object>.required",
+            "returns": "array<object>.required",
             "items": "array<object>.required"
           }
         }
@@ -2577,7 +2580,8 @@
               "supplierName": "string.required",
               "dueDate": "unrepresentable.nullable.required"
             },
-            "items": "array<object>.required"
+            "items": "array<object>.required",
+            "returns": "array<object>.required"
           }
         }
       }

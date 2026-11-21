@@ -593,6 +593,7 @@ export const grnItems = pgTable(
     // Quantities
     receivedQty: doublePrecision("received_qty").notNull(),
     acceptedQty: doublePrecision("accepted_qty").notNull(), // THIS updates the inventory ledger
+    // no-index: covered:idx_grn_items_awaiting_return partial index (id) where rejected_qty > 0
     rejectedQty: doublePrecision("rejected_qty").default(0),
 
     // Standard QA
@@ -866,6 +867,7 @@ export const purchaseReturnItems = pgTable(
     itemId: integer("item_id")
       .references(() => itemMaster.id)
       .notNull(),
+    // no-index: covered:idx_purchase_return_items_grn_item_source filtered with grn_item_id
     source: purchaseReturnSourceEnum("source").notNull(),
     returnQty: qty3Col("return_qty").notNull(),
     uom: text("uom").notNull(),

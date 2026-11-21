@@ -73,6 +73,8 @@ export const poItemDetailSchema = poItemSchema
     itemCategory: z.string(),
     prItemId: z.number().int().nullable(),
     prNumber: z.string().nullable(),
+    // Posted purchase returns on this line (BR-PRT-20, 38).
+    returnedQty: z.number(),
   });
 export type poItemDetailSchemaType = z.infer<typeof poItemDetailSchema>;
 
@@ -80,6 +82,14 @@ export type poItemDetailSchemaType = z.infer<typeof poItemDetailSchema>;
 export const poDetailsSchema = z.object({
   po: poResponseSchema,
   items: z.array(poItemDetailSchema),
+  // Purchase returns of this PO (BR-PRT-38).
+  returns: z.array(
+    z.object({
+      id: z.number().int(),
+      proNumber: z.string(),
+      status: z.enum(["draft", "posted", "cancelled"]),
+    }),
+  ),
 });
 export type poDetailsSchemaType = z.infer<typeof poDetailsSchema>;
 

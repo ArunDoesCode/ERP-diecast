@@ -21,6 +21,7 @@ import {
   purchaseOrders,
   purchaseRequestItems,
   purchaseRequests,
+  purchaseReturns,
   supplierInvoices,
 } from "../db/schemas/02_procurement-purchasing";
 import {
@@ -704,9 +705,21 @@ export const poRepository = {
       return undefined;
     }
 
+    // BR-PRT-38: the PO's returns for its document flow
+    const returns = await db
+      .select({
+        id: purchaseReturns.id,
+        proNumber: purchaseReturns.proNumber,
+        status: purchaseReturns.status,
+      })
+      .from(purchaseReturns)
+      .where(eq(purchaseReturns.poId, poId))
+      .orderBy(desc(purchaseReturns.id));
+
     return {
       po,
       items,
+      returns,
     };
   },
 

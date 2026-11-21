@@ -15,6 +15,7 @@ import {
   purchaseOrders,
   purchaseRequestItems,
   purchaseRequests,
+  purchaseReturns,
   qaTests,
 } from "../db/schemas/02_procurement-purchasing";
 import { allocateDocumentSequence } from "../lib/document-number";
@@ -65,6 +66,9 @@ const grnItemDetailColumns = {
   orderedQty: purchaseOrderItems.qty,
   // BR-GRN-47: accepted so far on the PO line (all GRNs), for the screen warning
   poReceivedQty: purchaseOrderItems.receivedQty,
+  // BR-PRT-38: posted returns per source
+  rejectedReturnedQty: grnItems.rejectedReturnedQty,
+  acceptedReturnedQty: grnItems.acceptedReturnedQty,
 };
 
 const grnSortColumns = {
@@ -521,10 +525,22 @@ export const grnRepository = {
       corrected.map((r) => [r.grnItemId, Number(r.total)]),
     );
 
+    // BR-PRT-38: the GRN's returns for its document flow
+    const returns = await db
+      .select({
+        id: purchaseReturns.id,
+        proNumber: purchaseReturns.proNumber,
+        status: purchaseReturns.status,
+      })
+      .from(purchaseReturns)
+      .where(eq(purchaseReturns.grnId, grnId))
+      .orderBy(desc(purchaseReturns.id));
+
     return {
       grn,
       po: poRows[0] ?? null,
       prs,
+      returns,
       items: items.map((item) => {
         const correctedQty = correctedById.get(item.id) ?? 0;
         return {

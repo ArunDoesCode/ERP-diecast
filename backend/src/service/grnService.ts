@@ -7,6 +7,7 @@ import {
 } from "../lib/errors";
 import { grnRepository } from "../repository/grnRepository";
 import { poRepository } from "../repository/poRepository";
+import { purchaseReturnRepository } from "../repository/purchaseReturnRepository";
 import { postStock } from "../repository/stockPostingRepository";
 import { poService } from "../service/poService";
 import {
@@ -21,7 +22,7 @@ import {
 
 // Over-receipt tolerance: 5% above the PO line's ordered qty (BR-GRN-15).
 // Beyond that, the actor needs the override right and a reason.
-const OVER_RECEIPT_TOLERANCE_RATIO = 1.05;
+export const OVER_RECEIPT_TOLERANCE_RATIO = 1.05;
 
 const toMilli = (qty: number) => Math.round(qty * 1000);
 
@@ -600,6 +601,23 @@ export const grnService = {
       ) {
         throw new BadRequestError(
           `Corrections (${alreadyCorrected} already + ${input.qty}) cannot exceed the line's accepted qty (${line.acceptedQty}).`,
+        );
+      }
+
+      // BR-PRT-42: accepted - corrections - this correction can't go below the
+      // accepted qty held by non-cancelled returns (drafts + posted).
+      const reservedByReturns =
+        await purchaseReturnRepository.reservedByGrnLine([lineId], tx);
+      const acceptedReserved = reservedByReturns.get(lineId)?.accepted ?? 0;
+      if (
+        toMilli(line.acceptedQty) -
+          toMilli(alreadyCorrected) -
+          toMilli(input.qty) <
+        acceptedReserved
+      ) {
+        throw new BadRequestError(
+          `A correction of ${input.qty} would take the accepted qty below what is on purchase returns (${acceptedReserved / 1000}).`,
+          "GRN_CORRECTION_BELOW_RETURNED",
         );
       }
 

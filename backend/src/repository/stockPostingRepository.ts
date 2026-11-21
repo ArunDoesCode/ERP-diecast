@@ -105,7 +105,10 @@ export async function postStock(tx: Tx, input: PostStockInput) {
   const qtyMilli = toMilli(input.quantityChange);
   const balanceMilli = toMilli(lastRow?.balanceAfter ?? 0) + qtyMilli;
   if (input.blockNegative && balanceMilli < 0) {
-    throw new ConflictError("Insufficient stock at this location");
+    throw new ConflictError(
+      "Insufficient stock at this location",
+      "INSUFFICIENT_STOCK",
+    );
   }
   const balanceAfter = fromMilli(balanceMilli);
   const unitCostPaise = input.valueAtAverage
