@@ -23,9 +23,6 @@ export function istBoundsSql(today: string) {
   };
 }
 
-/** The plant day of a timestamp expression, as a date. */
-export const dayOfSql = (e: SQL) => sql`(${e})::date`;
-
 /**
  * The one named predicate "Late" (frozen BR-PO-19, A-54): ordered - received
  * > 0 on some line, dispatched / partly received, due before IST `today`.
