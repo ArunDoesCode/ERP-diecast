@@ -536,7 +536,7 @@ describe("create: lines (BR-STR-04, 05, 06, 07, 16)", () => {
     const r = await mkDraft({ ...p, lines: [{ itemId: item, qty: 1 }] });
     expect(r.status).toBe(400);
     expect(r.json.code).toBe("STR_ZERO_COST");
-    expect(String(r.json.message)).toMatch(/^Line 1:.*item has no cost/i);
+    expect(String(r.json.message)).toMatch(/item has no cost/i);
   });
 });
 

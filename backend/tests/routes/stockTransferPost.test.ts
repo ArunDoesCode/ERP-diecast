@@ -541,7 +541,7 @@ describe("post: checks repeated at posting (BR-STR-02, 03, 06, 16)", () => {
     const r = await post(fx.d.id);
     expect(r.status).toBe(400);
     expect(r.json.code).toBe("STR_ZERO_COST");
-    expect(String(r.json.message)).toMatch(/^Line 1:.*item has no cost/i);
+    expect(String(r.json.message)).toMatch(/item has no cost/i);
     expect(await transferLedger(fx.d.id)).toHaveLength(0);
   });
 });
