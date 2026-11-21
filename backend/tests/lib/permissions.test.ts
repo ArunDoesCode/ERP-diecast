@@ -90,6 +90,10 @@ const SPEC: Record<string, R[]> = {
   "stock_transfer.reverse": ["ow", "bo"],
   // supplier-rating spec "Who can do what" (BR-SRT-29)
   "supplier.rating.view": ["ow", "bo"],
+  // dispatch spec "Who can do what" (BR-DSP-35)
+  "dispatch.view": ["ow", "bo", "fs"],
+  "dispatch.manage": ["ow", "bo", "fs"],
+  "dispatch.cancel": ["ow"],
 };
 
 describe("BR-AUTH-06 permission catalog defined in code", () => {
@@ -275,6 +279,33 @@ describe("supplier-rating key and screen (BR-SRT-29, BR-SRT-40)", () => {
   test("BR-SRT-29 the supplier-ratings screen is /supplier-ratings behind supplier.rating.view", () => {
     expect(SCREENS["supplier-ratings"].path).toBe("/supplier-ratings");
     expect(SCREENS["supplier-ratings"].permission).toBe("supplier.rating.view");
+  });
+});
+
+describe("dispatch keys and screens (BR-DSP-35)", () => {
+  test("BR-DSP-35 the three dispatch keys are in the catalog", () => {
+    for (const k of ["dispatch.view", "dispatch.manage", "dispatch.cancel"])
+      expect(PERMISSION_KEYS as string[]).toContain(k);
+  });
+
+  test("BR-DSP-35 the pending-dispatch and delivery-notes screens sit behind dispatch.view", () => {
+    expect(SCREENS["delivery-notes-pending"].path).toBe(
+      "/delivery-notes/pending",
+    );
+    expect(SCREENS["delivery-notes-pending"].permission).toBe("dispatch.view");
+    expect(SCREENS["delivery-notes"].path).toBe("/delivery-notes");
+    expect(SCREENS["delivery-notes"].permission).toBe("dispatch.view");
+  });
+
+  test("BR-DSP-35 only owner holds dispatch.cancel; owner, back_office and floor_supervisor hold view and manage", () => {
+    const holders = (k: string) =>
+      Object.entries(SEED_GRANTS)
+        .filter(([, ks]) => (ks as string[]).includes(k))
+        .map(([n]) => n)
+        .sort();
+    expect(holders("dispatch.cancel")).toEqual(["owner"]);
+    for (const k of ["dispatch.view", "dispatch.manage"])
+      expect(holders(k)).toEqual(["back_office", "floor_supervisor", "owner"]);
   });
 });
 
