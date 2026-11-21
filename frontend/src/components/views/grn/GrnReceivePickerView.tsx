@@ -8,7 +8,7 @@ import {
 	parseAsStringLiteral,
 	useQueryState,
 } from "nuqs";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ReceivePickerRow } from "@/components/pages/grn/ReceivePickerRow";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorState } from "@/components/shared/ErrorState";
@@ -42,6 +42,8 @@ export function GrnReceivePickerView() {
 	const [urlQ, setUrlQ] = useQueryState("q", parseAsString.withDefault(""));
 	const [qInput, setQInput] = useState(urlQ);
 	const debouncedQ = useDebouncedValue(qInput, 350).trim();
+	// A row link was clicked: the pending URL sync must not overwrite that navigation.
+	const leaving = useRef(false);
 
 	const bucket = bucketRaw === "all" ? undefined : bucketRaw;
 	const query = useReceivablePosQuery(
@@ -58,7 +60,7 @@ export function GrnReceivePickerView() {
 
 	// Keep the URL in step with the debounced box (not on every key).
 	useEffect(() => {
-		if (debouncedQ === urlQ) return;
+		if (debouncedQ === urlQ || leaving.current) return;
 		void setUrlQ(debouncedQ || null);
 		void setPage(1);
 	}, [debouncedQ, urlQ, setUrlQ, setPage]);
@@ -83,7 +85,13 @@ export function GrnReceivePickerView() {
 	}
 
 	return (
-		<div className="flex w-full flex-col gap-4">
+		<div
+			className="flex w-full flex-col gap-4"
+			onClickCapture={(event) => {
+				if ((event.target as HTMLElement).closest("a[href]"))
+					leaving.current = true;
+			}}
+		>
 			<PageHeader
 				title="Receive goods"
 				description="Pick the order that arrived. Oldest due date first."

@@ -200,7 +200,7 @@ export function PurchaseRequisitionFormView(props: Props) {
 					setSaving(null);
 					return;
 				}
-				savedId = result.data.id;
+				savedId = result.data.pr.id;
 			} else {
 				if (!pr || !detail) return;
 				const result = await updateMutation.mutateAsync(

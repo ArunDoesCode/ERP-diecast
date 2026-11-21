@@ -40,7 +40,7 @@ export function getPurchaseRequisitionById(prId: number) {
 }
 
 export function createPurchaseRequisition(payload: PRCreatePayload) {
-	return api.post<ApiResult<PurchaseRequisition>, PRCreatePayload>(
+	return api.post<ApiResult<PurchaseRequisitionDetailPayload>, PRCreatePayload>(
 		API_ROUTES.purchaseRequisitions.create,
 		payload,
 	);
