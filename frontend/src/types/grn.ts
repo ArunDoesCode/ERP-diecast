@@ -4,6 +4,7 @@ import type {
 	PaginatedResponse,
 	PRStatus,
 } from "@/types/purchase-requisitions";
+import type { PrtLinkedReturn } from "@/types/purchase-return";
 
 export const grnStatusValues = [
 	"draft",
@@ -88,6 +89,9 @@ export interface GrnItemDetail extends GrnItem {
 	poReceivedQty: number;
 	correctedQty: number;
 	netAcceptedQty: number;
+	/** Posted purchase-return qty per source (BR-PRT-38). Absent until the backend sends it. */
+	rejectedReturnedQty?: number;
+	acceptedReturnedQty?: number;
 }
 
 export interface GrnDetailPayload {
@@ -95,6 +99,8 @@ export interface GrnDetailPayload {
 	po: GrnLinkedPo | null;
 	prs: GrnLinkedPr[];
 	items: GrnItemDetail[];
+	/** Returns made from this GRN (BR-PRT-38). Absent until the backend sends it. */
+	returns?: PrtLinkedReturn[];
 }
 
 export type GrnListParams = {

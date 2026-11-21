@@ -25,6 +25,8 @@ export type StatusDoc =
 	| "po"
 	| "grn"
 	| "grnQa"
+	| "purchaseReturn"
+	| "debitNote"
 	| "sco"
 	| "bom"
 	| "bomNode"
@@ -115,6 +117,15 @@ const MAP: Record<StatusDoc, Record<string, Entry>> = Object.assign(
 			passed: ["Passed", "success"],
 			failed: ["Failed", "danger"],
 			waived: ["Waived", "neutral"],
+		}),
+		purchaseReturn: table({
+			draft: ["Draft", "neutral"],
+			posted: ["Posted", "success"],
+			cancelled: ["Cancelled", "closed"],
+		}),
+		debitNote: table({
+			issued: ["Issued", "success"],
+			cancelled: ["Cancelled", "closed"],
 		}),
 		sco: table({
 			draft: ["Draft", "neutral"],

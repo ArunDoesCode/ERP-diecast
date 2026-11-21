@@ -190,6 +190,29 @@ html[data-density="compact"] {
 	--sidebar-ring: oklch(0.68 0.155 277);
 }
 
+/* Print sheets (debit note, return challan) stay light in both themes: the light values of existing tokens, scoped. */
+.print-sheet-light {
+	--background: oklch(0.985 0.002 286);
+	--foreground: oklch(0.21 0.006 286);
+	--card: oklch(1 0 0);
+	--muted: oklch(0.962 0.003 286);
+	--muted-foreground: oklch(0.49 0.012 286);
+	--table-header: oklch(0.955 0.004 286);
+	--border: oklch(0.91 0.004 286);
+	--destructive: oklch(0.53 0.2 27);
+	--brand-accent: oklch(0.511 0.262 277);
+	color-scheme: light;
+}
+
+/* Printing: the sidebar and its gap never print, so a sheet fills the page. */
+@media print {
+	[data-slot="sidebar"],
+	[data-slot="sidebar-gap"],
+	[data-slot="sidebar-container"] {
+		display: none;
+	}
+}
+
 @keyframes skeleton-sweep {
 	from {
 		transform: translateX(-100%);

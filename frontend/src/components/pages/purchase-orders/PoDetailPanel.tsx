@@ -1,5 +1,8 @@
 "use client";
 
+import Link from "next/link";
+
+import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
 	Table,
@@ -36,6 +39,8 @@ export function PoDetailPanel({ poId }: { poId: number }) {
 		);
 	}
 	const { po, items } = detail;
+	const returns = detail.returns ?? [];
+	const showReturned = items.some((item) => item.returnedQty !== undefined);
 
 	return (
 		<div className="space-y-4 rounded-md border p-3 text-sm">
@@ -64,6 +69,7 @@ export function PoDetailPanel({ poId }: { poId: number }) {
 					<TableRow>
 						<TableHead>Item</TableHead>
 						<TableHead>Qty</TableHead>
+						{showReturned ? <TableHead>Returned</TableHead> : null}
 						<TableHead>Rate</TableHead>
 						<TableHead>GST %</TableHead>
 						<TableHead className="text-right">Value</TableHead>
@@ -77,6 +83,11 @@ export function PoDetailPanel({ poId }: { poId: number }) {
 							<TableCell>
 								{item.qty} {item.uom ?? ""}
 							</TableCell>
+							{showReturned ? (
+								<TableCell>
+									{item.returnedQty ?? 0} {item.uom ?? ""}
+								</TableCell>
+							) : null}
 							<TableCell>{formatMoney(item.unitPricePaise)}</TableCell>
 							<TableCell>{item.gstPercent ?? 0}%</TableCell>
 							<TableCell className="text-right">
@@ -101,6 +112,25 @@ export function PoDetailPanel({ poId }: { poId: number }) {
 				<dt className="font-medium">Total</dt>
 				<dd className="font-medium">{formatMoney(po.totalAmountPaise)}</dd>
 			</dl>
+
+			{returns.length > 0 ? (
+				<section aria-label="Purchase returns" className="space-y-1">
+					<h4 className="font-medium">Purchase returns</h4>
+					<ul className="space-y-1">
+						{returns.map((entry) => (
+							<li key={entry.id} className="flex items-center gap-2">
+								<Link
+									href={`/purchase-returns/${entry.id}`}
+									className="font-mono text-brand-accent hover:underline"
+								>
+									{entry.proNumber}
+								</Link>
+								<StatusBadge doc="purchaseReturn" status={entry.status} />
+							</li>
+						))}
+					</ul>
+				</section>
+			) : null}
 
 			<section aria-label="Communications log" className="space-y-1">
 				<h4 className="font-medium">Communications</h4>

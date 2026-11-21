@@ -32,12 +32,15 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCan } from "@/hooks/use-can";
 import { useDeleteGrnMutation, useGrnDetailQuery } from "@/lib/api/grn/queries";
+import { useReturnPrefillQuery } from "@/lib/api/purchase-return/queries";
 import { formatDate, formatDocNo } from "@/lib/format";
 import { useBreadcrumbLast } from "@/lib/shell/breadcrumb-last";
 import type { Grn, GrnLinkedPo, GrnLinkedPr } from "@/types/grn";
+import type { PrtLinkedReturn } from "@/types/purchase-return";
 
 export function GrnDetailView({ grnId }: { grnId: number }) {
 	const canEditDraft = useCan("grn.edit_draft");
+	const canReturn = useCan("purchase_return.edit_draft");
 	const [editOpen, setEditOpen] = useState(false);
 
 	const detailQuery = useGrnDetailQuery(grnId, grnId > 0);
@@ -47,6 +50,15 @@ export function GrnDetailView({ grnId }: { grnId: number }) {
 	useBreadcrumbLast(grn?.grnNumber);
 
 	const canManage = canEditDraft && grn?.status === "draft";
+	// "Return to supplier" next step (BR-PRT-36): prefilled = primary, secondary = outline, none = hidden.
+	const prefillQuery = useReturnPrefillQuery(
+		grn?.id,
+		canReturn &&
+			grn !== undefined &&
+			grn.status !== "draft" &&
+			grn.poId !== null,
+	);
+	const returnAction = prefillQuery.data?.data.mainAction;
 
 	if (detailQuery.isLoading) {
 		return (
@@ -100,13 +112,32 @@ export function GrnDetailView({ grnId }: { grnId: number }) {
 					{ label: "Vehicle", value: grn.vehicleNo ?? "–" },
 				]}
 				actions={
-					canManage ? (
-						<GrnDraftActions grn={grn} onEdit={() => setEditOpen(true)} />
-					) : undefined
+					<>
+						{returnAction === "prefilled" || returnAction === "secondary" ? (
+							<Button
+								type="button"
+								size="sm"
+								variant={returnAction === "prefilled" ? "default" : "outline"}
+								asChild
+							>
+								<Link href={`/purchase-returns/new?grnId=${grn.id}`}>
+									Return to supplier
+								</Link>
+							</Button>
+						) : null}
+						{canManage ? (
+							<GrnDraftActions grn={grn} onEdit={() => setEditOpen(true)} />
+						) : null}
+					</>
 				}
 			/>
 
-			<GrnDocumentFlow grn={grn} po={detail.po} prs={detail.prs} />
+			<GrnDocumentFlow
+				grn={grn}
+				po={detail.po}
+				prs={detail.prs}
+				returns={detail.returns ?? []}
+			/>
 
 			<GrnDeliveryDetails grn={grn} />
 
@@ -136,10 +167,12 @@ function GrnDocumentFlow({
 	grn,
 	po,
 	prs,
+	returns,
 }: {
 	grn: Grn;
 	po: GrnLinkedPo | null;
 	prs: GrnLinkedPr[];
+	returns: PrtLinkedReturn[];
 }) {
 	const firstPr = prs[0];
 	return (
@@ -170,6 +203,13 @@ function GrnDocumentFlow({
 					status: <StatusBadge doc="grn" status={grn.status} />,
 					state: "current",
 				},
+				...returns.map((entry) => ({
+					label: "Purchase return",
+					docNo: entry.proNumber,
+					href: `/purchase-returns/${entry.id}`,
+					status: <StatusBadge doc="purchaseReturn" status={entry.status} />,
+					state: "done" as const,
+				})),
 			]}
 		/>
 	);

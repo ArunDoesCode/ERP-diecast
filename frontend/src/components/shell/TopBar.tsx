@@ -24,7 +24,7 @@ export function TopBar({
 }: TopBarProps) {
 	const foldLabel = sidebarFolded ? "Unfold sidebar" : "Fold sidebar";
 	return (
-		<header className="flex h-13 shrink-0 items-center gap-3 border-b bg-card px-3">
+		<header className="flex h-13 shrink-0 print:hidden items-center gap-3 border-b bg-card px-3">
 			<button
 				type="button"
 				aria-label={foldLabel}

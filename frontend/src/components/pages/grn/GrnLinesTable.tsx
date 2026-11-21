@@ -108,8 +108,22 @@ export function GrnLinesTable({
 												{item.correctedQty} corrected
 											</span>
 										) : null}
+										{item.acceptedReturnedQty !== undefined ? (
+											<span className="block text-sm text-muted-foreground">
+												Accepted {item.netAcceptedQty} · returned{" "}
+												{item.acceptedReturnedQty}
+											</span>
+										) : null}
 									</TableCell>
-									<TableCell>{item.rejectedQty ?? 0}</TableCell>
+									<TableCell>
+										{item.rejectedQty ?? 0}
+										{item.rejectedReturnedQty !== undefined ? (
+											<span className="block text-sm text-muted-foreground">
+												Rejected {item.rejectedQty ?? 0} · returned{" "}
+												{item.rejectedReturnedQty}
+											</span>
+										) : null}
+									</TableCell>
 									<TableCell>
 										<StatusBadge
 											doc="grnQa"

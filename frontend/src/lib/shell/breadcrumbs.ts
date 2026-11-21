@@ -18,6 +18,7 @@ const LIST_LABELS: Record<string, string> = {
 	"purchase-orders": "Purchase orders",
 	suppliers: "Suppliers",
 	grn: "Goods receipt",
+	"purchase-returns": "Purchase returns",
 	inventory: "Inventory",
 	subcontracting: "Subcontracting",
 	bom: "Bills of materials",

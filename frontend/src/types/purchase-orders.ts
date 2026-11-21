@@ -1,9 +1,9 @@
 import { z } from "zod";
-
 import type {
 	ApiResult,
 	PaginatedResponse,
 } from "@/types/purchase-requisitions";
+import type { PrtLinkedReturn } from "@/types/purchase-return";
 
 export const poStatusValues = [
 	"draft",
@@ -77,11 +77,15 @@ export interface PurchaseOrderItem {
 	itemCategory?: string;
 	prItemId?: number | null;
 	prNumber?: string | null;
+	/** Qty sent back on posted purchase returns (BR-PRT-38). Absent until the backend sends it. */
+	returnedQty?: number;
 }
 
 export interface PurchaseOrderDetailPayload {
 	po: PurchaseOrder;
 	items: PurchaseOrderItem[];
+	/** Returns made against this PO (BR-PRT-38). Absent until the backend sends it. */
+	returns?: PrtLinkedReturn[];
 }
 
 export type PurchaseOrderListParams = {

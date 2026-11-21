@@ -7,6 +7,7 @@ const API_Header = {
 	pr: "/pr",
 	po: "/po",
 	grn: "/grn",
+	purchaseReturn: "/purchase-return",
 	sco: "/sco",
 	bom: "/bom",
 	customers: "/customers",
@@ -209,6 +210,19 @@ export const API_ROUTES = {
 			`${API_Header.saleOrders}/${soId}/explosions/${eid}/rows`,
 		explosionDrafts: (soId: number, eid: number) =>
 			`${API_Header.saleOrders}/${soId}/explosions/${eid}/drafts`,
+	},
+	purchaseReturns: {
+		list: `${API_Header.purchaseReturn}/getreturns`,
+		awaiting: `${API_Header.purchaseReturn}/awaiting`,
+		detail: (id: number) =>
+			`${API_Header.purchaseReturn}/getreturndetails/${id}`,
+		prefill: (grnId: number) => `${API_Header.purchaseReturn}/prefill/${grnId}`,
+		create: `${API_Header.purchaseReturn}/createreturn`,
+		update: `${API_Header.purchaseReturn}/updatereturn`,
+		cancelDraft: (id: number) =>
+			`${API_Header.purchaseReturn}/${id}/cancel-draft`,
+		post: (id: number) => `${API_Header.purchaseReturn}/${id}/post`,
+		cancel: (id: number) => `${API_Header.purchaseReturn}/${id}/cancel`,
 	},
 	subcontracting: {
 		list: `${API_Header.sco}/getscos`,
