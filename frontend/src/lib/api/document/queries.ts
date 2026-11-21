@@ -17,9 +17,12 @@ export function useDocumentPanelQuery(docType: PanelDocType, docId: number) {
 		queryKey: documentKeys.panel(docType, docId),
 		queryFn: () => getDocumentPanel(docType, docId),
 		enabled: Number.isInteger(docId) && docId > 0,
-		// 4xx and 501 are final answers for this visit.
+		// 4xx and 501 are final answers for this visit; other 5xx retry twice.
 		retry: (count, error) =>
-			!(error instanceof ApiClientError && error.status < 600) && count < 2,
+			!(
+				error instanceof ApiClientError &&
+				(error.status < 500 || error.status === 501)
+			) && count < 2,
 	});
 }
 

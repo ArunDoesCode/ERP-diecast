@@ -9,6 +9,9 @@ import {
 import { toast } from "sonner";
 
 import { ApiClientError } from "@/lib/api/client";
+import { documentKeys } from "@/lib/api/document/queries";
+import { grnKeys } from "@/lib/api/grn/queries";
+import { homeKeys } from "@/lib/api/home/queries";
 import { purchaseRequisitionKeys } from "@/lib/api/purchase-requisitions/queries";
 import type {
 	ClosePoPayload,
@@ -147,6 +150,8 @@ export function useCreatePurchaseOrderMutation() {
 			}
 
 			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: homeKeys.all }),
+				queryClient.invalidateQueries({ queryKey: documentKeys.all }),
 				queryClient.invalidateQueries({
 					queryKey: purchaseOrderKeys.cards(),
 				}),
@@ -222,8 +227,10 @@ export function useCreateDraftPosMutation() {
 							error instanceof ApiClientError &&
 							(error.status === 409 ||
 								error.code === "PO_LINE_ALREADY_DRAFTED" ||
-								// Sequential case: frozen BR-PO-01 answers 400 (A-87). A schema 400 is not a conflict.
-								(error.status === 400 && error.code !== "VALIDATION_ERROR"));
+								// Sequential case: BR-PO-01 answers a code-less 400 "PR item N is not in pending status" (A-87).
+								(error.status === 400 &&
+									!error.code &&
+									/is not in pending status/i.test(error.message)));
 						return {
 							ok: false,
 							supplierName: group.supplierName,
@@ -237,6 +244,7 @@ export function useCreateDraftPosMutation() {
 			),
 		onSettled: async (_outcomes, _error, variables) => {
 			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: homeKeys.all }),
 				queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.cards() }),
 				queryClient.invalidateQueries({
 					queryKey: purchaseRequisitionKeys.cards(),
@@ -244,7 +252,7 @@ export function useCreateDraftPosMutation() {
 				queryClient.invalidateQueries({
 					queryKey: purchaseRequisitionKeys.detail(variables.prId),
 				}),
-				queryClient.invalidateQueries({ queryKey: ["document"] }),
+				queryClient.invalidateQueries({ queryKey: documentKeys.all }),
 				queryClient.invalidateQueries({ queryKey: ["approval"] }),
 			]);
 		},
@@ -257,10 +265,12 @@ function invalidatePOAndPR(
 	prId?: number,
 ) {
 	return Promise.all([
+		queryClient.invalidateQueries({ queryKey: homeKeys.all }),
+		queryClient.invalidateQueries({ queryKey: grnKeys.receivable() }),
 		queryClient.invalidateQueries({
 			queryKey: purchaseOrderKeys.communications(poId),
 		}),
-		queryClient.invalidateQueries({ queryKey: ["document"] }),
+		queryClient.invalidateQueries({ queryKey: documentKeys.all }),
 		queryClient.invalidateQueries({ queryKey: ["approval", "pending"] }),
 		queryClient.invalidateQueries({ queryKey: ["approval", "history"] }),
 		queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.cards() }),
@@ -459,12 +469,7 @@ export function useConfirmPoMutation() {
 				return;
 			}
 
-			await Promise.all([
-				queryClient.invalidateQueries({
-					queryKey: purchaseOrderKeys.detail(variables.poId),
-				}),
-				queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.cards() }),
-			]);
+			await invalidatePOAndPR(queryClient, variables.poId);
 			toast.success(result.message || `${result.data.poNumber} confirmed`);
 		},
 		onError: (error) => {
@@ -495,12 +500,7 @@ export function useMarkPoInvoicedMutation() {
 				return;
 			}
 
-			await Promise.all([
-				queryClient.invalidateQueries({
-					queryKey: purchaseOrderKeys.detail(variables.poId),
-				}),
-				queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.cards() }),
-			]);
+			await invalidatePOAndPR(queryClient, variables.poId);
 			toast.success(result.message || `${result.data.poNumber} invoiced`);
 		},
 		onError: (error) => {
@@ -521,12 +521,7 @@ export function useClosePoMutation() {
 				return;
 			}
 
-			await Promise.all([
-				queryClient.invalidateQueries({
-					queryKey: purchaseOrderKeys.detail(variables.poId),
-				}),
-				queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.cards() }),
-			]);
+			await invalidatePOAndPR(queryClient, variables.poId);
 			toast.success(result.message || `${result.data.poNumber} closed`);
 		},
 		onError: (error) => {

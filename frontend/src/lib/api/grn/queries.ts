@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { assetKeys } from "@/lib/api/asset/queries";
 import { ApiClientError } from "@/lib/api/client";
 import { documentKeys } from "@/lib/api/document/queries";
+import { homeKeys } from "@/lib/api/home/queries";
 import { purchaseOrderKeys } from "@/lib/api/purchase-orders/queries";
 import type {
 	GrnBypassPayload,
@@ -87,9 +88,10 @@ export function useCreateGrnMutation() {
 			}
 
 			await Promise.all([
-				queryClient.invalidateQueries({ queryKey: ["home"] }),
+				queryClient.invalidateQueries({ queryKey: homeKeys.all }),
 				queryClient.invalidateQueries({ queryKey: grnKeys.list() }),
 				queryClient.invalidateQueries({ queryKey: grnKeys.receivable() }),
+				queryClient.invalidateQueries({ queryKey: documentKeys.all }),
 				...(result.data.grn.poId != null
 					? [
 							queryClient.invalidateQueries({
@@ -118,7 +120,10 @@ export function useUpdateGrnMutation() {
 			}
 
 			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: homeKeys.all }),
 				queryClient.invalidateQueries({ queryKey: grnKeys.list() }),
+				queryClient.invalidateQueries({ queryKey: grnKeys.receivable() }),
+				queryClient.invalidateQueries({ queryKey: documentKeys.all }),
 				queryClient.invalidateQueries({
 					queryKey: grnKeys.detail(variables.grnId),
 				}),
@@ -142,7 +147,12 @@ export function useDeleteGrnMutation() {
 				return;
 			}
 
-			await queryClient.invalidateQueries({ queryKey: grnKeys.list() });
+			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: homeKeys.all }),
+				queryClient.invalidateQueries({ queryKey: grnKeys.list() }),
+				queryClient.invalidateQueries({ queryKey: grnKeys.receivable() }),
+				queryClient.invalidateQueries({ queryKey: documentKeys.all }),
+			]);
 			toast.success(result.message || "GRN deleted");
 		},
 		onError: (error) => {
@@ -157,8 +167,9 @@ function invalidateGrnAndPO(
 	poId: number,
 ) {
 	return Promise.all([
-		queryClient.invalidateQueries({ queryKey: ["home"] }),
+		queryClient.invalidateQueries({ queryKey: homeKeys.all }),
 		queryClient.invalidateQueries({ queryKey: grnKeys.list() }),
+		queryClient.invalidateQueries({ queryKey: grnKeys.receivable() }),
 		queryClient.invalidateQueries({ queryKey: grnKeys.detail(grnId) }),
 		queryClient.invalidateQueries({ queryKey: documentKeys.all }),
 		// Stock and moving average change on QA/bypass/correction postings.
