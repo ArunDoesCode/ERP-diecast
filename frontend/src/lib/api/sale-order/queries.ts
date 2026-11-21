@@ -2,6 +2,7 @@
 
 import {
 	keepPreviousData,
+	type QueryClient,
 	useMutation,
 	useQuery,
 	useQueryClient,
@@ -9,6 +10,8 @@ import {
 import { toast } from "sonner";
 
 import { ApiClientError } from "@/lib/api/client";
+import { purchaseRequisitionKeys } from "@/lib/api/purchase-requisitions/queries";
+import { scoKeys } from "@/lib/api/subcontracting/queries";
 import type {
 	SoAuditParams,
 	SoCreatePayload,
@@ -41,6 +44,11 @@ import {
 
 export const soKeys = {
 	all: ["sale-orders"] as const,
+	lists: () => ["sale-orders", "list"] as const,
+	explosionsOf: (soId: number) => ["sale-orders", "explosions", soId] as const,
+	explosionOf: (soId: number) => ["sale-orders", "explosion", soId] as const,
+	explosionRowsOf: (soId: number) =>
+		["sale-orders", "explosion-rows", soId] as const,
 	list: (params?: SoListParams) =>
 		["sale-orders", "list", params ?? {}] as const,
 	detail: (soId: number) => ["sale-orders", "detail", soId] as const,
@@ -53,6 +61,19 @@ export const soKeys = {
 	explosionRows: (soId: number, eid: number, params?: SoExplosionRowsParams) =>
 		["sale-orders", "explosion-rows", soId, eid, params ?? {}] as const,
 };
+
+function invalidateSo(queryClient: QueryClient, soId: number) {
+	void queryClient.invalidateQueries({ queryKey: soKeys.lists() });
+	void queryClient.invalidateQueries({ queryKey: soKeys.detail(soId) });
+}
+
+function invalidateExplosions(queryClient: QueryClient, soId: number) {
+	void queryClient.invalidateQueries({ queryKey: soKeys.explosionsOf(soId) });
+	void queryClient.invalidateQueries({ queryKey: soKeys.explosionOf(soId) });
+	void queryClient.invalidateQueries({
+		queryKey: soKeys.explosionRowsOf(soId),
+	});
+}
 
 /** Server text is already plain words for 400 / 409. */
 export function soErrorMessage(error: unknown, fallback: string) {
@@ -123,7 +144,7 @@ export function useCreateSaleOrderMutation() {
 	return useMutation({
 		mutationFn: (payload: SoCreatePayload) => createSaleOrder(payload),
 		onSuccess: () => {
-			void queryClient.invalidateQueries({ queryKey: soKeys.all });
+			void queryClient.invalidateQueries({ queryKey: soKeys.lists() });
 			toast.success("Draft saved");
 		},
 		// 400 / 409 CUSTOMER_PO_EXISTS are shown by the form.
@@ -135,7 +156,7 @@ export function useUpdateSaleOrderMutation(soId: number) {
 	return useMutation({
 		mutationFn: (payload: SoUpdatePayload) => updateSaleOrder(soId, payload),
 		onSuccess: () => {
-			void queryClient.invalidateQueries({ queryKey: soKeys.all });
+			invalidateSo(queryClient, soId);
 			toast.success("Sale order saved");
 		},
 		// 409s (STALE_VERSION, LIVE_DOCUMENTS_LINKED, ...) are shown by the form.
@@ -147,7 +168,7 @@ export function useConfirmSaleOrderMutation(soId: number) {
 	return useMutation({
 		mutationFn: (payload: SoVersionPayload) => confirmSaleOrder(soId, payload),
 		onSuccess: () => {
-			void queryClient.invalidateQueries({ queryKey: soKeys.all });
+			invalidateSo(queryClient, soId);
 			toast.success("Sale order confirmed");
 		},
 		onError: (error) => {
@@ -161,7 +182,7 @@ export function useResumeSaleOrderMutation(soId: number) {
 	return useMutation({
 		mutationFn: (payload: SoVersionPayload) => resumeSaleOrder(soId, payload),
 		onSuccess: () => {
-			void queryClient.invalidateQueries({ queryKey: soKeys.all });
+			invalidateSo(queryClient, soId);
 			toast.success("Sale order resumed");
 		},
 		onError: (error) => {
@@ -191,7 +212,7 @@ export function useSoReasonMutation(soId: number, action: SoReasonAction) {
 		mutationFn: (payload: SoReasonPayload) =>
 			REASON_CALLS[action](soId, payload),
 		onSuccess: () => {
-			void queryClient.invalidateQueries({ queryKey: soKeys.all });
+			invalidateSo(queryClient, soId);
 			toast.success(REASON_DONE[action]);
 		},
 	});
@@ -202,7 +223,8 @@ export function useRunSoExplosionMutation(soId: number) {
 	return useMutation({
 		mutationFn: () => runSoExplosion(soId),
 		onSuccess: (result) => {
-			void queryClient.invalidateQueries({ queryKey: soKeys.all });
+			invalidateSo(queryClient, soId);
+			invalidateExplosions(queryClient, soId);
 			toast.success(`Explosion ${result.data.number} done`);
 		},
 		onError: (error) => {
@@ -217,7 +239,12 @@ export function useCreateSoDraftsMutation(soId: number, eid: number) {
 		mutationFn: (payload: SoDraftsPayload) =>
 			createSoDrafts(soId, eid, payload),
 		onSuccess: () => {
-			void queryClient.invalidateQueries({ queryKey: soKeys.all });
+			invalidateSo(queryClient, soId);
+			invalidateExplosions(queryClient, soId);
+			void queryClient.invalidateQueries({
+				queryKey: purchaseRequisitionKeys.cards(),
+			});
+			void queryClient.invalidateQueries({ queryKey: scoKeys.list() });
 		},
 		// The view shows the numbers as links (success) or the server message (409 / 400).
 	});

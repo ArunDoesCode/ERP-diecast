@@ -94,13 +94,17 @@ export const saleExplosionRepository = {
     return rows[0]?.ok === true;
   },
 
-  /** One run at a time across all SOs; waits at most 15 s (lock_timeout 55P03). */
-  async lockGlobalRun(tx: DbTransaction) {
+  /** One run at a time across all SOs; busy -> false at once (409 EXPLOSION_BUSY). */
+  async tryLockGlobalRun(tx: DbTransaction) {
+    const rows = (await tx.execute(
+      sql`select pg_try_advisory_xact_lock(${LOCK_CLASS_GLOBAL}::int, 0::int) as ok`,
+    )) as unknown as Array<{ ok: boolean }>;
+    return rows[0]?.ok === true;
+  },
+
+  /** A wait on any later lock in the run (SO row) gives up after 15 s (55P03). */
+  async setRunLockTimeout(tx: DbTransaction) {
     await tx.execute(sql`set local lock_timeout = '15s'`);
-    await tx.execute(
-      sql`select pg_advisory_xact_lock(${LOCK_CLASS_GLOBAL}::int, 0::int)`,
-    );
-    await tx.execute(sql`set local lock_timeout = '0'`);
   },
 
   // ---- run: writes ----
@@ -213,6 +217,7 @@ export const saleExplosionRepository = {
           inArray(purchaseRequestItems.itemId, itemIds),
           inArray(purchaseRequestItems.status, ["pending", "po_draft"]),
           notInArray(purchaseRequests.status, ["rejected", "cancelled"]),
+          sql`${purchaseRequestItems.requestedQty} > ${purchaseRequestItems.issuedQty}`,
         ),
       )
       .orderBy(asc(purchaseRequestItems.id));
@@ -254,6 +259,7 @@ export const saleExplosionRepository = {
         and(
           inArray(purchaseOrderItems.itemId, itemIds),
           notInArray(purchaseOrders.status, ["cancelled", "closed"]),
+          sql`${purchaseOrderItems.qty} > ${purchaseOrderItems.receivedQty}`,
         ),
       )
       .orderBy(asc(purchaseOrderItems.id));
@@ -299,6 +305,7 @@ export const saleExplosionRepository = {
             "cancelled",
             "closed",
           ]),
+          sql`(${subcontractingOrderItems.expectedReturnQty} - ${subcontractingOrderItems.acceptedQty} - ${subcontractingOrderItems.rejectedQty} - ${subcontractingOrderItems.lossQty}) > 0`,
         ),
       )
       .orderBy(asc(subcontractingOrderItems.id));

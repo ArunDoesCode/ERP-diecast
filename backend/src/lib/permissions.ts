@@ -168,7 +168,7 @@ export const PERMISSIONS = {
   "so.view": p(
     "sale-order",
     "View sale orders",
-    "See customers, sale orders and BOM explosions (prices included)",
+    "See customers and sale orders (with prices) and BOM explosions (no prices)",
   ),
   "so.manage": p(
     "sale-order",

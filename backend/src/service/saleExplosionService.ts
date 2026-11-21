@@ -389,6 +389,7 @@ async function buildExplosion(
         else if (!(inb && !inb.normal && !inb.buyAsIs && inb.alloy))
           tag = "no_bom"; // an alloy bought by its casting is plain "buy"
       }
+      // BR-SO-27: an inactive item is flagged and cannot be raised
       if (!blockReason && !info.isActive) blockReason = "inactive_item";
       if (
         !blockReason &&
@@ -401,7 +402,7 @@ async function buildExplosion(
 
       const draft: RowDraft = {
         itemId: id,
-        level: Math.min(a.level, 10),
+        level: Math.min(levelOf.get(id) ?? a.level, 10),
         rowType,
         tag,
         blockReason,
@@ -431,8 +432,9 @@ async function buildExplosion(
       const expanded = await expandBomLevel(tx, {
         items: walkDrafts.map((d) => ({
           partId: d.itemId,
-          // net 0: only the node (type, BOM revision) is read
-          qty: Math.max(1, Math.ceil(d.net / 1000)),
+          // BR-SO-23: the exact net (thousandths); 1 when nothing is short,
+          // then only the node (type, BOM revision) is read
+          qty: d.net > 0 ? d.net / 1000 : 1,
         })),
       });
       expanded.forEach((part, i) => {
@@ -443,8 +445,10 @@ async function buildExplosion(
           d.tag = "no_bom";
           return;
         }
+        // BR-SO-44: cast / assemble rows show qty (and pour) for planning only
         d.rowType = TYPE_OF_TREATMENT[part.node.treatment];
         d.bomRevisionId = part.node.bomId;
+        // BR-SO-24: the level result is passed down as given, never re-rounded
         if (d.net <= 0) return;
         if (part.node.pourQty !== undefined) d.pour = part.node.pourQty;
         if (part.node.jobWork) d.send = part.node.jobWork.sendNeed;
@@ -509,7 +513,13 @@ export const saleExplosionService = {
             "EXPLOSION_IN_PROGRESS",
           );
         }
-        await saleExplosionRepository.lockGlobalRun(tx);
+        if (!(await saleExplosionRepository.tryLockGlobalRun(tx))) {
+          throw conflict(
+            "Another explosion is running. Try again in a moment.",
+            "EXPLOSION_BUSY",
+          );
+        }
+        await saleExplosionRepository.setRunLockTimeout(tx);
 
         const so = await saleOrderRepository.lockById(soId, tx);
         if (!so) throw soNotFound();
@@ -697,7 +707,7 @@ export const saleExplosionService = {
     };
   },
 
-  // BR-SO-50, 51: the screen's rows; no price anywhere.
+  // BR-SO-50, 51: the screen's rows; no price anywhere (BR-SO-51: price is SO-screen only).
   async rows(
     soId: number,
     eid: number,

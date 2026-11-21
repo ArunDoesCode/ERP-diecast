@@ -578,6 +578,8 @@ export const saleOrderService = {
 
         const itemIdsNeeded = new Set<number>();
         for (const e of edits) {
+          // existing line items too: the sku lookup below reads this one query
+          itemIdsNeeded.add(liveOf(e.id).itemId);
           if (e.itemId !== undefined) itemIdsNeeded.add(e.itemId);
         }
         for (const a of adds) {
@@ -650,10 +652,7 @@ export const saleOrderService = {
             needChanged = true;
           }
           if (!sku) {
-            sku =
-              (await saleOrderRepository.findItemsByIds([itemId], tx)).get(
-                itemId,
-              )?.sku ?? String(itemId);
+            sku = items.get(itemId)?.sku ?? String(itemId);
           }
           assertQtyForUnit(sku, uom, e.qty);
 
@@ -1013,6 +1012,7 @@ export const saleOrderService = {
   },
 
   // BR-SO-18, 19, 20
+  // BR-SO-20: never hard-deleted; a cancelled SO keeps its number, reservations are released
   async cancel(soId: number, input: SoReasonBody, actorId: number) {
     return db.transaction(async (tx) => {
       const so = await lockSo(soId, input.editVersion, tx);
@@ -1305,16 +1305,11 @@ export const saleOrderService = {
   /** BR-SO-48: a PR may name only an existing, confirmed SO. */
   async assertConfirmedForPrLink(soId: number, executor?: DbExecutor) {
     const row = await saleOrderRepository.findStatusById(soId, executor);
-    if (!row) {
-      throw new BadRequestError(
-        "saleOrderId does not name an existing sale order",
-        "PR_SALE_ORDER_INVALID",
-      );
-    }
-    if (row.status !== "confirmed") {
+    // SEC-001: one answer for "no such SO" and "not confirmed", no status leak
+    if (!row || row.status !== "confirmed") {
       throw new BadRequestError(
         "saleOrderId must name a confirmed sale order",
-        "PR_SALE_ORDER_NOT_CONFIRMED",
+        "PR_SALE_ORDER_INVALID",
       );
     }
   },

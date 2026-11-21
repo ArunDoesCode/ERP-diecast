@@ -110,7 +110,8 @@ export function ceilDiv(a: bigint, b: bigint): bigint {
 /** BR-BOM-18: pour = ceil(Q / (1 - reject)). */
 export function pourQty(qty: number, castingRejectPct: number | null): number {
   const keepBp = 10000n - toScaled(castingRejectPct ?? 0, 2);
-  return Number(ceilDiv(BigInt(qty) * 10000n, keepBp));
+  // qty may carry thousandths (a sale-order net of 2.5); whole qty gives the same result
+  return Number(ceilDiv(toScaled(qty, 3) * 10000n, keepBp * 1000n));
 }
 
 /**
@@ -135,8 +136,8 @@ export function alloyKg(
   const meltBp = toScaled(c.meltLossPct ?? 0, 2);
   const denominator = cav * 10000n;
   const milli = ceilDiv(
-    BigInt(qty) * net * denominator + BigInt(pour) * shot * meltBp,
-    denominator,
+    toScaled(qty, 3) * net * denominator + BigInt(pour) * shot * meltBp * 1000n,
+    denominator * 1000n,
   );
   return Number(milli) / 1000;
 }
@@ -149,7 +150,7 @@ export function sendNeed(
   returnQty: number,
 ): number {
   const keepBp = 10000n - toScaled(jobWorkLossPct ?? 0, 2);
-  const afterLoss = ceilDiv(BigInt(qty) * 10000n, keepBp);
+  const afterLoss = ceilDiv(toScaled(qty, 3) * 10000n, keepBp * 1000n);
   return Number(ceilDiv(afterLoss * BigInt(sendQty), BigInt(returnQty)));
 }
 
@@ -162,7 +163,10 @@ export function childNeed(
   qtyPerPiece: number,
   unit: string,
 ): number {
-  const milli = BigInt(baseQty) * toScaled(qtyPerPiece, 3);
-  if (unit === "pcs" || unit === "set") return Number(ceilDiv(milli, 1000n));
-  return Number(milli) / 1000;
+  // baseQty may carry thousandths; scale 1e6 here, whole baseQty gives the old result
+  const micro = toScaled(baseQty, 3) * toScaled(qtyPerPiece, 3);
+  if (unit === "pcs" || unit === "set") {
+    return Number(ceilDiv(micro, 1000000n));
+  }
+  return Number(ceilDiv(micro, 1000n)) / 1000;
 }

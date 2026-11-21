@@ -85,6 +85,8 @@ export const saleDraftService = {
       throw denied("sco.manage");
     }
 
+    // BR-SO-45: pr.manage / sco.manage checked above, before anything is created
+    // BR-SO-40, 47: the drafts are ordinary draft PRs / SCOs, never auto-submitted
     return db.transaction(async (tx) => {
       const so = await saleOrderRepository.lockById(soId, tx);
       if (!so) {
@@ -206,6 +208,7 @@ export const saleDraftService = {
       const noteText = (what: string) =>
         `Auto-generated from ${number} — review before ${what}`;
 
+      // ---- BR-SO-43: a job worker (default from the BOM) and a return date per row
       // ---- BR-SO-42, 43: job-work rows -> one SCO per job worker, validated now ----
       const jobPicks = picks.filter((p) => p.type === "job_work");
       const scoGroups = new Map<
@@ -315,6 +318,7 @@ export const saleDraftService = {
         }
       }
 
+      const pickByRow = new Map(picks.map((x) => [x.rowId, x]));
       const scos: { id: number; scoNumber: string }[] = [];
       const scoItemOf = new Map<number, number>(); // rowId -> sco line id
       for (const { group, lines } of preparedScos) {
@@ -325,7 +329,7 @@ export const saleDraftService = {
           details.items.map((i) => [i.finishedItemId, i.id]),
         );
         for (const rowId of group.rowIds) {
-          const p = picks.find((x) => x.rowId === rowId) as Pick;
+          const p = pickByRow.get(rowId) as Pick;
           scoItemOf.set(rowId, lineOfItem.get(p.itemId) as number);
         }
       }
