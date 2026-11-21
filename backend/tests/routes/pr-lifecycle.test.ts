@@ -37,6 +37,7 @@ import {
   purchaseRequests,
 } from "../../src/db/schemas/02_procurement-purchasing";
 import { employees } from "../../src/db/schemas/03_hcm";
+import { customers, saleOrders } from "../../src/db/schemas/05_sales";
 import { authService } from "../../src/service/authService";
 
 const app = createApp();
@@ -180,6 +181,37 @@ async function setAvgCost(key: string, paise: number) {
     .where(eq(itemMaster.id, item[key] as number));
 }
 
+let soSeq = 0;
+/** A real sale order row in the given status (fixture, inserted directly). */
+async function makeSo(status: "draft" | "confirmed" | "cancelled") {
+  let [c] = await db
+    .select({ id: customers.id })
+    .from(customers)
+    .where(eq(customers.name, "TEST_prlife_customer"));
+  if (!c) {
+    [c] = await db
+      .insert(customers)
+      .values({
+        name: "TEST_prlife_customer",
+        stateCode: "27",
+        address: "TEST_prlife address",
+        createdBy: emp.a as number,
+      })
+      .returning({ id: customers.id });
+  }
+  const [so] = await db
+    .insert(saleOrders)
+    .values({
+      soNumber: `TEST_PRLIFE_SO_${Date.now()}_${soSeq++}`,
+      customerId: (c as { id: number }).id,
+      status,
+      orderDate: "2026-11-01",
+      createdBy: emp.a as number,
+    })
+    .returning({ id: saleOrders.id });
+  return (so as { id: number }).id;
+}
+
 async function cleanup() {
   const ids = (
     await db
@@ -216,6 +248,8 @@ async function cleanup() {
         .delete(purchaseRequests)
         .where(inArray(purchaseRequests.id, prIds));
     }
+    await db.delete(saleOrders).where(inArray(saleOrders.createdBy, ids));
+    await db.delete(customers).where(inArray(customers.createdBy, ids));
     await db
       .update(documentNumberCounters)
       .set({ lastUpdatedBy: null })
@@ -402,10 +436,26 @@ describe("BR-PR-02 header checks", () => {
     );
   });
 
-  test("BR-PR-02 saleOrderId is stored as sent, unchecked", async () => {
-    const res = await create("a", { type: "sale_order", saleOrderId: 42 });
+  test("BR-SO-48 saleOrderId naming no real SO -> 400 PR_SALE_ORDER_INVALID", async () => {
+    const res = await create("a", { type: "sale_order", saleOrderId: 999999 });
+    expect(res.status).toBe(400);
+    expect((await json(res)).code).toBe("PR_SALE_ORDER_INVALID");
+  });
+
+  test("BR-SO-48 saleOrderId naming a draft or cancelled SO -> 400", async () => {
+    for (const status of ["draft", "cancelled"] as const) {
+      const soId = await makeSo(status);
+      const res = await create("a", { type: "sale_order", saleOrderId: soId });
+      expect(res.status).toBe(400);
+      expect((await json(res)).code).toBe("PR_SALE_ORDER_INVALID");
+    }
+  });
+
+  test("BR-SO-48 saleOrderId naming a confirmed SO is stored", async () => {
+    const soId = await makeSo("confirmed");
+    const res = await create("a", { type: "sale_order", saleOrderId: soId });
     expect(res.status).toBe(201);
-    expect(prOf(await json(res)).saleOrderId).toBe(42);
+    expect(prOf(await json(res)).saleOrderId).toBe(soId);
   });
 
   test("BR-PR-02 editing a draft to maintenance without an asset -> 400", async () => {

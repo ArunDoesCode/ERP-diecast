@@ -3,7 +3,12 @@ import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-export type QuickFilter = { key: string; label: string; count?: number };
+/** `count: null` hides the number (the API gives no counts); `undefined` shows "–" while loading. A bar where no chip has a `count` key at all shows no numbers. */
+export type QuickFilter = {
+	key: string;
+	label: string;
+	count?: number | null;
+};
 
 export type FilterBarProps = {
 	quick?: QuickFilter[];
@@ -24,12 +29,13 @@ export function FilterBar({
 	filtersActive,
 }: FilterBarProps) {
 	const firstKey = quick?.[0]?.key;
+	const noCounts = quick?.every((q) => !("count" in q)) ?? true;
 	const active = filtersActive === true || (quick ? value !== firstKey : false);
 	return (
 		<div
 			role="toolbar"
 			aria-label="Filters"
-			className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"
+			className="flex flex-col gap-3 min-[1280px]:flex-row min-[1280px]:items-center min-[1280px]:justify-between"
 		>
 			<div className="flex flex-wrap items-center gap-2">
 				{quick?.map((q) => {
@@ -41,13 +47,15 @@ export function FilterBar({
 							aria-pressed={selected}
 							onClick={() => onChange(q.key)}
 							className={cn(
-								"inline-flex h-7 flex-row-reverse items-center gap-1.5 rounded-full border px-3 text-xs font-medium",
+								"inline-flex h-9 flex-row-reverse items-center gap-1.5 rounded-full border px-3.5 text-sm font-medium",
 								selected
 									? "border-brand-accent bg-brand-accent text-brand-accent-foreground"
 									: "border-border bg-card text-foreground hover:bg-muted",
 							)}
 						>
-							<span className="tabular-nums">{q.count ?? "–"}</span>
+							{noCounts || q.count === null ? null : (
+								<span className="tabular-nums">{q.count ?? "–"}</span>
+							)}
 							<span>{q.label}</span>
 						</button>
 					);

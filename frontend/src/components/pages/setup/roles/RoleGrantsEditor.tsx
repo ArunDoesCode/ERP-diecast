@@ -138,13 +138,13 @@ function GrantsGrid({
 									<span>
 										{k.label}
 										{!k.grantable && (
-											<span className="ml-2 text-xs text-muted-foreground">
+											<span className="ml-2 text-sm text-muted-foreground">
 												super-admin only
 											</span>
 										)}
 									</span>
 									{k.description && (
-										<span className="text-xs text-muted-foreground">
+										<span className="text-sm text-muted-foreground">
 											{k.description}
 										</span>
 									)}

@@ -94,7 +94,7 @@ export function ConfirmPoDialog({
 					<div>
 						<label
 							htmlFor="po-confirm-method"
-							className="mb-1 block text-xs font-medium"
+							className="mb-1 block text-[13px] leading-[18px] font-semibold"
 						>
 							Confirmation method
 						</label>
@@ -115,7 +115,7 @@ export function ConfirmPoDialog({
 					<div>
 						<label
 							htmlFor="po-confirm-note"
-							className="mb-1 block text-xs font-medium"
+							className="mb-1 block text-[13px] leading-[18px] font-semibold"
 						>
 							Note
 						</label>

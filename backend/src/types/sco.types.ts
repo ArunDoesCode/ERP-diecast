@@ -169,6 +169,8 @@ export const companySettingsUpsertSchema = z
       .string()
       .trim()
       .regex(/^\d{2}$/, "State code is 2 digits"),
+    // dispatch BR-DSP-23, 42: same-state e-way bill limit, paise. Omitted = unchanged.
+    ewayIntraLimitPaise: z.number().int().min(1).max(10_000_000_000).optional(),
   })
   .strict();
 export type companySettingsUpsertSchemaType = z.infer<
@@ -188,7 +190,15 @@ export type companySettingsHistoryQuerySchemaType = z.infer<
 // One changed field of one save, newest first.
 export const companySettingsHistoryRowSchema = z.object({
   id: z.number().int(),
-  field: z.enum(["name", "address", "gstin", "stateCode"]),
+  field: z.enum([
+    "name",
+    "address",
+    "gstin",
+    "stateCode",
+    "priceToleranceBp",
+    "weightToleranceBp",
+    "ewayIntraLimitPaise",
+  ]),
   oldValue: z.string().nullable(),
   newValue: z.string(),
   changedBy: z.number().int(),

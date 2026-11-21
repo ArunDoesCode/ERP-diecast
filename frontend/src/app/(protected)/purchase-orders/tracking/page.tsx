@@ -1,5 +1,6 @@
-import { PurchaseOrderTrackingView } from "@/components/views/purchase-orders/PurchaseOrderTrackingView";
+import { redirect } from "next/navigation";
 
+// BR-FF-41: the order list lives at /purchase-orders.
 export default function PurchaseOrderTrackingPage() {
-	return <PurchaseOrderTrackingView />;
+	redirect("/purchase-orders");
 }

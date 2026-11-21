@@ -21,10 +21,14 @@ import {
   purchaseOrderItems,
   purchaseOrders,
   purchaseRequestItems,
+  purchaseReturns,
   serviceMaster,
+  stockTransfers,
   supplierItems,
   supplierMaster,
 } from "../db/schemas/02_procurement";
+import { bomLines, boms } from "../db/schemas/02_procurement-bom";
+import { deliveryNotes } from "../db/schemas/06_dispatch";
 import { BadRequestError, ConflictError, NotFoundError } from "../lib/errors";
 import { istDayStartInstant, istNextDayStartInstant } from "../lib/ist-day";
 import { safeSearch, safeSearchSql } from "../lib/safe-search";
@@ -43,6 +47,7 @@ import type {
   assetServiceListQuerySchemaType,
   assetStockListQuerySchemaType,
 } from "../types/asset.types";
+import { findRateChoices } from "./rateChainRepository";
 import { postStock } from "./stockPostingRepository";
 
 const itemColumns = getTableColumns(itemMaster);
@@ -63,7 +68,9 @@ const inventoryMovementColumns = {
   referenceType: inventoryLedger.referenceType,
   referenceId: inventoryLedger.referenceId,
   referenceLineId: inventoryLedger.referenceLineId,
-  sourceNumber: grns.grnNumber,
+  sourceNumber: sql<
+    string | null
+  >`coalesce(${grns.grnNumber}, ${purchaseReturns.proNumber}, ${stockTransfers.transferNumber}, ${deliveryNotes.dnNumber})`,
   quantityChange: inventoryLedger.quantityChange,
   balanceAfter: inventoryLedger.balanceAfter,
   unitCostPaise: inventoryLedger.unitCostPaise,
@@ -129,7 +136,8 @@ type MachineUpdateData = PartialUpdate<
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-// BR-INV-04: any ledger row, PR line, PO line or supplier-item line.
+// BR-INV-04: any ledger row, PR line, PO line or supplier-item line; BR-BOM-20:
+// any BOM revision (any status) that uses the item as part, line, sent item or alloy.
 async function itemInUse(tx: Tx, itemId: number) {
   const [row] = await tx.execute<{ used: boolean }>(sql`
     select (
@@ -137,6 +145,8 @@ async function itemInUse(tx: Tx, itemId: number) {
       or exists (select 1 from ${purchaseRequestItems} where ${purchaseRequestItems.itemId} = ${itemId})
       or exists (select 1 from ${purchaseOrderItems} where ${purchaseOrderItems.itemId} = ${itemId})
       or exists (select 1 from ${supplierItems} where ${supplierItems.itemId} = ${itemId})
+      or exists (select 1 from ${boms} where ${boms.partId} = ${itemId} or ${boms.sentItemId} = ${itemId} or ${boms.alloyItemId} = ${itemId})
+      or exists (select 1 from ${bomLines} where ${bomLines.componentItemId} = ${itemId})
     ) as used`);
   return row?.used === true;
 }
@@ -208,6 +218,9 @@ export const assetRepository = {
         sku: string;
         uom: string;
         reorderLevel: number;
+        reorderQty: number;
+        minOrderQty: number;
+        orderMultiple: number;
       },
       isInUse: () => Promise<boolean>,
     ) => ItemUpdateData | Promise<ItemUpdateData>,
@@ -218,6 +231,9 @@ export const assetRepository = {
           sku: itemMaster.sku,
           uom: itemMaster.uom,
           reorderLevel: itemMaster.reorderLevel,
+          reorderQty: itemMaster.reorderQty,
+          minOrderQty: itemMaster.minOrderQty,
+          orderMultiple: itemMaster.orderMultiple,
         })
         .from(itemMaster)
         .where(eq(itemMaster.id, id))
@@ -246,81 +262,27 @@ export const assetRepository = {
     return updated;
   },
 
-  // BR-INV-24 fallback chain: newest line of an approved-or-later PO for this
-  // supplier+item; else the supplier's catalog price; else the item average
-  // cost if > 0; else the item's standard rate. Undefined only for an unknown item.
-  async getLastRate(itemId: number, supplierId: number) {
-    const [poHistoryRow] = await db
-      .select({ ratePaise: purchaseOrderItems.unitPricePaise })
-      .from(purchaseOrderItems)
-      .innerJoin(purchaseOrders, eq(purchaseOrders.id, purchaseOrderItems.poId))
-      .where(
-        and(
-          eq(purchaseOrders.supplierId, supplierId),
-          eq(purchaseOrderItems.itemId, itemId),
-          sql`${purchaseOrderItems.unitPricePaise} > 0`,
-          inArray(purchaseOrders.status, [
-            "approved",
-            "dispatched",
-            "partial_received",
-            "fully_received",
-            "invoiced",
-            "closed",
-          ]),
-        ),
-      )
-      .orderBy(desc(purchaseOrders.createdAt), desc(purchaseOrderItems.id))
-      .limit(1);
+  // BR-INV-24 / BR-RFQ-50 chain (rateChainRepository, shared with the PO create
+  // resolver): usable contract rate first (only when `includeContract`, BR-RFQ-56),
+  // else newest line of an approved-or-later PO for this supplier+item, else the
+  // supplier's catalog price, else item average cost > 0, else item standard rate.
+  // Undefined only for an unknown item.
+  async getLastRate(
+    itemId: number,
+    supplierId: number,
+    opts: { onDate: string; includeContract: boolean },
+  ) {
+    const choices = await findRateChoices(db, supplierId, [itemId], opts);
+    return choices.get(itemId);
+  },
 
-    if (poHistoryRow && poHistoryRow.ratePaise > 0) {
-      return {
-        ratePaise: poHistoryRow.ratePaise,
-        source: "po_history" as const,
-      };
-    }
-
-    const [supplierCatalogRow] = await db
-      .select({ ratePaise: supplierItems.supplierUnitPricePaise })
-      .from(supplierItems)
-      .where(
-        and(
-          eq(supplierItems.supplierId, supplierId),
-          eq(supplierItems.itemId, itemId),
-          eq(supplierItems.isActive, true), // BR-SUP-15: inactive row never suggested
-        ),
-      )
-      .limit(1);
-
-    if (supplierCatalogRow && supplierCatalogRow.ratePaise > 0) {
-      return {
-        ratePaise: supplierCatalogRow.ratePaise,
-        source: "supplier_catalog" as const,
-      };
-    }
-
-    const [itemRow] = await db
-      .select({
-        averageCostPaise: itemMaster.averageCostPaise,
-        standardRatePaise: itemMaster.standardRatePaise,
-      })
-      .from(itemMaster)
-      .where(eq(itemMaster.id, itemId))
-      .limit(1);
-
-    if (!itemRow) {
-      return undefined;
-    }
-    if (itemRow.averageCostPaise > 0) {
-      return {
-        ratePaise: itemRow.averageCostPaise,
-        source: "item_average" as const,
-      };
-    }
-    return {
-      // legacy rows may still have 0 (API rejects 0 on write)
-      ratePaise: itemRow.standardRatePaise,
-      source: "standard_rate" as const,
-    };
+  // PERF-01: same chain for many items at once (unknown items left out).
+  async getLastRates(
+    itemIds: number[],
+    supplierId: number,
+    opts: { onDate: string; includeContract: boolean },
+  ) {
+    return findRateChoices(db, supplierId, itemIds, opts);
   },
 
   async listServices(params: assetServiceListQuerySchemaType) {
@@ -420,6 +382,33 @@ export const assetRepository = {
               "grn",
               "grn_bypass",
               "grn_correction",
+            ]),
+          ),
+        )
+        .leftJoin(
+          purchaseReturns,
+          and(
+            eq(purchaseReturns.id, inventoryLedger.referenceId),
+            inArray(inventoryLedger.referenceType, ["pro", "pro_cancel"]),
+          ),
+        )
+        .leftJoin(
+          stockTransfers,
+          and(
+            eq(stockTransfers.id, inventoryLedger.referenceId),
+            inArray(inventoryLedger.referenceType, [
+              "stock_transfer",
+              "stock_transfer_reversal",
+            ]),
+          ),
+        )
+        .leftJoin(
+          deliveryNotes,
+          and(
+            eq(deliveryNotes.id, inventoryLedger.referenceId),
+            inArray(inventoryLedger.referenceType, [
+              "delivery_note",
+              "delivery_note_cancel",
             ]),
           ),
         )

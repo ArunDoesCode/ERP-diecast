@@ -19,9 +19,13 @@ export type SearchableSelectOption = {
 	value: string;
 	label: string;
 	secondaryLabel?: string;
+	/** Shown but not pickable (e.g. already used on another line). */
+	disabled?: boolean;
 };
 
 type SearchableSelectProps = {
+	/** Id of the trigger button, so a `<Label htmlFor>` can point at it. */
+	id?: string;
 	value?: string;
 	options: SearchableSelectOption[];
 	onValueChange: (value: string) => void;
@@ -39,6 +43,7 @@ type SearchableSelectProps = {
 };
 
 export function SearchableSelect({
+	id,
 	value,
 	options,
 	onValueChange,
@@ -78,9 +83,13 @@ export function SearchableSelect({
 		<Popover open={open} onOpenChange={setOpen}>
 			<PopoverTrigger asChild>
 				<Button
+					id={id}
 					type="button"
 					variant="outline"
-					className={cn("w-full justify-between font-normal", className)}
+					className={cn(
+						"w-full justify-between bg-input/20 font-normal dark:bg-input/30",
+						className,
+					)}
 					disabled={disabled}
 				>
 					<span className={cn(!selected && "text-muted-foreground")}>
@@ -97,6 +106,7 @@ export function SearchableSelect({
 						value={searchValue}
 						onChange={(event) => onSearchChange(event.target.value)}
 						placeholder={searchPlaceholder}
+						aria-label={searchPlaceholder}
 					/>
 
 					{isLoading ? (
@@ -106,7 +116,7 @@ export function SearchableSelect({
 							<Skeleton className="h-8 w-full" />
 						</div>
 					) : options.length === 0 ? (
-						<p className="px-2 py-1 text-xs text-muted-foreground">
+						<p className="px-2 py-1 text-sm text-muted-foreground">
 							{emptyText}
 						</p>
 					) : (
@@ -118,7 +128,8 @@ export function SearchableSelect({
 								<button
 									key={option.value}
 									type="button"
-									className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-xs hover:bg-accent"
+									disabled={option.disabled}
+									className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
 									onClick={() => {
 										onValueChange(option.value);
 										setOpen(false);
@@ -127,7 +138,7 @@ export function SearchableSelect({
 									<span className="flex flex-col">
 										<span>{option.label}</span>
 										{option.secondaryLabel ? (
-											<span className="text-[11px] text-muted-foreground">
+											<span className="text-sm text-muted-foreground">
 												{option.secondaryLabel}
 											</span>
 										) : null}

@@ -21,3 +21,5 @@ Source: `docs/plans/agentic-workflow-v2.md` → Phase 6 and Baseline.
 | Date | Run | Mode | Min | Agent calls | Tokens | Fix rounds | Findings | Parked | Confirm | Commits | chore+docs | test | fix | PR |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | 2026-11-18 | epic-design-system | epic | 126 | 11 (epic) + ~60 (sub-features) | 0 | 1 | 0 | 0 | 0 | 41 | 0+2 | 14 | 7 | epic PR |
+| 2026-11-20 | epic-design-system-v2 | epic | 39 | 0 | 0 | 0 | 0 | 0 | 0 | 16 | 0+1 | 5 | 3 | epic PR |
+| 2026-11-21 | epic-factory-flows | epic | 819 | 0 | 0 | 2 | 0 | 1 | 0 | 65 | 0+12 | 17 | 12 | epic PR |

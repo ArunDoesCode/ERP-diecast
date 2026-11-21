@@ -25,10 +25,33 @@ export type StatusDoc =
 	| "po"
 	| "grn"
 	| "grnQa"
+	| "purchaseReturn"
+	| "st"
+	| "debitNote"
+	| "dn"
+	| "dnTag"
+	| "supplierInvoice"
+	| "supplierInvoiceMatch"
+	| "rfq"
+	| "quote"
+	| "rfqLine"
+	| "rfqFlag"
+	| "contract"
 	| "sco"
+	| "bom"
+	| "bomNode"
+	| "so"
+	| "soSnapshot"
+	| "customer"
+	| "soRowTag"
+	| "reorderRun"
+	| "reorderItem"
+	| "reorderOutcome"
+	| "prSource"
 	| "challanDue"
 	| "approval"
 	| "supplier"
+	| "supplierRating"
 	| "item"
 	| "machine"
 	| "employee"
@@ -105,6 +128,86 @@ const MAP: Record<StatusDoc, Record<string, Entry>> = Object.assign(
 			passed: ["Passed", "success"],
 			failed: ["Failed", "danger"],
 			waived: ["Waived", "neutral"],
+			mixed: ["Partly accepted", "warning"],
+		}),
+		purchaseReturn: table({
+			draft: ["Draft", "neutral"],
+			posted: ["Posted", "success"],
+			cancelled: ["Cancelled", "closed"],
+		}),
+		st: table({
+			draft: ["Draft", "neutral"],
+			posted: ["Posted", "success"],
+			cancelled: ["Cancelled", "closed"],
+			reversed: ["Reversed", "closed"],
+		}),
+		dn: table({
+			draft: ["Draft", "neutral"],
+			posted: ["Posted", "success"],
+			cancelled: ["Cancelled", "closed"],
+		}),
+		dnTag: table({
+			eway_needed: ["E-way needed", "warning"],
+			eway_missing: ["E-way missing", "warning"],
+			eway_optional: ["E-way optional", "neutral"],
+			eway_expired: ["E-way expired", "danger"],
+			short_stock: ["Short stock", "warning"],
+		}),
+		debitNote: table({
+			issued: ["Issued", "success"],
+			cancelled: ["Cancelled", "closed"],
+		}),
+		supplierInvoice: table({
+			draft: ["Draft", "neutral"],
+			blocked: ["Blocked", "warning"],
+			approved: ["Payable", "success"],
+			cancelled: ["Cancelled", "closed"],
+			legacy: ["Legacy", "closed"],
+			overdue: ["Overdue", "danger"],
+		}),
+		supplierInvoiceMatch: table({
+			ok: ["OK", "success"],
+			qty: ["Qty", "danger"],
+			price: ["Price", "danger"],
+			tax: ["Tax", "danger"],
+			tax_rate: ["Tax rate", "danger"],
+			total: ["Total", "danger"],
+			charge: ["Charge not on PO", "danger"],
+			below_po_rate: ["Below PO rate", "info"],
+		}),
+		rfq: table({
+			draft: ["Draft", "neutral"],
+			sent: ["Sent", "info"],
+			partially_awarded: ["Partly awarded", "info"],
+			awarded: ["Awarded", "success"],
+			closed: ["Closed", "closed"],
+			cancelled: ["Cancelled", "closed"],
+		}),
+		quote: table({
+			draft: ["Draft", "neutral"],
+			submitted: ["Submitted", "info"],
+			awarded: ["Awarded", "success"],
+			not_awarded: ["Not awarded", "closed"],
+			cancelled: ["Cancelled", "closed"],
+		}),
+		rfqLine: table({
+			open: ["Open", "neutral"],
+			awarded: ["Awarded", "success"],
+			dropped: ["Dropped", "closed"],
+		}),
+		rfqFlag: table({
+			late: ["Late", "danger"],
+			lowest: ["Lowest", "success"],
+			expired: ["Expired", "closed"],
+			not_quoted: ["Not quoted", "closed"],
+			inactive: ["Supplier inactive", "closed"],
+		}),
+		contract: table({
+			draft: ["Draft", "neutral"],
+			active: ["Active", "success"],
+			expired: ["Expired", "warning"],
+			terminated: ["Terminated", "closed"],
+			cancelled: ["Cancelled", "closed"],
 		}),
 		sco: table({
 			draft: ["Draft", "neutral"],
@@ -117,12 +220,68 @@ const MAP: Record<StatusDoc, Record<string, Entry>> = Object.assign(
 			closed: ["Closed", "closed"],
 			cancelled: ["Cancelled", "closed"],
 		}),
+		bom: table({
+			draft: ["Draft", "neutral"],
+			active: ["Active", "success"],
+			retired: ["Retired", "closed"],
+		}),
+		bomNode: table({
+			no_bom: ["No BOM", "neutral"],
+			inactive: ["Inactive", "closed"],
+			loop: ["Loop", "danger"],
+		}),
+		so: table({
+			draft: ["Draft", "neutral"],
+			confirmed: ["Confirmed", "info"],
+			on_hold: ["On hold", "warning"],
+			closed: ["Closed", "closed"],
+			cancelled: ["Cancelled", "closed"],
+		}),
+		soSnapshot: table({
+			current: ["Current", "success"],
+			out_of_date: ["Out of date", "warning"],
+			superseded: ["Superseded", "closed"],
+		}),
+		customer: ACTIVE,
+		soRowTag: table({
+			no_bom: ["No BOM", "neutral"],
+			buy_as_is: ["Buy as is", "neutral"],
+			inactive: ["Inactive item", "closed"],
+			loop: ["BOM loop", "danger"],
+		}),
+		reorderRun: table({
+			running: ["Running", "info"],
+			done: ["Done", "success"],
+			failed: ["Failed", "danger"],
+		}),
+		reorderItem: table({
+			will_be_ordered: ["Will be ordered", "warning"],
+			covered: ["Covered", "info"],
+			needs_reorder_qty: ["Needs a reorder qty", "warning"],
+			ok: ["OK", "success"],
+		}),
+		reorderOutcome: table({
+			raised: ["Raised", "success"],
+			needs_reorder_qty: ["Needs a reorder qty", "neutral"],
+			invalid_line: ["Invalid line", "neutral"],
+			deferred: ["Deferred to next run", "neutral"],
+		}),
+		prSource: table({
+			reorder: ["Reorder", "neutral"],
+		}),
 		challanDue: table({
 			ok: ["On time", "success"],
 			warning: ["Due soon", "warning"],
 			overdue: ["Overdue", "danger"],
 		}),
 		supplier: ACTIVE,
+		supplierRating: table({
+			good: ["Good", "success"],
+			watch: ["Watch", "warning"],
+			poor: ["Poor", "danger"],
+			not_enough_data: ["Not enough data", "neutral"],
+			no_data: ["No data", "neutral"],
+		}),
 		item: ACTIVE,
 		machine: ACTIVE,
 		employee: ACTIVE,

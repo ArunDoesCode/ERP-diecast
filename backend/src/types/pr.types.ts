@@ -70,6 +70,12 @@ export const prItemDetailSchema = prItemSchema.extend({
   linkedPoNumber: z.string().nullable(),
   defaultSupplierId: z.number().int().nullable(),
   defaultSupplierName: z.string().nullable(),
+  // Contract step 2 (BR-FF-43, 48, 49): optional until implemented.
+  /** PO the line is on via pr_po_item_links, else null (BR-FF-43). */
+  onPoId: z.number().int().nullable(),
+  onPoNumber: z.string().nullable(),
+  /** Rate the Create PO dialog pre-fills; 0 / null = dialog asks (BR-FF-49). */
+  suggestedRatePaise: z.number().int().nonnegative().nullable(),
 });
 export type prItemDetailSchemaType = z.infer<typeof prItemDetailSchema>;
 
@@ -145,6 +151,8 @@ export const createPrSchema = prCreateBaseSchema
   .extend({
     items: z.array(createPrItemSchema).min(1).max(500),
   })
+  // BR-RO-17: an unknown key (reorderRunId included) is a 400
+  .strict()
   .superRefine((data, ctx) => {
     if (data.type === "maintenance" && data.assetId == null) {
       ctx.addIssue({
@@ -225,6 +233,8 @@ export const updatePrSchema = prUpdateBaseSchema
       .nullish()
       .transform((v) => v ?? []),
   })
+  // BR-RO-17: an unknown key (reorderRunId included) is a 400
+  .strict()
   .superRefine((data, ctx) => {
     const hasUpdateField =
       data.type !== undefined ||
@@ -253,12 +263,27 @@ export const updatePrSchema = prUpdateBaseSchema
 
 export type updatePrSchemaType = z.infer<typeof updatePrSchema>;
 
+const queryBoolSchema = z
+  .enum(["true", "false"])
+  .optional()
+  .transform((value) => (value === undefined ? undefined : value === "true"));
+
+export const prBucketSchema = z.enum(["late", "today", "later"]);
+export type prBucketSchemaType = z.infer<typeof prBucketSchema>;
+
 export const prListQuerySchema = z
   .object({
     page: z.coerce.number().int().min(1).default(1),
     pageSize: z.coerce.number().int().min(1).max(100).default(10),
     sortBy: z
-      .enum(["id", "prNumber", "type", "status", "createdAt"])
+      .enum([
+        "id",
+        "prNumber",
+        "type",
+        "status",
+        "createdAt",
+        "estimatedAmountPaise",
+      ])
       .optional(),
     sortDir: z.enum(["asc", "desc"]).default("asc"),
     // Comma-separated list of statuses, e.g. "approved,partial_ordered".
@@ -277,7 +302,34 @@ export const prListQuerySchema = z
       .pipe(z.array(prStatusSchema).max(20).optional()),
     type: prTypeSchema.optional(),
     q: searchTermSchema,
+    // BR-RO-17: "true" = raised by an automatic reorder run, "false" = not
+    raisedByReorder: z
+      .enum(["true", "false"])
+      .transform((v) => v === "true")
+      .optional(),
+    reorderRunId: z.coerce.number().int().min(1).optional(),
+    // BR-FF-12, 21..23, 106: "my PRs", "To order" chip and its due-date bucket.
+    mine: queryBoolSchema,
+    toOrder: queryBoolSchema,
+    bucket: prBucketSchema.optional(),
   })
-  .strict();
+  .strict()
+  // CR-04: bucket only makes sense on the To order list.
+  .refine((q) => q.bucket === undefined || q.toOrder === true, {
+    message: "bucket requires toOrder=true",
+    path: ["bucket"],
+  });
+
+// Contract step 2: list row = stored PR + display fields (optional until the
+// handler fills them: BR-FF-12, 21..23, 106, 109).
+export const prListRowSchema = prSchema.extend({
+  requestedByName: z.string(),
+  lineCount: z.number().int().min(0),
+  /** Earliest required-by among pending lines (YYYY-MM-DD) or null. */
+  earliestRequiredBy: z.string().nullable(),
+  /** Latest approval request of this PR was sent back. */
+  sentBack: z.boolean(),
+});
+export type prListRowSchemaType = z.infer<typeof prListRowSchema>;
 
 export type prListQuerySchemaType = z.infer<typeof prListQuerySchema>;

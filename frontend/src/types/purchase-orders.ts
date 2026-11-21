@@ -1,9 +1,8 @@
-import { z } from "zod";
-
 import type {
 	ApiResult,
 	PaginatedResponse,
 } from "@/types/purchase-requisitions";
+import type { PrtLinkedReturn } from "@/types/purchase-return";
 
 export const poStatusValues = [
 	"draft",
@@ -18,7 +17,13 @@ export const poStatusValues = [
 ] as const;
 
 export type POStatus = (typeof poStatusValues)[number];
-export type POSortField = "id" | "poNumber" | "status" | "createdAt";
+export type POSortField =
+	| "id"
+	| "poNumber"
+	| "status"
+	| "createdAt"
+	| "dueDate"
+	| "totalAmountPaise";
 
 export interface PurchaseOrder {
 	id: number;
@@ -77,11 +82,26 @@ export interface PurchaseOrderItem {
 	itemCategory?: string;
 	prItemId?: number | null;
 	prNumber?: string | null;
+	/** Qty sent back on posted purchase returns (BR-PRT-38). Absent until the backend sends it. */
+	returnedQty?: number;
+	// scm-rfq: contract / quote link and rate-override audit. Null for callers without po.manage / contract.view.
+	contractItemId?: number | null;
+	contractNumber?: string | null;
+	contractRatePaise?: number | null;
+	quoteItemId?: number | null;
+	quoteNumber?: string | null;
+	rateSource?: "contract" | "quote" | null;
+	rateOverrideReason?: string | null;
+	rateOverrideBy?: number | null;
+	rateOverrideByName?: string | null;
+	rateOverrideAt?: string | null;
 }
 
 export interface PurchaseOrderDetailPayload {
 	po: PurchaseOrder;
 	items: PurchaseOrderItem[];
+	/** Returns made against this PO (BR-PRT-38). Absent until the backend sends it. */
+	returns?: PrtLinkedReturn[];
 }
 
 export type PurchaseOrderListParams = {
@@ -93,6 +113,8 @@ export type PurchaseOrderListParams = {
 	supplierId?: number;
 	q?: string;
 	overdue?: boolean;
+	mine?: boolean;
+	bucket?: "late" | "today" | "later";
 };
 
 /** BR-SUP-13 allowed GST percentages. */
@@ -113,6 +135,8 @@ export type POCreatePayload = {
 		prItemId: number;
 		unitPricePaise: number;
 		gstPercent?: number;
+		/** Only with a rate different from the contract rate (needs `contract.override_rate`). */
+		rateOverrideReason?: string;
 	}>;
 };
 
@@ -133,8 +157,14 @@ export type POUpdatePayload = {
 		prItemId: number;
 		unitPricePaise: number;
 		gstPercent?: number;
+		rateOverrideReason?: string;
 	}>;
-	updates?: Array<{ id: number; unitPricePaise: number; gstPercent?: number }>;
+	updates?: Array<{
+		id: number;
+		unitPricePaise: number;
+		gstPercent?: number;
+		rateOverrideReason?: string;
+	}>;
 	deletes?: Array<{ id: number }>;
 };
 
@@ -147,6 +177,7 @@ export type POCancelResult = ApiResult<PurchaseOrder>;
 
 // inventory BR-INV-30: where the rate suggestion comes from.
 export type LastRateSource =
+	| "contract"
 	| "po_history"
 	| "supplier_catalog"
 	| "item_average"
@@ -154,6 +185,7 @@ export type LastRateSource =
 
 /** BR-PO-25: the label shown next to the rate suggestion. */
 export const LAST_RATE_SOURCE_LABEL: Record<LastRateSource, string> = {
+	contract: "Contract",
 	po_history: "Last PO",
 	supplier_catalog: "Price list",
 	item_average: "Item average",
@@ -172,7 +204,16 @@ export function suggestedRateInput(ratePaise: number | null | undefined) {
 export type LastRateResult = ApiResult<{
 	ratePaise: number;
 	source: LastRateSource;
+	/** Source "contract" only (inventory BR-INV-30): the line is bound to this contract line. */
+	contractItemId?: number;
+	contractId?: number;
+	contractNumber?: string;
+	/** Contract quantity still open on the date (a number, or a decimal string). */
+	qtyLeft?: number | string;
+	gstPercent?: number;
 }>;
+
+export type LastRateData = Extract<LastRateResult, { success: true }>["data"];
 
 export const poCommunicationChannelValues = [
 	"email",
@@ -208,12 +249,6 @@ export type UpdatePoDelayPayload = {
 	delayReason?: string;
 };
 export type ConfirmPoPayload = { confirmationMethod: string; note?: string };
-export type MarkPoInvoicedPayload = {
-	invoiceNumber: string;
-	invoiceDate: string;
-	billedAmountPaise: number;
-	dueDate?: string;
-};
 export type ClosePoPayload = { note?: string };
 export type ShortClosePoPayload = { reason: string };
 
@@ -221,18 +256,7 @@ export type ShortClosePoPayload = { reason: string };
 export type POSendResult = ApiResult<PurchaseOrder>;
 export type PODelayResult = ApiResult<PurchaseOrder>;
 export type POConfirmResult = ApiResult<PurchaseOrder>;
-export type POInvoiceResult = ApiResult<PurchaseOrder>;
 export type POCloseResult = ApiResult<PurchaseOrder>;
 export type POShortCloseResult = ApiResult<PurchaseOrder>;
 export type POCommunicationsResult = ApiResult<PoCommunication[]>;
 export type POCommunicationResult = ApiResult<PoCommunication>;
-
-export const markPoInvoicedSchema = z.object({
-	invoiceNumber: z.string().min(1, "Invoice number is required"),
-	invoiceDate: z.string().min(1, "Invoice date is required"),
-	billedAmountRupees: z.coerce
-		.number()
-		.nonnegative("Amount cannot be negative"),
-	dueDate: z.string().optional(),
-});
-export type MarkPoInvoicedFormInput = z.infer<typeof markPoInvoicedSchema>;

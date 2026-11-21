@@ -9,7 +9,6 @@ import {
   confirmPoSchema,
   createPoSchema,
   logPoCommunicationSchema,
-  markPoInvoicedSchema,
   markPoSentSchema,
   poListQuerySchema,
   shortClosePoSchema,
@@ -32,7 +31,7 @@ export const poController = {
       throw new BadRequestError("Invalid PO id");
     }
 
-    const data = await poService.getDetails(id);
+    const data = await poService.getDetails(id, c.get("actor"));
     return c.json({ success: true, data });
   },
 
@@ -40,20 +39,20 @@ export const poController = {
     const query = poListQuerySchema.parse(
       Object.fromEntries(new URL(c.req.url).searchParams),
     );
-    const { data, meta } = await poService.list(query);
+    const { data, meta } = await poService.list(query, parseActorId(c));
     return c.json({ success: true, data, meta });
   },
 
   async create(c: Context<AppEnv>) {
     const body = createPoSchema.parse(await c.req.json());
-    const actorId = parseActorId(c);
-    const data = await poService.create(body, actorId);
+    parseActorId(c);
+    const data = await poService.create(body, c.get("actor"));
     return c.json({ success: true, data }, 201);
   },
 
   async update(c: Context<AppEnv>) {
     const body = updatePoSchema.parse(await c.req.json());
-    const data = await poService.update(body);
+    const data = await poService.update(body, c.get("actor"));
     return c.json({ success: true, data });
   },
 
@@ -126,17 +125,6 @@ export const poController = {
     const body = confirmPoSchema.parse(await c.req.json());
     const actorId = parseActorId(c);
     const data = await poService.confirmSupplier(id, body, actorId);
-    return c.json({ success: true, data });
-  },
-
-  async markInvoiced(c: Context<AppEnv>) {
-    const id = Number(c.req.param("id"));
-    if (!Number.isInteger(id) || id <= 0) {
-      throw new BadRequestError("Invalid PO id");
-    }
-
-    const body = markPoInvoicedSchema.parse(await c.req.json());
-    const data = await poService.markInvoiced(id, body, parseActorId(c));
     return c.json({ success: true, data });
   },
 

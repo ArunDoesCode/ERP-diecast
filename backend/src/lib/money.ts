@@ -51,3 +51,28 @@ export function toSafePaise(value: string | number | bigint): number {
   }
   return n;
 }
+
+/** Math.round(n / d) for n >= 0, d > 0: half up, exact in BigInt. */
+export function divRoundHalfUp(numerator: bigint, divisor: bigint): bigint {
+  return (2n * numerator + divisor) / (2n * divisor);
+}
+
+/** bigint -> paise number, 400 AMOUNT_TOO_LARGE above MAX_MONEY_PAISE. */
+export function toPaise(value: bigint): number {
+  const n = Number(value);
+  assertMoneyInRange(n);
+  return n;
+}
+
+const MAX_SAFE = BigInt(Number.MAX_SAFE_INTEGER);
+
+/** bigint -> number, 400 SINV_AMOUNT_TOO_LARGE above MAX_SAFE_INTEGER (BR-SINV-36). */
+export function safePaise(value: bigint): number {
+  if (value > MAX_SAFE || value < -MAX_SAFE) {
+    throw new BadRequestError(
+      "An amount on this invoice is above the largest value allowed",
+      "SINV_AMOUNT_TOO_LARGE",
+    );
+  }
+  return Number(value);
+}

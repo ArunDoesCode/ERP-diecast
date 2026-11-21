@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
 	Table,
@@ -13,14 +15,50 @@ import {
 	usePoCommunicationsQuery,
 	usePurchaseOrderDetailQuery,
 } from "@/lib/api/purchase-orders/queries";
-import { formatDateTime, formatMoney } from "@/lib/format";
-import type { PoCommunicationType } from "@/types/purchase-orders";
+import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
+import type {
+	PoCommunicationType,
+	PurchaseOrderItem,
+} from "@/types/purchase-orders";
 
 const COMM_TYPE_LABEL: Record<PoCommunicationType, string> = {
 	po_sent: "PO sent",
 	reminder: "Reminder",
 	escalation: "Escalation",
 };
+
+const RATE_SOURCE_LABEL = { contract: "Contract", quote: "Quote" } as const;
+
+/** Contract no. and rate source of a line, plus a rate override and who did it (BR-RFQ-30, 51). */
+function RateSourceNote({ item }: { item: PurchaseOrderItem }) {
+	if (!item.rateSource && !item.contractNumber && !item.quoteNumber) {
+		return <span className="text-muted-foreground">–</span>;
+	}
+	return (
+		<span className="block">
+			{item.rateSource ? RATE_SOURCE_LABEL[item.rateSource] : null}
+			{item.contractNumber ? (
+				<span className="font-mono"> {item.contractNumber}</span>
+			) : null}
+			{item.quoteNumber ? (
+				<span className="font-mono"> {item.quoteNumber}</span>
+			) : null}
+			{item.rateOverrideReason ? (
+				<span className="block text-[13px] text-muted-foreground">
+					Override
+					{item.contractRatePaise != null
+						? ` · was ${formatMoney(item.contractRatePaise)}`
+						: ""}
+					{` · ${item.rateOverrideReason}`}
+					{item.rateOverrideByName ? ` · by ${item.rateOverrideByName}` : ""}
+					{item.rateOverrideAt
+						? `, ${formatDateTime(item.rateOverrideAt)}`
+						: ""}
+				</span>
+			) : null}
+		</span>
+	);
+}
 
 /** PO lines with GST, totals (BR-PO-04) and the communications log (BR-PO-17). */
 export function PoDetailPanel({ poId }: { poId: number }) {
@@ -32,19 +70,21 @@ export function PoDetailPanel({ poId }: { poId: number }) {
 	if (detailQuery.isLoading) return <Skeleton className="h-24 w-full" />;
 	if (!detail) {
 		return (
-			<p className="text-xs text-destructive">Could not load the PO details.</p>
+			<p className="text-sm text-destructive">Could not load the PO details.</p>
 		);
 	}
 	const { po, items } = detail;
+	const returns = detail.returns ?? [];
+	const showReturned = items.some((item) => item.returnedQty !== undefined);
 
 	return (
-		<div className="space-y-4 rounded-md border p-3 text-xs">
+		<div className="space-y-4 rounded-md border p-3 text-sm">
 			<div className="grid gap-1 text-muted-foreground sm:grid-cols-3">
 				<span>
 					Payment terms:{" "}
 					{po.paymentTermsDays != null ? `${po.paymentTermsDays} days` : "-"}
 				</span>
-				<span>Expected delivery: {po.expectedDeliveryDate ?? "-"}</span>
+				<span>Expected delivery: {formatDate(po.expectedDeliveryDate)}</span>
 				<span>Delivery terms: {po.deliveryTerms ?? "-"}</span>
 				{po.status === "cancelled" && po.cancelReason ? (
 					<span className="sm:col-span-3">
@@ -64,7 +104,9 @@ export function PoDetailPanel({ poId }: { poId: number }) {
 					<TableRow>
 						<TableHead>Item</TableHead>
 						<TableHead>Qty</TableHead>
+						{showReturned ? <TableHead>Returned</TableHead> : null}
 						<TableHead>Rate</TableHead>
+						<TableHead>Rate source</TableHead>
 						<TableHead>GST %</TableHead>
 						<TableHead className="text-right">Value</TableHead>
 						<TableHead className="text-right">GST</TableHead>
@@ -77,7 +119,15 @@ export function PoDetailPanel({ poId }: { poId: number }) {
 							<TableCell>
 								{item.qty} {item.uom ?? ""}
 							</TableCell>
+							{showReturned ? (
+								<TableCell>
+									{item.returnedQty ?? 0} {item.uom ?? ""}
+								</TableCell>
+							) : null}
 							<TableCell>{formatMoney(item.unitPricePaise)}</TableCell>
+							<TableCell>
+								<RateSourceNote item={item} />
+							</TableCell>
 							<TableCell>{item.gstPercent ?? 0}%</TableCell>
 							<TableCell className="text-right">
 								{formatMoney(
@@ -101,6 +151,25 @@ export function PoDetailPanel({ poId }: { poId: number }) {
 				<dt className="font-medium">Total</dt>
 				<dd className="font-medium">{formatMoney(po.totalAmountPaise)}</dd>
 			</dl>
+
+			{returns.length > 0 ? (
+				<section aria-label="Purchase returns" className="space-y-1">
+					<h4 className="font-medium">Purchase returns</h4>
+					<ul className="space-y-1">
+						{returns.map((entry) => (
+							<li key={entry.id} className="flex items-center gap-2">
+								<Link
+									href={`/purchase-returns/${entry.id}`}
+									className="font-mono text-brand-accent hover:underline"
+								>
+									{entry.proNumber}
+								</Link>
+								<StatusBadge doc="purchaseReturn" status={entry.status} />
+							</li>
+						))}
+					</ul>
+				</section>
+			) : null}
 
 			<section aria-label="Communications log" className="space-y-1">
 				<h4 className="font-medium">Communications</h4>

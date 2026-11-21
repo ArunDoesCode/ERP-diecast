@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { ApiClientError } from "@/lib/api/client";
 import type {
 	ChallanCreatePayload,
-	CompanySettingsPayload,
+	CompanySettingsSavePayload,
 	LossLogParams,
 	OpenChallanParams,
 	QaDecisionPayload,
@@ -207,7 +207,7 @@ export function useSaveCompanySettingsMutation() {
 	const queryClient = useQueryClient();
 
 	return useMutation({
-		mutationFn: (payload: CompanySettingsPayload) =>
+		mutationFn: (payload: CompanySettingsSavePayload) =>
 			saveCompanySettings(payload),
 		onSuccess: async (result) => {
 			if (!result.success) {

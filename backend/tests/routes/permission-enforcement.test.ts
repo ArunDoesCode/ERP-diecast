@@ -20,10 +20,18 @@ import {
   expect,
   test,
 } from "bun:test";
-import { and, eq, like } from "drizzle-orm";
+import { and, eq, inArray, like, or } from "drizzle-orm";
 import { createApp } from "../../src/app";
 import { db } from "../../src/db/client";
 import { rolePermissions, roles } from "../../src/db/schemas/01_auth";
+import {
+  purchaseRequestItems,
+  purchaseRequests,
+} from "../../src/db/schemas/02_procurement-purchasing";
+import {
+  reorderRunItems,
+  reorderRuns,
+} from "../../src/db/schemas/02_procurement-reorder";
 import { employees } from "../../src/db/schemas/03_hcm";
 import { invalidateActor, invalidateRole } from "../../src/lib/auth-middleware";
 import { PERMISSION_KEYS } from "../../src/lib/permissions";
@@ -122,6 +130,46 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  // the matrix call to POST /api/reorder/check-now creates a run (and maybe a draft PR) for a test employee
+  const ids = (
+    await db
+      .select({ id: employees.id })
+      .from(employees)
+      .where(like(employees.email, `${PREFIX}%`))
+  ).map((e) => e.id);
+  if (ids.length > 0) {
+    const runIds = (
+      await db
+        .select({ id: reorderRuns.id })
+        .from(reorderRuns)
+        .where(
+          or(
+            inArray(reorderRuns.startedBy, ids),
+            inArray(reorderRuns.draftOwnerId, ids),
+          ),
+        )
+    ).map((r) => r.id);
+    if (runIds.length > 0) {
+      await db
+        .delete(reorderRunItems)
+        .where(inArray(reorderRunItems.runId, runIds));
+      const prIds = (
+        await db
+          .select({ id: purchaseRequests.id })
+          .from(purchaseRequests)
+          .where(inArray(purchaseRequests.reorderRunId, runIds))
+      ).map((p) => p.id);
+      if (prIds.length > 0) {
+        await db
+          .delete(purchaseRequestItems)
+          .where(inArray(purchaseRequestItems.prId, prIds));
+        await db
+          .delete(purchaseRequests)
+          .where(inArray(purchaseRequests.id, prIds));
+      }
+      await db.delete(reorderRuns).where(inArray(reorderRuns.id, runIds));
+    }
+  }
   await db.delete(employees).where(like(employees.email, `${PREFIX}%`));
   await db.delete(roles).where(like(roles.name, `${PREFIX}%`));
 });

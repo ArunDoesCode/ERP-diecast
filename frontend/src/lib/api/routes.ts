@@ -3,12 +3,24 @@ const API_Header = {
 	setup: "/setup",
 	approval: "/approval",
 	supplier: "/supplier",
+	supplierRating: "/supplier-rating",
 	asset: "/asset",
 	pr: "/pr",
 	po: "/po",
 	grn: "/grn",
+	purchaseReturn: "/purchase-return",
+	stockTransfer: "/stock-transfer",
+	document: "/document",
 	sco: "/sco",
+	bom: "/bom",
+	customers: "/customers",
+	saleOrders: "/sale-orders",
+	dispatch: "/dispatch",
+	reorder: "/reorder",
 	company: "/company",
+	supplierInvoice: "/supplier-invoice",
+	rfq: "/rfq",
+	rateContract: "/rate-contract",
 };
 export const API_ROUTES = {
 	auth: {
@@ -64,6 +76,8 @@ export const API_ROUTES = {
 			`${API_Header.approval}/getRequestTrail/${id}`,
 		actOnRequest: (id: number) => `${API_Header.approval}/actOnRequest/${id}`,
 		getMyPendingApprovals: `${API_Header.approval}/getMyPendingApprovals`,
+		getDocumentView: (docType: string, docId: number) =>
+			`${API_Header.approval}/getDocumentView/${docType}/${docId}`,
 		getApprovalHistory: (docType: string, docId: number) =>
 			`${API_Header.approval}/getApprovalHistory/${docType}/${docId}`,
 		getCurrentApprovalByDoc: (docType: string, docId: number) =>
@@ -95,6 +109,7 @@ export const API_ROUTES = {
 		items: `${API_Header.asset}/items`,
 		itemLastRate: (itemId: number) =>
 			`${API_Header.asset}/items/${itemId}/last-rate`,
+		itemsLastRates: `${API_Header.asset}/items/last-rates`,
 		services: `${API_Header.asset}/services`,
 		machines: {
 			list: `${API_Header.asset}/machines`,
@@ -137,7 +152,6 @@ export const API_ROUTES = {
 		escalate: (poId: number) => `${API_Header.po}/${poId}/escalate`,
 		delay: (poId: number) => `${API_Header.po}/${poId}/delay`,
 		confirm: (poId: number) => `${API_Header.po}/${poId}/confirm`,
-		invoice: (poId: number) => `${API_Header.po}/${poId}/invoice`,
 		close: (poId: number) => `${API_Header.po}/${poId}/close`,
 		shortClose: (poId: number) => `${API_Header.po}/${poId}/short-close`,
 		communications: (poId: number) => `${API_Header.po}/${poId}/communications`,
@@ -146,6 +160,7 @@ export const API_ROUTES = {
 		list: `${API_Header.grn}/getgrns`,
 		detail: (grnId: number) => `${API_Header.grn}/getgrndetails/${grnId}`,
 		create: `${API_Header.grn}/creategrn`,
+		receivable: `${API_Header.grn}/getreceivablepos`,
 		update: `${API_Header.grn}/updategrn`,
 		remove: (grnId: number) => `${API_Header.grn}/deletegrn/${grnId}`,
 		qaDecision: (grnId: number, lineId: number) =>
@@ -154,6 +169,96 @@ export const API_ROUTES = {
 			`${API_Header.grn}/${grnId}/lines/${lineId}/bypass`,
 		correction: (grnId: number, lineId: number) =>
 			`${API_Header.grn}/${grnId}/lines/${lineId}/correction`,
+	},
+	bom: {
+		list: API_Header.bom,
+		create: API_Header.bom,
+		needs: `${API_Header.bom}/needs`,
+		detail: (bomId: number) => `${API_Header.bom}/${bomId}`,
+		update: (bomId: number) => `${API_Header.bom}/${bomId}`,
+		remove: (bomId: number) => `${API_Header.bom}/${bomId}`,
+		tree: (bomId: number) => `${API_Header.bom}/${bomId}/tree`,
+		changeSummary: (bomId: number) =>
+			`${API_Header.bom}/${bomId}/change-summary`,
+		release: (bomId: number) => `${API_Header.bom}/${bomId}/release`,
+		retire: (bomId: number) => `${API_Header.bom}/${bomId}/retire`,
+		whereUsed: (itemId: number) =>
+			`${API_Header.bom}/items/${itemId}/where-used`,
+		history: (partId: number) => `${API_Header.bom}/parts/${partId}/history`,
+		startRevision: (partId: number) =>
+			`${API_Header.bom}/parts/${partId}/revisions`,
+	},
+	customers: {
+		list: API_Header.customers,
+		create: API_Header.customers,
+		detail: (customerId: number) => `${API_Header.customers}/${customerId}`,
+		update: (customerId: number) => `${API_Header.customers}/${customerId}`,
+	},
+	reorder: {
+		items: `${API_Header.reorder}/items`,
+		runs: `${API_Header.reorder}/runs`,
+		runDetail: (runId: number) => `${API_Header.reorder}/runs/${runId}`,
+		checkNow: `${API_Header.reorder}/check-now`,
+		settings: `${API_Header.reorder}/settings`,
+		ownerCandidates: `${API_Header.reorder}/owner-candidates`,
+	},
+	saleOrders: {
+		list: API_Header.saleOrders,
+		create: API_Header.saleOrders,
+		detail: (soId: number) => `${API_Header.saleOrders}/${soId}`,
+		update: (soId: number) => `${API_Header.saleOrders}/${soId}`,
+		confirm: (soId: number) => `${API_Header.saleOrders}/${soId}/confirm`,
+		hold: (soId: number) => `${API_Header.saleOrders}/${soId}/hold`,
+		resume: (soId: number) => `${API_Header.saleOrders}/${soId}/resume`,
+		close: (soId: number) => `${API_Header.saleOrders}/${soId}/close`,
+		cancel: (soId: number) => `${API_Header.saleOrders}/${soId}/cancel`,
+		audit: (soId: number) => `${API_Header.saleOrders}/${soId}/audit`,
+		explosions: (soId: number) => `${API_Header.saleOrders}/${soId}/explosions`,
+		explosion: (soId: number, eid: number) =>
+			`${API_Header.saleOrders}/${soId}/explosions/${eid}`,
+		explosionRows: (soId: number, eid: number) =>
+			`${API_Header.saleOrders}/${soId}/explosions/${eid}/rows`,
+		explosionDrafts: (soId: number, eid: number) =>
+			`${API_Header.saleOrders}/${soId}/explosions/${eid}/drafts`,
+	},
+	purchaseReturns: {
+		list: `${API_Header.purchaseReturn}/getreturns`,
+		awaiting: `${API_Header.purchaseReturn}/awaiting`,
+		detail: (id: number) =>
+			`${API_Header.purchaseReturn}/getreturndetails/${id}`,
+		prefill: (grnId: number) => `${API_Header.purchaseReturn}/prefill/${grnId}`,
+		create: `${API_Header.purchaseReturn}/createreturn`,
+		update: `${API_Header.purchaseReturn}/updatereturn`,
+		cancelDraft: (id: number) =>
+			`${API_Header.purchaseReturn}/${id}/cancel-draft`,
+		post: (id: number) => `${API_Header.purchaseReturn}/${id}/post`,
+		cancel: (id: number) => `${API_Header.purchaseReturn}/${id}/cancel`,
+	},
+	dispatch: {
+		pending: `${API_Header.dispatch}/pending`,
+		settings: `${API_Header.dispatch}/settings`,
+		notes: `${API_Header.dispatch}/notes`,
+		note: (id: number) => `${API_Header.dispatch}/notes/${id}`,
+		post: (id: number) => `${API_Header.dispatch}/notes/${id}/post`,
+		cancelDraft: (id: number) =>
+			`${API_Header.dispatch}/notes/${id}/cancel-draft`,
+		cancel: (id: number) => `${API_Header.dispatch}/notes/${id}/cancel`,
+		transport: (id: number) => `${API_Header.dispatch}/notes/${id}/transport`,
+		transportHistory: (id: number) =>
+			`${API_Header.dispatch}/notes/${id}/transport-history`,
+	},
+	stockTransfers: {
+		list: API_Header.stockTransfer,
+		detail: (id: number) => `${API_Header.stockTransfer}/${id}`,
+		create: API_Header.stockTransfer,
+		update: (id: number) => `${API_Header.stockTransfer}/${id}`,
+		cancel: (id: number) => `${API_Header.stockTransfer}/${id}/cancel`,
+		post: (id: number) => `${API_Header.stockTransfer}/${id}/post`,
+		reverse: (id: number) => `${API_Header.stockTransfer}/${id}/reverse`,
+	},
+	document: {
+		panel: (docType: "pr" | "po" | "grn", docId: number) =>
+			`${API_Header.document}/getpanel/${docType}/${docId}`,
 	},
 	subcontracting: {
 		list: `${API_Header.sco}/getscos`,
@@ -175,7 +280,64 @@ export const API_ROUTES = {
 		challanDetail: (challanId: number) =>
 			`${API_Header.sco}/challans/${challanId}`,
 	},
+	supplierRating: {
+		list: `${API_Header.supplierRating}/list`,
+		card: (supplierId: number) =>
+			`${API_Header.supplierRating}/${supplierId}/card`,
+		lines: (supplierId: number) =>
+			`${API_Header.supplierRating}/${supplierId}/lines`,
+		trend: (supplierId: number) =>
+			`${API_Header.supplierRating}/${supplierId}/trend`,
+	},
+	supplierInvoices: {
+		list: `${API_Header.supplierInvoice}/getsupplierinvoices`,
+		billableLines: `${API_Header.supplierInvoice}/getbillablelines`,
+		detail: (id: number) =>
+			`${API_Header.supplierInvoice}/getsupplierinvoicedetails/${id}`,
+		create: `${API_Header.supplierInvoice}/createsupplierinvoice`,
+		update: `${API_Header.supplierInvoice}/updatesupplierinvoice`,
+		remove: (id: number) =>
+			`${API_Header.supplierInvoice}/deletesupplierinvoice/${id}`,
+		submit: (id: number) => `${API_Header.supplierInvoice}/${id}/submit`,
+		backToDraft: (id: number) =>
+			`${API_Header.supplierInvoice}/${id}/back-to-draft`,
+		release: (id: number) => `${API_Header.supplierInvoice}/${id}/release`,
+		cancel: (id: number) => `${API_Header.supplierInvoice}/${id}/cancel`,
+	},
+	rfq: {
+		prLines: `${API_Header.rfq}/pr-lines`,
+		list: `${API_Header.rfq}/getrfqs`,
+		detail: (id: number) => `${API_Header.rfq}/getrfqdetails/${id}`,
+		create: `${API_Header.rfq}/createrfq`,
+		update: `${API_Header.rfq}/updaterfq`,
+		send: (id: number) => `${API_Header.rfq}/${id}/send`,
+		cancel: (id: number) => `${API_Header.rfq}/${id}/cancel`,
+		close: (id: number) => `${API_Header.rfq}/${id}/close`,
+		print: (id: number) => `${API_Header.rfq}/${id}/print`,
+		comparison: (id: number) => `${API_Header.rfq}/${id}/comparison`,
+		award: (id: number) => `${API_Header.rfq}/${id}/award`,
+		createQuote: (id: number) => `${API_Header.rfq}/${id}/quotes`,
+		quote: (quoteId: number) => `${API_Header.rfq}/quotes/${quoteId}`,
+		submitQuote: (quoteId: number) =>
+			`${API_Header.rfq}/quotes/${quoteId}/submit`,
+		cancelQuote: (quoteId: number) =>
+			`${API_Header.rfq}/quotes/${quoteId}/cancel`,
+	},
+	rateContracts: {
+		list: `${API_Header.rateContract}/getcontracts`,
+		detail: (id: number) =>
+			`${API_Header.rateContract}/getcontractdetails/${id}`,
+		create: `${API_Header.rateContract}/createcontract`,
+		update: `${API_Header.rateContract}/updatecontract`,
+		activate: (id: number) => `${API_Header.rateContract}/${id}/activate`,
+		terminate: (id: number) => `${API_Header.rateContract}/${id}/terminate`,
+		cancel: (id: number) => `${API_Header.rateContract}/${id}/cancel`,
+	},
+	home: {
+		getCounts: "/home/getcounts",
+	},
 	company: {
+		invoiceTolerances: `${API_Header.company}/invoice-tolerances`,
 		settings: `${API_Header.company}/settings`,
 		settingsHistory: `${API_Header.company}/settings/history`,
 	},

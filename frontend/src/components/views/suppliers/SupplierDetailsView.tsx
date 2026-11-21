@@ -3,6 +3,7 @@
 import { IconArrowLeft, IconEdit } from "@tabler/icons-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { RatingCard } from "@/components/pages/supplier-rating/RatingCard";
 import { SupplierHistoryCard } from "@/components/pages/suppliers/SupplierHistoryCard";
 import { SupplierMasterModal } from "@/components/pages/suppliers/SupplierMasterModal";
 import { SupplierOfferingsSection } from "@/components/pages/suppliers/SupplierOfferingsSection";
@@ -74,6 +75,7 @@ export function SupplierDetailsView({ supplierId }: SupplierDetailsViewProps) {
 	const [editOpen, setEditOpen] = useState(false);
 	const [statusConfirmOpen, setStatusConfirmOpen] = useState(false);
 	const canManage = useCan("supplier.manage");
+	const canViewRating = useCan("supplier.rating.view");
 
 	const detailQuery = useSupplierDetailQuery(supplierId);
 	const updateMasterMutation = useUpdateSupplierMasterMutation();
@@ -175,35 +177,49 @@ export function SupplierDetailsView({ supplierId }: SupplierDetailsViewProps) {
 				<CardContent>
 					<div className="grid grid-cols-1 gap-x-4 gap-y-5 sm:grid-cols-2 md:grid-cols-3">
 						<div>
-							<p className="text-xs text-muted-foreground">Supplier type</p>
+							<p className="text-[13px] leading-[18px] font-semibold text-muted-foreground">
+								Supplier type
+							</p>
 							<p className="text-sm">{renderValue(supplier.type)}</p>
 						</div>
 						<div>
-							<p className="text-xs text-muted-foreground">GST number</p>
+							<p className="text-[13px] leading-[18px] font-semibold text-muted-foreground">
+								GST number
+							</p>
 							<p className="text-sm">{renderValue(supplier.gstNumber)}</p>
 						</div>
 						<div>
-							<p className="text-xs text-muted-foreground">PAN number</p>
+							<p className="text-[13px] leading-[18px] font-semibold text-muted-foreground">
+								PAN number
+							</p>
 							<p className="text-sm">{renderValue(supplier.panNumber)}</p>
 						</div>
 						<div>
-							<p className="text-xs text-muted-foreground">Contact person</p>
+							<p className="text-[13px] leading-[18px] font-semibold text-muted-foreground">
+								Contact person
+							</p>
 							<p className="text-sm">{renderValue(supplier.contactPerson)}</p>
 						</div>
 						<div>
-							<p className="text-xs text-muted-foreground">Phone</p>
+							<p className="text-[13px] leading-[18px] font-semibold text-muted-foreground">
+								Phone
+							</p>
 							<p className="text-sm">{renderValue(supplier.phone)}</p>
 						</div>
 						<div>
-							<p className="text-xs text-muted-foreground">Email</p>
+							<p className="text-[13px] leading-[18px] font-semibold text-muted-foreground">
+								Email
+							</p>
 							<p className="text-sm">{renderValue(supplier.email)}</p>
 						</div>
 						<div className="sm:col-span-2 md:col-span-3">
-							<p className="text-xs text-muted-foreground">Address</p>
+							<p className="text-[13px] leading-[18px] font-semibold text-muted-foreground">
+								Address
+							</p>
 							<p className="text-sm">{renderValue(supplier.address)}</p>
 						</div>
 						<div>
-							<p className="text-xs text-muted-foreground">
+							<p className="text-[13px] leading-[18px] font-semibold text-muted-foreground">
 								Default payment terms
 							</p>
 							<p className="text-sm">
@@ -215,6 +231,8 @@ export function SupplierDetailsView({ supplierId }: SupplierDetailsViewProps) {
 					</div>
 				</CardContent>
 			</Card>
+
+			{canViewRating ? <RatingCard supplierId={supplierId} /> : null}
 
 			<SupplierOfferingsSection supplierId={supplierId} canManage={canManage} />
 

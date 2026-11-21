@@ -18,6 +18,7 @@ import {
   prDetailsSchema,
   prLineCancelResultSchema,
   prListQuerySchema,
+  prListRowSchema,
   prSchema,
   prStatusSchema,
   prUpdateResultSchema,
@@ -46,14 +47,23 @@ register({
   // purchase-order BR-PO-26: meta.statusCounts = rows per status for the
   // same search (the PO screen's quick filters).
   responses: {
-    "200": paginatedResponse(prSchema).extend({
+    "200": paginatedResponse(prListRowSchema).extend({
       meta: paginationMetaSchema.extend({
         statusCounts: z.record(prStatusSchema, z.number().int().min(0)),
+        // BR-FF-02, 21: rows toOrder=true would return under the other filters.
+        toOrderCount: z.number().int().min(0),
       }),
     }),
   },
   pagination: {
-    sortableFields: ["id", "prNumber", "type", "status", "createdAt"],
+    sortableFields: [
+      "id",
+      "prNumber",
+      "type",
+      "status",
+      "createdAt",
+      "estimatedAmountPaise",
+    ],
     searchable: true,
   },
 });

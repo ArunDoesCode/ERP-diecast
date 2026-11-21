@@ -9,12 +9,15 @@ import {
 import { toast } from "sonner";
 
 import { ApiClientError } from "@/lib/api/client";
+import { documentKeys } from "@/lib/api/document/queries";
+import { grnKeys } from "@/lib/api/grn/keys";
+import { homeKeys } from "@/lib/api/home/queries";
 import { purchaseRequisitionKeys } from "@/lib/api/purchase-requisitions/queries";
+import { istTodayIso } from "@/lib/ist-date";
 import type {
 	ClosePoPayload,
 	ConfirmPoPayload,
 	LogPoCommunicationPayload,
-	MarkPoInvoicedFormInput,
 	POCreatePayload,
 	POUpdatePayload,
 	PurchaseOrderListParams,
@@ -29,46 +32,52 @@ import {
 	createPurchaseOrder,
 	escalatePurchaseOrder,
 	getItemLastRate,
+	getItemsLastRates,
 	getPurchaseOrderById,
 	getPurchaseOrderCommunications,
 	getPurchaseOrders,
 	getSupplierPriceRows,
-	markPurchaseOrderInvoiced,
 	sendPurchaseOrder,
 	sendPurchaseOrderReminder,
 	shortClosePurchaseOrder,
 	updatePurchaseOrder,
 	updatePurchaseOrderDelay,
 } from "./fetchers";
-
-export const purchaseOrderKeys = {
-	cards: (params?: PurchaseOrderListParams) =>
-		params
-			? (["purchase-orders", "cards", params] as const)
-			: (["purchase-orders", "cards"] as const),
-	detail: (poId: number) => ["purchase-orders", "detail", poId] as const,
-	communications: (poId: number) =>
-		["purchase-orders", "communications", poId] as const,
-	lastRate: (itemId: number, supplierId: number) =>
-		["purchase-orders", "last-rate", itemId, supplierId] as const,
-	priceRows: (supplierId: number, itemIds: number[]) =>
-		["purchase-orders", "price-rows", supplierId, itemIds] as const,
-};
+import { purchaseOrderKeys } from "./keys";
 
 const PO_ERROR_MESSAGES: Record<string, string> = {
+	PR_LINE_ON_OPEN_RFQ:
+		"A requisition line is on an open RFQ. Award, close or cancel the RFQ first.",
+	OVERRIDE_REASON_REQUIRED: "Give a reason for changing the contract rate.",
+	CONTRACT_LINE_LOCKED_FIELD:
+		"The GST % of a contract line is fixed by the contract.",
+	CONTRACT_NOT_ACTIVE:
+		"A contract on this PO is no longer active. Change the rate on that line to continue.",
 	PO_NOT_EDITABLE: "Only a draft PO can be edited.",
 	DOC_LOCKED_IN_APPROVAL:
 		"This PO is waiting for approval and cannot be changed. Withdraw it first.",
+	PO_LINE_FROM_AWARD:
+		"This line came from an RFQ award. Cancel the PO to undo the award.",
 	PO_LINE_ALREADY_DRAFTED: "One of those PR lines is already on another PO.",
 };
 
 function errorMessage(error: unknown, fallback: string) {
 	if (!(error instanceof ApiClientError)) return fallback;
+	if (error.code === "CONTRACT_QTY_EXCEEDED") {
+		const details = (error.body as { details?: Record<string, unknown> } | null)
+			?.details;
+		return details?.cap !== undefined
+			? `Over contract quantity: agreed ${String(details.agreed)}, ordered ${String(details.ordered)}, cap ${String(details.cap)}.`
+			: error.message;
+	}
 	if (error.code && PO_ERROR_MESSAGES[error.code]) {
 		return PO_ERROR_MESSAGES[error.code];
 	}
 	return error.message;
 }
+
+/** Plain-words PO error, for banners that show an error inline. */
+export const poErrorMessage = errorMessage;
 
 function normalize(value?: string | null) {
 	const trimmed = value?.trim();
@@ -104,15 +113,31 @@ export function useItemLastRateQuery(
 	supplierId: number,
 	enabled: boolean,
 ) {
+	const onDate = istTodayIso();
 	return useQuery({
-		queryKey: purchaseOrderKeys.lastRate(itemId, supplierId),
-		queryFn: () => getItemLastRate(itemId, supplierId),
+		queryKey: purchaseOrderKeys.lastRate(itemId, supplierId, onDate),
+		queryFn: () => getItemLastRate(itemId, supplierId, onDate),
 		enabled:
 			enabled &&
 			Number.isFinite(itemId) &&
 			itemId > 0 &&
 			Number.isFinite(supplierId) &&
 			supplierId > 0,
+	});
+}
+
+/** One query for the last rate of every line on a PO (PERF-01/02). */
+export function useItemsLastRatesQuery(
+	itemIds: number[],
+	supplierId: number,
+	enabled: boolean,
+) {
+	const onDate = istTodayIso();
+	const ids = [...new Set(itemIds)].sort((a, b) => a - b);
+	return useQuery({
+		queryKey: purchaseOrderKeys.lastRates(ids, supplierId, onDate),
+		queryFn: () => getItemsLastRates(ids, supplierId, onDate),
+		enabled: enabled && supplierId > 0 && ids.length > 0,
 	});
 }
 
@@ -147,6 +172,8 @@ export function useCreatePurchaseOrderMutation() {
 			}
 
 			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: homeKeys.all }),
+				queryClient.invalidateQueries({ queryKey: documentKeys.all }),
 				queryClient.invalidateQueries({
 					queryKey: purchaseOrderKeys.cards(),
 				}),
@@ -167,15 +194,108 @@ export function useCreatePurchaseOrderMutation() {
 	});
 }
 
+export type PoDraftGroup = {
+	supplierId: number;
+	supplierName: string;
+	/** Earliest required-by date (YYYY-MM-DD) of the group's PR lines (A-92); omitted when none. */
+	expectedDeliveryDate?: string;
+	lines: Array<{ prItemId: number; unitPricePaise: number }>;
+};
+
+export type PoDraftOutcome =
+	| {
+			ok: true;
+			supplierName: string;
+			po: { id: number; poNumber: string };
+	  }
+	| { ok: false; supplierName: string; message: string; conflict: boolean };
+
+/**
+ * Create PO from a requisition (BR-FF-48, 58, 59): one createpo call per supplier, in
+ * parallel. A refused supplier does not stop the others; the result lists every outcome.
+ * No toasts here: the caller words the message from the outcomes.
+ */
+export function useCreateDraftPosMutation() {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: async (variables: {
+			prId: number;
+			groups: PoDraftGroup[];
+		}): Promise<PoDraftOutcome[]> =>
+			Promise.all(
+				variables.groups.map(async (group): Promise<PoDraftOutcome> => {
+					try {
+						const result = await createPurchaseOrder({
+							supplierId: group.supplierId,
+							expectedDeliveryDate: group.expectedDeliveryDate,
+							lines: group.lines,
+						});
+						if (!result.success) {
+							return {
+								ok: false,
+								supplierName: group.supplierName,
+								message: result.message || "Could not create the order",
+								conflict: false,
+							};
+						}
+						return {
+							ok: true,
+							supplierName: group.supplierName,
+							po: {
+								id: result.data.po.id,
+								poNumber: result.data.po.poNumber,
+							},
+						};
+					} catch (error) {
+						const conflict =
+							error instanceof ApiClientError &&
+							(error.status === 409 ||
+								error.code === "PO_LINE_ALREADY_DRAFTED" ||
+								// Sequential case: BR-PO-01 answers a code-less 400 "PR item N is not in pending status" (A-87).
+								(error.status === 400 &&
+									!error.code &&
+									/is not in pending status/i.test(error.message)));
+						return {
+							ok: false,
+							supplierName: group.supplierName,
+							message: conflict
+								? "Already on another order"
+								: errorMessage(error, "Could not create the order"),
+							conflict,
+						};
+					}
+				}),
+			),
+		onSettled: async (_outcomes, _error, variables) => {
+			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: homeKeys.all }),
+				queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.cards() }),
+				queryClient.invalidateQueries({
+					queryKey: purchaseRequisitionKeys.cards(),
+				}),
+				queryClient.invalidateQueries({
+					queryKey: purchaseRequisitionKeys.detail(variables.prId),
+				}),
+				queryClient.invalidateQueries({ queryKey: documentKeys.all }),
+				queryClient.invalidateQueries({ queryKey: ["approval"] }),
+			]);
+		},
+	});
+}
+
 function invalidatePOAndPR(
 	queryClient: ReturnType<typeof useQueryClient>,
 	poId: number,
 	prId?: number,
 ) {
 	return Promise.all([
+		queryClient.invalidateQueries({ queryKey: homeKeys.all }),
+		queryClient.invalidateQueries({ queryKey: grnKeys.receivable() }),
 		queryClient.invalidateQueries({
 			queryKey: purchaseOrderKeys.communications(poId),
 		}),
+		queryClient.invalidateQueries({ queryKey: documentKeys.all }),
 		queryClient.invalidateQueries({ queryKey: ["approval", "pending"] }),
 		queryClient.invalidateQueries({ queryKey: ["approval", "history"] }),
 		queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.cards() }),
@@ -199,7 +319,10 @@ function invalidatePOAndPR(
 	]);
 }
 
-export function useUpdatePurchaseOrderMutation() {
+/** `quietSuccess.current = true` skips the "updated" toast (Save and submit shows one toast). */
+export function useUpdatePurchaseOrderMutation(quietSuccess?: {
+	current: boolean;
+}) {
 	const queryClient = useQueryClient();
 
 	return useMutation({
@@ -216,7 +339,9 @@ export function useUpdatePurchaseOrderMutation() {
 				variables.payload.poId,
 				variables.prId,
 			);
-			toast.success(result.message || `${result.data.po.poNumber} updated`);
+			if (!quietSuccess?.current) {
+				toast.success(result.message || `${result.data.po.poNumber} updated`);
+			}
 		},
 		onError: (error) => {
 			toast.error(errorMessage(error, "Failed to update PO"));
@@ -369,52 +494,11 @@ export function useConfirmPoMutation() {
 				return;
 			}
 
-			await Promise.all([
-				queryClient.invalidateQueries({
-					queryKey: purchaseOrderKeys.detail(variables.poId),
-				}),
-				queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.cards() }),
-			]);
+			await invalidatePOAndPR(queryClient, variables.poId);
 			toast.success(result.message || `${result.data.poNumber} confirmed`);
 		},
 		onError: (error) => {
 			toast.error(errorMessage(error, "Failed to record confirmation"));
-		},
-	});
-}
-
-export function useMarkPoInvoicedMutation() {
-	const queryClient = useQueryClient();
-
-	return useMutation({
-		mutationFn: (variables: {
-			poId: number;
-			payload: MarkPoInvoicedFormInput;
-		}) =>
-			markPurchaseOrderInvoiced(variables.poId, {
-				invoiceNumber: variables.payload.invoiceNumber,
-				invoiceDate: variables.payload.invoiceDate,
-				billedAmountPaise: Math.round(
-					variables.payload.billedAmountRupees * 100,
-				),
-				dueDate: normalize(variables.payload.dueDate),
-			}),
-		onSuccess: async (result, variables) => {
-			if (!result.success) {
-				toast.error(result.message || "Failed to mark PO as invoiced");
-				return;
-			}
-
-			await Promise.all([
-				queryClient.invalidateQueries({
-					queryKey: purchaseOrderKeys.detail(variables.poId),
-				}),
-				queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.cards() }),
-			]);
-			toast.success(result.message || `${result.data.poNumber} invoiced`);
-		},
-		onError: (error) => {
-			toast.error(errorMessage(error, "Failed to mark PO as invoiced"));
 		},
 	});
 }
@@ -431,12 +515,7 @@ export function useClosePoMutation() {
 				return;
 			}
 
-			await Promise.all([
-				queryClient.invalidateQueries({
-					queryKey: purchaseOrderKeys.detail(variables.poId),
-				}),
-				queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.cards() }),
-			]);
+			await invalidatePOAndPR(queryClient, variables.poId);
 			toast.success(result.message || `${result.data.poNumber} closed`);
 		},
 		onError: (error) => {
@@ -476,6 +555,7 @@ export function toPOCreatePayload(input: {
 		prItemId: number;
 		unitPriceRupees: number;
 		gstPercent?: number;
+		rateOverrideReason?: string;
 	}>;
 }): POCreatePayload {
 	return {
@@ -488,6 +568,7 @@ export function toPOCreatePayload(input: {
 			prItemId: line.prItemId,
 			unitPricePaise: Math.round(line.unitPriceRupees * 100),
 			gstPercent: line.gstPercent,
+			rateOverrideReason: normalize(line.rateOverrideReason),
 		})),
 	};
 }

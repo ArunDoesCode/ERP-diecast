@@ -20,10 +20,12 @@ export type PaginationProps = {
 	total: number;
 	onPageChange: (page: number) => void;
 	onPageSizeChange?: (pageSize: number) => void;
+	/** Show the "1 to 7 of 7" row even when everything fits on one page. */
+	alwaysShow?: boolean;
 };
 
 const ARROW =
-	"inline-flex size-7 items-center justify-center rounded-md border border-border text-xs hover:bg-muted aria-disabled:pointer-events-none aria-disabled:opacity-50";
+	"inline-flex size-8 items-center justify-center rounded-md border border-border text-sm hover:bg-muted aria-disabled:pointer-events-none aria-disabled:opacity-50";
 
 export function Pagination({
 	page,
@@ -31,22 +33,21 @@ export function Pagination({
 	total,
 	onPageChange,
 	onPageSizeChange,
+	alwaysShow,
 }: PaginationProps) {
 	const pageCount = Math.max(1, Math.ceil(total / pageSize));
-	// One page that fits: nothing to page through. The size select stays so a large
-	// page size can be lowered; a stale ?page beyond the last page keeps the nav so
-	// the user can get back.
+	// Hidden when total <= page size (BR-FF-105) unless `alwaysShow` (DES-60); a stale ?page beyond the last page
+	// keeps the nav so the user can get back.
 	const fitsOnePage = total <= pageSize && page <= 1;
-	const showSizeSelect =
-		onPageSizeChange !== undefined && total > Math.min(...PAGE_SIZE_OPTIONS);
-	if (total <= 0 || (fitsOnePage && !showSizeSelect)) return null;
+	const showSizeSelect = onPageSizeChange !== undefined;
+	if (total <= 0 || (!alwaysShow && fitsOnePage)) return null;
 	const atStart = page <= 1;
 	const atEnd = page >= pageCount;
 	const numbers = getPageNumbers(page, pageCount);
 
 	return (
 		<div className="flex flex-col items-center justify-between gap-3 py-2 sm:flex-row">
-			<div className="flex items-center gap-3 text-xs text-muted-foreground">
+			<div className="flex items-center gap-3 text-sm text-muted-foreground">
 				<span className="tabular-nums">
 					{formatPageRange(page, pageSize, total)}
 				</span>
@@ -87,7 +88,7 @@ export function Pagination({
 								// biome-ignore lint/suspicious/noArrayIndexKey: gaps are positional
 								key={`gap-${i}`}
 								aria-hidden="true"
-								className="px-1 text-xs text-muted-foreground"
+								className="px-1 text-sm text-muted-foreground"
 							>
 								…
 							</span>

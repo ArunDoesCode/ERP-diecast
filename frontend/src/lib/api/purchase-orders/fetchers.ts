@@ -1,11 +1,12 @@
 import { api } from "@/lib/api/client";
+import type { PoListResultV2 } from "@/lib/api/purchase-orders/list-types";
 import { API_ROUTES } from "@/lib/api/routes";
 import type {
 	ClosePoPayload,
 	ConfirmPoPayload,
+	LastRateData,
 	LastRateResult,
 	LogPoCommunicationPayload,
-	MarkPoInvoicedPayload,
 	POCancelResult,
 	POCloseResult,
 	POCommunicationResult,
@@ -14,8 +15,6 @@ import type {
 	POCreatePayload,
 	POCreateResult,
 	PODelayResult,
-	POInvoiceResult,
-	POListResult,
 	POSendResult,
 	POShortCloseResult,
 	POUpdatePayload,
@@ -44,7 +43,7 @@ function toQueryString(params?: Record<string, unknown>) {
 }
 
 export function getPurchaseOrders(params?: PurchaseOrderListParams) {
-	return api.get<POListResult>(
+	return api.get<PoListResultV2>(
 		`${API_ROUTES.purchaseOrders.list}${toQueryString(params)}`,
 	);
 }
@@ -62,10 +61,54 @@ export function createPurchaseOrder(payload: POCreatePayload) {
 	);
 }
 
-export function getItemLastRate(itemId: number, supplierId: number) {
+/** `onDate` (IST day) picks the contract in force on the PO date (BR-RFQ-50). */
+export function getItemLastRate(
+	itemId: number,
+	supplierId: number,
+	onDate?: string,
+) {
 	return api.get<LastRateResult>(
-		`${API_ROUTES.assets.itemLastRate(itemId)}${toQueryString({ supplierId })}`,
+		`${API_ROUTES.assets.itemLastRate(itemId)}${toQueryString({ supplierId, onDate })}`,
 	);
+}
+
+// The batched last-rates endpoint takes at most 200 ids per call.
+const LAST_RATE_CHUNK = 200;
+
+/**
+ * Last rates for many items at once, keyed by item id (PERF-01/02): one call per
+ * 200 items. Items the backend does not know are omitted (undefined).
+ */
+export async function getItemsLastRates(
+	itemIds: number[],
+	supplierId: number,
+	onDate?: string,
+): Promise<Record<number, LastRateData | undefined>> {
+	const ids = [...new Set(itemIds)].sort((a, b) => a - b);
+	const chunks: number[][] = [];
+	for (let i = 0; i < ids.length; i += LAST_RATE_CHUNK) {
+		chunks.push(ids.slice(i, i + LAST_RATE_CHUNK));
+	}
+	const pages = await Promise.all(
+		chunks.map((chunk) =>
+			api.get<{
+				success: boolean;
+				data: (LastRateData & { itemId: number })[];
+			}>(
+				`${API_ROUTES.assets.itemsLastRates}${toQueryString({
+					supplierId,
+					itemIds: chunk.join(","),
+					onDate,
+				})}`,
+			),
+		),
+	);
+	const byItem: Record<number, LastRateData | undefined> = {};
+	for (const id of ids) byItem[id] = undefined;
+	for (const page of pages) {
+		for (const { itemId, ...rest } of page.data) byItem[itemId] = rest;
+	}
+	return byItem;
 }
 
 // Ids per call: the supplier item list takes at most 100 ids, one page.
@@ -156,16 +199,6 @@ export function updatePurchaseOrderDelay(
 export function confirmPurchaseOrder(poId: number, payload: ConfirmPoPayload) {
 	return api.post<POConfirmResult, ConfirmPoPayload>(
 		API_ROUTES.purchaseOrders.confirm(poId),
-		payload,
-	);
-}
-
-export function markPurchaseOrderInvoiced(
-	poId: number,
-	payload: MarkPoInvoicedPayload,
-) {
-	return api.post<POInvoiceResult, MarkPoInvoicedPayload>(
-		API_ROUTES.purchaseOrders.invoice(poId),
 		payload,
 	);
 }

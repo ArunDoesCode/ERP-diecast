@@ -10,6 +10,8 @@ import {
   sql,
 } from "drizzle-orm";
 
+import { alias } from "drizzle-orm/pg-core";
+
 import { db } from "../db/client";
 import { itemMaster } from "../db/schemas/02_procurement-catalog";
 import {
@@ -21,19 +23,31 @@ import {
   purchaseOrders,
   purchaseRequestItems,
   purchaseRequests,
-  supplierInvoices,
+  purchaseReturns,
 } from "../db/schemas/02_procurement-purchasing";
+import {
+  rateContractItems,
+  rateContracts,
+  rfqItems,
+  rfqQuoteItems,
+  rfqQuotes,
+  rfqs,
+} from "../db/schemas/02_procurement-rfq";
 import {
   supplierItems,
   supplierMaster,
 } from "../db/schemas/02_procurement-suppliers";
 import { employees } from "../db/schemas/03_hcm";
+import { istDayKey } from "../lib/ist-day";
 import { safeSearch } from "../lib/safe-search";
 import type {
   poListQuerySchemaType,
   poStatusSchemaType,
 } from "../types/po.types";
+import { openQtySql, pendingQaQtySql, round3 } from "./openQty";
+import { poBucketSql, poDueSql, poLateSql } from "./poPredicates";
 import { prRepository } from "./prRepository";
+import { findRateChoices } from "./rateChainRepository";
 
 // All stored PO columns plus the canceller's name and the due date
 // (BR-PO-19: revised date if set, else expected date).
@@ -57,6 +71,8 @@ const purchaseOrderColumns = {
 
 const purchaseOrderItemWriteColumns = getTableColumns(purchaseOrderItems);
 
+const overrideEmployee = alias(employees, "po_rate_override_by");
+
 const purchaseOrderItemDetailColumns = {
   ...purchaseOrderItemWriteColumns,
   itemSku: itemMaster.sku,
@@ -64,16 +80,39 @@ const purchaseOrderItemDetailColumns = {
   itemCategory: itemMaster.category,
   prItemId: prPoItemLinks.prItemId,
   prNumber: purchaseRequests.prNumber,
+  // BR-RFQ-31, 50, 51: where the rate came from, who overrode it
+  contractNumber: rateContracts.contractNumber,
+  quoteNumber: rfqQuotes.quoteNumber,
+  rateOverrideByName: overrideEmployee.name,
 };
 
 type PurchaseOrderInsert = typeof purchaseOrders.$inferInsert;
 export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
+// BR-RFQ-31, 50, 51: where a line's rate came from (all null for a typed or suggested rate).
+export type PoLineRateLinks = {
+  quoteItemId: number | null;
+  contractItemId: number | null;
+  contractRatePaise: number | null;
+  rateOverrideReason: string | null;
+  rateOverrideBy: number | null;
+  rateOverrideAt: Date | null;
+};
+
+export const NO_RATE_LINKS: PoLineRateLinks = {
+  quoteItemId: null,
+  contractItemId: null,
+  contractRatePaise: null,
+  rateOverrideReason: null,
+  rateOverrideBy: null,
+  rateOverrideAt: null,
+};
+
 export type CreatePoLineData = {
   prItemId: number;
   unitPricePaise: number;
   gstPercent: number;
-};
+} & PoLineRateLinks;
 
 export type UpdatePoData = Partial<
   Pick<
@@ -135,7 +174,7 @@ export type PreparedPoLine = {
   gstPercent: number;
   lineValuePaise: number;
   lineTaxPaise: number;
-};
+} & PoLineRateLinks;
 
 export type PoLinePriceData = {
   id: number;
@@ -143,6 +182,7 @@ export type PoLinePriceData = {
   gstPercent: number;
   lineValuePaise: number;
   lineTaxPaise: number;
+  links: PoLineRateLinks;
 };
 
 type PrItemForUpdateRow = {
@@ -163,51 +203,52 @@ const poSortColumns = {
   poNumber: purchaseOrders.poNumber,
   status: purchaseOrders.status,
   createdAt: purchaseOrders.createdAt,
+  totalAmountPaise: purchaseOrders.totalAmountPaise,
 } as const;
 
 export const poRepository = {
-  async list(params: poListQuerySchemaType) {
-    const sortColumn =
-      params.sortBy && params.sortBy in poSortColumns
-        ? poSortColumns[params.sortBy as keyof typeof poSortColumns]
-        : purchaseOrders.id;
+  async list(params: poListQuerySchemaType, actorId: number, today: string) {
     const orderFn = params.sortDir === "desc" ? desc : asc;
+    // dueDate is the BR-PO-19 expression; no due date sorts last.
+    const dueOrder =
+      params.sortDir === "desc"
+        ? sql`${poDueSql} desc nulls last`
+        : sql`${poDueSql} asc nulls last`;
+    const sortExpr =
+      params.sortBy === "dueDate"
+        ? dueOrder
+        : orderFn(
+            params.sortBy && params.sortBy in poSortColumns
+              ? poSortColumns[params.sortBy as keyof typeof poSortColumns]
+              : purchaseOrders.id,
+          );
 
     const searchFilters = [
       safeSearch(params.q, purchaseOrders.poNumber, purchaseOrders.notes),
       params.supplierId
         ? eq(purchaseOrders.supplierId, params.supplierId)
         : undefined,
-    ];
+      // BR-FF-107: "my POs" = created by the caller; narrows the strip too.
+      params.mine === true ? eq(purchaseOrders.createdBy, actorId) : undefined,
+    ].filter((filter) => filter !== undefined);
     const filters = [
       ...searchFilters,
       params.status && params.status.length > 0
         ? inArray(purchaseOrders.status, params.status)
         : undefined,
-      params.overdue
-        ? and(
-            inArray(purchaseOrders.status, ["dispatched", "partial_received"]),
-            // BR-PO-19: due date = revised date if set, else expected date; before today.
-            sql`coalesce(${purchaseOrders.revisedDeliveryDate}, ${purchaseOrders.expectedDeliveryDate}) < current_date`,
-            sql`exists (
-              select 1 from ${purchaseOrderItems}
-              where ${purchaseOrderItems.poId} = ${purchaseOrders.id}
-                and (${purchaseOrderItems.qty} - coalesce(${purchaseOrderItems.receivedQty}, 0)) > 0
-            )`,
-          )
-        : undefined,
+      // BR-FF-26: `overdue` is the same predicate as bucket=late (BR-PO-19).
+      params.overdue ? poLateSql(today) : undefined,
+      params.bucket ? poBucketSql(params.bucket, today) : undefined,
     ].filter((filter) => filter !== undefined);
 
     const whereClause = filters.length > 0 ? and(...filters) : undefined;
-    const countWhere = and(
-      ...searchFilters.filter((filter) => filter !== undefined),
-    );
-    const [rows, [totalRow], countRows] = await Promise.all([
+    const countWhere = and(...searchFilters);
+    const [rows, [totalRow], countRows, [lateRow]] = await Promise.all([
       db
         .select(purchaseOrderColumns)
         .from(purchaseOrders)
         .where(whereClause)
-        .orderBy(orderFn(sortColumn), asc(purchaseOrders.id))
+        .orderBy(sortExpr, asc(purchaseOrders.id))
         .limit(params.pageSize)
         .offset((params.page - 1) * params.pageSize),
       db.select({ value: count() }).from(purchaseOrders).where(whereClause),
@@ -218,6 +259,11 @@ export const poRepository = {
         .from(purchaseOrders)
         .where(countWhere)
         .groupBy(purchaseOrders.status),
+      // BR-FF-26: rows the Late filter returns under the other filters.
+      db
+        .select({ value: count() })
+        .from(purchaseOrders)
+        .where(and(countWhere, poLateSql(today))),
     ]);
 
     const statusCounts = Object.fromEntries(
@@ -225,10 +271,39 @@ export const poRepository = {
     ) as Record<poStatusSchemaType, number>;
     for (const row of countRows) statusCounts[row.status] = row.value;
 
+    // PERF-04: line count and received % of the page's POs, one grouped query.
+    const ids = rows.map((r) => r.id);
+    const aggRows =
+      ids.length === 0
+        ? []
+        : await db
+            .select({
+              poId: purchaseOrderItems.poId,
+              lineCount: count(),
+              qty: sql<number>`coalesce(sum(${purchaseOrderItems.qty}), 0)`,
+              received: sql<number>`coalesce(sum(coalesce(${purchaseOrderItems.receivedQty}, 0)), 0)`,
+            })
+            .from(purchaseOrderItems)
+            .where(inArray(purchaseOrderItems.poId, ids))
+            .groupBy(purchaseOrderItems.poId);
+    const aggByPo = new Map(aggRows.map((a) => [a.poId, a]));
+
     return {
-      rows,
+      rows: rows.map((r) => {
+        const agg = aggByPo.get(r.id);
+        const qty = Number(agg?.qty ?? 0);
+        // BR-FF-107: accepted / ordered by qty, whole percent.
+        const pct =
+          qty > 0 ? Math.round((Number(agg?.received) / qty) * 100) : 0;
+        return {
+          ...r,
+          lineCount: agg?.lineCount ?? 0,
+          receivedPct: Math.min(100, Math.max(0, pct)),
+        };
+      }),
       total: totalRow?.value ?? 0,
       statusCounts,
+      lateCount: lateRow?.value ?? 0,
     };
   },
 
@@ -310,12 +385,12 @@ export const poRepository = {
   // for the pending/draftable invariant — findPurchaseRequestItemsByIdsForUpdate
   // re-asserts that under the FOR UPDATE lock inside the transaction, and that
   // check is what actually prevents a double-draft race.
-  async findPurchaseRequestItemsByIds(ids: number[]) {
+  async findPurchaseRequestItemsByIds(ids: number[], tx?: Tx) {
     if (ids.length === 0) {
       return [];
     }
 
-    return db
+    return (tx ?? db)
       .select({
         id: purchaseRequestItems.id,
         prId: purchaseRequestItems.prId,
@@ -402,6 +477,12 @@ export const poRepository = {
           gstPercent: line.gstPercent,
           lineValuePaise: line.lineValuePaise,
           lineTaxPaise: line.lineTaxPaise,
+          quoteItemId: line.quoteItemId,
+          contractItemId: line.contractItemId,
+          contractRatePaise: line.contractRatePaise,
+          rateOverrideReason: line.rateOverrideReason,
+          rateOverrideBy: line.rateOverrideBy,
+          rateOverrideAt: line.rateOverrideAt,
         })),
       )
       .returning(purchaseOrderItemWriteColumns);
@@ -539,7 +620,7 @@ export const poRepository = {
         ),
         sql` `,
       )} else ${column} end`;
-    return tx
+    const updated = await tx
       .update(purchaseOrderItems)
       .set({
         unitPricePaise: caseOf(
@@ -573,82 +654,95 @@ export const poRepository = {
         ),
       )
       .returning(purchaseOrderItemWriteColumns);
+    // BR-RFQ-50, 51, 54: contract link / override audit changes line by line
+    // (only lines whose links actually changed are written).
+    const linkChanged = rows.filter((row) => {
+      const before = updated.find((u) => u.id === row.id);
+      return (
+        before &&
+        (before.contractItemId !== row.links.contractItemId ||
+          before.contractRatePaise !== row.links.contractRatePaise ||
+          before.rateOverrideReason !== row.links.rateOverrideReason ||
+          before.rateOverrideBy !== row.links.rateOverrideBy ||
+          before.rateOverrideAt?.getTime() !==
+            row.links.rateOverrideAt?.getTime())
+      );
+    });
+    for (const row of linkChanged) {
+      await tx
+        .update(purchaseOrderItems)
+        .set({
+          contractItemId: row.links.contractItemId,
+          contractRatePaise: row.links.contractRatePaise,
+          rateOverrideReason: row.links.rateOverrideReason,
+          rateOverrideBy: row.links.rateOverrideBy,
+          rateOverrideAt: row.links.rateOverrideAt,
+        })
+        .where(eq(purchaseOrderItems.id, row.id));
+    }
+    if (linkChanged.length === 0) return updated;
+    return this.findPoItemsByIds(
+      poId,
+      rows.map((row) => row.id),
+      tx,
+    );
+  },
+
+  async findPoItemsByIds(poId: number, ids: number[], tx: Tx) {
+    if (ids.length === 0) return [];
+    return tx
+      .select(purchaseOrderItemWriteColumns)
+      .from(purchaseOrderItems)
+      .where(
+        and(
+          eq(purchaseOrderItems.poId, poId),
+          inArray(purchaseOrderItems.id, ids),
+        ),
+      )
+      .orderBy(asc(purchaseOrderItems.id));
+  },
+
+  // BR-RFQ-02: PR lines that sit on an RFQ that is still open (draft / sent / partially_awarded).
+  async findOpenRfqForPrItems(prItemIds: number[], executor: Tx | typeof db) {
+    if (prItemIds.length === 0) return [];
+    return executor
+      .select({
+        prItemId: rfqItems.prItemId,
+        rfqId: rfqs.id,
+        rfqNumber: rfqs.rfqNumber,
+      })
+      .from(rfqItems)
+      .innerJoin(rfqs, eq(rfqs.id, rfqItems.rfqId))
+      .where(
+        and(
+          inArray(rfqItems.prItemId, prItemIds),
+          eq(rfqItems.lineStatus, "open"),
+        ),
+      );
   },
 
   /**
-   * #53, BR-INV-24 for many items at once: the default rate per item for this
-   * supplier, same chain as assetRepository.getLastRate (newest approved-or-
-   * later PO line, else active catalog price, else average cost > 0, else
-   * standard rate). Two queries in all. Unknown items are left out.
+   * #53, BR-INV-24, BR-RFQ-50 for many items at once: the default rate per item
+   * for this supplier from the one shared chain (rateChainRepository, also used
+   * by assetRepository.getLastRate): usable contract first, then newest
+   * approved-or-later PO line, catalog price, average cost, standard rate.
+   * Unknown items are left out.
    */
-  async findLastRates(supplierId: number, itemIds: number[]) {
-    const rates = new Map<number, number>();
-    if (itemIds.length === 0) return rates;
-
-    const [poRows, itemRows] = await Promise.all([
-      db
-        .selectDistinctOn([purchaseOrderItems.itemId], {
-          itemId: purchaseOrderItems.itemId,
-          ratePaise: purchaseOrderItems.unitPricePaise,
-        })
-        .from(purchaseOrderItems)
-        .innerJoin(
-          purchaseOrders,
-          eq(purchaseOrders.id, purchaseOrderItems.poId),
-        )
-        .where(
-          and(
-            eq(purchaseOrders.supplierId, supplierId),
-            inArray(purchaseOrderItems.itemId, itemIds),
-            sql`${purchaseOrderItems.unitPricePaise} > 0`,
-            inArray(purchaseOrders.status, [
-              "approved",
-              "dispatched",
-              "partial_received",
-              "fully_received",
-              "invoiced",
-              "closed",
-            ]),
-          ),
-        )
-        .orderBy(
-          purchaseOrderItems.itemId,
-          desc(purchaseOrders.createdAt),
-          desc(purchaseOrderItems.id),
-        ),
-      db
-        .select({
-          itemId: itemMaster.id,
-          averageCostPaise: itemMaster.averageCostPaise,
-          standardRatePaise: itemMaster.standardRatePaise,
-          catalogPaise: supplierItems.supplierUnitPricePaise,
-        })
-        .from(itemMaster)
-        .leftJoin(
-          supplierItems,
-          and(
-            eq(supplierItems.itemId, itemMaster.id),
-            eq(supplierItems.supplierId, supplierId),
-            eq(supplierItems.isActive, true), // BR-SUP-15
-          ),
-        )
-        .where(inArray(itemMaster.id, itemIds)),
-    ]);
-
-    const poRate = new Map(poRows.map((row) => [row.itemId, row.ratePaise]));
-    for (const row of itemRows) {
-      const fromPo = poRate.get(row.itemId);
-      const rate =
-        fromPo && fromPo > 0
-          ? fromPo
-          : row.catalogPaise && row.catalogPaise > 0
-            ? row.catalogPaise
-            : row.averageCostPaise > 0
-              ? row.averageCostPaise
-              : row.standardRatePaise;
-      rates.set(row.itemId, rate);
-    }
-    return rates;
+  async findLastRates(
+    supplierId: number,
+    itemIds: number[],
+    opts: {
+      onDate?: string;
+      includeContract?: boolean;
+      includeFallback?: boolean;
+    } = {},
+    tx?: Tx,
+  ) {
+    return findRateChoices(tx ?? db, supplierId, itemIds, {
+      onDate: opts.onDate ?? istDayKey(),
+      includeContract: opts.includeContract ?? true,
+      includeFallback: opts.includeFallback ?? true,
+    });
   },
 
   async findPoItemsByPoId(poId: number, tx?: Tx) {
@@ -679,7 +773,12 @@ export const poRepository = {
         .where(eq(purchaseOrders.id, poId))
         .limit(1),
       db
-        .select(purchaseOrderItemDetailColumns)
+        .select({
+          ...purchaseOrderItemDetailColumns,
+          // BR-FF-09: arrived and pending QA / still open.
+          pendingQaQty: pendingQaQtySql.mapWith(Number),
+          openQty: openQtySql.mapWith(Number),
+        })
         .from(purchaseOrderItems)
         .innerJoin(itemMaster, eq(itemMaster.id, purchaseOrderItems.itemId))
         .leftJoin(
@@ -694,6 +793,23 @@ export const poRepository = {
           purchaseRequests,
           eq(purchaseRequests.id, purchaseRequestItems.prId),
         )
+        .leftJoin(
+          rateContractItems,
+          eq(rateContractItems.id, purchaseOrderItems.contractItemId),
+        )
+        .leftJoin(
+          rateContracts,
+          eq(rateContracts.id, rateContractItems.contractId),
+        )
+        .leftJoin(
+          rfqQuoteItems,
+          eq(rfqQuoteItems.id, purchaseOrderItems.quoteItemId),
+        )
+        .leftJoin(rfqQuotes, eq(rfqQuotes.id, rfqQuoteItems.quoteId))
+        .leftJoin(
+          overrideEmployee,
+          eq(overrideEmployee.id, purchaseOrderItems.rateOverrideBy),
+        )
         .where(eq(purchaseOrderItems.poId, poId))
         .orderBy(asc(purchaseOrderItems.id)),
     ]);
@@ -704,9 +820,26 @@ export const poRepository = {
       return undefined;
     }
 
+    // BR-PRT-38: the PO's returns for its document flow
+    const returns = await db
+      .select({
+        id: purchaseReturns.id,
+        proNumber: purchaseReturns.proNumber,
+        status: purchaseReturns.status,
+      })
+      .from(purchaseReturns)
+      .where(eq(purchaseReturns.poId, poId))
+      .orderBy(desc(purchaseReturns.id));
+
     return {
       po,
-      items,
+      items: items.map((item) => ({
+        ...item,
+        pendingQaQty: round3(item.pendingQaQty),
+        // Over-receipt never shows a negative open qty.
+        openQty: Math.max(0, round3(item.openQty)),
+      })),
+      returns,
     };
   },
 
@@ -887,52 +1020,6 @@ export const poRepository = {
         toEmail: data.toEmail ?? null,
         note: data.note ?? null,
         sentBy: data.sentBy,
-      })
-      .returning();
-
-    return row;
-  },
-
-  async findSupplierInvoice(
-    supplierId: number,
-    invoiceNumber: string,
-    tx?: Tx,
-  ) {
-    const executor = tx ?? db;
-    const [row] = await executor
-      .select({ id: supplierInvoices.id })
-      .from(supplierInvoices)
-      .where(
-        and(
-          eq(supplierInvoices.supplierId, supplierId),
-          eq(supplierInvoices.invoiceNumber, invoiceNumber),
-        ),
-      )
-      .limit(1);
-    return row;
-  },
-
-  async insertSupplierInvoice(
-    data: {
-      invoiceNumber: string;
-      invoiceDate: Date;
-      poId: number;
-      supplierId: number;
-      billedAmountPaise: number;
-      dueDate?: Date | null;
-    },
-    tx?: Tx,
-  ) {
-    const executor = tx ?? db;
-    const [row] = await executor
-      .insert(supplierInvoices)
-      .values({
-        invoiceNumber: data.invoiceNumber,
-        invoiceDate: data.invoiceDate,
-        poId: data.poId,
-        supplierId: data.supplierId,
-        billedAmountPaise: data.billedAmountPaise,
-        dueDate: data.dueDate ?? null,
       })
       .returning();
 

@@ -3,6 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { IconPlus } from "@tabler/icons-react";
 import { type PaginationState, useTable } from "@tanstack/react-table";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { DataTable } from "@/components/common/DataTable";
@@ -19,6 +20,7 @@ import {
 	listEmptyState,
 	listErrorState,
 } from "@/components/pages/inventory/list-states";
+import { transferQty } from "@/components/pages/stock-transfers/transfer-format";
 import { FilterBar } from "@/components/shared/FilterBar";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Badge } from "@/components/ui/badge";
@@ -30,7 +32,6 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { FloatingLabelInput } from "@/components/ui/floating-label";
 import {
 	Form,
 	FormControl,
@@ -39,6 +40,8 @@ import {
 	FormLabel,
 	FormMessage,
 } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
 	Select,
 	SelectContent,
@@ -62,6 +65,7 @@ import {
 	type AssetTransactionType,
 	assetManualReferenceTypeValues,
 	assetMovementFormSchema,
+	assetReferenceTypeValues,
 } from "@/types/asset";
 
 const REFERENCE_TYPE_LABEL: Record<AssetReferenceType, string> = {
@@ -70,12 +74,17 @@ const REFERENCE_TYPE_LABEL: Record<AssetReferenceType, string> = {
 	grn_correction: "GRN correction",
 	opening_stock: "Opening stock",
 	sco_loss: "SCO loss",
-	pro: "PRO",
+	pro: "Purchase return",
+	pro_cancel: "Return cancelled",
 	sco_issue: "SCO issue",
 	sco_receipt: "SCO receipt",
 	job_order_issue: "Job order issue",
 	scrap_dispatch: "Scrap dispatch",
 	stock_adjustment: "Stock-take",
+	stock_transfer: "Stock transfer",
+	stock_transfer_reversal: "Transfer reversal",
+	delivery_note: "Delivery note",
+	delivery_note_cancel: "Delivery note cancelled",
 };
 
 const MANUAL_REFERENCE_LABEL = {
@@ -94,6 +103,40 @@ function sourceLabel(movement: AssetMovement) {
 	const source = movement.sourceDocument;
 	if (!source || source.id === 0) return `${label} (manual)`;
 	return `${label} ${source.number ?? `#${source.id}`}`;
+}
+
+/** Document number of the source, linked to the return page for pro / pro_cancel rows. */
+function SourceCell({ movement }: { movement: AssetMovement }) {
+	const source = movement.sourceDocument;
+	const isReturn =
+		movement.referenceType === "pro" || movement.referenceType === "pro_cancel";
+	const isTransfer =
+		movement.referenceType === "stock_transfer" ||
+		movement.referenceType === "stock_transfer_reversal";
+	const isDispatch =
+		movement.referenceType === "delivery_note" ||
+		movement.referenceType === "delivery_note_cancel";
+	if (!(isReturn || isTransfer || isDispatch) || !source || source.id === 0) {
+		return <>{sourceLabel(movement)}</>;
+	}
+	const id = source.id || movement.referenceId;
+	return (
+		<span>
+			{REFERENCE_TYPE_LABEL[movement.referenceType]}{" "}
+			<Link
+				href={
+					isTransfer
+						? `/inventory/stock-transfers/${id}`
+						: isDispatch
+							? `/delivery-notes/${id}`
+							: `/purchase-returns/${id}`
+				}
+				className="font-mono text-brand-accent hover:underline"
+			>
+				{source.number ?? `#${id}`}
+			</Link>
+		</span>
+	);
 }
 
 function toMovementPayload(
@@ -318,11 +361,13 @@ function MovementCreateForm({ onDone }: MovementCreateFormProps) {
 					control={form.control}
 					name="quantity"
 					render={({ field }) => (
-						<FormItem className="min-h-19">
+						<FormItem className="min-h-19 gap-1.5">
+							<FormLabel htmlFor="movement-quantity">
+								{isOpening ? "Opening quantity" : "Counted quantity"}
+							</FormLabel>
 							<FormControl>
-								<FloatingLabelInput
+								<Input
 									id="movement-quantity"
-									label={isOpening ? "Opening quantity" : "Counted quantity"}
 									type="number"
 									step="0.001"
 									min="0"
@@ -348,15 +393,15 @@ function MovementCreateForm({ onDone }: MovementCreateFormProps) {
 					control={form.control}
 					name="unitCost"
 					render={({ field }) => (
-						<FormItem className="min-h-19">
+						<FormItem className="min-h-19 gap-1.5">
+							<FormLabel htmlFor="movement-unit-cost">
+								{isOpening
+									? "Rate per unit (₹)"
+									: "Cost per unit (₹) - needed if counted is more than balance"}
+							</FormLabel>
 							<FormControl>
-								<FloatingLabelInput
+								<Input
 									id="movement-unit-cost"
-									label={
-										isOpening
-											? "Rate per unit (₹)"
-											: "Cost per unit (₹) - needed if counted is more than balance"
-									}
 									type="number"
 									step="0.01"
 									min="0"
@@ -382,11 +427,13 @@ function MovementCreateForm({ onDone }: MovementCreateFormProps) {
 					control={form.control}
 					name="batchNumber"
 					render={({ field }) => (
-						<FormItem className="min-h-19">
+						<FormItem className="min-h-19 gap-1.5">
+							<FormLabel htmlFor="movement-batch-number">
+								Batch number (optional)
+							</FormLabel>
 							<FormControl>
-								<FloatingLabelInput
+								<Input
 									id="movement-batch-number"
-									label="Batch number (optional)"
 									name={field.name}
 									value={field.value ?? ""}
 									onBlur={field.onBlur}
@@ -405,11 +452,11 @@ function MovementCreateForm({ onDone }: MovementCreateFormProps) {
 					control={form.control}
 					name="reason"
 					render={({ field }) => (
-						<FormItem className="min-h-19">
+						<FormItem className="min-h-19 gap-1.5">
+							<FormLabel htmlFor="movement-reason">Reason</FormLabel>
 							<FormControl>
-								<FloatingLabelInput
+								<Input
 									id="movement-reason"
-									label="Reason"
 									name={field.name}
 									value={field.value ?? ""}
 									onBlur={field.onBlur}
@@ -438,7 +485,16 @@ function MovementCreateForm({ onDone }: MovementCreateFormProps) {
 	);
 }
 
-export function InventoryMovementsManager() {
+const TRANSFER_FILTER_ALL = "all";
+
+export function InventoryMovementsManager({
+	initialReferenceType,
+}: {
+	initialReferenceType?: AssetReferenceType;
+}) {
+	const [referenceType, setReferenceType] = useState<
+		AssetReferenceType | undefined
+	>(initialReferenceType);
 	const [pagination, setPagination] = useState<PaginationState>({
 		pageIndex: 0,
 		pageSize: 10,
@@ -453,6 +509,7 @@ export function InventoryMovementsManager() {
 		page: pagination.pageIndex + 1,
 		pageSize: pagination.pageSize,
 		itemId: selectedItemId,
+		referenceType,
 	});
 
 	const movements = movementsQuery.data?.data ?? [];
@@ -466,18 +523,25 @@ export function InventoryMovementsManager() {
 					<DataTableColumnHeader column={column} title="Item" />
 				),
 				cell: ({ row }) => (
-					<Button
-						type="button"
-						variant="link"
-						className="h-auto p-0"
-						onClick={() => setDetailMovement(row.original)}
-					>
-						{row.original.itemName}
-					</Button>
+					<div className="flex max-w-56 flex-col items-start whitespace-normal">
+						<Button
+							type="button"
+							variant="link"
+							className="h-auto p-0 text-left whitespace-normal"
+							onClick={() => setDetailMovement(row.original)}
+						>
+							{row.original.itemName}
+						</Button>
+						{/* Below 1100 px the Location column is hidden; it sits under the item. */}
+						<span className="text-[13px] text-muted-foreground min-[1100px]:hidden">
+							{row.original.locationName}
+						</span>
+					</div>
 				),
 			},
 			{
 				accessorKey: "locationName",
+				meta: { hideBelow1100: true },
 				header: ({ column }) => (
 					<DataTableColumnHeader column={column} title="Location" />
 				),
@@ -497,13 +561,15 @@ export function InventoryMovementsManager() {
 			{
 				id: "source",
 				header: "Source",
-				cell: ({ row }) => sourceLabel(row.original),
+				cell: ({ row }) => <SourceCell movement={row.original} />,
 			},
 			{
 				accessorKey: "quantityChange",
 				header: ({ column }) => (
 					<DataTableColumnHeader column={column} title="Qty Change" />
 				),
+				cell: ({ row }) =>
+					`${row.original.quantityChange > 0 ? "+" : ""}${transferQty(row.original.quantityChange, row.original.itemUom)}`,
 			},
 			{
 				accessorKey: "createdAt",
@@ -541,7 +607,33 @@ export function InventoryMovementsManager() {
 				}
 			/>
 			<FilterBar value="" onChange={() => {}}>
-				<div className="flex w-full gap-2 sm:max-w-lg">
+				<div className="flex w-full flex-wrap items-end gap-2 sm:max-w-2xl">
+					<div className="flex flex-col gap-1.5">
+						<Label htmlFor="movement-source-type">Source type</Label>
+						<Select
+							value={referenceType ?? TRANSFER_FILTER_ALL}
+							onValueChange={(value) => {
+								setReferenceType(
+									value === TRANSFER_FILTER_ALL
+										? undefined
+										: (value as AssetReferenceType),
+								);
+								setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+							}}
+						>
+							<SelectTrigger id="movement-source-type" className="w-44">
+								<SelectValue placeholder="Source type" />
+							</SelectTrigger>
+							<SelectContent>
+								<SelectItem value={TRANSFER_FILTER_ALL}>All sources</SelectItem>
+								{assetReferenceTypeValues.map((type) => (
+									<SelectItem key={type} value={type}>
+										{REFERENCE_TYPE_LABEL[type]}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+					</div>
 					<div className="flex-1">
 						<ItemPicker
 							value={selectedItemId}
@@ -558,6 +650,7 @@ export function InventoryMovementsManager() {
 						variant="outline"
 						onClick={() => {
 							setSelectedItemId(undefined);
+							setReferenceType(undefined);
 							setPagination((prev) => ({ ...prev, pageIndex: 0 }));
 						}}
 					>
@@ -623,7 +716,7 @@ export function InventoryMovementsManager() {
 							</p>
 							<p>
 								<span className="font-medium">Source:</span>{" "}
-								{sourceLabel(detailMovement)}
+								<SourceCell movement={detailMovement} />
 							</p>
 							{detailMovement.notes ? (
 								<p>
@@ -633,11 +726,17 @@ export function InventoryMovementsManager() {
 							) : null}
 							<p>
 								<span className="font-medium">Quantity Change:</span>{" "}
-								{detailMovement.quantityChange}
+								{transferQty(
+									detailMovement.quantityChange,
+									detailMovement.itemUom,
+								)}
 							</p>
 							<p>
 								<span className="font-medium">Balance After:</span>{" "}
-								{detailMovement.balanceAfter}
+								{transferQty(
+									detailMovement.balanceAfter,
+									detailMovement.itemUom,
+								)}
 							</p>
 							<p>
 								<span className="font-medium">Created:</span>{" "}

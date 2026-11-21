@@ -156,3 +156,35 @@ If a decision is reversed, add a new entry that references the old one — don't
 ### D-025 — design-system skill turns on the design-reviewer (2026-11-18, owner)
 - **Decision:** `frontend/.claude/skills/design-system/SKILL.md` is written (plan step 3.6), so the design-reviewer is active (PROTOCOL → Efficiency). In `/feature` Phase 3 it runs right after test-runner, not in parallel (same ports and test DB), on the screens the dev reports list; it sets gates `design` and `screenshots`. Without `@axe-core/playwright` it checks accessibility with Playwright's accessibility snapshot and notes "axe not installed".
 - **Why:** the owner asked for design and screenshot gates on every build now that the tokens and components exist.
+
+### D-026 — Design system v2 colours: graphite and indigo (2026-11-20, owner)
+- **Decision:** the emerald primary and steel-blue accent are replaced by a graphite primary and one indigo accent on neutral greys (hue 286). Status tones and chart colours stay. Values: `docs/specs/design-system/spec.md` → "Tokens — colour" (v2).
+- **Why:** the owner asked for a sleek, modern, minimalist look and to "change the color scheme completely", and picked "A graphite" from three drawn directions. A green main button also competed with the green "approved" status. Required by BR-DS-24 before any token value changes.
+
+### D-027 — Design system v2 sizes: one step up (2026-11-20, owner)
+- **Decision:** 14 px text, 36 px buttons and fields, 44 px table rows, 24 px bold page titles, 24 px card padding; "Compact" gives 13 px text and 36 px rows. This replaces the 13 px / 36 px answer of 2026-11-18. Values: `docs/specs/design-system/spec.md` → "Tokens — type, density, shape" (v2).
+- **Why:** the owner found the app too small ("a little zoomed in") and picked "Size A (14 px)" from a drawn comparison of today, A and B. Most controls were 12 px text in 28 px boxes.
+
+
+### D-028 — Overnight SCM build: agents take the recommended option on every card (2026-11-20, owner)
+- **Decision:** for bom, sale-order, reorder, purchase-returns, supplier-invoice, rfq, stock-transfer, supplier-rating and dispatch, every OWNER.md card and every "Decided for you — please confirm" line takes the recommended option; each card records "Your answer: A (owner pre-approved recommended options in chat, 2026-11-20)". Every choice cites ERPNext / Odoo / SAP B1 (stricter wins). Specs are frozen on this approval and built in the order above; anything the owner disagrees with in the morning becomes a change request.
+- **Why:** owner, chat 2026-11-20: "take ur own decision and record them and run whatever parallel subagents u want to complete a complete scm module according to my plan, ill do a complete merge in moring once completed"; "including bom explosion and other features"; "make sure u reasearch other erp's and take decision and build"; "follow best ui ux standards, and flows and test completely, run as many parallel agents as possible".
+
+### D-029 — New detail pages are two-pane (2026-11-20, owner)
+- **Decision:** detail pages of the nine SCM modules use two panes (document left, money / history / next step right), lists are full-page, forms are full-page with labels above fields, and each document offers its next step. This overrides the design-system skill's one-column detail default for these screens; design-reviewer accepts it.
+- **Why:** owner standards relayed 2026-11-20 ("follow best ui ux standards, and flows").
+
+### D-030 — Overnight SCM build: one epic branch for all nine modules (2026-11-20, coordinator under D-028)
+- **Decision:** the nine frozen SCM specs and their builds live on one branch `epic/scm` (cut from `epic/design-system-v2`, PR #111). Each module is a sub-feature branch `feature/scm-<module>` merged locally into `epic/scm` in build order (bom → sale-order → reorder → purchase-returns → supplier-invoice → rfq → stock-transfer → supplier-rating → dispatch). One push and one PR into `main` at the end; merge #111 first. Modules not built tonight keep their frozen spec on the branch.
+- **Why:** sale-order and dispatch depend on bom; one test DB forces serial builds; the session cannot create sibling worktrees; the owner asked for "a complete merge in the morning".
+
+### D-031 — SCM epic merges factory-flows before its PR (2026-11-21, coordinator under D-028)
+The owner merges #111 (design-system v2), then #117 (factory-flows), then the SCM epic. To keep the SCM PR mergeable, `epic/factory-flows` (ce560c9, which contains #111) was merged into `epic/scm` locally and all 32 conflicts resolved keeping both sides. factory-flows' migration stays untouched (it reaches main first); SCM migrations were re-chained after it, one renamed (`free_pestilence` → 20261120180000, SQL unchanged) and the duplicate `idx_grns_received_date` dropped from the supplier-rating index migration. The PO page is keyed by PO id (factory-flows), so all SCM links moved to it. BR-FF-100 gets a change request: SCM screens sit in their own menu groups between General and Admin. Why: one mergeable PR in the owner's merge order; a migration already on main is never edited. Any local DB that ran the old SCM migration names needs `db:test:rebuild` / a dev rebuild.
+
+### D-040 — factory-flows decided and frozen overnight on the owner's behalf (2026-11-20, factory-flows v1)
+- **Decision:** every card and "please confirm" line in `docs/specs/factory-flows/OWNER.md` took the recommended option (cards 1–3 = A; 19 confirm rows = yes), each backed by an ERPNext / Odoo / SAP B1 benchmark (stricter one when they disagree, `docs/research/factory-flows.md` → Decision benchmarks), and the spec was frozen without a live OWNER.md approval. Owner's words, relayed by the parent session: owner pre-approved recommended options in chat, 2026-11-20: "automate that sessions take ur own decision and record them and run whatever parallel subagents u want ... ill do a complete merge in moring once completed"; "dont want for my review ill review the decicsion u take tonight".
+- **Why:** the owner went to bed and asked for the build to run to hand-over overnight; he reviews all decisions in the morning. Any "no" becomes a change request (`/freeze factory-flows` change path).
+
+### D-041 — factory-flows built overnight; e2e tail parked (2026-11-21, factory-flows v1)
+- **Decision:** the epic was built as commits on one branch (`epic/factory-flows`, cut from `epic/design-system-v2`) with one PR into main, instead of sub-PRs into the epic. After the third fix round 7 Playwright specs were still red (mostly older golden specs and tablet views); they were parked as one issue rather than looping a fourth time (PROTOCOL loop limit). All backend, typecheck, lint, contract and build gates are green.
+- **Why:** owner asked for one PR to review in the morning; the loop limit exists to stop endless fix rounds.

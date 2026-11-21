@@ -12,6 +12,7 @@ const INVENTORY_PAGES = [
 	{ href: "/inventory/locations", label: "Locations" },
 	{ href: "/inventory/stock", label: "Stock" },
 	{ href: "/inventory/movements", label: "Movements" },
+	{ href: "/inventory/stock-transfers", label: "Stock transfers" },
 	{ href: "/inventory/stock-check", label: "Stock check" },
 ];
 

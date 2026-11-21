@@ -26,6 +26,11 @@ export function isUniqueViolation(error: unknown): boolean {
   return findPgError(error, "23505") !== undefined;
 }
 
+/** 55P03: lock_not_available, e.g. a `lock_timeout` that ran out. */
+export function isLockTimeout(error: unknown): boolean {
+  return findPgError(error, "55P03") !== undefined;
+}
+
 /** 23503: foreign-key violation, anywhere in the cause chain. */
 export function isForeignKeyViolation(error: unknown): boolean {
   return findPgError(error, "23503") !== undefined;
@@ -42,4 +47,12 @@ export function conflictLocation(error: unknown): {
     constraint: text(pg?.constraint_name),
     table: text(pg?.table_name),
   };
+}
+
+/** 40P01 deadlock detected or 40001 serialization failure: safe to retry. */
+export function isRetryableConflict(error: unknown): boolean {
+  return (
+    findPgError(error, "40P01") !== undefined ||
+    findPgError(error, "40001") !== undefined
+  );
 }

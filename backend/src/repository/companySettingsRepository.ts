@@ -31,7 +31,12 @@ export const companySettingsRepository = {
         .where(eq(companySettings.id, 1))
         .limit(1)
         .for("update");
-      const changes = TRACKED_FIELDS.filter(
+      const changes: {
+        field: string;
+        oldValue: string | null;
+        newValue: string;
+        createdBy: number;
+      }[] = TRACKED_FIELDS.filter(
         (field) => current?.[field] !== input[field],
       ).map((field) => ({
         field,
@@ -39,6 +44,21 @@ export const companySettingsRepository = {
         newValue: input[field],
         createdBy: actorId,
       }));
+      // BR-DSP-42: the e-way limit is optional on the body; omitted = unchanged.
+      if (
+        input.ewayIntraLimitPaise !== undefined &&
+        current?.ewayIntraLimitPaise !== input.ewayIntraLimitPaise
+      ) {
+        changes.push({
+          field: "ewayIntraLimitPaise",
+          oldValue:
+            current?.ewayIntraLimitPaise === undefined
+              ? null
+              : String(current.ewayIntraLimitPaise),
+          newValue: String(input.ewayIntraLimitPaise),
+          createdBy: actorId,
+        });
+      }
       if (current && changes.length === 0) {
         // nothing changed: no history row, audit stamp untouched
         return current;
@@ -55,6 +75,47 @@ export const companySettingsRepository = {
       if (!row) {
         throw new Error("Company settings upsert returned no row");
       }
+      await tx.insert(companySettingsHistory).values(changes);
+      return row;
+    });
+  },
+
+  // BR-SINV-32: change one or both tolerances (basis points) on the existing row; one
+  // history row per changed field, same transaction. Returns undefined when there is
+  // no company row yet.
+  async updateTolerances(
+    input: { priceToleranceBp?: number; weightToleranceBp?: number },
+    actorId: number,
+  ) {
+    return db.transaction(async (tx) => {
+      const [current] = await tx
+        .select()
+        .from(companySettings)
+        .where(eq(companySettings.id, 1))
+        .limit(1)
+        .for("update");
+      if (!current) {
+        return undefined;
+      }
+      const changes = (["priceToleranceBp", "weightToleranceBp"] as const)
+        .filter(
+          (field) =>
+            input[field] !== undefined && input[field] !== current[field],
+        )
+        .map((field) => ({
+          field,
+          oldValue: String(current[field]),
+          newValue: String(input[field]),
+          createdBy: actorId,
+        }));
+      if (changes.length === 0) {
+        return current;
+      }
+      const [row] = await tx
+        .update(companySettings)
+        .set({ ...input, updatedBy: actorId, updatedAt: new Date() })
+        .where(eq(companySettings.id, 1))
+        .returning();
       await tx.insert(companySettingsHistory).values(changes);
       return row;
     });

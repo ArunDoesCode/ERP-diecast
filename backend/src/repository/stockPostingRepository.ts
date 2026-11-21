@@ -7,6 +7,7 @@ import {
   locations,
 } from "../db/schemas/02_procurement-catalog";
 import { BadRequestError, ConflictError, NotFoundError } from "../lib/errors";
+import { fromMilli, toMilli } from "../lib/milli";
 import { assertMoneyInRange, assertStockValueInRange } from "../lib/money";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -36,8 +37,6 @@ export type PostStockInput = {
 };
 
 // Quantities are exact to 3 decimals: all math runs on integer thousandths.
-const toMilli = (qty: number) => Math.round(qty * 1000);
-const fromMilli = (milli: number) => milli / 1000;
 
 // BR-STD-43: thousandths x paise can pass 2^53, so products run in BigInt and
 // are turned into a number only after the range check.
@@ -105,7 +104,10 @@ export async function postStock(tx: Tx, input: PostStockInput) {
   const qtyMilli = toMilli(input.quantityChange);
   const balanceMilli = toMilli(lastRow?.balanceAfter ?? 0) + qtyMilli;
   if (input.blockNegative && balanceMilli < 0) {
-    throw new ConflictError("Insufficient stock at this location");
+    throw new ConflictError(
+      "Insufficient stock at this location",
+      "INSUFFICIENT_STOCK",
+    );
   }
   const balanceAfter = fromMilli(balanceMilli);
   const unitCostPaise = input.valueAtAverage

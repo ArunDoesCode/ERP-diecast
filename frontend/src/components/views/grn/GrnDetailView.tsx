@@ -6,11 +6,19 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { EditGrnModal } from "@/components/pages/grn/EditGrnModal";
-import { GrnLinesTable } from "@/components/pages/grn/GrnLinesTable";
+import {
+	GrnLinesTable,
+	isPendingLine,
+} from "@/components/pages/grn/GrnLinesTable";
+import { GrnQaDecisionModal } from "@/components/pages/grn/GrnQaDecisionModal";
+import { EnterInvoiceButton } from "@/components/pages/supplier-invoices/EnterInvoiceButton";
+import { InvoicesCard } from "@/components/pages/supplier-invoices/InvoicesCard";
 import { DetailHeader } from "@/components/shared/DetailHeader";
 import { DocumentFlow } from "@/components/shared/DocumentFlow";
+import { DocumentSidePanel } from "@/components/shared/DocumentSidePanel";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { TwoPaneLayout } from "@/components/shared/TwoPaneLayout";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -32,13 +40,18 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCan } from "@/hooks/use-can";
 import { useDeleteGrnMutation, useGrnDetailQuery } from "@/lib/api/grn/queries";
+import { useReturnPrefillQuery } from "@/lib/api/purchase-return/queries";
 import { formatDate, formatDocNo } from "@/lib/format";
 import { useBreadcrumbLast } from "@/lib/shell/breadcrumb-last";
-import type { Grn, GrnLinkedPo, GrnLinkedPr } from "@/types/grn";
+import type { Grn, GrnItemDetail, GrnLinkedPo, GrnLinkedPr } from "@/types/grn";
+import type { PrtLinkedReturn } from "@/types/purchase-return";
 
 export function GrnDetailView({ grnId }: { grnId: number }) {
 	const canEditDraft = useCan("grn.edit_draft");
+	const canReturn = useCan("purchase_return.edit_draft");
+	const canDecideQa = useCan("grn.qa_decide");
 	const [editOpen, setEditOpen] = useState(false);
+	const [inspectLine, setInspectLine] = useState<GrnItemDetail | null>(null);
 
 	const detailQuery = useGrnDetailQuery(grnId, grnId > 0);
 	const detail = detailQuery.data?.success ? detailQuery.data.data : undefined;
@@ -47,6 +60,22 @@ export function GrnDetailView({ grnId }: { grnId: number }) {
 	useBreadcrumbLast(grn?.grnNumber);
 
 	const canManage = canEditDraft && grn?.status === "draft";
+	// "Return to supplier" next step (BR-PRT-36): prefilled = primary, secondary = outline, none = hidden.
+	const prefillQuery = useReturnPrefillQuery(
+		grn?.id,
+		canReturn &&
+			grn !== undefined &&
+			grn.status !== "draft" &&
+			grn.poId !== null,
+	);
+	const returnAction = prefillQuery.data?.data.mainAction;
+
+	// "Enter supplier invoice" next step (BR-SINV-38): only a GRN with accepted goods.
+	const billableGrn =
+		grn?.status === "accepted" || grn?.status === "partial_accepted";
+	// Next step (BR-FF-44): Inspect the first pending line.
+	const firstPending = items.find(isPendingLine);
+	const showInspect = canDecideQa && firstPending !== undefined;
 
 	if (detailQuery.isLoading) {
 		return (
@@ -100,24 +129,84 @@ export function GrnDetailView({ grnId }: { grnId: number }) {
 					{ label: "Vehicle", value: grn.vehicleNo ?? "–" },
 				]}
 				actions={
-					canManage ? (
-						<GrnDraftActions grn={grn} onEdit={() => setEditOpen(true)} />
-					) : undefined
+					<>
+						{showInspect ? (
+							<Button
+								type="button"
+								onClick={() => setInspectLine(firstPending)}
+							>
+								Inspect
+							</Button>
+						) : null}
+						{returnAction === "prefilled" || returnAction === "secondary" ? (
+							<Button
+								type="button"
+								size="sm"
+								variant={returnAction === "prefilled" ? "default" : "outline"}
+								asChild
+							>
+								<Link href={`/purchase-returns/new?grnId=${grn.id}`}>
+									Return to supplier
+								</Link>
+							</Button>
+						) : null}
+						{grn.poId !== null ? (
+							<EnterInvoiceButton
+								poId={grn.poId}
+								grnId={grn.id}
+								enabled={billableGrn}
+							/>
+						) : null}
+						{canManage ? (
+							<GrnDraftActions grn={grn} onEdit={() => setEditOpen(true)} />
+						) : null}
+					</>
 				}
 			/>
 
-			<GrnDocumentFlow grn={grn} po={detail.po} prs={detail.prs} />
+			<GrnDocumentFlow
+				grn={grn}
+				po={detail.po}
+				prs={detail.prs}
+				returns={detail.returns ?? []}
+			/>
 
-			<GrnDeliveryDetails grn={grn} />
+			<TwoPaneLayout
+				sideLabel="Receipt summary"
+				side={<DocumentSidePanel docType="grn" docId={grn.id} />}
+			>
+				<GrnDeliveryDetails grn={grn} />
 
-			<Card>
-				<CardHeader>
-					<CardTitle>Lines</CardTitle>
-				</CardHeader>
-				<CardContent>
-					<GrnLinesTable grnId={grn.id} poId={grn.poId ?? 0} items={items} />
-				</CardContent>
-			</Card>
+				<Card>
+					<CardHeader>
+						<CardTitle>Lines</CardTitle>
+					</CardHeader>
+					<CardContent>
+						<GrnLinesTable
+							grnId={grn.id}
+							poId={grn.poId ?? 0}
+							items={items}
+							onInspect={setInspectLine}
+						/>
+					</CardContent>
+				</Card>
+			</TwoPaneLayout>
+
+			{inspectLine ? (
+				<GrnQaDecisionModal
+					grnId={grn.id}
+					poId={grn.poId ?? 0}
+					line={inspectLine}
+					open
+					onOpenChange={(open) => {
+						if (!open) setInspectLine(null);
+					}}
+				/>
+			) : null}
+
+			{grn.poId !== null ? (
+				<InvoicesCard poId={grn.poId} grnId={grn.id} canEnter={billableGrn} />
+			) : null}
 
 			{editOpen ? (
 				<EditGrnModal
@@ -136,11 +225,15 @@ function GrnDocumentFlow({
 	grn,
 	po,
 	prs,
+	returns,
 }: {
 	grn: Grn;
 	po: GrnLinkedPo | null;
 	prs: GrnLinkedPr[];
+	returns: PrtLinkedReturn[];
 }) {
+	const canOpenPr = useCan("pr.manage");
+	const canOpenPo = useCan("po.manage");
 	const firstPr = prs[0];
 	return (
 		<DocumentFlow
@@ -152,7 +245,11 @@ function GrnDocumentFlow({
 							? `${firstPr.prNumber} +${prs.length - 1}`
 							: firstPr.prNumber
 						: undefined,
-					href: firstPr ? `/purchase-orders/${firstPr.id}` : undefined,
+					// A step the viewer cannot open is plain text (BR-FF-03).
+					href:
+						firstPr && canOpenPr
+							? `/purchase-requisitions/${firstPr.id}`
+							: undefined,
 					status: firstPr ? (
 						<StatusBadge doc="pr" status={firstPr.status} />
 					) : undefined,
@@ -161,6 +258,7 @@ function GrnDocumentFlow({
 				{
 					label: "Purchase order",
 					docNo: po?.poNumber,
+					href: po && canOpenPo ? `/purchase-orders/${po.id}` : undefined,
 					status: po ? <StatusBadge doc="po" status={po.status} /> : undefined,
 					state: po ? "done" : "todo",
 				},
@@ -170,6 +268,15 @@ function GrnDocumentFlow({
 					status: <StatusBadge doc="grn" status={grn.status} />,
 					state: "current",
 				},
+				...[...returns]
+					.sort((a, b) => a.proNumber.localeCompare(b.proNumber))
+					.map((entry) => ({
+						label: "Purchase return",
+						docNo: entry.proNumber,
+						href: `/purchase-returns/${entry.id}`,
+						status: <StatusBadge doc="purchaseReturn" status={entry.status} />,
+						state: "done" as const,
+					})),
 			]}
 		/>
 	);
@@ -187,7 +294,7 @@ function GrnDeliveryDetails({ grn }: { grn: Grn }) {
 		<dl className="flex flex-wrap gap-x-6 gap-y-1 text-[13px]">
 			{rows.map((row) => (
 				<div key={row.label} className="flex gap-1.5">
-					<dt className="text-xs font-semibold text-muted-foreground">
+					<dt className="text-[13px] leading-[18px] font-semibold text-muted-foreground">
 						{row.label}
 					</dt>
 					<dd>{row.value}</dd>
@@ -205,7 +312,7 @@ function GrnDraftActions({ grn, onEdit }: { grn: Grn; onEdit: () => void }) {
 
 	return (
 		<>
-			<Button type="button" size="sm" variant="outline" onClick={onEdit}>
+			<Button type="button" variant="outline" onClick={onEdit}>
 				Edit
 			</Button>
 			<DropdownMenu>

@@ -53,6 +53,7 @@ import {
 } from "../../src/db/schemas/02_procurement-purchasing";
 import { supplierMaster } from "../../src/db/schemas/02_procurement-suppliers";
 import { employees } from "../../src/db/schemas/03_hcm";
+import { customers, saleOrders } from "../../src/db/schemas/05_sales";
 import { authService } from "../../src/service/authService";
 
 const app = createApp();
@@ -201,6 +202,33 @@ async function resetPolicies() {
     .where(like(approvalPolicies.name, `${NAME}%`));
 }
 
+let confirmedSoId: number | undefined;
+/** One real confirmed SO (BR-SO-48 needs it for sale_order PRs), created on first use. */
+async function ensureConfirmedSo(): Promise<number> {
+  if (confirmedSoId) return confirmedSoId;
+  const [c] = await db
+    .insert(customers)
+    .values({
+      name: `${NAME}customer`,
+      stateCode: "27",
+      address: "TEST_aprpol address",
+      createdBy: emp.req as number,
+    })
+    .returning({ id: customers.id });
+  const [so] = await db
+    .insert(saleOrders)
+    .values({
+      soNumber: `TEST_APRPOL_SO_${Date.now()}`,
+      customerId: (c as { id: number }).id,
+      status: "confirmed",
+      orderDate: "2026-11-01",
+      createdBy: emp.req as number,
+    })
+    .returning({ id: saleOrders.id });
+  confirmedSoId = (so as { id: number }).id;
+  return confirmedSoId;
+}
+
 /** Creates a PR (via the API) of the given type whose estimate is exactly `paise`, then submits it. */
 async function submitPr(type: string, paise: number, submitter = "req") {
   await db
@@ -211,7 +239,7 @@ async function submitPr(type: string, paise: number, submitter = "req") {
     type === "maintenance"
       ? { assetId: machineId }
       : type === "sale_order"
-        ? { saleOrderId: 42 }
+        ? { saleOrderId: await ensureConfirmedSo() }
         : {};
   const cr = await call("req", "POST", "/api/pr/createpr", {
     type,
@@ -305,6 +333,9 @@ async function cleanup() {
         .delete(purchaseRequests)
         .where(inArray(purchaseRequests.id, prIds));
     }
+    await db.delete(saleOrders).where(inArray(saleOrders.createdBy, ids));
+    await db.delete(customers).where(inArray(customers.createdBy, ids));
+    confirmedSoId = undefined;
     await db
       .update(documentNumberCounters)
       .set({ lastUpdatedBy: null })

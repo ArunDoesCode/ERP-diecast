@@ -4,15 +4,17 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
-import { FloatingLabelInput } from "@/components/ui/floating-label";
 import {
 	Form,
 	FormControl,
 	FormField,
 	FormItem,
+	FormLabel,
 	FormMessage,
 } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 import { useSaveCompanySettingsMutation } from "@/lib/api/subcontracting/queries";
+import { formatMoney } from "@/lib/format";
 import {
 	type CompanySettings,
 	type CompanySettingsInput,
@@ -33,6 +35,9 @@ export function CompanySettingsForm({
 			address: settings?.address ?? "",
 			gstin: settings?.gstin ?? "",
 			stateCode: settings?.stateCode ?? "",
+			ewayIntraLimitRupees: String(
+				(settings?.ewayIntraLimitPaise ?? 5_000_000) / 100,
+			),
 		},
 	});
 
@@ -40,19 +45,22 @@ export function CompanySettingsForm({
 		<Form {...form}>
 			<form
 				className="max-w-xl space-y-4"
-				onSubmit={form.handleSubmit((values) => mutation.mutate(values))}
+				onSubmit={form.handleSubmit((values) => {
+					const { ewayIntraLimitRupees, ...rest } = values;
+					mutation.mutate({
+						...rest,
+						ewayIntraLimitPaise: Math.round(Number(ewayIntraLimitRupees) * 100),
+					});
+				})}
 			>
 				<FormField
 					control={form.control}
 					name="name"
 					render={({ field }) => (
-						<FormItem className="min-h-19">
+						<FormItem className="min-h-19 gap-1.5">
+							<FormLabel htmlFor="company-name">Company name</FormLabel>
 							<FormControl>
-								<FloatingLabelInput
-									{...field}
-									id="company-name"
-									label="Company name"
-								/>
+								<Input {...field} id="company-name" />
 							</FormControl>
 							<FormMessage />
 						</FormItem>
@@ -62,13 +70,10 @@ export function CompanySettingsForm({
 					control={form.control}
 					name="address"
 					render={({ field }) => (
-						<FormItem className="min-h-19">
+						<FormItem className="min-h-19 gap-1.5">
+							<FormLabel htmlFor="company-address">Address</FormLabel>
 							<FormControl>
-								<FloatingLabelInput
-									{...field}
-									id="company-address"
-									label="Address"
-								/>
+								<Input {...field} id="company-address" />
 							</FormControl>
 							<FormMessage />
 						</FormItem>
@@ -79,14 +84,10 @@ export function CompanySettingsForm({
 						control={form.control}
 						name="gstin"
 						render={({ field }) => (
-							<FormItem className="min-h-19">
+							<FormItem className="min-h-19 gap-1.5">
+								<FormLabel htmlFor="company-gstin">GSTIN</FormLabel>
 								<FormControl>
-									<FloatingLabelInput
-										{...field}
-										id="company-gstin"
-										label="GSTIN"
-										maxLength={15}
-									/>
+									<Input {...field} id="company-gstin" maxLength={15} />
 								</FormControl>
 								<FormMessage />
 							</FormItem>
@@ -96,20 +97,43 @@ export function CompanySettingsForm({
 						control={form.control}
 						name="stateCode"
 						render={({ field }) => (
-							<FormItem className="min-h-19">
+							<FormItem className="min-h-19 gap-1.5">
+								<FormLabel htmlFor="company-state-code">State code</FormLabel>
 								<FormControl>
-									<FloatingLabelInput
-										{...field}
-										id="company-state-code"
-										label="State code"
-										maxLength={2}
-									/>
+									<Input {...field} id="company-state-code" maxLength={2} />
 								</FormControl>
 								<FormMessage />
 							</FormItem>
 						)}
 					/>
 				</div>
+				<FormField
+					control={form.control}
+					name="ewayIntraLimitRupees"
+					render={({ field }) => (
+						<FormItem className="min-h-19 gap-1.5">
+							<FormLabel htmlFor="company-eway-limit">
+								E-way bill limit, same state (₹)
+							</FormLabel>
+							<FormControl>
+								<Input
+									{...field}
+									id="company-eway-limit"
+									inputMode="decimal"
+									className="text-right tabular-nums sm:max-w-48"
+								/>
+							</FormControl>
+							<p className="text-[13px] text-muted-foreground">
+								{Number.isFinite(Number(field.value)) && field.value !== ""
+									? `${formatMoney(Math.round(Number(field.value) * 100))}. `
+									: ""}
+								A delivery note at or above this value needs an e-way bill.
+								Other-state sales always need one.
+							</p>
+							<FormMessage />
+						</FormItem>
+					)}
+				/>
 				<Button type="submit" disabled={mutation.isPending}>
 					{mutation.isPending ? "Saving..." : "Save"}
 				</Button>

@@ -112,7 +112,7 @@ export function GrnQaDecisionModal({
 						<div>
 							<label
 								htmlFor="grn-qa-accepted-qty"
-								className="mb-1 block text-xs font-medium"
+								className="mb-1 block text-[13px] leading-[18px] font-semibold"
 							>
 								Accepted qty
 							</label>
@@ -128,7 +128,7 @@ export function GrnQaDecisionModal({
 						<div>
 							<label
 								htmlFor="grn-qa-rejected-qty"
-								className="mb-1 block text-xs font-medium"
+								className="mb-1 block text-[13px] leading-[18px] font-semibold"
 							>
 								Rejected qty
 							</label>
@@ -143,7 +143,7 @@ export function GrnQaDecisionModal({
 						</div>
 					</div>
 					{!sumMatches ? (
-						<p className="text-xs text-destructive">
+						<p className="text-sm text-destructive">
 							Accepted + rejected must equal the arrived qty ({line.receivedQty}
 							).
 						</p>
@@ -152,7 +152,7 @@ export function GrnQaDecisionModal({
 					<div>
 						<label
 							htmlFor="grn-qa-batch-number"
-							className="mb-1 block text-xs font-medium"
+							className="mb-1 block text-[13px] leading-[18px] font-semibold"
 						>
 							Batch / heat no
 						</label>
@@ -167,13 +167,13 @@ export function GrnQaDecisionModal({
 					{isOverReceipt ? (
 						canOverride ? (
 							<div>
-								<p className="mb-2 rounded-md border border-warning/30 bg-warning-subtle px-3 py-2 text-xs text-warning">
+								<p className="mb-2 rounded-md border border-warning/30 bg-warning-subtle px-3 py-2 text-sm text-warning">
 									With earlier receipts this exceeds 105% of the ordered qty.
 									Give a reason to override.
 								</p>
 								<label
 									htmlFor="grn-qa-override-reason"
-									className="mb-1 block text-xs font-medium"
+									className="mb-1 block text-[13px] leading-[18px] font-semibold"
 								>
 									Over-receipt override reason
 								</label>
@@ -184,7 +184,7 @@ export function GrnQaDecisionModal({
 								/>
 							</div>
 						) : (
-							<p className="rounded-md border border-warning/30 bg-warning-subtle px-3 py-2 text-xs text-warning">
+							<p className="rounded-md border border-warning/30 bg-warning-subtle px-3 py-2 text-sm text-warning">
 								With earlier receipts this exceeds 105% of the ordered qty. You
 								cannot override it; ask the owner or back office.
 							</p>
@@ -194,7 +194,7 @@ export function GrnQaDecisionModal({
 					<div>
 						<label
 							htmlFor="grn-qa-certificate-url"
-							className="mb-1 block text-xs font-medium"
+							className="mb-1 block text-[13px] leading-[18px] font-semibold"
 						>
 							Certificate URL
 						</label>
@@ -209,7 +209,7 @@ export function GrnQaDecisionModal({
 					<div>
 						<label
 							htmlFor="grn-qa-remarks"
-							className="mb-1 block text-xs font-medium"
+							className="mb-1 block text-[13px] leading-[18px] font-semibold"
 						>
 							Remarks
 						</label>

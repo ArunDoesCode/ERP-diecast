@@ -5,6 +5,7 @@ import {
 	type SortingState,
 	useTable,
 } from "@tanstack/react-table";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { DataTable } from "@/components/common/DataTable";
 import { DataTableColumnHeader } from "@/components/common/DataTableColumnHeader";
@@ -19,6 +20,7 @@ import {
 import { PageHeader } from "@/components/shared/PageHeader";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -28,6 +30,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { useCan } from "@/hooks/use-can";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useStockQuery } from "@/lib/api/asset/queries";
 import { formatMoney } from "@/lib/format";
@@ -62,6 +65,7 @@ export function InventoryStockManager() {
 	const [category, setCategory] = useState<"all" | AssetItemCategory>("all");
 	const [reorderFilter, setReorderFilter] = useState<"all" | "below">("all");
 
+	const canTransfer = useCan("stock_transfer.manage");
 	const debouncedSearch = useDebouncedValue(searchValue, 350);
 	const activeSort = sorting[0];
 
@@ -88,17 +92,23 @@ export function InventoryStockManager() {
 					<DataTableColumnHeader column={column} title="Item" />
 				),
 				cell: ({ row }) => (
-					<div className="flex items-center gap-2">
-						<span>{row.original.name}</span>
-						{row.original.isActive ? null : (
-							<StatusBadge doc="item" status="inactive" />
-						)}
+					<div className="flex flex-col">
+						<div className="flex items-center gap-2">
+							<span>{row.original.name}</span>
+							{row.original.isActive ? null : (
+								<StatusBadge doc="item" status="inactive" />
+							)}
+						</div>
+						<span className="font-mono text-[13px] text-muted-foreground min-[1100px]:hidden">
+							{row.original.sku}
+						</span>
 					</div>
 				),
 			},
 			{
 				id: "sku",
 				accessorKey: "sku",
+				meta: { hideBelow1100: true },
 				header: ({ column }) => (
 					<DataTableColumnHeader column={column} title="SKU" />
 				),
@@ -131,6 +141,7 @@ export function InventoryStockManager() {
 				id: "averageCostPaise",
 				accessorKey: "averageCostPaise",
 				enableSorting: false,
+				meta: { hideBelow1100: true },
 				header: "Average cost",
 				cell: ({ getValue }) => formatMoney(getValue<number>()),
 			},
@@ -146,6 +157,7 @@ export function InventoryStockManager() {
 				id: "reorderLevel",
 				accessorKey: "reorderLevel",
 				enableSorting: false,
+				meta: { hideBelow1100: true },
 				header: "Reorder level",
 			},
 			{
@@ -156,17 +168,35 @@ export function InventoryStockManager() {
 					row.original.locations.length === 0 ? (
 						"—"
 					) : (
-						<ul className="text-xs">
+						<ul className="text-sm">
 							{row.original.locations.map((location) => (
-								<li key={location.locationId}>
-									{location.locationName}: {location.balance} {row.original.uom}
+								<li
+									key={location.locationId}
+									className="flex flex-wrap items-center gap-x-2 gap-y-1 py-1"
+								>
+									<span>
+										{location.locationName}: {location.balance}{" "}
+										{row.original.uom}
+									</span>
+									{canTransfer &&
+									location.balance > 0 &&
+									location.locationType !== "vendor_premise" ? (
+										<Button type="button" variant="outline" asChild>
+											<Link
+												href={`/inventory/stock-transfers/new?item=${row.original.itemId}&from=${location.locationId}`}
+												aria-label={`Move ${row.original.name} from ${location.locationName}`}
+											>
+												Move stock
+											</Link>
+										</Button>
+									) : null}
 								</li>
 							))}
 						</ul>
 					),
 			},
 		],
-		[],
+		[canTransfer],
 	);
 
 	const table = useTable({

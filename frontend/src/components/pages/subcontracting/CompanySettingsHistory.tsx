@@ -14,14 +14,31 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { useCompanySettingsHistoryQuery } from "@/lib/api/subcontracting/queries";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, formatMoney } from "@/lib/format";
 
 const FIELD_LABEL: Record<string, string> = {
 	name: "Name",
 	address: "Address",
 	gstin: "GSTIN",
 	stateCode: "State",
+	priceToleranceBp: "Price tolerance",
+	weightToleranceBp: "Weight tolerance",
+	ewayIntraLimitPaise: "E-way bill limit",
 };
+
+// Tolerances are stored as basis points text; show them as a percent.
+function historyValue(field: string, value: string | null) {
+	if (!value) return "–";
+	if (field === "ewayIntraLimitPaise") {
+		const paise = Number(value);
+		return Number.isFinite(paise) ? formatMoney(paise) : value;
+	}
+	if (field !== "priceToleranceBp" && field !== "weightToleranceBp") {
+		return value;
+	}
+	const bp = Number(value);
+	return Number.isFinite(bp) ? `${bp / 100}%` : value;
+}
 
 // BR-SCO-29: change history, newest first, read-only.
 export function CompanySettingsHistory() {
@@ -64,8 +81,8 @@ export function CompanySettingsHistory() {
 								<TableCell>{formatDateTime(row.changedAt)}</TableCell>
 								<TableCell>{row.changedByName ?? "–"}</TableCell>
 								<TableCell>{FIELD_LABEL[row.field] ?? row.field}</TableCell>
-								<TableCell>{row.oldValue || "–"}</TableCell>
-								<TableCell>{row.newValue || "–"}</TableCell>
+								<TableCell>{historyValue(row.field, row.oldValue)}</TableCell>
+								<TableCell>{historyValue(row.field, row.newValue)}</TableCell>
 							</TableRow>
 						))}
 					</TableBody>

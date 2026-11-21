@@ -32,10 +32,17 @@ import {
 import { useAuthSessionStore } from "@/lib/store/auth-session-store";
 
 // Screens with no permission key: open to every signed-in user (BR-AUTH-15).
-const ALWAYS_ALLOWED_PATHS = ["/landing", "/approvals"];
+const ALWAYS_ALLOWED_PATHS = ["/home", "/landing", "/approvals"];
+
+// A typed PO / PR document URL opens the page, which shows "You do not have access to this
+// document" itself (BR-FF-04) or reads it through the approval read rule (BR-FF-53). The list
+// screens still redirect home (BR-AUTH-15).
+const DOCUMENT_PAGE_PATH =
+	/^\/(purchase-orders|purchase-requisitions)\/\d+\/?$/;
 
 function isPathAllowed(pathname: string, allowedPaths: string[]) {
 	const path = normalizeAllowedPath(pathname);
+	if (path && DOCUMENT_PAGE_PATH.test(path)) return true;
 	return allowedPaths.some((allowedPath) => {
 		const allowed = normalizeAllowedPath(allowedPath);
 		if (!allowed) return false;
@@ -77,7 +84,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 			...ALWAYS_ALLOWED_PATHS,
 			...screens.map((screen) => screen.path),
 		];
-		if (!isPathAllowed(pathname, allowed)) router.replace("/landing");
+		if (!isPathAllowed(pathname, allowed))
+			router.replace(`/home?denied=${encodeURIComponent(pathname)}`);
 	}, [sessionReady, screens, pathname, router]);
 
 	const changeFolded = (next: boolean) => {
@@ -101,7 +109,6 @@ export function AppShell({ children }: { children: ReactNode }) {
 			<SidebarProvider
 				open={!folded}
 				onOpenChange={(open) => changeFolded(!open)}
-				style={{ "--sidebar-width-icon": "52px" } as React.CSSProperties}
 			>
 				<ShellFrame
 					pathname={pathname}
@@ -160,7 +167,7 @@ function ShellFrame({
 					onToggleSidebar={toggleSidebar}
 					user={user}
 				/>
-				<div className="p-5">{children}</div>
+				<div className="p-6">{children}</div>
 			</SidebarInset>
 		</>
 	);

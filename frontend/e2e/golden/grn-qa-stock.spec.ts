@@ -8,7 +8,6 @@ import { expect, test } from "@playwright/test";
 import {
 	dispatchedPo,
 	makeCatalog,
-	openGrnOfPo,
 	qaDecideOnScreen,
 	receiveGoodsOnScreen,
 	stockRowOnScreen,
@@ -31,33 +30,34 @@ test("T-5 (3) GRN accepted by QA puts the qty in the main store and moves the PO
 	await uiLogin(qa, "qa_inspector");
 
 	// First lot: 400 arrive, QA accepts.
-	await receiveGoodsOnScreen(page, po.prId, `${po.poNumber}-A`, 400);
-	await openGrnOfPo(qa, po.poNumber);
+	const grnA = await receiveGoodsOnScreen(
+		page,
+		po.poNumber,
+		`${po.poNumber}-A`,
+		400,
+	);
+	await qa.goto(`/grn/${grnA}`);
 	await qaDecideOnScreen(qa, 400);
 
 	let row = await stockRowOnScreen(page, cat.itemSku);
 	await expect(row).toContainText("400 kg");
 	await expect(row).toContainText(`${cat.mainStoreName}: 400 kg`);
-	await page.goto(`/purchase-orders/${po.prId}`);
-	await expect(
-		page.getByText(/partly received|partial received/i).first(),
-	).toBeVisible();
+	await page.goto(`/purchase-orders/${po.poId}`);
+	await expect(page.getByText(/partly received/i).first()).toBeVisible();
 
 	// Second lot: the remaining 600, QA accepts: fully received.
-	await receiveGoodsOnScreen(page, po.prId, `${po.poNumber}-B`, 600);
-	await qa.goto("/grn");
-	await qa
-		.getByRole("row")
-		.filter({ hasText: po.poNumber })
-		.filter({ hasText: "Draft" })
-		.getByText(/^GRN-/)
-		.first()
-		.click();
+	const grnB = await receiveGoodsOnScreen(
+		page,
+		po.poNumber,
+		`${po.poNumber}-B`,
+		600,
+	);
+	await qa.goto(`/grn/${grnB}`);
 	await qaDecideOnScreen(qa, 600);
 
 	row = await stockRowOnScreen(page, cat.itemSku);
 	await expect(row).toContainText(`${cat.mainStoreName}: 1000 kg`);
-	await page.goto(`/purchase-orders/${po.prId}`);
+	await page.goto(`/purchase-orders/${po.poId}`);
 	await expect(page.getByText(/fully received/i).first()).toBeVisible();
 	await qaCtx.close();
 });

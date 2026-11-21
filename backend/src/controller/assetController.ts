@@ -9,6 +9,7 @@ import {
   assetItemListQuerySchema,
   assetItemUpdateSchema,
   assetLastRateQuerySchema,
+  assetLastRatesQuerySchema,
   assetLocationCreateSchema,
   assetLocationListQuerySchema,
   assetLocationUpdateSchema,
@@ -60,7 +61,15 @@ export const assetController = {
     const query = assetLastRateQuerySchema.parse(
       Object.fromEntries(new URL(c.req.url).searchParams),
     );
-    const data = await assetService.getLastRate(itemId, query);
+    const data = await assetService.getLastRate(itemId, query, c.get("actor"));
+    return c.json({ success: true, data });
+  },
+
+  async getLastRates(c: Context<AppEnv>) {
+    const query = assetLastRatesQuerySchema.parse(
+      Object.fromEntries(new URL(c.req.url).searchParams),
+    );
+    const data = await assetService.getLastRates(query, c.get("actor"));
     return c.json({ success: true, data });
   },
 

@@ -21,6 +21,7 @@ export const ITEM_CATEGORIES = [
   "Spare Part",
   "Tooling",
   "Packing",
+  "Manufactured part",
 ] as const;
 export const ITEM_UNITS = ["kg", "pcs", "ltr", "m", "set"] as const;
 export const itemCategorySchema = z.enum(ITEM_CATEGORIES);
@@ -39,6 +40,11 @@ const reorderLevelSchema = z
   .refine((v) => Math.abs(v * 1000 - Math.round(v * 1000)) < 1e-6, {
     message: "Quantity can have at most 3 decimals",
   });
+
+// BR-RO-09: reorder qty / min order qty / order multiple. >= 0, up to 3
+// decimals, at most 1 000 000 000; whole for pcs / set is a service check
+// (same as reorderLevel).
+const reorderQtyFieldSchema = reorderLevelSchema.max(1_000_000_000);
 
 // Whole paise > 0 per unit (BR-INV-03); cost columns are int4.
 const standardRateSchema = z.number().int().min(1).max(MAX_MONEY_PAISE);
@@ -95,6 +101,9 @@ export const assetItemCreateSchema = z
     category: itemCategorySchema,
     uom: itemUnitSchema,
     reorderLevel: reorderLevelSchema.optional(),
+    reorderQty: reorderQtyFieldSchema.optional(),
+    minOrderQty: reorderQtyFieldSchema.optional(),
+    orderMultiple: reorderQtyFieldSchema.optional(),
     standardRatePaise: standardRateSchema,
   })
   .strict();
@@ -106,12 +115,19 @@ export type assetItemCreateSchemaType = z.infer<typeof assetItemCreateSchema>;
 // standard rate. Always answers (ratePaise >= 1).
 export const assetLastRateQuerySchema = z.object({
   supplierId: z.coerce.number().int().positive(),
+  // BR-RFQ-50: IST day the contract must cover; default today (IST)
+  onDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD")
+    .optional(),
 });
 export type assetLastRateQuerySchemaType = z.infer<
   typeof assetLastRateQuerySchema
 >;
 
 export const assetLastRateSourceSchema = z.enum([
+  // BR-RFQ-50, 56: only for callers with po.manage or contract.view
+  "contract",
   "po_history",
   "supplier_catalog",
   "item_average", // item average cost (> 0) (BR-INV-30; was pr_estimate)
@@ -122,8 +138,39 @@ export const assetLastRateSchema = z.object({
   // 0 only for a legacy item whose standard rate was never set
   ratePaise: z.number().int().min(0),
   source: assetLastRateSourceSchema,
+  // set only when source is "contract"
+  contractItemId: z.number().int().optional(),
+  contractId: z.number().int().optional(),
+  contractNumber: z.string().optional(),
+  // cap - ordered qty; null for a rate-only contract line (BR-RFQ-52)
+  qtyLeft: z.number().nullable().optional(),
+  gstPercent: z.number().optional(),
 });
 export type assetLastRateSchemaType = z.infer<typeof assetLastRateSchema>;
+
+// GET /asset/items/last-rates (PERF-01): the last-rate chain for many items of one supplier.
+export const assetLastRatesQuerySchema = z.object({
+  supplierId: z.coerce.number().int().positive(),
+  itemIds: z
+    .string()
+    .regex(/^\d+(,\d+)*$/, "Use comma separated item ids")
+    .transform((v) => [...new Set(v.split(",").map(Number))])
+    .refine((ids) => ids.length <= 200 && ids.every((id) => id > 0), {
+      message: "Between 1 and 200 positive item ids",
+    }),
+  onDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD")
+    .optional(),
+});
+export type assetLastRatesQuerySchemaType = z.infer<
+  typeof assetLastRatesQuerySchema
+>;
+
+// Unknown items are left out of the list.
+export const assetLastRatesSchema = z.array(
+  assetLastRateSchema.extend({ itemId: z.number().int() }),
+);
 
 export const assetItemUpdateSchema = z
   .object({
@@ -133,6 +180,9 @@ export const assetItemUpdateSchema = z
     category: itemCategorySchema.optional(),
     uom: itemUnitSchema.optional(),
     reorderLevel: reorderLevelSchema.optional(),
+    reorderQty: reorderQtyFieldSchema.optional(),
+    minOrderQty: reorderQtyFieldSchema.optional(),
+    orderMultiple: reorderQtyFieldSchema.optional(),
     standardRatePaise: standardRateSchema.optional(),
     // BR-SCO-09: HSN for the job-work challan; null clears it.
     hsnCode: z.string().trim().min(1).max(20).nullable().optional(),
@@ -214,6 +264,7 @@ export const inventoryReferenceTypeSchema = z.enum([
   "grn",
   "grn_bypass",
   "pro",
+  "pro_cancel",
   "sco_issue",
   "sco_receipt",
   "job_order_issue",
@@ -222,6 +273,10 @@ export const inventoryReferenceTypeSchema = z.enum([
   "grn_correction",
   "opening_stock",
   "sco_loss",
+  "stock_transfer",
+  "stock_transfer_reversal",
+  "delivery_note",
+  "delivery_note_cancel",
 ]);
 
 // The only reference types the manual movement screen may post (BR-GRN-43).
@@ -247,6 +302,10 @@ export const documentMovementReferenceTypeSchema = z.enum([
   "sco_loss",
   "job_order_issue",
   "scrap_dispatch",
+  "stock_transfer",
+  "stock_transfer_reversal",
+  "delivery_note",
+  "delivery_note_cancel",
 ]);
 
 export const assetInventoryMovementListQuerySchema = z
@@ -424,6 +483,7 @@ export const assetStockLocationBalanceSchema = z.object({
     "vendor_premise",
     "finished_goods",
     "scrap_yard",
+    "store",
   ]),
   // last ledger balanceAfter for that item+location
   balance: z.number(),
@@ -511,7 +571,7 @@ export const assetInventoryMovementListRowSchema =
     sourceDocument: z.object({
       type: inventoryReferenceTypeSchema,
       id: z.number().int(),
-      // document number, e.g. "GRN-2026-0001"; null for manual movements
+      // document number, e.g. "GRN-2026-0001" or the purchase return's pro_number; null for manual movements
       // (referenceId 0: the reason is in `notes`)
       number: z.string().nullable(),
     }),

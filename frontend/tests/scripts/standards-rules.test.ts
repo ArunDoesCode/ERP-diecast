@@ -1,11 +1,12 @@
 /**
- * docs/specs/design-system/spec.md (v1): BR-DS-01 (palette and hex), BR-DS-09 (motion).
+ * docs/specs/design-system/spec.md (v2): BR-DS-01 (palette and hex), BR-DS-09 (motion), BR-DS-28 (sizes).
  * Pure rule functions: paths are relative to frontend/ with "/" separators.
  */
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import * as rulesModule from "../../scripts/standards-rules";
 import { checkMotion, checkPalette } from "../../scripts/standards-rules";
 
 const HERE = fileURLToPath(new URL(".", import.meta.url));
@@ -249,5 +250,227 @@ describe("BR-DS-09 allow-list file", () => {
 			expect(p.startsWith("src/")).toBe(true);
 			expect(p.includes("..")).toBe(false);
 		}
+	});
+});
+
+/**
+ * BR-DS-28: no text under 12 px (12 px only in the badge); no button (icon-only included), field
+ * or select under 32 px high, anywhere under frontend/src/, ui/** included.
+ * The spec names the check "size" but not the function: assumed `checkSize(path, source)`
+ * returning findings with rule "size", like checkPalette / checkMotion. Namespace import so a
+ * missing export fails these tests only.
+ */
+type Check = (path: string, source: string) => { rule: string; line: number }[];
+const checkSize = (path: string, source: string) => {
+	const fn = (rulesModule as unknown as { checkSize?: Check }).checkSize;
+	if (!fn) throw new Error("checkSize is not exported from standards-rules.ts");
+	return fn(path, source);
+};
+const BADGE = "src/components/shared/StatusBadge.tsx";
+const DIALOG = "src/components/ui/dialog.tsx";
+
+describe("BR-DS-28 sizes only from the token tables", () => {
+	test("BR-DS-28 a dialog button with h-7 text-xs is reported (spec example)", () => {
+		const f = checkSize(DIALOG, jsx("inline-flex h-7 text-xs"));
+		expect(f.length).toBeGreaterThanOrEqual(1);
+		expect(rules(f)).toContain("size");
+	});
+
+	for (const cls of [
+		"text-xs",
+		"text-[11px]",
+		"text-[10px]",
+		"text-[0.6875rem]",
+	]) {
+		test(`BR-DS-28 flags ${cls} outside the badge`, () => {
+			expect(rules(checkSize(VIEW, jsx(cls)))).toContain("size");
+		});
+	}
+
+	test("BR-DS-28 flags text under 12 px inside src/components/ui/**", () => {
+		expect(rules(checkSize(DIALOG, jsx("text-[11px]")))).toContain("size");
+	});
+
+	test("BR-DS-28 12 px text is allowed in the badge", () => {
+		expect(checkSize(BADGE, jsx("text-xs"))).toEqual([]);
+	});
+
+	test("BR-DS-28 text under 12 px is flagged even in the badge", () => {
+		expect(rules(checkSize(BADGE, jsx("text-[11px]")))).toContain("size");
+	});
+
+	for (const cls of [
+		"text-sm",
+		"text-base",
+		"text-lg",
+		"text-[14px]",
+		"text-[13px]",
+	]) {
+		test(`BR-DS-28 does not flag ${cls}`, () => {
+			expect(checkSize(VIEW, jsx(cls))).toEqual([]);
+		});
+	}
+
+	for (const cls of ["h-7", "h-6", "h-5", "h-[28px]", "size-7", "size-6"]) {
+		test(`BR-DS-28 flags control height ${cls} on a button`, () => {
+			const src = `export const X = () => <button className="${cls}" />;\n`;
+			expect(rules(checkSize(VIEW, src))).toContain("size");
+		});
+	}
+
+	test("BR-DS-28 flags an icon-only button at size-7", () => {
+		const src = `export const X = () => <Button size="icon" className="size-7"><Icon /></Button>;\n`;
+		expect(rules(checkSize(VIEW, src))).toContain("size");
+	});
+
+	test("BR-DS-28 flags an input under 32 px high", () => {
+		const src = `export const X = () => <input className="h-7 border" />;\n`;
+		expect(rules(checkSize(VIEW, src))).toContain("size");
+	});
+
+	test("BR-DS-28 flags a select trigger under 32 px high", () => {
+		const src = `export const X = () => <SelectTrigger className="h-6" />;\n`;
+		expect(rules(checkSize(VIEW, src))).toContain("size");
+	});
+
+	for (const cls of ["h-8", "h-9", "h-10", "size-8", "size-9"]) {
+		test(`BR-DS-28 accepts ${cls} on a button (32, 36, 40 px)`, () => {
+			const src = `export const X = () => <button className="${cls}" />;\n`;
+			expect(checkSize(VIEW, src)).toEqual([]);
+		});
+	}
+
+	test("BR-DS-28 the rule applies under src/components/ui/** too", () => {
+		const src = `export const X = () => <button className="h-6" />;\n`;
+		expect(rules(checkSize(DIALOG, src))).toContain("size");
+	});
+
+	test("BR-DS-28 size words in comments are ignored", () => {
+		expect(
+			checkSize(VIEW, `// was h-7 text-xs\nexport const X = 1;\n`),
+		).toEqual([]);
+	});
+
+	test("BR-DS-28 reports the line of the offending class", () => {
+		const src = `const a = 1;\nconst b = 2;\n${jsx("text-xs")}`;
+		expect(checkSize(VIEW, src)[0]?.line).toBe(3);
+	});
+
+	test("BR-DS-28 a clean file has no findings", () => {
+		expect(checkSize(VIEW, jsx("flex p-2 text-sm"))).toEqual([]);
+	});
+	// SPEC-02: the control and its height class can sit on different lines.
+	for (const tag of ["Button", "Input", "SelectTrigger", "button", "input"]) {
+		for (const cls of ["h-7", "h-6", "h-[28px]", "size-7"]) {
+			test(`BR-DS-28 flags <${tag}> with ${cls} on a later line`, () => {
+				const src = `export const X = () => (\n\t<${tag}\n\t\tvariant="outline"\n\t\tclassName="flex ${cls} px-2"\n\t/>\n);\n`;
+				const f = checkSize(VIEW, src);
+				expect(f.length).toBeGreaterThanOrEqual(1);
+				expect(rules(f)).toContain("size");
+			});
+		}
+	}
+
+	test("BR-DS-28 flags a multi-line cn() className on a Button", () => {
+		const src = `export const X = () => (\n\t<Button\n\t\tclassName={cn(\n\t\t\t"flex",\n\t\t\t"h-7",\n\t\t)}\n\t/>\n);\n`;
+		expect(rules(checkSize(VIEW, src))).toContain("size");
+	});
+
+	test("BR-DS-28 accepts a multi-line Button at h-9", () => {
+		const src = `export const X = () => (\n\t<Button\n\t\tvariant="outline"\n\t\tclassName="flex h-9 px-2"\n\t/>\n);\n`;
+		expect(checkSize(VIEW, src)).toEqual([]);
+	});
+
+	test("BR-DS-28 a small height on a non-control multi-line element is not flagged", () => {
+		const src = `export const X = () => (\n\t<div\n\t\tclassName="flex h-7 px-2"\n\t/>\n);\n`;
+		expect(checkSize(VIEW, src)).toEqual([]);
+	});
+
+	test("BR-DS-28 a small height on a later control is not hidden by an earlier OK control", () => {
+		const src = `export const X = () => (\n\t<>\n\t\t<Button\n\t\t\tclassName="h-9"\n\t\t/>\n\t\t<Button\n\t\t\tclassName="h-7"\n\t\t/>\n\t</>\n);\n`;
+		expect(rules(checkSize(VIEW, src))).toContain("size");
+	});
+
+	for (const cls of ["h-1", "h-2", "h-3", "h-4", "size-4"]) {
+		test(`BR-DS-28 flags control height ${cls} on a button`, () => {
+			const src = `export const X = () => <button className="${cls}" />;\n`;
+			expect(rules(checkSize(VIEW, src))).toContain("size");
+		});
+	}
+});
+
+/**
+ * BR-DS-29: a form field has one look, label above, 36 px high; the floating-label field is not used.
+ * The spec names the check "field-look" but not the function: assumed `checkFieldLook(path, source)`
+ * returning findings with rule "field-look" (same shape as checkSize).
+ */
+const checkFieldLook = (path: string, source: string) => {
+	const fn = (rulesModule as unknown as { checkFieldLook?: Check })
+		.checkFieldLook;
+	if (!fn)
+		throw new Error("checkFieldLook is not exported from standards-rules.ts");
+	return fn(path, source);
+};
+const FORM = "src/components/pages/suppliers/SupplierMasterModal.tsx";
+
+describe("BR-DS-29 one field look, label above", () => {
+	test("BR-DS-29 flags the floating-label field (spec example: supplier form)", () => {
+		const src = `import { FloatingLabelInput } from "@/components/ui/floating-label";\nexport const X = () => <FloatingLabelInput label="GST number" />;\n`;
+		const f = checkFieldLook(FORM, src);
+		expect(f.length).toBeGreaterThanOrEqual(1);
+		expect(rules(f)).toContain("field-look");
+	});
+
+	for (const name of ["FloatingLabelInput", "FloatingInput", "FloatingLabel"]) {
+		test(`BR-DS-29 flags <${name}> in a view`, () => {
+			const src = `export const X = () => <${name} id="a" />;\n`;
+			expect(rules(checkFieldLook(VIEW, src))).toContain("field-look");
+		});
+	}
+
+	test("BR-DS-29 reports the line of the floating field", () => {
+		const src = `const a = 1;\nconst b = 2;\nexport const X = () => <FloatingLabelInput id="a" />;\n`;
+		const f = checkFieldLook(FORM, src);
+		expect(f[0]?.line).toBe(3);
+	});
+
+	test("BR-DS-29 flags the floating-label import in a shared component too", () => {
+		const src = `import { FloatingInput } from "../ui/floating-label";\nexport const X = FloatingInput;\n`;
+		expect(rules(checkFieldLook(SHARED, src))).toContain("field-look");
+	});
+
+	test("BR-DS-29 label-above field (Label + Input) is not flagged", () => {
+		const src = `export const X = () => (\n\t<div>\n\t\t<Label htmlFor="gst">GST number</Label>\n\t\t<Input id="gst" className="h-9" />\n\t</div>\n);\n`;
+		expect(checkFieldLook(FORM, src)).toEqual([]);
+	});
+
+	test("BR-DS-29 ignores floating-label words inside comments", () => {
+		const src = `// was FloatingLabelInput\n/* floating-label */\nexport const X = 1;\n`;
+		expect(checkFieldLook(FORM, src)).toEqual([]);
+	});
+});
+
+describe("BR-DS-29 the floating-label field is retired", () => {
+	const SRC = resolve(HERE, "../../src");
+	const walk = (dir: string): string[] =>
+		readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+			e.isDirectory()
+				? walk(resolve(dir, e.name))
+				: /\.(ts|tsx)$/.test(e.name)
+					? [resolve(dir, e.name)]
+					: [],
+		);
+
+	test("BR-DS-29 ui/floating-label.tsx no longer exists", () => {
+		expect(existsSync(resolve(SRC, "components/ui/floating-label.tsx"))).toBe(
+			false,
+		);
+	});
+
+	test("BR-DS-29 no file under src/ imports floating-label", () => {
+		const users = walk(SRC).filter((f) =>
+			/floating-label/.test(readFileSync(f, "utf8")),
+		);
+		expect(users).toEqual([]);
 	});
 });

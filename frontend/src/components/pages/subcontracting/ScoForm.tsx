@@ -8,7 +8,7 @@ import { ScoItemPicker } from "@/components/pages/subcontracting/ScoItemPicker";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FloatingLabelInput } from "@/components/ui/floating-label";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
 	Select,
@@ -291,7 +291,9 @@ export function ScoForm({ existing }: ScoFormProps) {
 				</CardHeader>
 				<CardContent className="grid gap-4 md:grid-cols-2">
 					<div>
-						<span className="mb-1 block text-xs font-medium">Vendor</span>
+						<span className="mb-1 block text-[13px] leading-[18px] font-semibold">
+							Vendor
+						</span>
 						{existing ? (
 							<p className="flex h-9 items-center text-sm">
 								{existing.sco.vendorName}
@@ -310,22 +312,28 @@ export function ScoForm({ existing }: ScoFormProps) {
 							/>
 						)}
 					</div>
-					<FloatingLabelInput
-						id="sco-return-date"
-						label="Expected return date"
-						type="date"
-						min={istTodayIso()}
-						value={expectedReturnDate}
-						onChange={(event) => setExpectedReturnDate(event.target.value)}
-					/>
-					<FloatingLabelInput
-						id="sco-project-ref"
-						label="Project reference (optional)"
-						value={projectRef}
-						onChange={(event) => setProjectRef(event.target.value)}
-					/>
+					<div className="grid gap-1.5">
+						<Label htmlFor="sco-return-date">Expected return date</Label>
+						<Input
+							id="sco-return-date"
+							type="date"
+							min={istTodayIso()}
+							value={expectedReturnDate}
+							onChange={(event) => setExpectedReturnDate(event.target.value)}
+						/>
+					</div>
+					<div className="grid gap-1.5">
+						<Label htmlFor="sco-project-ref">
+							Project reference (optional)
+						</Label>
+						<Input
+							id="sco-project-ref"
+							value={projectRef}
+							onChange={(event) => setProjectRef(event.target.value)}
+						/>
+					</div>
 					<div>
-						<Label htmlFor="sco-notes" className="mb-1 block text-xs">
+						<Label htmlFor="sco-notes" className="mb-1 block">
 							Notes (optional)
 						</Label>
 						<Textarea
@@ -370,7 +378,9 @@ export function ScoForm({ existing }: ScoFormProps) {
 						return (
 							<div key={line.key} className="space-y-3 rounded-lg border p-4">
 								<div className="flex items-center justify-between">
-									<span className="text-xs font-medium">Line {index + 1}</span>
+									<span className="text-[13px] leading-[18px] font-semibold">
+										Line {index + 1}
+									</span>
 									{lines.length > 1 ? (
 										<Button
 											type="button"
@@ -389,7 +399,7 @@ export function ScoForm({ existing }: ScoFormProps) {
 								</div>
 								<div className="grid gap-3 md:grid-cols-3">
 									<div>
-										<span className="mb-1 block text-xs font-medium">
+										<span className="mb-1 block text-[13px] leading-[18px] font-semibold">
 											Raw item (sent)
 										</span>
 										<ScoItemPicker
@@ -406,7 +416,7 @@ export function ScoForm({ existing }: ScoFormProps) {
 										/>
 									</div>
 									<div>
-										<span className="mb-1 block text-xs font-medium">
+										<span className="mb-1 block text-[13px] leading-[18px] font-semibold">
 											Finished item (returned)
 										</span>
 										<ScoItemPicker
@@ -425,7 +435,7 @@ export function ScoForm({ existing }: ScoFormProps) {
 									<div>
 										<Label
 											htmlFor={`sco-service-${line.key}`}
-											className="mb-1 block text-xs"
+											className="mb-1 block"
 										>
 											Service
 										</Label>
@@ -459,43 +469,57 @@ export function ScoForm({ existing }: ScoFormProps) {
 									</div>
 								</div>
 								<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-									<FloatingLabelInput
-										id={`sco-send-${line.key}`}
-										label={`Send qty${line.rawItemUom ? ` (${line.rawItemUom})` : ""}`}
-										type="number"
-										min="1"
-										step="1"
-										value={line.sendQty}
-										onChange={(event) =>
-											updateLine(line.key, { sendQty: event.target.value })
-										}
-									/>
-									<FloatingLabelInput
-										id={`sco-return-${line.key}`}
-										label={`Return qty${line.finishedItemUom ? ` (${line.finishedItemUom})` : ""}`}
-										type="number"
-										min="1"
-										step="1"
-										value={line.returnQty}
-										onChange={(event) =>
-											updateLine(line.key, { returnQty: event.target.value })
-										}
-									/>
-									<FloatingLabelInput
-										id={`sco-price-${line.key}`}
-										label="Price per pc (₹)"
-										type="number"
-										min="0"
-										step="0.01"
-										value={line.priceRupees}
-										onChange={(event) =>
-											updateLine(line.key, { priceRupees: event.target.value })
-										}
-									/>
+									<div className="grid gap-1.5">
+										<Label
+											htmlFor={`sco-send-${line.key}`}
+										>{`Send qty${line.rawItemUom ? ` (${line.rawItemUom})` : ""}`}</Label>
+										<Input
+											id={`sco-send-${line.key}`}
+											type="number"
+											min="1"
+											step="1"
+											value={line.sendQty}
+											onChange={(event) =>
+												updateLine(line.key, { sendQty: event.target.value })
+											}
+										/>
+									</div>
+									<div className="grid gap-1.5">
+										<Label
+											htmlFor={`sco-return-${line.key}`}
+										>{`Return qty${line.finishedItemUom ? ` (${line.finishedItemUom})` : ""}`}</Label>
+										<Input
+											id={`sco-return-${line.key}`}
+											type="number"
+											min="1"
+											step="1"
+											value={line.returnQty}
+											onChange={(event) =>
+												updateLine(line.key, { returnQty: event.target.value })
+											}
+										/>
+									</div>
+									<div className="grid gap-1.5">
+										<Label htmlFor={`sco-price-${line.key}`}>
+											Price per pc (₹)
+										</Label>
+										<Input
+											id={`sco-price-${line.key}`}
+											type="number"
+											min="0"
+											step="0.01"
+											value={line.priceRupees}
+											onChange={(event) =>
+												updateLine(line.key, {
+													priceRupees: event.target.value,
+												})
+											}
+										/>
+									</div>
 									<div>
 										<Label
 											htmlFor={`sco-gst-${line.key}`}
-											className="mb-1 block text-xs"
+											className="mb-1 block"
 										>
 											GST %
 										</Label>
@@ -520,17 +544,21 @@ export function ScoForm({ existing }: ScoFormProps) {
 											</SelectContent>
 										</Select>
 									</div>
-									<FloatingLabelInput
-										id={`sco-batch-${line.key}`}
-										label="Batch (optional)"
-										value={line.batch}
-										onChange={(event) =>
-											updateLine(line.key, { batch: event.target.value })
-										}
-									/>
+									<div className="grid gap-1.5">
+										<Label htmlFor={`sco-batch-${line.key}`}>
+											Batch (optional)
+										</Label>
+										<Input
+											id={`sco-batch-${line.key}`}
+											value={line.batch}
+											onChange={(event) =>
+												updateLine(line.key, { batch: event.target.value })
+											}
+										/>
+									</div>
 								</div>
 								{error ? (
-									<p className="text-xs text-destructive">{error}</p>
+									<p className="text-sm text-destructive">{error}</p>
 								) : null}
 							</div>
 						);
@@ -547,7 +575,7 @@ export function ScoForm({ existing }: ScoFormProps) {
 			</div>
 
 			{showErrors && headerError ? (
-				<p className="text-xs text-destructive">{headerError}</p>
+				<p className="text-sm text-destructive">{headerError}</p>
 			) : null}
 
 			<div className="flex justify-end gap-2">

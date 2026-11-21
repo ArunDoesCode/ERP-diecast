@@ -1,0 +1,1 @@
+ALTER TABLE "grn_items" ADD COLUMN "created_at" timestamp DEFAULT now() NOT NULL;

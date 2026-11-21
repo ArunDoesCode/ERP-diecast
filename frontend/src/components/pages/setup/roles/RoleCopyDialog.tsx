@@ -59,7 +59,7 @@ function CopyForm({ role, onDone }: { role: Role; onDone: () => void }) {
 				value={name}
 				onChange={(event) => setName(event.target.value)}
 			/>
-			<p className="text-xs text-muted-foreground">
+			<p className="text-sm text-muted-foreground">
 				Gets the same permissions as {role.name}.
 			</p>
 			<Button type="submit" disabled={mutation.isPending || !name.trim()}>

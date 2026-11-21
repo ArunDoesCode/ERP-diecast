@@ -78,7 +78,7 @@ export function GrnBypassAlert({
 					<div>
 						<label
 							htmlFor="grn-bypass-accepted-qty"
-							className="mb-1 block text-xs font-medium"
+							className="mb-1 block text-[13px] leading-[18px] font-semibold"
 						>
 							Accepted qty
 						</label>
@@ -91,7 +91,7 @@ export function GrnBypassAlert({
 							onChange={(event) => setAcceptedQty(event.target.value)}
 						/>
 						{rejectedRest > 0 ? (
-							<p className="mt-1 text-xs text-muted-foreground">
+							<p className="mt-1 text-sm text-muted-foreground">
 								Rest ({rejectedRest}) will be recorded as rejected.
 							</p>
 						) : null}
@@ -100,7 +100,7 @@ export function GrnBypassAlert({
 					<div>
 						<label
 							htmlFor="grn-bypass-batch-number"
-							className="mb-1 block text-xs font-medium"
+							className="mb-1 block text-[13px] leading-[18px] font-semibold"
 						>
 							Batch / heat no
 						</label>
@@ -115,13 +115,13 @@ export function GrnBypassAlert({
 					{isOverReceipt ? (
 						canOverride ? (
 							<div>
-								<p className="mb-2 rounded-md border border-warning/30 bg-warning-subtle px-3 py-2 text-xs text-warning">
+								<p className="mb-2 rounded-md border border-warning/30 bg-warning-subtle px-3 py-2 text-sm text-warning">
 									With earlier receipts this exceeds 105% of the ordered qty.
 									Give a reason to override.
 								</p>
 								<label
 									htmlFor="grn-bypass-override-reason"
-									className="mb-1 block text-xs font-medium"
+									className="mb-1 block text-[13px] leading-[18px] font-semibold"
 								>
 									Over-receipt override reason
 								</label>
@@ -132,7 +132,7 @@ export function GrnBypassAlert({
 								/>
 							</div>
 						) : (
-							<p className="rounded-md border border-warning/30 bg-warning-subtle px-3 py-2 text-xs text-warning">
+							<p className="rounded-md border border-warning/30 bg-warning-subtle px-3 py-2 text-sm text-warning">
 								With earlier receipts this exceeds 105% of the ordered qty. You
 								cannot override it; ask the owner or back office.
 							</p>
@@ -141,7 +141,7 @@ export function GrnBypassAlert({
 
 					<label
 						htmlFor="grn-bypass-reason"
-						className="block text-xs font-medium"
+						className="block text-[13px] leading-[18px] font-semibold"
 					>
 						Bypass reason
 					</label>

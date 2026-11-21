@@ -60,6 +60,40 @@ const SPEC: Record<string, R[]> = {
   "sco.qa_decide": ["ow", "bo", "qa"],
   "sco.loss_override": ["ow"],
   "company.manage": ["ow"],
+  // bom spec who-table, sale-order spec who-table, reorder spec who-table
+  "bom.view": ["ow", "bo", "fs"],
+  "bom.manage": ["ow", "bo"],
+  "bom.release": ["ow"],
+  "customer.manage": ["ow", "bo"],
+  "reorder.manage": ["ow", "bo"],
+  "so.view": ["ow", "bo"],
+  "so.manage": ["ow", "bo"],
+  "so.explode": ["ow", "bo"],
+  // purchase-returns spec "Who can do what" (BR-PRT)
+  "purchase_return.view": ["ow", "bo", "fs", "qa"],
+  "purchase_return.edit_draft": ["ow", "bo", "fs"],
+  "purchase_return.post": ["ow", "bo"],
+  "purchase_return.cancel_posted": ["ow", "bo"],
+  // supplier-invoice spec "Who can do what" (BR-SINV-33)
+  "invoice.view": ["ow", "bo"],
+  "invoice.manage": ["ow", "bo"],
+  "invoice.release": ["ow"],
+  // rfq spec "Who can do what" (BR-RFQ-70)
+  "rfq.view": ["ow", "bo"],
+  "rfq.manage": ["ow", "bo"],
+  "rfq.award": ["ow", "bo"],
+  "contract.view": ["ow", "bo"],
+  "contract.manage": ["ow"],
+  "contract.override_rate": ["ow"],
+  // stock-transfer spec "Who can do what" (BR-STR-34)
+  "stock_transfer.manage": ["ow", "bo"],
+  "stock_transfer.reverse": ["ow", "bo"],
+  // supplier-rating spec "Who can do what" (BR-SRT-29)
+  "supplier.rating.view": ["ow", "bo"],
+  // dispatch spec "Who can do what" (BR-DSP-35)
+  "dispatch.view": ["ow", "bo", "fs"],
+  "dispatch.manage": ["ow", "bo", "fs"],
+  "dispatch.cancel": ["ow"],
 };
 
 describe("BR-AUTH-06 permission catalog defined in code", () => {
@@ -99,13 +133,212 @@ describe("BR-AUTH-06 permission catalog defined in code", () => {
     }
   });
 
-  test("BR-AUTH-06 landing and approvals screens need no key; setup needs setup.roles.manage", () => {
-    expect(SCREENS.landing.permission).toBeNull();
+  test("BR-AUTH-06 home (BR-FF-100, BR-FF-102) and approvals screens need no key; setup needs setup.roles.manage", () => {
+    expect(SCREENS.home.permission).toBeNull();
+    expect(SCREENS.home.path).toBe("/home");
+    expect("landing" in SCREENS).toBe(false);
     expect(SCREENS.approvals.permission).toBeNull();
     expect(SCREENS.setup.permission).toBe("setup.roles.manage");
     expect(SCREENS["employee-directory"].permission).toBe(
       "employees.directory.view",
     );
+  });
+});
+
+describe("purchase-returns keys and screen (BR-PRT who-can-do-what)", () => {
+  test("BR-PRT-37 the four purchase_return keys are in the catalog", () => {
+    for (const k of [
+      "purchase_return.view",
+      "purchase_return.edit_draft",
+      "purchase_return.post",
+      "purchase_return.cancel_posted",
+    ]) {
+      expect(PERMISSION_KEYS as string[]).toContain(k);
+    }
+  });
+
+  test("BR-PRT-37 the purchase-returns screen is /purchase-returns behind purchase_return.view", () => {
+    expect(SCREENS["purchase-returns"].path).toBe("/purchase-returns");
+    expect(SCREENS["purchase-returns"].permission).toBe("purchase_return.view");
+  });
+
+  test("BR-PRT-12 only owner and back_office hold post and cancel_posted; floor_supervisor cannot post", () => {
+    for (const k of ["purchase_return.post", "purchase_return.cancel_posted"]) {
+      const holders = Object.entries(SEED_GRANTS)
+        .filter(([, ks]) => (ks as string[]).includes(k))
+        .map(([n]) => n)
+        .sort();
+      expect(holders).toEqual(["back_office", "owner"]);
+    }
+  });
+});
+
+describe("supplier-invoice keys and screen (BR-SINV-33)", () => {
+  test("BR-SINV-33 the three invoice keys are in the catalog", () => {
+    for (const k of ["invoice.view", "invoice.manage", "invoice.release"]) {
+      expect(PERMISSION_KEYS as string[]).toContain(k);
+    }
+  });
+
+  test("BR-SINV-33 the supplier-invoices screen is /supplier-invoices behind invoice.view", () => {
+    expect(SCREENS["supplier-invoices"].path).toBe("/supplier-invoices");
+    expect(SCREENS["supplier-invoices"].permission).toBe("invoice.view");
+  });
+
+  test("BR-SINV-25 only the owner holds invoice.release", () => {
+    const holders = Object.entries(SEED_GRANTS)
+      .filter(([, ks]) => (ks as string[]).includes("invoice.release"))
+      .map(([n]) => n);
+    expect(holders).toEqual(["owner"]);
+  });
+
+  test("BR-SINV-33 owner and back_office hold invoice.view and invoice.manage, nobody else", () => {
+    for (const k of ["invoice.view", "invoice.manage"]) {
+      const holders = Object.entries(SEED_GRANTS)
+        .filter(([, ks]) => (ks as string[]).includes(k))
+        .map(([n]) => n)
+        .sort();
+      expect(holders).toEqual(["back_office", "owner"]);
+    }
+  });
+});
+
+describe("rfq and rate-contract keys and screens (BR-RFQ-70)", () => {
+  const KEYS = [
+    "rfq.view",
+    "rfq.manage",
+    "rfq.award",
+    "contract.view",
+    "contract.manage",
+    "contract.override_rate",
+  ];
+
+  test("BR-RFQ-70 the six rfq / contract keys are in the catalog", () => {
+    for (const k of KEYS) expect(PERMISSION_KEYS as string[]).toContain(k);
+  });
+
+  test("BR-RFQ-70 the rfq screen is /rfq behind rfq.view", () => {
+    expect(SCREENS.rfq.path).toBe("/rfq");
+    expect(SCREENS.rfq.permission).toBe("rfq.view");
+  });
+
+  test("BR-RFQ-70 the rate-contracts screen is /rate-contracts behind contract.view", () => {
+    expect(SCREENS["rate-contracts"].path).toBe("/rate-contracts");
+    expect(SCREENS["rate-contracts"].permission).toBe("contract.view");
+  });
+
+  test("BR-RFQ-70 owner holds all six keys; back_office holds rfq.view, rfq.manage, rfq.award, contract.view only", () => {
+    for (const k of KEYS) expect(SEED_GRANTS.owner as string[]).toContain(k);
+    const bo = (SEED_GRANTS.back_office as string[]).filter((k) =>
+      KEYS.includes(k),
+    );
+    expect(bo.sort()).toEqual(
+      ["rfq.view", "rfq.manage", "rfq.award", "contract.view"].sort(),
+    );
+  });
+
+  test("BR-RFQ-70 contract.manage and contract.override_rate are owner only", () => {
+    for (const k of ["contract.manage", "contract.override_rate"]) {
+      const holders = Object.entries(SEED_GRANTS)
+        .filter(([, ks]) => (ks as string[]).includes(k))
+        .map(([n]) => n);
+      expect(holders).toEqual(["owner"]);
+    }
+  });
+
+  test("BR-RFQ-70 floor_supervisor, qa_inspector, die_designer and operator hold none of the six", () => {
+    for (const role of [
+      "floor_supervisor",
+      "qa_inspector",
+      "die_designer",
+      "operator",
+    ] as const)
+      for (const k of KEYS)
+        expect(SEED_GRANTS[role] as string[]).not.toContain(k);
+  });
+});
+
+describe("supplier-rating key and screen (BR-SRT-29, BR-SRT-40)", () => {
+  test("BR-SRT-29 supplier.rating.view is in the catalog", () => {
+    expect(PERMISSION_KEYS as string[]).toContain("supplier.rating.view");
+  });
+
+  test("BR-SRT-29 only owner and back_office hold supplier.rating.view", () => {
+    const holders = Object.entries(SEED_GRANTS)
+      .filter(([, ks]) => (ks as string[]).includes("supplier.rating.view"))
+      .map(([n]) => n)
+      .sort();
+    expect(holders).toEqual(["back_office", "owner"]);
+  });
+
+  test("BR-SRT-40 floor_supervisor holds supplier.view but not supplier.rating.view", () => {
+    expect(SEED_GRANTS.floor_supervisor as string[]).toContain("supplier.view");
+    expect(SEED_GRANTS.floor_supervisor as string[]).not.toContain(
+      "supplier.rating.view",
+    );
+  });
+
+  test("BR-SRT-29 the supplier-ratings screen is /supplier-ratings behind supplier.rating.view", () => {
+    expect(SCREENS["supplier-ratings"].path).toBe("/supplier-ratings");
+    expect(SCREENS["supplier-ratings"].permission).toBe("supplier.rating.view");
+  });
+});
+
+describe("dispatch keys and screens (BR-DSP-35)", () => {
+  test("BR-DSP-35 the three dispatch keys are in the catalog", () => {
+    for (const k of ["dispatch.view", "dispatch.manage", "dispatch.cancel"])
+      expect(PERMISSION_KEYS as string[]).toContain(k);
+  });
+
+  test("BR-DSP-35 the pending-dispatch and delivery-notes screens sit behind dispatch.view", () => {
+    expect(SCREENS["delivery-notes-pending"].path).toBe(
+      "/delivery-notes/pending",
+    );
+    expect(SCREENS["delivery-notes-pending"].permission).toBe("dispatch.view");
+    expect(SCREENS["delivery-notes"].path).toBe("/delivery-notes");
+    expect(SCREENS["delivery-notes"].permission).toBe("dispatch.view");
+  });
+
+  test("BR-DSP-35 only owner holds dispatch.cancel; owner, back_office and floor_supervisor hold view and manage", () => {
+    const holders = (k: string) =>
+      Object.entries(SEED_GRANTS)
+        .filter(([, ks]) => (ks as string[]).includes(k))
+        .map(([n]) => n)
+        .sort();
+    expect(holders("dispatch.cancel")).toEqual(["owner"]);
+    for (const k of ["dispatch.view", "dispatch.manage"])
+      expect(holders(k)).toEqual(["back_office", "floor_supervisor", "owner"]);
+  });
+});
+
+describe("stock-transfer keys and screen (BR-STR-34)", () => {
+  const KEYS = ["stock_transfer.manage", "stock_transfer.reverse"];
+
+  test("BR-STR-34 the two stock_transfer keys are in the catalog", () => {
+    for (const k of KEYS) expect(PERMISSION_KEYS as string[]).toContain(k);
+  });
+
+  test("BR-STR-34 the stock-transfers screen is /inventory/stock-transfers behind inventory.view", () => {
+    expect(SCREENS["stock-transfers"].path).toBe("/inventory/stock-transfers");
+    expect(SCREENS["stock-transfers"].permission).toBe("inventory.view");
+  });
+
+  test("BR-STR-34 only owner and back_office hold the two keys", () => {
+    for (const k of KEYS) {
+      const holders = Object.entries(SEED_GRANTS)
+        .filter(([, ks]) => (ks as string[]).includes(k))
+        .map(([n]) => n)
+        .sort();
+      expect(holders).toEqual(["back_office", "owner"]);
+    }
+  });
+
+  test("BR-STR-34 floor_supervisor holds inventory.view but neither transfer key", () => {
+    expect(SEED_GRANTS.floor_supervisor as string[]).toContain(
+      "inventory.view",
+    );
+    for (const k of KEYS)
+      expect(SEED_GRANTS.floor_supervisor as string[]).not.toContain(k);
   });
 });
 

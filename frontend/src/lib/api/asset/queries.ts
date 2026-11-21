@@ -207,11 +207,12 @@ export function useCreateMovementMutation() {
 	});
 }
 
-export function useStockQuery(params?: AssetStockListParams) {
+export function useStockQuery(params?: AssetStockListParams, enabled = true) {
 	return useQuery({
 		queryKey: assetKeys.stock(params),
 		queryFn: () => getStock(params),
 		placeholderData: keepPreviousData,
+		enabled,
 	});
 }
 

@@ -7,6 +7,7 @@ import {
   companySettingsHistoryQuerySchema,
   companySettingsUpsertSchema,
 } from "../types/sco.types";
+import { updateInvoiceTolerancesSchema } from "../types/supplierInvoice.types";
 
 export const companySettingsController = {
   async get(c: Context<AppEnv>) {
@@ -21,6 +22,25 @@ export const companySettingsController = {
       throw new UnauthorizedError("Invalid user session");
     }
     const data = await companySettingsService.upsert(body, actorId);
+    return c.json({ success: true, data });
+  },
+
+  // supplier-invoice BR-SINV-32: the two match tolerances.
+  async getInvoiceTolerances(c: Context<AppEnv>) {
+    const data = await companySettingsService.getInvoiceTolerances();
+    return c.json({ success: true, data });
+  },
+
+  async updateInvoiceTolerances(c: Context<AppEnv>) {
+    const body = updateInvoiceTolerancesSchema.parse(await c.req.json());
+    const actorId = Number(c.get("user").userId);
+    if (!Number.isInteger(actorId) || actorId <= 0) {
+      throw new UnauthorizedError("Invalid user session");
+    }
+    const data = await companySettingsService.updateInvoiceTolerances(
+      body,
+      actorId,
+    );
     return c.json({ success: true, data });
   },
 

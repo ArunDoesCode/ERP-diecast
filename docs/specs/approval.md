@@ -1,7 +1,7 @@
 ---
 module: approval
 status: frozen           # draft | frozen | changed-after-freeze
-version: 2
+version: 3
 frozen_on: 2026-09-29
 owner: Arun
 depends_on: [auth-setup, purchase-requisition, purchase-order, subcontracting, approval-policies]
@@ -81,7 +81,7 @@ Document status after each outcome (BR-APR-42, 43):
 | BR-APR-48 | Cancelling a doc with an open request cancels the request in the same transaction; trail `cancelled`, actor = who cancelled the doc, cancel reason in notes. If the doc cancel fails, the request stays pending. | U cancels pending PO "wrong supplier" → request cancelled, trail actor U with that note |
 | BR-APR-50 | Requests only ever get `pending_approval`, `approved`, `rejected`, `require_more_info`, `cancelled`; `partial_ordered`, `fully_ordered`, `auto_approved` are never written. | any sequence → none of the three unused values |
 | BR-APR-51 | A request (details, trail, current request of a doc) is readable by holders of `approval.view_all`, the requester, and any active employee who is an approver anywhere in its chain; others 403. | chain [floor_supervisor, owner]: qa_inspector → 403, floor_supervisor → 200 |
-| BR-APR-52 | "My pending approvals" lists pending requests whose current step is my role or me (doc number, amount, requester, level x of N). Only holders of `approval.view_others_pending` may view another employee's list (others 403); an inactive target is 404. | back_office passes another employeeId → 403; super-admin → 200 |
+| BR-APR-52 | "My pending approvals" lists pending requests whose current step is my role or me (doc number, amount, requester, level x of N). Only holders of `approval.view_others_pending` may view another employee's list (others 403); an inactive target is 404. | back_office passes another employeeId → 403; super-admin → 200 (rows then carry no amount — v3, factory-flows BR-FF-77) |
 | BR-APR-54 | A doc's approval history is all its requests newest first, each with its trail oldest first, readable per BR-APR-51. PR/PO/SCO detail shows the live state (level x of N, who can act now) and this history. | PR pending 2 of 2 → "Level 2 of 2 — owner" plus history; sent-back + approved requests both listed |
 | BR-APR-61 | A request raised by a holder of `approval.auto_approve_own` (seed: owner) is auto-approved at submit, whatever policy matches (BR-APR-28). Anyone else's request skips the chain only when its matched policy is auto-approve (approval-policies BR-APR-05). | owner submits ₹5L PO → approved at once; back_office submits same PO → owner step pending |
 
@@ -108,3 +108,5 @@ None open.
 - 2026-09-29 — pre-freeze touch-up: BR-APR-43 cites BR-PO-07/11 and BR-PR-31/36 (Q4=B, reject or cancel). BR-APR-47 uses `PR_NOT_EDITABLE` for PRs. "(assumed)" dropped from BR-APR-24 and the stuck-request line.
 - 2026-09-29 — frozen v1 (all questions answered by Arun)
 - 2026-09-29 — v2 clarified during build (review): actions are only approve, reject, send back and withdraw — there is no approval `cancel` action; a document is cancelled only through its own module's cancel (BR-APR-48). Submit (BR-APR-24) also needs the document type's key (`pr.manage` for PRs, `po.manage` for POs). Error codes used: `APPROVAL_ALREADY_OPEN` (BR-APR-26), `APPROVAL_NOTES_REQUIRED` (BR-APR-37), `APPROVAL_NOT_REQUESTER` (BR-APR-39), `APPROVAL_ALREADY_ACTED` (BR-APR-33), `APPROVAL_NO_ELIGIBLE_APPROVER` (BR-APR-23). `isSaleOrderLinked` is not returned by the policy API (BR-APR-15).
+- 2026-11-20 — CR v3 (from factory-flows, A-62, pre-approved): `getMyPendingApprovals` rows gain doc number, requester and amount; the amount is returned only on the caller's own list, never on another employee's list (BR-APR-52 narrowed; factory-flows BR-FF-77). Tests to touch: `grep -rn "BR-APR-52" backend/tests`.
+- 2026-11-21 — change after freeze, owner pre-approved in chat 2026-11-20 ("take ur own decision and record them"), carried from the frozen rfq spec: PO submit and last-level approve re-check the rate contract (active, qty cap) — BR-RFQ-52, 54.

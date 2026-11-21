@@ -12,6 +12,8 @@ import {
 export type DataTableColumnMeta = {
 	/** Right-align the column (header and cells) with tabular numbers (BR-DS-19). */
 	numeric?: boolean;
+	/** Hide the column (header and cells) below 1100 px; the view shows the content elsewhere. */
+	hideBelow1100?: boolean;
 };
 
 // TanStack Table v9 exposes only the features a table registers. Every list in the

@@ -3,7 +3,8 @@ module: approval
 spec: docs/specs/approval.md (frozen) + docs/specs/approval-policies.md (frozen)
 last_verified_commit: eea4fb1
 last_verified_on: 2026-09-29
-depends_on: [auth-setup, purchase-requisition, purchase-order]
+partially_verified: 986ea76 (2026-11-21) — rate-contract hooks in submitRequest / actOnRequest only
+depends_on: [auth-setup, purchase-requisition, purchase-order, rfq]
 ---
 
 # Approval policy engine — as-built map
@@ -84,13 +85,17 @@ Full shapes: `cd backend && bun run contract:query "<METHOD /path>"`.
   no open request, PR re-read under lock (amount changed → re-match) → auto-approve if
   `policy.autoApprove` or actor has `approval.auto_approve_own` (else every step needs an active
   approver, `APPROVAL_NO_ELIGIBLE_APPROVER`) → insert request + `submitted` trail (+ `auto_approved`
-  trail) → mirror status. Auto-approved PO orders its PR lines at once.
+  trail) → mirror status. Auto-approved PO orders its PR lines at once. PO only: after the source-status
+  check, inside the tx, `rateContractService.assertPoContractsForSubmit` (linked contract still usable today
+  → else 409 `CONTRACT_NOT_ACTIVE`; contract qty cap → 409 `CONTRACT_QTY_EXCEEDED`).
 - **`actOnRequest`**: approve / reject / sent_back need non-blank `notes` (`APPROVAL_NOTES_REQUIRED`).
   Tx with row lock → not pending → 409 `APPROVAL_NOT_PENDING` → withdraw: requester only
   (`APPROVAL_NOT_REQUESTER`); others: role or specific-employee check on `chainSnapshot`, and approve is
   blocked if the actor already approved a level (`APPROVAL_ALREADY_ACTED`). Approve at last level →
   `approved`, else `currentLevel + 1`; reject → `rejected`; sent_back → `require_more_info`;
-  withdraw → `cancelled`. One trail row, then mirror:
+  withdraw → `cancelled`. PO last-level approve: after the eligibility / already-approved checks and before
+  the status change (CR-02), `rateContractService.assertPoContractsForApprove` re-checks the cap only, under
+  the contract-line lock (A-47). One trail row, then mirror:
   - PR: withdraw and sent_back → `draft`; others mirror the request status.
   - PO: reject → `cancelLockedPo` (PO cancelled, PR lines cancelled); withdraw / sent_back → `draft`;
     final approve → `approved` + `orderPrLinesOfPo` (PR lines ordered).
@@ -120,6 +125,7 @@ Full shapes: `cd backend && bun run contract:query "<METHOD /path>"`.
 | `backend/tests/types/approval.types.test.ts` | update schema keeps omitted fields, rejects empty PATCH |
 | `backend/tests/repository/approvalRepository.test.ts` | matching rank, submit scenario |
 | `backend/tests/lib/permissions.test.ts` | approval keys per role |
+| `backend/tests/routes/poContract.test.ts` | contract checks at PO submit and last-level approve (BR-RFQ-52, 54) |
 
 ## Known gaps / debt
 - **SPEC-P3**: UI rules BR-APR-57..60 (policy form) have no automated test; manual checklist only. No
@@ -143,3 +149,4 @@ Full shapes: `cd backend && bun run contract:query "<METHOD /path>"`.
 |---|---|---|
 | 2026-09-27 | 0a406f4 | Map created from as-built code (no prior spec) |
 | 2026-09-29 | work/m1 0a406f4..eea4fb1 | approval + approval-policies v2 built: policy admin, request flow, history endpoint, keys |
+| 2026-11-21 | df25886..986ea76 (partial) | PO submit / last-level approve call the rate-contract checks (`rfq.md`). Rest not re-verified |

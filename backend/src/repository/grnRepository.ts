@@ -1,4 +1,18 @@
-import { and, asc, count, desc, eq, inArray, ne, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  exists,
+  gt,
+  gte,
+  inArray,
+  lt,
+  ne,
+  or,
+  sql,
+} from "drizzle-orm";
 
 import { db } from "../db/client";
 import {
@@ -9,18 +23,55 @@ import {
 import {
   grnCorrections,
   grnItems,
+  grnStatusEnum,
   grns,
   prPoItemLinks,
   purchaseOrderItems,
   purchaseOrders,
   purchaseRequestItems,
   purchaseRequests,
+  purchaseReturns,
   qaTests,
 } from "../db/schemas/02_procurement-purchasing";
+import { supplierMaster } from "../db/schemas/02_procurement-suppliers";
 import { allocateDocumentSequence } from "../lib/document-number";
 import { NotFoundError } from "../lib/errors";
+import { grnQaSummary } from "../lib/grn-qa-summary";
+import {
+  istDayBoundsOfKey,
+  istDayKey,
+  istDayStartInstant,
+  istNextDayStartInstant,
+} from "../lib/ist-day";
 import { safeSearch } from "../lib/safe-search";
-import type { grnListQuerySchemaType } from "../types/grn.types";
+import type {
+  grnListQuerySchemaType,
+  receivablePosQuerySchemaType,
+} from "../types/grn.types";
+import { openQtySql, pendingQaQtySql, round3 } from "./openQty";
+
+const receivableDueSql = sql<Date | null>`coalesce(${purchaseOrders.revisedDeliveryDate}, ${purchaseOrders.expectedDeliveryDate})`;
+
+export type ReceivablePoRow = {
+  poId: number;
+  poNumber: string;
+  supplierId: number;
+  supplierName: string;
+  status: "dispatched" | "partial_received";
+  dueDate: string | null;
+  isLate: boolean;
+  lines: {
+    poItemId: number;
+    itemId: number;
+    sku: string;
+    itemName: string;
+    uom: string;
+    orderedQty: number;
+    receivedQty: number;
+    pendingQaQty: number;
+    openQty: number;
+  }[];
+};
 
 export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -65,6 +116,9 @@ const grnItemDetailColumns = {
   orderedQty: purchaseOrderItems.qty,
   // BR-GRN-47: accepted so far on the PO line (all GRNs), for the screen warning
   poReceivedQty: purchaseOrderItems.receivedQty,
+  // BR-PRT-38: posted returns per source
+  rejectedReturnedQty: grnItems.rejectedReturnedQty,
+  acceptedReturnedQty: grnItems.acceptedReturnedQty,
 };
 
 const grnSortColumns = {
@@ -107,6 +161,147 @@ export type UpdateGrnHeaderData = Partial<
 >;
 
 export const grnRepository = {
+  /** BR-FF-61..63, 70, 71: receivable POs paged in SQL, lines in one query. Named columns, no money. */
+  async listReceivablePos(params: receivablePosQuerySchemaType) {
+    const now = new Date();
+    const startToday = istDayStartInstant(now).toISOString();
+    const startTomorrow = istNextDayStartInstant(now).toISOString();
+    const hasOpenLine = exists(
+      db
+        .select({ one: sql`1` })
+        .from(purchaseOrderItems)
+        .where(
+          and(
+            eq(purchaseOrderItems.poId, purchaseOrders.id),
+            gt(openQtySql, sql`0`),
+          ),
+        ),
+    );
+    const bucketFilter =
+      params.bucket === "late"
+        ? lt(receivableDueSql, startToday)
+        : params.bucket === "today"
+          ? and(
+              gte(receivableDueSql, startToday),
+              lt(receivableDueSql, startTomorrow),
+            )
+          : params.bucket === "later"
+            ? // No due date counts as Later (BR-FF-23 convention).
+              or(
+                gte(receivableDueSql, startTomorrow),
+                sql`${receivableDueSql} is null`,
+              )
+            : undefined;
+    const where = and(
+      inArray(purchaseOrders.status, ["dispatched", "partial_received"]),
+      hasOpenLine,
+      params.poId ? eq(purchaseOrders.id, params.poId) : undefined,
+      safeSearch(params.q, purchaseOrders.poNumber, supplierMaster.name),
+      bucketFilter,
+    );
+
+    const [totalRow] = await db
+      .select({ total: count() })
+      .from(purchaseOrders)
+      .innerJoin(
+        supplierMaster,
+        eq(supplierMaster.id, purchaseOrders.supplierId),
+      )
+      .where(where);
+    const total = Number(totalRow?.total ?? 0);
+
+    const dir = params.sortDir === "desc" ? sql`desc` : sql`asc`;
+    const orderBy =
+      params.sortBy === "poNumber"
+        ? [sql`${purchaseOrders.poNumber} ${dir}`, asc(purchaseOrders.id)]
+        : params.sortBy === "supplierName"
+          ? [sql`${supplierMaster.name} ${dir}`, asc(purchaseOrders.id)]
+          : [
+              sql`${receivableDueSql} ${dir} nulls last`,
+              asc(purchaseOrders.id),
+            ];
+
+    const pos = await db
+      .select({
+        poId: purchaseOrders.id,
+        poNumber: purchaseOrders.poNumber,
+        supplierId: purchaseOrders.supplierId,
+        supplierName: supplierMaster.name,
+        status: purchaseOrders.status,
+        due: receivableDueSql,
+      })
+      .from(purchaseOrders)
+      .innerJoin(
+        supplierMaster,
+        eq(supplierMaster.id, purchaseOrders.supplierId),
+      )
+      .where(where)
+      .orderBy(...orderBy)
+      .limit(params.pageSize)
+      .offset((params.page - 1) * params.pageSize);
+
+    const lineRows = pos.length
+      ? await db
+          .select({
+            poId: purchaseOrderItems.poId,
+            poItemId: purchaseOrderItems.id,
+            itemId: purchaseOrderItems.itemId,
+            sku: itemMaster.sku,
+            itemName: itemMaster.name,
+            uom: sql<string>`coalesce(${purchaseOrderItems.uom}, ${itemMaster.uom})`,
+            orderedQty: purchaseOrderItems.qty,
+            receivedQty: sql<number>`coalesce(${purchaseOrderItems.receivedQty}, 0)`,
+            pendingQaQty: pendingQaQtySql,
+            openQty: openQtySql,
+          })
+          .from(purchaseOrderItems)
+          .innerJoin(itemMaster, eq(itemMaster.id, purchaseOrderItems.itemId))
+          .where(
+            and(
+              inArray(
+                purchaseOrderItems.poId,
+                pos.map((p) => p.poId),
+              ),
+              gt(openQtySql, sql`0`),
+            ),
+          )
+          .orderBy(asc(purchaseOrderItems.id))
+      : [];
+
+    const linesByPo = new Map<number, ReceivablePoRow["lines"]>();
+    for (const l of lineRows) {
+      const list = linesByPo.get(l.poId as number) ?? [];
+      list.push({
+        poItemId: l.poItemId,
+        itemId: l.itemId as number,
+        sku: l.sku,
+        itemName: l.itemName,
+        uom: l.uom,
+        orderedQty: round3(l.orderedQty),
+        receivedQty: round3(l.receivedQty),
+        pendingQaQty: round3(l.pendingQaQty),
+        openQty: round3(l.openQty),
+      });
+      linesByPo.set(l.poId as number, list);
+    }
+
+    const todayKey = istDayKey(now);
+    const rows: ReceivablePoRow[] = pos.map((p) => {
+      const dueDate = p.due ? istDayKey(new Date(p.due)) : null;
+      return {
+        poId: p.poId,
+        poNumber: p.poNumber,
+        supplierId: p.supplierId as number,
+        supplierName: p.supplierName,
+        status: p.status as ReceivablePoRow["status"],
+        dueDate,
+        isLate: dueDate !== null && dueDate < todayKey,
+        lines: linesByPo.get(p.poId) ?? [],
+      };
+    });
+    return { rows, total, today: todayKey };
+  },
+
   // Lets grnService compose grnItems/purchaseOrderItems/PO-rollup/GRN-header
   // writes in a single transaction after a QA action or bypass — the
   // transaction itself is opened here (repository-only DB access), the
@@ -449,7 +644,12 @@ export const grnRepository = {
 
   async getDetails(grnId: number) {
     const [grnRows, items] = await Promise.all([
-      db.select(grnColumns).from(grns).where(eq(grns.id, grnId)).limit(1),
+      db
+        .select({ ...grnColumns, supplierName: supplierMaster.name })
+        .from(grns)
+        .leftJoin(supplierMaster, eq(supplierMaster.id, grns.supplierId))
+        .where(eq(grns.id, grnId))
+        .limit(1),
       db
         .select(grnItemDetailColumns)
         .from(grnItems)
@@ -521,10 +721,22 @@ export const grnRepository = {
       corrected.map((r) => [r.grnItemId, Number(r.total)]),
     );
 
+    // BR-PRT-38: the GRN's returns for its document flow
+    const returns = await db
+      .select({
+        id: purchaseReturns.id,
+        proNumber: purchaseReturns.proNumber,
+        status: purchaseReturns.status,
+      })
+      .from(purchaseReturns)
+      .where(eq(purchaseReturns.grnId, grnId))
+      .orderBy(desc(purchaseReturns.id));
+
     return {
       grn,
       po: poRows[0] ?? null,
       prs,
+      returns,
       items: items.map((item) => {
         const correctedQty = correctedById.get(item.id) ?? 0;
         return {
@@ -569,43 +781,119 @@ export const grnRepository = {
     return row;
   },
 
-  async list(params: grnListQuerySchemaType) {
+  async list(params: grnListQuerySchemaType, today: string) {
     const sortColumn =
       params.sortBy && params.sortBy in grnSortColumns
         ? grnSortColumns[params.sortBy as keyof typeof grnSortColumns]
         : grns.id;
     const orderFn = params.sortDir === "desc" ? desc : asc;
 
-    const filters = [
+    // BR-FF-28: any line pending QA (same predicate as the Home tile).
+    const hasPendingLine = sql`exists (
+      select 1 from ${grnItems}
+      where ${grnItems.grnId} = ${grns.id} and ${grnItems.qaStatus} = 'pending'
+    )`;
+    // BR-FF-109: strip counts follow the search and PO, not status / QA / bucket.
+    const searchFilters = [
       safeSearch(params.q, grns.grnNumber),
       params.poId !== undefined ? eq(grns.poId, params.poId) : undefined,
-      params.status !== undefined ? eq(grns.status, params.status) : undefined,
+    ].filter((filter) => filter !== undefined);
+    const day = istDayBoundsOfKey(today);
+    // bucket=late implies QA pending (CR-05).
+    const qaStatus = params.bucket === "late" ? "pending" : params.qaStatus;
+    const filters = [
+      ...searchFilters,
+      params.status && params.status.length > 0
+        ? inArray(grns.status, params.status)
+        : undefined,
       // qaStatus filters at the line level — a GRN "matches" if any of its
       // lines carry that qaStatus. EXISTS keeps the header-level
       // pagination/count at 1 row per GRN instead of fanning out via a join.
-      params.qaStatus !== undefined
+      qaStatus !== undefined
         ? sql`exists (
             select 1 from ${grnItems}
             where ${grnItems.grnId} = ${grns.id}
-              and ${grnItems.qaStatus} = ${params.qaStatus}
+              and ${grnItems.qaStatus} = ${qaStatus}
           )`
         : undefined,
+      // received_date is a real timestamp: compare instants against the IST
+      // day bounds (BR-FF-08), which also keeps idx_grns_received_date usable.
+      params.bucket === "late" ? lt(grns.receivedDate, day.start) : undefined,
+      params.bucket === "today"
+        ? and(
+            gte(grns.receivedDate, day.start),
+            lt(grns.receivedDate, day.next),
+          )
+        : undefined,
+      params.bucket === "later" ? gte(grns.receivedDate, day.next) : undefined,
     ].filter((filter) => filter !== undefined);
 
     const whereClause = filters.length > 0 ? and(...filters) : undefined;
+    const countWhere = and(...searchFilters);
 
-    const [rows, [totalRow]] = await Promise.all([
+    const [rows, [totalRow], statusRows, [qaPendingRow]] = await Promise.all([
       db
-        .select({ ...grnColumns, poNumber: purchaseOrders.poNumber })
+        .select({
+          ...grnColumns,
+          poNumber: purchaseOrders.poNumber,
+          supplierName: supplierMaster.name,
+        })
         .from(grns)
         .leftJoin(purchaseOrders, eq(purchaseOrders.id, grns.poId))
+        .leftJoin(supplierMaster, eq(supplierMaster.id, grns.supplierId))
         .where(whereClause)
         .orderBy(orderFn(sortColumn), asc(grns.id))
         .limit(params.pageSize)
         .offset((params.page - 1) * params.pageSize),
       db.select({ value: count() }).from(grns).where(whereClause),
+      db
+        .select({ status: grns.status, value: count() })
+        .from(grns)
+        .where(countWhere)
+        .groupBy(grns.status),
+      db
+        .select({ value: count() })
+        .from(grns)
+        .where(and(countWhere, hasPendingLine)),
     ]);
 
-    return { rows, total: totalRow?.value ?? 0 };
+    // PERF-04: line count and QA mix of the page's GRNs, one grouped query.
+    const ids = rows.map((r) => r.id);
+    const lineAgg =
+      ids.length === 0
+        ? []
+        : await db
+            .select({
+              grnId: grnItems.grnId,
+              lines: count(),
+              pending: sql<number>`count(*) filter (where ${grnItems.qaStatus} = 'pending')`,
+              passed: sql<number>`count(*) filter (where ${grnItems.qaStatus} in ('passed', 'waived'))`,
+              failed: sql<number>`count(*) filter (where ${grnItems.qaStatus} = 'failed')`,
+            })
+            .from(grnItems)
+            .where(inArray(grnItems.grnId, ids))
+            .groupBy(grnItems.grnId);
+    const aggByGrn = new Map(lineAgg.map((a) => [a.grnId, a]));
+
+    const statusCounts: Record<string, number> = Object.fromEntries(
+      grnStatusEnum.enumValues.map((status) => [status, 0]),
+    );
+    for (const r of statusRows) statusCounts[r.status] = r.value;
+    // Overlaps Draft: a draft can also be QA pending (BR-FF-109).
+    statusCounts.qa_pending = qaPendingRow?.value ?? 0;
+
+    return {
+      rows: rows.map((r) => {
+        const a = aggByGrn.get(r.id);
+        const lines = a?.lines ?? 0;
+        const pending = Number(a?.pending ?? 0);
+        const passed = Number(a?.passed ?? 0);
+        const failed = Number(a?.failed ?? 0);
+        const qaSummary = grnQaSummary({ lines, pending, passed, failed });
+        return { ...r, lineCount: lines, qaSummary };
+      }),
+      total: totalRow?.value ?? 0,
+      statusCounts,
+    };
   },
 };

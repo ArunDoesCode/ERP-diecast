@@ -1,0 +1,103 @@
+# Sale order — assumptions
+
+> Every choice an agent made without the owner, during spec **and** build. Append-only, never renumber.
+> Rule for choosing: do what ERPNext / Odoo / SAP do; if they disagree, the stricter one. No option surveys.
+> Tag `confirm` = touches money, stock, tax, permissions or what a factory user sees → the owner answers
+> yes / no. Rows from the spec phase are listed by name in `OWNER.md` → "Decided for you — please confirm";
+> rows from the build are listed in the hand-over. Tag `info` = technical, no answer needed.
+> A "no" becomes a card (before freeze) or a normal change request (after).
+> Owner delegated all decisions (chat, 2026-11-20): "take ur own decision and record them…".
+
+Source keys (all read 2026-11-20):
+[E-SO](https://docs.frappe.io/erpnext/user/manual/en/sales-order) ERPNext Sales Order ·
+[E-PP](https://docs.frappe.io/erpnext/user/manual/en/production-plan) ERPNext Production Plan ·
+[E-MR](https://docs.frappe.io/erpnext/user/manual/en/material-request) ERPNext Material Request ·
+[E-SCO](https://docs.frappe.io/erpnext/user/manual/en/subcontracting-order) ERPNext Subcontracting Order ·
+[O-SO](https://www.odoo.com/documentation/18.0/applications/sales/sales/sales_quotations/create_quotations.html) Odoo quotations / SO ·
+[O-RR](https://www.odoo.com/documentation/18.0/applications/inventory_and_mrp/inventory/warehouses_storage/replenishment/reordering_rules.html) Odoo replenishment ·
+[O-SUB](https://www.odoo.com/documentation/18.0/applications/inventory_and_mrp/manufacturing/subcontracting/subcontracting_resupply.html) Odoo subcontracting ·
+[S-MRP](https://help.sap.com/saphelp_sbo92/helpdata/en/79/c73ffa97294571b5c4991e5f219f5a/content.htm) SAP B1 MRP sources ·
+[S-REC](https://help.sap.com/saphelp_sbo91/helpdata/en/44/e9d8df694103fce10000000a1553f6/content.htm) SAP B1 order recommendations ·
+[S-RUN](https://help.sap.com/saphelp_sbo91/helpdata/en/69/47ea51b5b14320a5db9c17499ff7bc/content.htm) SAP B1 MRP re-run ·
+[S-SO](https://help.sap.com/saphelp_sbo92/helpdata/en/44/fd93f693202463e10000000a1553f7/content.htm) SAP B1 update / cancel SO ·
+[S-CAN](https://help.sap.com/saphelp_sbo92/helpdata/en/ca/080f4f7ad8498b9a39eae01f95764c/content.htm) SAP B1 cancelling documents ·
+[MRPE](https://www.mrpeasy.com/documentation) MRPeasy
+
+| Id | Date | Phase | Question | Choice | Source | Tag | Owner answer |
+|---|---|---|---|---|---|---|---|
+| A-01 | 2026-11-20 | spec | Does a sale order need approval before confirm? (Flow, BR-SO-12) | No; any `so.manage` holder confirms | ERPNext submit by Sales User, no default workflow [E-SO]; Odoo "Confirm" button [O-SO]; SAP B1 approval procedures are optional setup [S-SO] | confirm | pre-approved (chat 2026-11-20) |
+| A-02 | 2026-11-20 | spec | Who may raise drafts from an explosion? (BR-SO-45) | `so.explode` plus `pr.manage` for bought rows / `sco.manage` for job-work rows; seed ow, bo | ERPNext checks the target doctype's rights when making MR / PO from an SO [E-MR]; SAP B1 separates MRP wizard and recommendation release [S-REC] | confirm | pre-approved |
+| A-03 | 2026-11-20 | spec | Does the floor supervisor see sale orders? (Who can do what, BR-SO-04) | No `so.view` for fs: sale prices stay off the floor | ERPNext SO read is limited to Sales roles [E-SO]; Odoo sales access groups [O-SO]; SAP B1 per-document authorisations [S-SO]; all restrict, stricter = no floor access | confirm | pre-approved |
+| A-04 | 2026-11-20 | spec | Cancel an SO that has live drafts? (BR-SO-19) | Refused, numbers listed; nothing auto-cancelled | ERPNext asks to cancel linked docs first [E-SO]; SAP B1 can't cancel once copied forward [S-SO]; Odoo does not cascade [O-SO] | confirm | pre-approved |
+| A-05 | 2026-11-20 | spec | Do draft PRs and draft POs count as open supply? (BR-SO-31) | Yes, both; re-runs don't raise the same need twice | SAP B1 counts purchase requests and POs as supply [S-MRP]; ERPNext projected qty includes requested and ordered qty [E-PP] | confirm | pre-approved |
+| A-06 | 2026-11-20 | spec | Customer master (BR-SO-01..03) | New small list: name, state, address, GSTIN; kept by `customer.manage` (ow, bo) | ERPNext Customer + address with GSTIN [E-SO]; Odoo contacts [O-SO]; SAP B1 business partner [S-SO] | confirm | pre-approved |
+| A-07 | 2026-11-20 | spec | Tax on the SO (BR-SO-11, 57; dispatch CR-SO-4) | Each line stores a GST % (BR-SUP-13 list); the SO shows value before tax; GST is computed on the delivery note | ERPNext [E-SO], Odoo [O-SO] and SAP B1 [S-SO] all show tax on the SO; tax is owed at supply, so we compute it once, on the delivery note (dispatch BR-DSP-19) — stored rate keeps the same result | confirm | pre-approved |
+| A-08 | 2026-11-20 | spec | Does a fully shipped SO close itself? (BR-SO-54, CR-SO-1) | Yes, "fully delivered", claims released; partial never closes | ERPNext moves to Completed [E-SO]; SAP B1 closes a fully copied order [S-SO]; Odoo marks fully delivered [O-SO] | confirm | pre-approved |
+| A-09 | 2026-11-20 | spec | Reopen a closed SO? (BR-SO-55, CR-SO-2) | Only a "fully delivered" close, only by cancelling its delivery note; a hand close is final | SAP B1 cancellation reopens the base [S-CAN]; ERPNext reverts status on delivery-note cancel and also allows manual Re-open [E-SO] — stricter: no manual re-open | confirm | pre-approved |
+| A-10 | 2026-11-20 | spec | Ship-to on the SO (BR-SO-56, CR-SO-3) | Optional address + state; empty = customer's | ERPNext shipping address [E-SO]; Odoo delivery address [O-SO]; SAP B1 ship-to [S-SO] | confirm | pre-approved |
+| A-11 | 2026-11-20 | spec | What happens to an order's stock claim when goods ship? (BR-SO-58) | The claim drops by the shipped qty at posting | ERPNext stock reservation is consumed by the delivery note [E-SO]; MRPeasy booking consumed on shipment [MRPE] | confirm | pre-approved |
+| A-12 | 2026-11-20 | spec | Same customer PO number twice (BR-SO-06) | Refused (cancelled excluded) | ERPNext "allow multiple SO against a customer PO" off by default [E-SO]; Odoo no check [O-SO]; stricter | info | — |
+| A-13 | 2026-11-20 | spec | Price 0; level limit; rounding (BR-SO-07, 23) | Price 0 allowed (samples); 10 levels and rounding are the BOM module's (BR-BOM-10, 18) | ERPNext / Odoo allow zero rate [E-SO][O-SO]; one calculation, not a copy | info | — |
+| A-14 | 2026-11-20 | spec | Which changes make a snapshot out of date? (BR-SO-38) | Need-affecting only: qty, date, line add / remove, hold / resume, delivery post / cancel, BOM release / retire; not notes, price, GST, ship-to, customer PO | ERPNext [E-PP] and SAP B1 [S-RUN] recompute need from qty and date only; coordinator answer 2026-11-20. Overrides data.md's "every edit bumps edit_version" | info | — |
+| A-15 | 2026-11-20 | spec | PR line "issued" qty (BR-SO-31) | Assumed to include qty on draft POs, so open PR = requested − issued never double-counts with open PO; **build: write a test, CR-SO/PR-3** | ERPNext MR ordered qty counts draft POs? docs silent [E-MR]; coordinator answer | info | — |
+| A-16 | 2026-11-20 | spec | Existing PR rows with a `sale_order_id` no SO matches (BR-SO-48) | Migration sets them to null, appends "(old SO ref N)" to notes; **hand-over lists the count** | ERPNext links only to existing documents [E-MR]; UAT-1 not started, rows are test data | info | — |
+| A-17 | 2026-11-20 | spec | How the explosion calls the BOM (BR-SO-23, 28) | `bomNeedsService.expandBomLevel` per item and level, in-process in the run tx; own path + `MAX_BOM_LEVELS` guard | ERPNext exploded items and Odoo BoM structure are one function [E-PP][O-RR]; BOM design data.md | info | — |
+| A-18 | 2026-11-20 | spec | What counts as "raised from this SO" (BR-SO-53) | **Superseded by A-67.** Was: PR with `saleOrderId` = SO, plus SCO lines linked to any snapshot row of the SO | ERPNext MR keeps the SO link [E-MR]; Odoo links resupply to source [O-SUB] | info | — |
+| A-19 | 2026-11-20 | spec | Item at several levels (BR-SO-25, 50) | One row at the deepest level; gross summed, netted once (low-level code) | SAP B1 MRP low-level netting [S-MRP]; ERPNext consolidates same item [E-PP] | info | — |
+| A-20 | 2026-11-20 | spec | Default GST % on a line (BR-SO-57) | None: required per line (data.md default 0 to be dropped) | SAP B1 tax code per row required [S-SO]; a silent 0 would under-tax the note | info | — |
+| A-21 | 2026-11-20 | spec | Id type, audit columns (data) | serial int ids; project audit columns | project convention; n/a in ERPs (technical) | info | — |
+| A-22 | 2026-11-20 | spec | Qty type (data) | `numeric(14,3)`, not double (item stock stays double; read as `round(x::numeric, 3)`) | "no float" invariant; ERPNext / Odoo use float precision [E-SO][O-SO], stricter wins | info | — |
+| A-23 | 2026-11-20 | spec | Date type (data) | `date` for order, delivery, customer PO dates (IST day) | D-022; ERPNext SO delivery date is a date field [E-SO] | info | — |
+| A-24 | 2026-11-20 | spec | SO number (data) | docType `SO`, IST month key, same helper as SCO | D-019, D-022; ERPNext naming series [E-SO] | info | — |
+| A-25 | 2026-11-20 | spec | Customer fields (data) | minimal 5 fields; GSTIN not unique | ERPNext Customer name unique, GSTIN on the address [E-SO] | info | — |
+| A-26 | 2026-11-20 | spec | Duplicate customer PO (data) | partial unique index excluding cancelled | ERPNext default off [E-SO]; Odoo no check [O-SO]; stricter | info | — |
+| A-27 | 2026-11-20 | spec | Out-of-date snapshot (data) | derived from a version + live BOM revision compare, not a stored flag | ERPNext / SAP simply re-run [E-PP][S-RUN]; no cross-module writes | info | — |
+| A-28 | 2026-11-20 | spec | Two counters (data) | `edit_version` guards concurrent edits (every write); `need_version` drives out-of-date, bumped only by need-affecting changes (= A-14) | coordinator answer 2026-11-20; ERPNext Production Plan re-fetch is manual, no stale flag [E-PP] | info | — |
+| A-29 | 2026-11-20 | spec | One row per item per snapshot (data) | level = deepest depth, netting once after all gross summed (= A-19) | ERPNext consolidate [E-PP]; SAP low-level code [S-MRP] | info | — |
+| A-30 | 2026-11-20 | spec | Reservation shape (data) | rows per snapshot row with FK to the exact supply line; released by timestamp, kept | ERPNext Reserve Stock, no ledger [E-SO]; MRPeasy booking against PO/MO [MRPE] | info | — |
+| A-31 | 2026-11-20 | spec | Claims on a line that moved PR → PO (data) | claims summed and clamped at the line's remaining qty | ERPNext MR "Partially Ordered" [E-MR] | info | — |
+| A-32 | 2026-11-20 | spec | Link snapshot row → document (data) | FK columns on the row, partial unique | ERPNext MR keeps SO item link [E-MR] | info | — |
+| A-33 | 2026-11-20 | spec | SCO → SO link (data) | via row link, no new SCO column; `project_ref` = SO number | Odoo links resupply to the PO, not a field [O-SUB]; ERPNext SCO from PO [E-SCO] | info | — |
+| A-34 | 2026-11-20 | spec | Serialisation (data) | advisory locks, no run-status table | SAP B1 MRP runs one scenario at a time [S-RUN]; project row-lock pattern (D-019) | info | — |
+| A-35 | 2026-11-20 | spec | Audit (data) | new insert-only `sales_audit_log` | mirrors `auth_audit_log`; ERPNext Version log before → after [E-SO] | info | — |
+| A-36 | 2026-11-20 | spec | Ship-to columns (data) | `ship_to_address` + `ship_to_state_code`, nullable (= A-10) | ERPNext shipping address [E-SO]; Odoo delivery address [O-SO] | info | — |
+| A-37 | 2026-11-20 | spec | GST % per line column (data) | `gst_percent numeric(5,2)` in the BR-SUP-13 set (= A-07, A-20) | ERPNext item tax template [E-SO]; Odoo line taxes [O-SO]; SAP B1 tax code per row [S-SO] | info | — |
+| A-38 | 2026-11-20 | spec | Close kind (data) | `close_kind` manual / fully_delivered, set by hook only (= A-08) | ERPNext Completed vs Closed are separate states [E-SO] | info | — |
+| A-39 | 2026-11-20 | spec | Reopen path (data) | only `fully_delivered`, on delivery-note cancel, by hook (= A-09) | ERPNext reverts on DN cancel [E-SO]; SAP reopens base [S-CAN] | info | — |
+| A-40 | 2026-11-20 | spec | Delivery post / cancel staleness (data) | hook marks the snapshot out of date (via the need version, A-14) | ERPNext / SAP recompute open qty every run [E-PP][S-RUN]; ours explicit | info | — |
+| A-41 | 2026-11-20 | spec | `deliveredQty` writer (data) | only `applyDelivery` | BR-SO-09; ERPNext updates delivered qty from DN only [E-SO] | info | — |
+| A-42 | 2026-11-20 | spec | Bounds (data) | qty ≤ 1,000,000 (BR-BOM-18 bound); price ≤ 100,000,000 paise; ≤ 200 lines | BOM spec; technical, n/a in ERPs | info | — |
+| A-43 | 2026-11-20 | spec | Orphan PR `sale_order_id` (data) | null + note, not a failed migration (= A-16) | ERPNext links only to existing docs [E-MR] | info | — |
+| A-44 | 2026-11-20 | spec | Customer lookup (api) | reuse the list endpoint with `isActive` + `q`, no `/lookup` | api-endpoint-intake §7; technical, n/a in ERPs | info | — |
+| A-45 | 2026-11-20 | spec | Transitions (api) | one POST per action, not `PATCH status` | project PO / SCO pattern; ERPNext whitelisted actions (close, hold) [E-SO] | info | — |
+| A-46 | 2026-11-20 | spec | Race on edit (api) | `editVersion` in the body plus the row lock; mismatch 409 | ERPNext "document modified, reload" [E-SO] | info | — |
+| A-47 | 2026-11-20 | spec | Rows endpoint paged (api) | page 50 default, max 100 | pagination contract; technical | info | — |
+| A-48 | 2026-11-20 | spec | Permission per route (api) | drafts route guarded by `so.explode`, `pr.manage` / `sco.manage` checked per picked row | ERPNext checks the target doctype's role [E-MR] | info | — |
+| A-49 | 2026-11-20 | spec | Explosion → BOM call (api) | in-process service call inside the run tx, never HTTP (= A-17; name is `expandBomLevel`, not `levelNeeds`) | ERPNext / Odoo one function behind the report [E-PP][O-RR] | info | — |
+| A-50 | 2026-11-20 | spec | Draft grouping (api) | all bought rows → one PR; job-work rows → one SCO per vendor | ERPNext one MR per action [E-MR]; SAP per vendor [S-REC]; owner card 6 | info | — |
+| A-51 | 2026-11-20 | spec | Job-worker candidates in the row response (api) | vendor id + name only, no supplier prices | BR-SO-51 spirit; SAP shows vendor on recommendation [S-REC] | info | — |
+| A-52 | 2026-11-20 | spec | Ship-to and GST per line (api) | accepted on create / edit, stored, never used for tax in the SO (= A-07) | ERPNext / Odoo / SAP B1 keep tax per SO row [E-SO][O-SO][S-SO] | info | — |
+| A-53 | 2026-11-20 | spec | Close kinds (api) | `closeKind` returned; manual close is the only close route; fully-delivered close and reopen are dispatch hooks | ERPNext Completed vs Closed [E-SO] | info | — |
+| A-54 | 2026-11-20 | spec | Out-of-date reason for deliveries (api) | `outOfDateReasons` adds `"delivery_changed"` | coordinator message; SAP re-run [S-RUN] | info | — |
+| A-55 | 2026-11-20 | spec | Customer form dialog or page? (screens) | full page | owner standard (two-pane detail, full-page forms) | info | — |
+| A-56 | 2026-11-20 | spec | New status docs `so`, `soSnapshot`, `customer` (screens) | added to `status-tone.ts` with existing tones only | design-system skill §3 | info | — |
+| A-57 | 2026-11-20 | spec | Explosion pane layout (screens) | one full-width table card, not two panes | design-system skill §5; SAP recommendation is one table [S-REC] | info | — |
+| A-58 | 2026-11-20 | spec | 13 BR-SO-50 fields in 11 columns (screens) | level as indent chip on Item; unit as suffix; pick box and Raise share the last column | BR-SO-50, 1366 px; ERPNext production plan table [E-PP] | info | — |
+| A-59 | 2026-11-20 | spec | Explosion primary button (screens) | "Create drafts (N)" in DetailHeader; "Re-run explosion" outline | BR-DS-06 (one primary per page) | info | — |
+| A-60 | 2026-11-20 | spec | Rows the user may not raise (screens) | pick box not rendered | BR-DS-27 | info | — |
+| A-61 | 2026-11-20 | spec | Snapshot route (screens) | `/sale-orders/[id]/explosion` current; `?run=E1` old | design-system skill §5 | info | — |
+| A-62 | 2026-11-20 | spec | SO price entry (screens) | rupees with 2 decimals, sent as integer paise | BR-SO-07, `format.ts`; ERPNext rate in currency [E-SO] | info | — |
+| A-63 | 2026-11-20 | spec | SO list default (screens) | "Open" chip (draft + confirmed + on hold), newest first | list pattern; ERPNext SO list default open [E-SO] | info | — |
+| A-64 | 2026-11-20 | spec | Mock screenshots (screens) | not made; ASCII wireframes | no running API yet | info | — |
+| A-65 | 2026-11-20 | spec | Walk shape (data) | SO calls `expandBomLevel` itself, level by level deepest-first, netting once per consolidated item; reuses `assertNoLoop` / `MAX_BOM_LEVELS` (`computeBomNeeds`' per-path `netNeed` hook can't consolidate) | SAP B1 low-level netting [S-MRP]; BOM design allows direct `expandBomLevel` use | info | — |
+| A-66 | 2026-11-20 | spec | Extra fields wanted from `expandBomLevel` (data) | inactive flag per child; job worker, service, send / return qty, loss % on job-work nodes; part item + kind on the node; several parts per call → CR-SO/BOM-1, covered by the frozen BOM design | ERPNext SCO supplied items come from the BOM [E-SCO]; Odoo subcontract BOM names the vendor [O-SUB] | info | — |
+| A-67 | 2026-11-20 | spec | What counts as "raised from this SO" and as its own supply? (BR-SO-14, 19, 33, 48, 53) | Only PR / SCO lines linked through explosion rows; a hand-typed PR `saleOrderId` is information only (locks nothing, ordinary open supply) and may be set only for a confirmed SO; approval routing: see A-76 | ERPNext locks and counts by document link (MR item ↔ SO item) [E-MR]; Odoo links by procurement, not a free field [O-RR]; coordinator decision 2026-11-20 | confirm | pre-approved |
+| A-68 | 2026-11-20 | spec | May the picked qty exceed the shortage? (BR-SO-39) | No: capped at the row's net (400 above) | SAP B1 lets the planner edit recommendation qty [S-REC]; ERPNext MR from a plan uses the shortfall [E-PP]; stricter = cap | confirm | pre-approved |
+| A-69 | 2026-11-20 | spec | Who sees linked documents and job-worker names? (Security) | `so.view` sees linked PR / SCO numbers and statuses; job-worker candidate names only with `so.explode`, never supplier prices | ERPNext shows linked docs on the SO dashboard to SO readers [E-SO]; supplier data needs purchase roles [E-MR] | confirm | pre-approved |
+| A-70 | 2026-11-20 | spec | What is "free stock"? (BR-SO-30) | Stock in active, non-virtual plant locations, scrap yard and job-worker premises excluded, minus other orders' current claims, never below 0 | ERPNext projected qty excludes reserved and uses chosen warehouses [E-PP]; SAP B1 MRP uses selected warehouses [S-MRP]; Odoo forecast per warehouse [O-RR] | confirm | pre-approved |
+| A-71 | 2026-11-20 | spec | Ids from another SO or snapshot (BR-SO-59, 62) | Line ids must belong to the locked SO; snapshot to the SO and rows to the snapshot; else 404, nothing saved | OWASP object-level authorisation; ERPNext child rows belong to their parent [E-SO] | info | — |
+| A-72 | 2026-11-20 | spec | Audit of dispatch hooks (BR-SO-52) | `sales_audit_log` row in the caller's tx with posting user, note id, before → after | ERPNext Version log on status / delivered-qty updates [E-SO] | info | — |
+| A-73 | 2026-11-20 | spec | Text trims and date range (BR-SO-61) | reason / notes / customer PO trimmed before length checks; dates 2000-01-01 .. today + 5 years | `backend/CLAUDE.md` validation standard; ERPNext strips data fields [E-SO] | info | — |
+| A-74 | 2026-11-20 | spec | Line removal shape (BR-SO-13, 14, 60; data) | soft remove (`removed_at`), `last_line_no` counter, delivered line → 409 `SO_LINE_DELIVERED`; separate `delivery_version` so out-of-date says "delivery changed" vs "order changed"; qty-cut block is SO-wide (stricter) | ERPNext can't remove a delivered item on Update Items [E-SO]; SAP B1 closes rows rather than deleting copied ones [S-SO] | confirm | pre-approved |
+| A-75 | 2026-11-20 | spec | Run performance shape (data) | free stock read once per level via `freeStockByItems(tx, itemIds[])`; supply reads batched per level; outOfDate in one query; merge by item per level with a visited set; multi-row inserts for rows and reservations | technical; SAP B1 MRP runs per scenario in one pass [S-RUN] | info | — |
+| A-76 | 2026-11-20 | spec | Which approval policy do explosion PRs follow? (BR-SO-40, CR-SO/PR-1) | Explosion PRs have type `sale_order`, so policies with category `sale_order` match (BR-APR-02, 15); a hand-typed `saleOrderId` keeps the PR's own type | ERPNext approval by document link, not a free field [E-MR]; coordinator decision 2026-11-20 | confirm | pre-approved |

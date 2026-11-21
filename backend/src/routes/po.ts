@@ -17,12 +17,12 @@ import {
   confirmPoSchema,
   createPoSchema,
   logPoCommunicationSchema,
-  markPoInvoicedSchema,
   markPoSentSchema,
   poCommunicationDetailSchema,
   poCommunicationSchema,
   poDetailsSchema,
   poListQuerySchema,
+  poListRowSchema,
   poResponseSchema,
   poStatusSchema,
   poUpdateResultSchema,
@@ -52,14 +52,23 @@ register({
   request: { query: poListQuerySchema },
   // BR-PO-26: meta.statusCounts = rows per status for the same search.
   responses: {
-    "200": paginatedResponse(poResponseSchema).extend({
+    "200": paginatedResponse(poListRowSchema).extend({
       meta: paginationMetaSchema.extend({
         statusCounts: z.record(poStatusSchema, z.number().int().min(0)),
+        // BR-FF-24..26, 107: rows the Late filter returns (one BR-PO-19 predicate).
+        lateCount: z.number().int().min(0),
       }),
     }),
   },
   pagination: {
-    sortableFields: ["id", "poNumber", "status", "createdAt"],
+    sortableFields: [
+      "id",
+      "poNumber",
+      "status",
+      "createdAt",
+      "dueDate",
+      "totalAmountPaise",
+    ],
     searchable: true,
   },
 });
@@ -203,22 +212,6 @@ register({
     "Record supplier confirmation of the PO. Informational only, never blocks a status transition.",
   auth: { type: "permission", key: "po.manage" },
   request: { body: confirmPoSchema },
-  responses: { "200": successResponse(poResponseSchema) },
-});
-
-poRouter.post(
-  PO_ROUTES.invoice,
-  requirePermission("po.manage"),
-  asyncHandler(poController.markInvoiced),
-);
-register({
-  method: "POST",
-  path: `${PO_BASE_PATH}${PO_ROUTES.invoice}`,
-  tags: ["po"],
-  summary:
-    "Record a supplier invoice against a fully-received PO and move it to invoiced.",
-  auth: { type: "permission", key: "po.manage" },
-  request: { body: markPoInvoicedSchema },
   responses: { "200": successResponse(poResponseSchema) },
 });
 

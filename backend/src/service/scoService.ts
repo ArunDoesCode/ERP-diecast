@@ -49,7 +49,7 @@ function toPaginatedMeta(page: number, pageSize: number, total: number) {
 }
 
 // BR-SCO-03: today .. today + 365 days (whole days, IST).
-function assertReturnDateInWindow(date: Date) {
+export function assertReturnDateInWindow(date: Date) {
   const daysAway = istDaysBetween(new Date(), date);
   if (daysAway < 0) {
     throw new BadRequestError(
@@ -171,6 +171,57 @@ async function loadDetails(id: number, tx?: Tx): Promise<scoDetailsSchemaType> {
   };
 }
 
+/**
+ * Everything a create checks before it writes: vendor, return date window,
+ * lines against the vendor's service list. Split from the insert so the
+ * sale-order drafts can validate every SCO before any number is allocated.
+ */
+export async function prepareScoCreate(
+  input: createScoSchemaType,
+  tx: Tx,
+): Promise<PreparedScoLine[]> {
+  const vendor = await scoRepository.findVendor(input.vendorId, tx);
+  if (!vendor) {
+    throw new NotFoundError("Vendor not found");
+  }
+  if (!vendor.isActive) {
+    throw new BadRequestError("Vendor is inactive", "SUPPLIER_INACTIVE");
+  }
+  if (vendor.type !== "service_provider" && vendor.type !== "both") {
+    throw new BadRequestError(
+      "Vendor must be a service provider",
+      "SCO_VENDOR_TYPE_INVALID",
+    );
+  }
+  assertReturnDateInWindow(input.expectedReturnDate);
+  return prepareLines(input.vendorId, input.lines, tx);
+}
+
+/** Writes a prepared SCO (allocates the number) and returns its id. */
+export async function insertPreparedSco(
+  input: createScoSchemaType,
+  lines: PreparedScoLine[],
+  actorId: number,
+  tx: Tx,
+): Promise<number> {
+  return scoRepository.insertOrder(
+    {
+      vendorId: input.vendorId,
+      status: "draft",
+      projectRef: input.projectRef ?? null,
+      notes: input.notes ?? null,
+      expectedReturnDate: input.expectedReturnDate,
+      ...totalsOf(lines),
+      createdBy: actorId,
+      lastUpdatedBy: actorId,
+    },
+    lines,
+    tx,
+  );
+}
+
+export { loadDetails as loadScoDetails };
+
 export const scoService = {
   async list(
     query: scoListQuerySchemaType,
@@ -222,45 +273,22 @@ export const scoService = {
     };
   },
 
-  // BR-SCO-01..04: header and lines saved together as a draft.
+  // BR-SCO-01..04: header and lines saved together as a draft. `outerTx`: the
+  // caller's transaction (sale-order drafts, BR-SO-46); without it the SCO gets
+  // its own.
   async create(
     input: createScoSchemaType,
     actorId: number,
+    outerTx?: Tx,
   ): Promise<scoDetailsSchemaType> {
     // Vendor check and line prep run inside the tx after the vendor lock,
     // as update does after the SCO lock (#57).
-    return db.transaction(async (tx) => {
-      const vendor = await scoRepository.findVendor(input.vendorId, tx);
-      if (!vendor) {
-        throw new NotFoundError("Vendor not found");
-      }
-      if (!vendor.isActive) {
-        throw new BadRequestError("Vendor is inactive", "SUPPLIER_INACTIVE");
-      }
-      if (vendor.type !== "service_provider" && vendor.type !== "both") {
-        throw new BadRequestError(
-          "Vendor must be a service provider",
-          "SCO_VENDOR_TYPE_INVALID",
-        );
-      }
-      assertReturnDateInWindow(input.expectedReturnDate);
-      const lines = await prepareLines(input.vendorId, input.lines, tx);
-      const id = await scoRepository.insertOrder(
-        {
-          vendorId: input.vendorId,
-          status: "draft",
-          projectRef: input.projectRef ?? null,
-          notes: input.notes ?? null,
-          expectedReturnDate: input.expectedReturnDate,
-          ...totalsOf(lines),
-          createdBy: actorId,
-          lastUpdatedBy: actorId,
-        },
-        lines,
-        tx,
-      );
+    const run = async (tx: Tx) => {
+      const lines = await prepareScoCreate(input, tx);
+      const id = await insertPreparedSco(input, lines, actorId, tx);
       return loadDetails(id, tx);
-    });
+    };
+    return outerTx ? run(outerTx) : db.transaction(run);
   },
 
   // BR-SCO-05: header and lines change only in draft.

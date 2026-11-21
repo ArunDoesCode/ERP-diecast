@@ -31,7 +31,13 @@ export type PRType = (typeof prTypeValues)[number];
 export type PRStatus = (typeof prStatusValues)[number];
 export type PRItemStatus = (typeof prItemStatusValues)[number];
 
-export type PRSortField = "id" | "prNumber" | "type" | "status" | "createdAt";
+export type PRSortField =
+	| "id"
+	| "prNumber"
+	| "type"
+	| "status"
+	| "createdAt"
+	| "estimatedAmountPaise";
 
 export type PaginationMeta = {
 	page: number;
@@ -82,6 +88,10 @@ export interface PurchaseRequisition {
 	cancelledByName?: string | null;
 	cancelledAt?: string | null;
 	cancelReason?: string | null;
+	/** Reorder run number that raised this PR; null for hand-made PRs. Read-only. */
+	reorderRunId?: number | null;
+	/** List only: pending lines still to buy that are on no open RFQ. */
+	linesFreeForRfq?: number;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -142,6 +152,14 @@ export type PurchaseRequisitionListParams = {
 	status?: PRStatus | PRStatus[];
 	type?: PRType;
 	q?: string;
+	raisedByReorder?: boolean;
+	reorderRunId?: number;
+	/** Only my own PRs. */
+	mine?: boolean;
+	/** Explicit false is sent as "false". */
+	toOrder?: boolean;
+	/** Needs `toOrder: true` (server answers 400 otherwise). */
+	bucket?: "late" | "today" | "later";
 };
 
 /** Local calendar date as YYYY-MM-DD (matches <input type="date">). */

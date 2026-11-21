@@ -17,7 +17,7 @@ export function LoginView() {
 						<CardTitle className="text-lg text-center">Login</CardTitle>
 					</CardHeader>
 					<CardContent className="">
-						<LoginForm onSuccess={() => router.push("/landing")} />
+						<LoginForm onSuccess={() => router.push("/home")} />
 					</CardContent>
 				</Card>
 			</div>

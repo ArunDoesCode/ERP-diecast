@@ -13,10 +13,12 @@ import { employees } from "../src/db/schemas/03_hcm";
 import { type Actor, loadActor } from "../src/lib/auth-middleware";
 import { approvalService } from "../src/service/approvalService";
 import { assetService } from "../src/service/assetService";
+import { companySettingsService } from "../src/service/companySettingsService";
 import { employeeService } from "../src/service/employeeService";
 import { grnService } from "../src/service/grnService";
 import { poService } from "../src/service/poService";
 import { prService } from "../src/service/prService";
+import { supplierInvoiceService } from "../src/service/supplierInvoiceService";
 import { supplierService } from "../src/service/supplierService";
 
 const DESK_ROLES = [
@@ -178,6 +180,17 @@ export async function runFixtures(opts: {
     admin,
   );
   log("users: 5 desk logins + 1 QR-only operator");
+
+  // ---- company details + invoice match tolerances (supplier-invoice BR-SINV-18, 32) ----
+  await companySettingsService.upsert(
+    {
+      name: "DiecastOS Demo Plant",
+      address: "Plot 14, MIDC Industrial Area, Pune, Maharashtra 411019",
+      gstin: "27AABCD1234E1Z5",
+      stateCode: "27",
+    },
+    userId.owner,
+  );
 
   // ---- locations, machines ----
   await assetService.createLocation({
@@ -472,7 +485,7 @@ export async function runFixtures(opts: {
           unitPricePaise: rate(l.sku),
         })),
       },
-      userId.back_office,
+      actors.back_office,
     );
     const itemBySku = {} as Record<string, number>;
     for (const it of created.items) {
@@ -708,15 +721,33 @@ export async function runFixtures(opts: {
   // PO7: full delivery, accepted, invoiced
   const g7 = await makeGrn(po7, [{ sku: "CN-GLOVES", qty: 2000 }], "CH-7001");
   await qa(g7.id, g7.line(po7, "CN-GLOVES"), 2000, null, "Count and size OK");
-  await poService.markInvoiced(
-    po7.id,
+  // Clean-match supplier invoice (price and GST = PO line) -> approved -> PO becomes invoiced.
+  const g7Paise = 2000 * rate("CN-GLOVES");
+  const g7IgstPaise = Math.round(g7Paise * 0.18); // PO line GST 18%; Chennai supplier vs Pune plant = IGST
+  const inv7 = await supplierInvoiceService.create(
     {
-      invoiceNumber: "SM/INV/0042",
-      invoiceDate: new Date(),
-      billedAmountPaise: po7.totalPaise,
+      poId: po7.id,
+      invoiceNumber: "SM/2026/0071",
+      invoiceDate: new Date().toISOString().slice(0, 10),
+      printed: {
+        taxablePaise: g7Paise,
+        cgstPaise: 0,
+        sgstPaise: 0,
+        igstPaise: g7IgstPaise,
+        totalPaise: g7Paise + g7IgstPaise,
+      },
+      lines: [
+        {
+          grnItemId: g7.line(po7, "CN-GLOVES"),
+          qty: 2000,
+          ratePaise: rate("CN-GLOVES"),
+          gstPercent: 18,
+        },
+      ],
     },
     userId.back_office,
   );
+  await supplierInvoiceService.submit(inv7.id, userId.back_office);
 
   // PO8: QA bypass by the owner, then closed
   const g8 = await makeGrn(po8, [{ sku: "RM-ADC12", qty: 500 }], "CH-8001");

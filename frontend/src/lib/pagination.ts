@@ -1,5 +1,7 @@
-/** Page sizes offered by every list; the first is the default. */
-export const PAGE_SIZE_OPTIONS = [10, 20, 50];
+/** Page sizes offered by every list (BR-FF-105). */
+export const PAGE_SIZE_OPTIONS = [25, 50, 100];
+/** Shared default page size. */
+export const DEFAULT_PAGE_SIZE = 50;
 
 /** "1 to 25 of 41"; total 0 → "0 of 0". */
 export function formatPageRange(

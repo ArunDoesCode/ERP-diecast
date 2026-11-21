@@ -26,10 +26,14 @@ function isNumeric(meta: DataTableColumnMeta | undefined) {
 	return meta?.numeric === true;
 }
 
+const HIDE_BELOW_1100 = "max-[1099px]:hidden";
+
 type DataTableProps<TData extends RowData> = {
 	table: DataTableInstance<TData>;
 	isLoading?: boolean;
 	rowClassName?: (row: TData) => string | undefined;
+	/** Mouse click anywhere on a row. Keyboard users act through a control inside the row. */
+	onRowClick?: (row: TData) => void;
 	/** Rendered in place of the empty row. */
 	emptyState?: ReactNode;
 	/** Rendered when set instead of the body. */
@@ -38,6 +42,8 @@ type DataTableProps<TData extends RowData> = {
 	skeletonRows?: number;
 	/** Hide the built-in pager when the view renders the shared `Pagination`. */
 	hidePagination?: boolean;
+	/** Narrower cell padding so a wide table fits a narrow area; the area still scrolls sideways. */
+	tight?: boolean;
 };
 
 // Render-only: owns header/body/skeleton/pagination markup for any TanStack Table
@@ -47,17 +53,22 @@ export function DataTable<TData extends RowData>({
 	table,
 	isLoading,
 	rowClassName,
+	onRowClick,
 	emptyState,
 	errorState,
 	skeletonRows = SKELETON_ROWS,
 	hidePagination,
+	tight,
 }: DataTableProps<TData>) {
 	const rows = table.getRowModel().rows;
 	const leafColumns = table.getVisibleLeafColumns();
 
 	return (
 		<>
-			<Table aria-busy={isLoading ? true : undefined}>
+			<Table
+				aria-busy={isLoading ? true : undefined}
+				className={tight ? "[&_td]:px-2 [&_th]:px-2" : undefined}
+			>
 				<TableHeader className="[&_tr]:bg-table-header [&_tr]:hover:bg-table-header">
 					{table.getHeaderGroups().map((headerGroup) => (
 						<TableRow key={headerGroup.id}>
@@ -68,6 +79,8 @@ export function DataTable<TData extends RowData>({
 									className={cn(
 										isNumeric(header.column.columnDef.meta) &&
 											"text-right tabular-nums",
+										header.column.columnDef.meta?.hideBelow1100 &&
+											HIDE_BELOW_1100,
 									)}
 								>
 									{header.isPlaceholder
@@ -87,7 +100,12 @@ export function DataTable<TData extends RowData>({
 							// biome-ignore lint/suspicious/noArrayIndexKey: fixed skeleton row count, never reorders
 							<TableRow key={`skeleton-row-${rowIndex}`}>
 								{leafColumns.map((column) => (
-									<TableCell key={column.id}>
+									<TableCell
+										key={column.id}
+										className={cn(
+											column.columnDef.meta?.hideBelow1100 && HIDE_BELOW_1100,
+										)}
+									>
 										<Skeleton className="h-4 w-full" />
 									</TableCell>
 								))}
@@ -113,13 +131,24 @@ export function DataTable<TData extends RowData>({
 						</TableRow>
 					) : (
 						rows.map((row) => (
-							<TableRow key={row.id} className={rowClassName?.(row.original)}>
+							<TableRow
+								key={row.id}
+								className={cn(
+									onRowClick && "cursor-pointer",
+									rowClassName?.(row.original),
+								)}
+								onClick={
+									onRowClick ? () => onRowClick(row.original) : undefined
+								}
+							>
 								{row.getVisibleCells().map((cell) => (
 									<TableCell
 										key={cell.id}
 										className={cn(
 											isNumeric(cell.column.columnDef.meta) &&
 												"text-right tabular-nums",
+											cell.column.columnDef.meta?.hideBelow1100 &&
+												HIDE_BELOW_1100,
 										)}
 									>
 										{flexRender(cell.column.columnDef.cell, cell.getContext())}

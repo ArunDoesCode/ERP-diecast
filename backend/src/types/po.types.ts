@@ -44,6 +44,18 @@ export const poResponseSchema = poSchema.extend({
 });
 export type poResponseSchemaType = z.infer<typeof poResponseSchema>;
 
+// GET /po/getpos row: the PO plus list display fields (BR-FF-24..26, 107, 109).
+// Optional until the handler fills them.
+export const poListRowSchema = poResponseSchema.extend({
+  lineCount: z.number().int().min(0),
+  /** Received share of ordered qty, whole percent 0..100. */
+  receivedPct: z.number().int().min(0).max(100),
+});
+export type poListRowSchemaType = z.infer<typeof poListRowSchema>;
+
+export const poBucketSchema = z.enum(["late", "today", "later"]);
+export type poBucketSchemaType = z.infer<typeof poBucketSchema>;
+
 // Per-line GST fields (BR-PO-04).
 export const poItemGstSchema = z.object({
   gstPercent: gstPercentSchema,
@@ -73,6 +85,26 @@ export const poItemDetailSchema = poItemSchema
     itemCategory: z.string(),
     prItemId: z.number().int().nullable(),
     prNumber: z.string().nullable(),
+    // Posted purchase returns on this line (BR-PRT-20, 38).
+    returnedQty: z.number(),
+    // BR-RFQ-31, 50, 51, 56: contract / quote link and override audit. The contract
+    // and quote fields are null for callers without po.manage or contract.view.
+    contractItemId: z.number().int().nullable(),
+    contractNumber: z.string().nullable(),
+    contractRatePaise: z.number().int().nullable(),
+    quoteItemId: z.number().int().nullable(),
+    quoteNumber: z.string().nullable(),
+    // Where the line rate came from; null = typed in or the normal suggestion.
+    rateSource: z.enum(["contract", "quote"]).nullable(),
+    rateOverrideReason: z.string().nullable(),
+    rateOverrideBy: z.number().int().nullable(),
+    rateOverrideByName: z.string().nullable(),
+    rateOverrideAt: z.string().nullable(),
+    // Contract step 2 (BR-FF-09, 43): optional until implemented.
+    /** Qty on GRN lines whose QA is still pending. */
+    pendingQaQty: z.number(),
+    /** Ordered - received - pending QA, never below 0. */
+    openQty: z.number(),
   });
 export type poItemDetailSchemaType = z.infer<typeof poItemDetailSchema>;
 
@@ -80,6 +112,14 @@ export type poItemDetailSchemaType = z.infer<typeof poItemDetailSchema>;
 export const poDetailsSchema = z.object({
   po: poResponseSchema,
   items: z.array(poItemDetailSchema),
+  // Purchase returns of this PO (BR-PRT-38).
+  returns: z.array(
+    z.object({
+      id: z.number().int(),
+      proNumber: z.string(),
+      status: z.enum(["draft", "posted", "cancelled"]),
+    }),
+  ),
 });
 export type poDetailsSchemaType = z.infer<typeof poDetailsSchema>;
 
@@ -90,6 +130,9 @@ export const poUpdateResultSchema = z.object({
   items: z.array(poItemSchema.extend(poItemGstSchema.shape)),
 });
 export type poUpdateResultSchemaType = z.infer<typeof poUpdateResultSchema>;
+
+// BR-RFQ-51: override reason, trimmed 3-500 chars.
+const rateOverrideReasonSchema = z.string().trim().min(3).max(500);
 
 export const createPoSchema = z.object({
   supplierId: z.number().int().positive(),
@@ -107,6 +150,9 @@ export const createPoSchema = z.object({
         unitPricePaise: z.number().int().min(1).max(MAX_MONEY_PAISE).optional(),
         // BR-PO-04: omitted = supplier's active price-list GST % (else 0).
         gstPercent: gstPercentSchema.optional(),
+        // BR-RFQ-51, 55: 3-500 chars, required when the rate differs from the
+        // linked contract rate (and the caller holds contract.override_rate).
+        rateOverrideReason: rateOverrideReasonSchema.optional(),
       }),
     )
     .min(1)
@@ -119,6 +165,7 @@ export const updatePoInsertItemSchema = z.object({
   prItemId: z.number().int().positive(),
   unitPricePaise: z.number().int().min(1).max(MAX_MONEY_PAISE).optional(),
   gstPercent: gstPercentSchema.optional(),
+  rateOverrideReason: rateOverrideReasonSchema.optional(),
 });
 export type updatePoInsertItemSchemaType = z.infer<
   typeof updatePoInsertItemSchema
@@ -130,6 +177,7 @@ export const updatePoUpdateItemSchema = z.object({
   id: z.number().int().positive(),
   unitPricePaise: z.number().int().min(1).max(MAX_MONEY_PAISE).optional(),
   gstPercent: gstPercentSchema.optional(),
+  rateOverrideReason: rateOverrideReasonSchema.optional(),
 });
 export type updatePoUpdateItemSchemaType = z.infer<
   typeof updatePoUpdateItemSchema
@@ -188,7 +236,16 @@ export const poListQuerySchema = z
   .object({
     page: z.coerce.number().int().min(1).default(1),
     pageSize: z.coerce.number().int().min(1).max(100).default(10),
-    sortBy: z.enum(["id", "poNumber", "status", "createdAt"]).optional(),
+    sortBy: z
+      .enum([
+        "id",
+        "poNumber",
+        "status",
+        "createdAt",
+        "dueDate",
+        "totalAmountPaise",
+      ])
+      .optional(),
     sortDir: z.enum(["asc", "desc"]).default("asc"),
     // Comma-separated list of statuses, e.g. "draft,approved".
     status: z
@@ -212,8 +269,21 @@ export const poListQuerySchema = z
       .enum(["true", "false"])
       .optional()
       .transform((value) => value === "true"),
+    // BR-FF-24..26, 107: "my POs" and the due-date bucket (any status filter).
+    mine: z
+      .enum(["true", "false"])
+      .optional()
+      .transform((value) =>
+        value === undefined ? undefined : value === "true",
+      ),
+    bucket: poBucketSchema.optional(),
   })
-  .strict();
+  .strict()
+  // `overdue=true` is the same as `bucket=late`; a different bucket is a 400.
+  .refine((q) => !q.overdue || q.bucket === undefined || q.bucket === "late", {
+    message: "overdue=true conflicts with bucket",
+    path: ["bucket"],
+  });
 
 export type poListQuerySchemaType = z.infer<typeof poListQuerySchema>;
 
@@ -285,17 +355,6 @@ export const confirmPoSchema = z.object({
   note: z.string().max(1000).optional(),
 });
 export type confirmPoSchemaType = z.infer<typeof confirmPoSchema>;
-
-// POST /po/:id/invoice — records a supplier invoice against a fully-received
-// PO and moves it to `invoiced`. Full 3-way-match/payment workflow is a
-// future AP feature; this only creates the supplierInvoices row.
-export const markPoInvoicedSchema = z.object({
-  invoiceNumber: z.string().trim().min(1).max(100),
-  invoiceDate: z.coerce.date(),
-  billedAmountPaise: z.number().int().nonnegative().max(MAX_MONEY_PAISE),
-  dueDate: z.coerce.date().optional(),
-});
-export type markPoInvoicedSchemaType = z.infer<typeof markPoInvoicedSchema>;
 
 // POST /po/:id/close — terminal close, legal from `fully_received` or
 // `invoiced`.

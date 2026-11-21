@@ -1,12 +1,18 @@
 "use client";
 
+import { IconDots } from "@tabler/icons-react";
 import { useState } from "react";
 
 import { GrnBypassAlert } from "@/components/pages/grn/GrnBypassAlert";
 import { GrnCorrectionAlert } from "@/components/pages/grn/GrnCorrectionAlert";
-import { GrnQaDecisionModal } from "@/components/pages/grn/GrnQaDecisionModal";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/ui/button";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
 	Table,
 	TableBody,
@@ -18,21 +24,25 @@ import {
 import { useCan } from "@/hooks/use-can";
 import type { GrnItemDetail } from "@/types/grn";
 
+export function isPendingLine(item: GrnItemDetail) {
+	return item.qaStatus === "pending" && !item.isQaBypassed;
+}
+
+/** Lines of one receipt. Inspect (one QA decision) is lifted to the page so the header button shares its dialog. */
 export function GrnLinesTable({
 	grnId,
 	poId,
 	items,
+	onInspect,
 }: {
 	grnId: number;
 	poId: number;
 	items: GrnItemDetail[];
+	onInspect: (line: GrnItemDetail) => void;
 }) {
 	const canDecideQa = useCan("grn.qa_decide");
 	const canBypassQa = useCan("grn.qa_bypass");
 	const canCorrectLine = useCan("grn.correct");
-	const [qaDecisionLine, setQaDecisionLine] = useState<GrnItemDetail | null>(
-		null,
-	);
 	const [bypassLine, setBypassLine] = useState<GrnItemDetail | null>(null);
 	const [correctionLine, setCorrectionLine] = useState<GrnItemDetail | null>(
 		null,
@@ -44,13 +54,11 @@ export function GrnLinesTable({
 				<TableHeader>
 					<TableRow>
 						<TableHead>Item</TableHead>
-						<TableHead>Ordered</TableHead>
-						<TableHead>Received</TableHead>
+						<TableHead>Arrived</TableHead>
 						<TableHead>Accepted</TableHead>
-						<TableHead>Net accepted</TableHead>
 						<TableHead>Rejected</TableHead>
 						<TableHead>QA status</TableHead>
-						<TableHead className="w-48">
+						<TableHead className="w-40">
 							<span className="sr-only">Actions</span>
 						</TableHead>
 					</TableRow>
@@ -59,7 +67,7 @@ export function GrnLinesTable({
 					{items.length === 0 ? (
 						<TableRow>
 							<TableCell
-								colSpan={8}
+								colSpan={6}
 								className="py-8 text-center text-muted-foreground"
 							>
 								No lines on this GRN.
@@ -67,10 +75,11 @@ export function GrnLinesTable({
 						</TableRow>
 					) : (
 						items.map((item) => {
-							const isPendingQa =
-								item.qaStatus === "pending" && !item.isQaBypassed;
+							const pending = isPendingLine(item);
 							const canCorrect =
-								item.qaStatus === "passed" || item.isQaBypassed === true;
+								(item.qaStatus === "passed" || item.isQaBypassed === true) &&
+								canCorrectLine;
+							const canBypass = pending && canBypassQa;
 
 							return (
 								<TableRow key={item.id}>
@@ -81,35 +90,49 @@ export function GrnLinesTable({
 												{item.itemSku}
 											</span>
 											{item.batchNumber ? (
-												<span className="text-xs text-muted-foreground">
+												<span className="text-sm text-muted-foreground">
 													Batch/heat: {item.batchNumber}
 												</span>
 											) : null}
 											{item.isQaBypassed ? (
-												<span className="text-xs text-muted-foreground">
+												<span className="text-sm text-muted-foreground">
 													QA bypassed: {item.qaBypassReason ?? "-"}
 												</span>
 											) : null}
 											{item.overReceiptReason ? (
-												<span className="text-xs text-warning">
+												<span className="text-sm text-warning">
 													Over-receipt +{item.overReceiptExcessQty ?? 0}:{" "}
 													{item.overReceiptReason}
 												</span>
 											) : null}
 										</div>
 									</TableCell>
-									<TableCell>{item.orderedQty}</TableCell>
-									<TableCell>{item.receivedQty}</TableCell>
-									<TableCell>{item.acceptedQty}</TableCell>
-									<TableCell>
-										{item.netAcceptedQty}
+									<TableCell className="tabular-nums">
+										{item.receivedQty} {item.uom}
+									</TableCell>
+									<TableCell className="tabular-nums">
+										{item.acceptedQty} {item.uom}
 										{item.correctedQty > 0 ? (
-											<span className="block text-xs text-muted-foreground">
-												{item.correctedQty} corrected
+											<span className="block text-sm text-muted-foreground">
+												{item.correctedQty} corrected, net {item.netAcceptedQty}
+											</span>
+										) : null}
+										{item.acceptedReturnedQty !== undefined ? (
+											<span className="block text-sm text-muted-foreground">
+												Accepted {item.netAcceptedQty} · returned{" "}
+												{item.acceptedReturnedQty}
 											</span>
 										) : null}
 									</TableCell>
-									<TableCell>{item.rejectedQty ?? 0}</TableCell>
+									<TableCell className="tabular-nums">
+										{item.rejectedQty ?? 0} {item.uom}
+										{item.rejectedReturnedQty !== undefined ? (
+											<span className="block text-sm text-muted-foreground">
+												Rejected {item.rejectedQty ?? 0} · returned{" "}
+												{item.rejectedReturnedQty}
+											</span>
+										) : null}
+									</TableCell>
 									<TableCell>
 										<StatusBadge
 											doc="grnQa"
@@ -117,40 +140,47 @@ export function GrnLinesTable({
 										/>
 									</TableCell>
 									<TableCell>
-										<div className="flex flex-wrap gap-2">
-											{isPendingQa ? (
-												<>
-													{canDecideQa ? (
-														<Button
-															type="button"
-															size="sm"
-															variant="outline"
-															onClick={() => setQaDecisionLine(item)}
-														>
-															Decide
-														</Button>
-													) : null}
-													{canBypassQa ? (
-														<Button
-															type="button"
-															size="sm"
-															variant="outline"
-															onClick={() => setBypassLine(item)}
-														>
-															Bypass
-														</Button>
-													) : null}
-												</>
-											) : null}
-											{canCorrect && canCorrectLine ? (
+										<div className="flex flex-wrap items-center justify-end gap-2">
+											{pending && canDecideQa ? (
 												<Button
 													type="button"
 													size="sm"
 													variant="outline"
-													onClick={() => setCorrectionLine(item)}
+													onClick={() => onInspect(item)}
 												>
-													Correct
+													Inspect
 												</Button>
+											) : null}
+											{canBypass || canCorrect ? (
+												<DropdownMenu>
+													<DropdownMenuTrigger asChild>
+														<Button
+															type="button"
+															size="sm"
+															variant="outline"
+															aria-label={`More actions for ${item.itemName}`}
+														>
+															<IconDots className="size-3.5" />
+															More
+														</Button>
+													</DropdownMenuTrigger>
+													<DropdownMenuContent align="end">
+														{canBypass ? (
+															<DropdownMenuItem
+																onSelect={() => setBypassLine(item)}
+															>
+																Bypass QA
+															</DropdownMenuItem>
+														) : null}
+														{canCorrect ? (
+															<DropdownMenuItem
+																onSelect={() => setCorrectionLine(item)}
+															>
+																Correction
+															</DropdownMenuItem>
+														) : null}
+													</DropdownMenuContent>
+												</DropdownMenu>
 											) : null}
 										</div>
 									</TableCell>
@@ -160,18 +190,6 @@ export function GrnLinesTable({
 					)}
 				</TableBody>
 			</Table>
-
-			{qaDecisionLine ? (
-				<GrnQaDecisionModal
-					grnId={grnId}
-					poId={poId}
-					line={qaDecisionLine}
-					open={qaDecisionLine !== null}
-					onOpenChange={(open) => {
-						if (!open) setQaDecisionLine(null);
-					}}
-				/>
-			) : null}
 
 			{bypassLine ? (
 				<GrnBypassAlert

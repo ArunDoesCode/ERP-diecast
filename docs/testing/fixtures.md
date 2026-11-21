@@ -12,7 +12,7 @@ only — never use it to learn what production code does.
 | The test DB is in memory: empty after a container restart. Rebuild with `bun run db:test:prepare` (never `db:reset`) | `docs/runbooks/test-db-reset.md` |
 | Real DB, no mocks. HTTP tests go through the full app: `createApp()` from `backend/src/app.ts` | every `tests/routes/*.test.ts` |
 | Tests live in `backend/tests/<layer>/` (`routes`, `service`, `repository`, `lib`, `types`, `scripts`; `scenarios` is created with the first scenario test) and import with `../../src/...` | folder layout |
-| **There are no shared helper files.** Each test file defines its own helpers at the top. Copy from the reference file below; do not import helpers from another test file | all files |
+| **Three shared helpers exist in `backend/tests/helpers/`:** `rfqFixtures.ts` (section 3a, RFQ / rate-contract / PO-contract tests), `ratingFixtures.ts` (3b, supplier rating), `dispatchFixtures.ts` (3c, delivery notes). Everywhere else each test file defines its own helpers at the top; copy from the reference files below and never import helpers from another test file | `tests/helpers/` |
 
 ## 2. What the test DB already holds (after `db:test:prepare`)
 Same as CI (`db:reset --no-fixtures`): schema, plus
@@ -37,6 +37,31 @@ row your test needs.
 | Approval flow | `backend/tests/routes/approval-requests.test.ts`, `approval-policies.test.ts` | policies with negative priorities, `act()` helper |
 | Smoke of the app + error mapping | `backend/tests/app.test.ts` | 401, 403, 404, validation |
 | Scripts run as a child process on a scratch DB | `backend/tests/scripts/*.test.ts` | `run()`, `withDb(url)`, `assertScratchOnly()`, sentinels |
+
+## 3a. Shared helper — `backend/tests/helpers/rfqFixtures.ts`
+Used by `rfq.test.ts`, `rfqQuotes.test.ts`, `rfqAward.test.ts`, `rateContract.test.ts`, `poContract.test.ts`.
+- `const fx = makeRfqFx("<tag>")` per file: its own `TEST_<tag>_<now>` prefix, its own rows, its own `fx.cleanup()` (call in `afterAll`). Files never share data.
+- Actors: `fx.owner()`, `owner2()`, `bo()`, `floor()`, `superAdmin()` (seed roles), or `fx.actor(key, ["rfq.view", …])` for a throw-away role with exactly those keys. Cached per key.
+- **`fx.call` signs a fresh token on every request**, so tests that move the clock with `setSystemTime(+N days)` stay authenticated (a token cached before the jump expires after 15 min of shifted time → 401).
+- Builders: `newSupplier`, `newItem`, `newPr` (approved PR + lines inserted straight into the tables — fixture shortcut), `mkRfq`, `quoteBody` / `enterQuote` / `mkQuote`, `award`, `mkContract`, `poLine` / `createPo`, `maintenancePoPolicy`, `submitPo`, `approve`, `poItems`; HTTP wrappers `rfqApi`, `rcApi`, `poApi`; `istDay(offset)`.
+- Extend this file for RFQ-area tests instead of copying it; for other modules the per-file rule still holds.
+
+## 3b. Shared helper — `backend/tests/helpers/ratingFixtures.ts`
+Used by `supplierRating.test.ts`, `supplierRatingList.test.ts`, `supplierRatingLines.test.ts`.
+- `const fx = makeRatingFx("<tag>")` per file: own `TEST_<tag>_<now>` prefix, own rows, `fx.cleanup()` in `afterAll`.
+- **Fixture shortcut:** suppliers, items, POs, GRNs and their lines are inserted straight into the tables so every date and qty is exact (not a production path). Timestamps are written at noon IST (`noonIst(day)`) so the IST day never slips.
+- Actors: `fx.owner()`, `bo()`, `floor()`, `qa()`, `superAdmin()`, or `fx.actor(key, ["supplier.rating.view"])` for a role with exactly those keys.
+- Reads: `fx.rating(path, who?)` (GET under `/api/supplier-rating`, default actor back_office), `card(id)`, `lines(id, query)`, `trend(id)` (return `data`).
+- Builders: `newSupplier({active?, name?})`, `newItem({uom?, standard?})`, `mkPo(supplierId, spec)` (status default `fully_received`, `due`, `revised`, `created`, lines, `grns: [{day, lines: [{line, recv, rej}]}]`), `delivered(supplierId, n, {due?, recv?, rej?, qty?})` (n on-time lines in one call), `addCorrection(grnItemId, qty)`.
+- Date helpers (exported): `istDay(offset)`, `monthDay(monthsAgo, dd)`, `monthKey(monthsAgo)`, `noonIst(day)`.
+
+## 3c. Shared helper — `backend/tests/helpers/dispatchFixtures.ts`
+Used by `dispatch.test.ts`, `dispatchPost.test.ts`, `dispatchCancel.test.ts`.
+- `const fx = makeDispatchFx("<tag>")` per file; `fx.cleanup()` in `afterAll`. **The single `company_settings` row is saved on the first `setupCompany()` and restored in `cleanup()`** — call `setupCompany()` before a post test (plant `PLANT`, state 27, limit ₹50,000).
+- Actors by seed role name (`"owner" | "back_office" | "floor_supervisor" | …`), token cached per role: `fx.call(role, method, path, body)`, `fx.dsp(role, method, "/notes…", body)` (prefix `/api/dispatch`); `null` role = no token.
+- Builders: `mkItem(over)`, `mkLoc()`, `mkVirtualLoc()`, `mkVendorLoc()`, `setLocActive(id, bool)`, `mkCustomer(over)`, `stock(item, loc, qty, cost)` (opening stock through the real movements route), `mkSo({customerId, lines, orderDate?, shipTo?, confirm?})` (created and confirmed through the real SO routes by back_office), `soDetail`, `soOp`, `soEdit`, `soPrice`, `setLimit(paise)`, `setCompany(over)`, `ewayNo()` (unique 12 digits), `roadTransport(over)`.
+- Notes: `draft(body, role?)` / `mustDraft`, `post(id, role = floor_supervisor)` / `mustPost`, `cancelPosted`, `cancelDraft`, `noteDetail(id, role = owner)`; `scenario({qty, soQty, price, gst, stockQty, cost, customerOver, transport, lotNo, uom})` = customer + location with stock + confirmed SO + draft, ready to post (defaults match the spec example: 1000 on the SO, 700 in stock, 600 on the note).
+- Readers: `ledgerOfNote(id)`, `ledgerOfItem(itemId)`, `balance(item, loc)`, `itemRow(id)`. Exported `istDay(offset)`, `fyOf(day)` (DN number FY), `PLANT`.
 
 ## 4. Helper patterns and their defaults
 - **Unique names.** `const RUN = \`TEST_<module>_${Date.now()}\`; let seq = 0; const uid = () => \`${RUN}_${++seq}\`;`
@@ -102,6 +127,6 @@ Also the run's `.pipeline/<id>/contract.md`. Things that were guessed wrong befo
 
 ## Not there yet
 - `frontend/e2e/` (Playwright) does not exist; this file gets a frontend section when it does.
-- No shared factory module. If the same helper is copied a fifth time, test-writer may propose
-  `backend/tests/helpers/` in its report; the coordinator opens an issue (it is a change to tests, so only
-  test-writer builds it).
+- No general shared factory module (only the per-area helpers `rfqFixtures.ts`, `ratingFixtures.ts`, `dispatchFixtures.ts`). If the same helper is
+  copied a fifth time elsewhere, test-writer may propose another `backend/tests/helpers/` file in its report;
+  the coordinator opens an issue (it is a change to tests, so only test-writer builds it).

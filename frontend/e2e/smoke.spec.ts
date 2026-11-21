@@ -25,13 +25,12 @@ test("T-4 seeded admin logs in and sees at least one purchase requisition row", 
 	await page.getByLabel("Email").fill(EMAIL);
 	await page.getByLabel("Password").fill(PASSWORD);
 	await page.getByRole("button", { name: "Sign in" }).click();
-	await page.waitForURL("**/landing");
+	await page.waitForURL("**/home");
 
 	await page.goto("/purchase-requisitions");
 	await expect(page).toHaveURL(/\/purchase-requisitions/);
-	// The list is a card grid (no table): each item is a card whose title button shows the PR number.
-	// Follow-up: a data-testid on the list item would be a sturdier hook than the number pattern.
-	const items = page.getByRole("button", { name: /^PR-\S+/ });
+	// BR-FF-110: the row number is a real link to the requisition page.
+	const items = page.getByRole("link", { name: /^PR-\S+/ });
 	await expect(items.first()).toBeVisible({ timeout: 15_000 });
 	expect(await items.count()).toBeGreaterThan(0);
 });

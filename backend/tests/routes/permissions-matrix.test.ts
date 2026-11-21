@@ -82,7 +82,6 @@ const MATRIX: [string, string, R[]][] = [
       ["POST", "/api/po/:id/escalate"],
       ["PATCH", "/api/po/:id/delay"],
       ["POST", "/api/po/:id/confirm"],
-      ["POST", "/api/po/:id/invoice"],
       ["POST", "/api/po/:id/close"],
     ] as [string, string][]
   ).map(([m, p]): [string, string, R[]] => [m, p, OW_BO]),

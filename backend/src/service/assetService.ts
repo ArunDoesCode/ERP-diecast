@@ -1,3 +1,4 @@
+import { db } from "../db/client";
 import { type Actor, can } from "../lib/auth-middleware";
 import {
   BadRequestError,
@@ -6,13 +7,17 @@ import {
   InternalServerError,
   NotFoundError,
 } from "../lib/errors";
+import { istDayKey } from "../lib/ist-day";
+import { contractCapQty, isRealDay, round3 } from "../lib/rfq-math";
 import { assetRepository } from "../repository/assetRepository";
+import { rateContractRepository } from "../repository/rateContractRepository";
 import type {
   assetInventoryMovementListQuerySchemaType,
   assetItemCreateSchemaType,
   assetItemListQuerySchemaType,
   assetItemUpdateSchemaType,
   assetLastRateQuerySchemaType,
+  assetLastRatesQuerySchemaType,
   assetLocationCreateSchemaType,
   assetLocationListQuerySchemaType,
   assetLocationUpdateSchemaType,
@@ -89,7 +94,12 @@ function getConflictError(error: unknown) {
 // BR-INV-12, 13 on the values the location will have.
 async function checkLocationRules(
   next: {
-    type: "main_store" | "vendor_premise" | "finished_goods" | "scrap_yard";
+    type:
+      | "main_store"
+      | "vendor_premise"
+      | "finished_goods"
+      | "scrap_yard"
+      | "store";
     linkedVendorId: number | null;
   },
   currentId: number | undefined,
@@ -134,6 +144,69 @@ function assertReorderLevelFitsUnit(reorderLevel: number, uom: string) {
   }
 }
 
+// BR-RO-09: reorder qty, min order qty and order multiple follow the same unit rule.
+function assertReorderFieldsFitUnit(
+  fields: { reorderQty: number; minOrderQty: number; orderMultiple: number },
+  uom: string,
+) {
+  for (const value of Object.values(fields)) {
+    assertReorderLevelFitsUnit(value, uom);
+  }
+}
+
+type LastRateChoice = NonNullable<
+  Awaited<ReturnType<typeof assetRepository.getLastRate>>
+>;
+
+// One fulfilment lookup for every contract-sourced choice (cap - ordered = qtyLeft).
+async function shapeLastRates(entries: [number, LastRateChoice][]) {
+  const lineIds = entries.flatMap(([, r]) =>
+    r.source === "contract" &&
+    r.agreedQty !== null &&
+    r.agreedQty !== undefined &&
+    r.contractItemId !== undefined
+      ? [r.contractItemId]
+      : [],
+  );
+  const fulfilment =
+    lineIds.length > 0
+      ? await rateContractRepository.fulfilmentByLine(db, lineIds)
+      : new Map<number, { ordered: number }>();
+  return entries.map(([itemId, result]) => {
+    if (result.source !== "contract") {
+      return { itemId, ratePaise: result.ratePaise, source: result.source };
+    }
+    let qtyLeft: number | null = null;
+    if (result.agreedQty !== null && result.agreedQty !== undefined) {
+      const ordered = round3(
+        fulfilment.get(result.contractItemId ?? 0)?.ordered ?? 0,
+      );
+      qtyLeft = round3(
+        contractCapQty(result.agreedQty, result.allowancePercent ?? 0) -
+          ordered,
+      );
+    }
+    return {
+      itemId,
+      ratePaise: result.ratePaise,
+      source: result.source,
+      ...(result.contractItemId !== undefined
+        ? { contractItemId: result.contractItemId }
+        : {}),
+      ...(result.contractId !== undefined
+        ? { contractId: result.contractId }
+        : {}),
+      ...(result.contractNumber !== undefined
+        ? { contractNumber: result.contractNumber }
+        : {}),
+      ...(result.gstPercent !== undefined
+        ? { gstPercent: result.gstPercent }
+        : {}),
+      qtyLeft,
+    };
+  });
+}
+
 export const assetService = {
   async listItems(params: assetItemListQuerySchemaType) {
     const { rows, total } = await assetRepository.listItems(params);
@@ -145,6 +218,14 @@ export const assetService = {
 
   async createItem(input: assetItemCreateSchemaType, actorId: number) {
     assertReorderLevelFitsUnit(input.reorderLevel ?? 0, input.uom);
+    assertReorderFieldsFitUnit(
+      {
+        reorderQty: input.reorderQty ?? 0,
+        minOrderQty: input.minOrderQty ?? 0,
+        orderMultiple: input.orderMultiple ?? 0,
+      },
+      input.uom,
+    );
     try {
       const created = await assetRepository.createItem(input, actorId);
       if (!created) {
@@ -186,6 +267,21 @@ export const assetService = {
               input.uom ?? current.uom,
             );
           }
+          if (
+            input.reorderQty !== undefined ||
+            input.minOrderQty !== undefined ||
+            input.orderMultiple !== undefined ||
+            uomChanges
+          ) {
+            assertReorderFieldsFitUnit(
+              {
+                reorderQty: input.reorderQty ?? current.reorderQty,
+                minOrderQty: input.minOrderQty ?? current.minOrderQty,
+                orderMultiple: input.orderMultiple ?? current.orderMultiple,
+              },
+              input.uom ?? current.uom,
+            );
+          }
           return {
             ...input,
             lastUpdatedBy: actorId,
@@ -206,12 +302,45 @@ export const assetService = {
     }
   },
 
-  async getLastRate(itemId: number, params: assetLastRateQuerySchemaType) {
-    const result = await assetRepository.getLastRate(itemId, params.supplierId);
+  // BR-RFQ-56: the contract rate is offered only to po.manage / contract.view holders.
+  async getLastRate(
+    itemId: number,
+    params: assetLastRateQuerySchemaType,
+    actor: Actor,
+  ) {
+    if (params.onDate !== undefined && !isRealDay(params.onDate)) {
+      throw new BadRequestError("onDate is not a valid date");
+    }
+    const result = await assetRepository.getLastRate(
+      itemId,
+      params.supplierId,
+      {
+        onDate: params.onDate ?? istDayKey(),
+        includeContract: can(actor, "po.manage") || can(actor, "contract.view"),
+      },
+    );
     if (!result) {
       throw new NotFoundError("Item not found.");
     }
-    return result;
+    const [shaped] = await shapeLastRates([[itemId, result]]);
+    const { itemId: _omit, ...rest } = shaped as NonNullable<typeof shaped>;
+    return rest;
+  },
+
+  // PERF-01: batched last rates, same visibility rules (BR-RFQ-56).
+  async getLastRates(params: assetLastRatesQuerySchemaType, actor: Actor) {
+    if (params.onDate !== undefined && !isRealDay(params.onDate)) {
+      throw new BadRequestError("onDate is not a valid date");
+    }
+    const choices = await assetRepository.getLastRates(
+      params.itemIds,
+      params.supplierId,
+      {
+        onDate: params.onDate ?? istDayKey(),
+        includeContract: can(actor, "po.manage") || can(actor, "contract.view"),
+      },
+    );
+    return shapeLastRates([...choices.entries()]);
   },
 
   async listServices(params: assetServiceListQuerySchemaType) {

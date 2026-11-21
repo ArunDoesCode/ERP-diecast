@@ -3,6 +3,7 @@ module: subcontracting
 spec: docs/specs/subcontracting.md (v3, frozen)
 last_verified_commit: de0fcfc
 last_verified_on: 2026-09-29
+partially_verified: d386e04 (2026-11-21) — company settings row (columns + history field enum) and the e-way limit used by dispatch
 depends_on: [suppliers, inventory, approval, grn]
 ---
 
@@ -16,7 +17,7 @@ depends_on: [suppliers, inventory, approval, grn]
 | Layer | Path | Key symbols |
 |---|---|---|
 | schema | `backend/src/db/schemas/02_procurement-purchasing.ts` | `subcontractingOrders`, `subcontractingOrderItems`, `scoChallans`, `scoChallanLines`, `subcontractingGrns` (receipts), `subcontractingGrnItems`, `scoReceiptSettlements` |
-| schema | `backend/src/db/schemas/04_company.ts` | `companySettings` (one row: plant name, address, GSTIN, state) |
+| schema | `backend/src/db/schemas/04_company.ts` | `companySettings` (one row: plant name, address, GSTIN, state, `priceToleranceBp`, `weightToleranceBp`, `ewayIntraLimitPaise`), `companySettingsHistory` |
 | schema | `02_procurement-catalog.ts` | `item_master.hsn_code`; ledger types `sco_issue`, `sco_receipt`, `sco_loss` |
 | routes | `backend/src/routes/sco.ts`, `company.ts` (+ `end-points.ts`) | `/api/sco/*`, `/api/company/settings` |
 | service | `service/scoService.ts`, `scoChallanService.ts`, `scoReceiptService.ts`, `scoReportService.ts`, `companySettingsService.ts` | order/approval/close, challan, receipt + QA, reports |
@@ -32,6 +33,8 @@ Endpoints and payloads: `.pipeline/subcontracting/contract.md`, or `bun run cont
 - Challan `JWC/<FY>/<seq>` (FY = Apr–Mar, e.g. `27-28`) + lines (qty, issue cost, heat, HSN, `settledQty`); due date = date + 1 year.
 - Receipt (`subcontracting_grns`) + lines; status/qaStatus reuse `grn_status` (`draft` never used; default `pending_qa`); vendor challan/invoice no. unique per vendor.
 - `sco_receipt_settlements`: receipt line ↔ challan line, `qty`, `processed_qty` (the part drawn by processed pieces — QA cost uses only this).
+- `company_settings.eway_intra_limit_paise` (bigint, default 5,000,000 = ₹50,000, check 1..10,000,000,000; migration `20261121111910_empty_goblin_queen`): same-state e-way limit read by dispatch only (`dispatch.md`); the SCO challan keeps its own fixed ₹50,000 rule. `PATCH /api/company/settings` takes it as optional (omitted = unchanged; the four old fields stay required); `GET` returns it. Settings screen field "E-way bill limit, same state (₹)" (`CompanySettingsForm`).
+- `company_settings_history.field` (and `GET /api/company/settings/history` enum in `sco.types.ts`): `name | address | gstin | stateCode | priceToleranceBp | weightToleranceBp | ewayIntraLimitPaise`; values as text, paise for the e-way limit (`companySettingsRepository` upsert writes one row per changed field; no change = no row).
 - Ledger rows: `sco_issue` (referenceId = challan id), `sco_receipt` (receipt id / line id), `sco_loss` (SCO id / line id, notes = reason). Vendor location = `<vendor> (job work)`, virtual, one per vendor (unique index).
 
 ## Gotchas
@@ -89,3 +92,4 @@ GST sources: [TaxGuru Sec 143](https://taxguru.in/goods-and-service-tax/job-work
 |---|---|---|
 | 2026-09-29 | — | Map created with spec draft v0 (schema only, no feature code) |
 | 2026-09-29 | PR #14 (0c84bea) | Built S1–S4 to spec v2; review fixes (CR-1 cost, indexes, deadlock order); v3: future challan date → 400 |
+| 2026-11-21 | bb8cfe9..d386e04 (partial) | Dispatch: `company_settings.eway_intra_limit_paise` + history; history field enum now lists the tolerance and e-way fields. Rest not re-verified |

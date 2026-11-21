@@ -1,0 +1,2 @@
+ALTER TABLE "company_settings" ADD COLUMN "eway_intra_limit_paise" bigint DEFAULT 5000000 NOT NULL;--> statement-breakpoint
+ALTER TABLE "company_settings" ADD CONSTRAINT "company_settings_eway_limit_range" CHECK ("eway_intra_limit_paise" between 1 and 10000000000);

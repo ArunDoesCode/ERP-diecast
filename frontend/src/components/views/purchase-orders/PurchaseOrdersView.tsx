@@ -1,6 +1,12 @@
 "use client";
 
-import { IconFileOff, IconListCheck, IconSearch } from "@tabler/icons-react";
+import {
+	IconAlertTriangle,
+	IconFileOff,
+	IconPlus,
+	IconSearch,
+	IconX,
+} from "@tabler/icons-react";
 import { useTable } from "@tanstack/react-table";
 import Link from "next/link";
 import { useMemo } from "react";
@@ -26,132 +32,181 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import {
-	type POQueueSearchField,
-	type POQueueStatusFilter,
-	usePOQueueControls,
-} from "@/components/views/purchase-orders/use-po-queue-controls";
-import { useCan } from "@/hooks/use-can";
-import { usePurchaseRequisitionsQuery } from "@/lib/api/purchase-requisitions/queries";
+	type PoGroup,
+	usePOListControls,
+} from "@/components/views/purchase-orders/use-po-list-controls";
+import type {
+	PoListQuery,
+	PoListRowV2,
+	PoListSortField,
+} from "@/lib/api/purchase-orders/list-types";
+import { usePurchaseOrdersQuery } from "@/lib/api/purchase-orders/queries";
 import { formatDate, formatDocNo, formatMoney } from "@/lib/format";
-import type { StatusCounts } from "@/types/purchase-orders";
-import {
-	type PRStatus,
-	type PRType,
-	type PurchaseRequisition,
-	prTypeValues,
-} from "@/types/purchase-requisitions";
 
-const QUEUE_STATUSES: PRStatus[] = ["approved", "partial_ordered"];
-
-const columns: DataTableColumnDef<PurchaseRequisition>[] = [
-	{
-		accessorKey: "prNumber",
-		header: "PR no.",
-		cell: ({ row }) => (
-			<Link
-				href={`/purchase-orders/${row.original.id}`}
-				className="font-mono text-brand-accent hover:underline"
-			>
-				{formatDocNo(row.original.prNumber)}
-			</Link>
-		),
-	},
-	{
-		accessorKey: "status",
-		header: "Status",
-		cell: ({ row }) => <StatusBadge doc="pr" status={row.original.status} />,
-	},
-	{ accessorKey: "type", header: "Type" },
-	{
-		accessorKey: "notes",
-		header: "Notes",
-		cell: ({ row }) => (
-			<span className="line-clamp-1 max-w-xs text-muted-foreground">
-				{row.original.notes?.trim() || "–"}
-			</span>
-		),
-	},
-	{
-		accessorKey: "estimatedAmountPaise",
-		header: "Estimated value",
-		meta: { numeric: true },
-		cell: ({ row }) => formatMoney(row.original.estimatedAmountPaise),
-	},
-	{
-		accessorKey: "createdAt",
-		header: "Created",
-		cell: ({ row }) => formatDate(row.original.createdAt),
-	},
+const SORT_FIELDS: Array<{ label: string; value: PoListSortField }> = [
+	{ label: "Newest first", value: "createdAt" },
+	{ label: "PO number", value: "poNumber" },
+	{ label: "Status", value: "status" },
+	{ label: "Due date", value: "dueDate" },
+	{ label: "Total", value: "totalAmountPaise" },
 ];
 
-export function PurchaseOrdersView() {
-	const canSeeTracking = useCan("po.manage");
+const BUCKET_LABEL = { late: "Late", today: "Today", later: "Later" } as const;
 
+const IST_DAY = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" });
+
+function makeColumns(today: string): DataTableColumnDef<PoListRowV2>[] {
+	return [
+		{
+			accessorKey: "poNumber",
+			header: "PO no.",
+			cell: ({ row }) => (
+				<Link
+					href={`/purchase-orders/${row.original.id}`}
+					className="font-mono text-brand-accent hover:underline"
+				>
+					{formatDocNo(row.original.poNumber)}
+				</Link>
+			),
+		},
+		{
+			accessorKey: "createdAt",
+			header: "Date",
+			cell: ({ row }) => formatDate(row.original.createdAt),
+		},
+		{
+			accessorKey: "supplierName",
+			header: "Supplier",
+			cell: ({ row }) => row.original.supplierName || "–",
+		},
+		{
+			accessorKey: "lineCount",
+			header: "Lines",
+			meta: { numeric: true },
+			cell: ({ row }) => row.original.lineCount ?? "–",
+		},
+		{
+			accessorKey: "totalAmountPaise",
+			header: "Total",
+			meta: { numeric: true },
+			cell: ({ row }) => formatMoney(row.original.totalAmountPaise),
+		},
+		{
+			id: "dueDate",
+			header: "Due date",
+			cell: ({ row }) => {
+				const { status } = row.original;
+				const due =
+					row.original.dueDate ??
+					row.original.revisedDeliveryDate ??
+					row.original.expectedDeliveryDate;
+				if (!due) return "–";
+				const open = status === "dispatched" || status === "partial_received";
+				const late = open && due.slice(0, 10) < today;
+				return late ? (
+					<span className="inline-flex items-center gap-1 font-medium text-destructive">
+						<IconAlertTriangle className="size-3.5" aria-hidden="true" />
+						{formatDate(due)}
+						<span className="sr-only"> (late)</span>
+					</span>
+				) : (
+					formatDate(due)
+				);
+			},
+		},
+		{
+			accessorKey: "receivedPct",
+			header: "Received",
+			meta: { numeric: true },
+			cell: ({ row }) =>
+				row.original.receivedPct === undefined
+					? "–"
+					: `${row.original.receivedPct} %`,
+		},
+		{
+			accessorKey: "status",
+			header: "Status",
+			cell: ({ row }) => <StatusBadge doc="po" status={row.original.status} />,
+		},
+	];
+}
+
+export function PurchaseOrdersView() {
 	const {
+		bucket,
+		clearBucket,
+		clearMine,
 		filtersActive,
-		onPRNumberChange,
+		group,
+		mine,
+		onGroupChange,
 		onPageSizeChange,
-		onSearchFieldChange,
+		onQChange,
+		onSortByChange,
 		onSortDirectionChange,
-		onStatusChange,
-		onTypeFilterChange,
 		page,
 		pageSize,
-		prNumberSearch,
 		q,
+		qInput,
 		resetFilters,
-		searchField,
 		setPage,
+		sortBy,
 		sortDir,
 		status,
-		typeFilter,
-	} = usePOQueueControls();
+	} = usePOListControls();
 
-	// BR-PR-48: the PR number search goes in `q`, the type in its own param.
-	const queueQuery = usePurchaseRequisitionsQuery({
+	const params: PoListQuery = {
 		page,
 		pageSize,
-		sortBy: "createdAt",
+		q,
+		status,
+		mine: mine ? true : undefined,
+		bucket: bucket ?? undefined,
+		sortBy,
 		sortDir,
-		status: status === "all" ? QUEUE_STATUSES : [status],
-		...(searchField === "prNumber"
-			? { q }
-			: typeFilter !== "all"
-				? { type: typeFilter }
-				: {}),
-	});
+	};
+	const poQuery = usePurchaseOrdersQuery(params);
+	const result = poQuery.data;
 
-	// BR-PO-26: the quick-filter counts come in the same answer's meta.
-	const statusCounts = (
-		queueQuery.data?.meta as
-			| { statusCounts?: StatusCounts<PRStatus> }
-			| undefined
-	)?.statusCounts;
-	const approved = statusCounts?.approved;
-	const partial = statusCounts?.partial_ordered;
+	const orders = useMemo(() => result?.data ?? [], [result]);
+	const total = result?.meta.total ?? 0;
+	const counts = result?.meta.statusCounts;
 
+	// BR-FF-109 groups. Open = dispatched + partly received; every Late row is also Open.
+	const n = (key: keyof NonNullable<typeof counts>) => counts?.[key] ?? 0;
 	const quick = [
 		{
 			key: "all",
 			label: "All",
-			count:
-				approved !== undefined && partial !== undefined
-					? approved + partial
-					: undefined,
+			count: counts
+				? Object.values(counts).reduce((sum, v) => sum + (v ?? 0), 0)
+				: undefined,
 		},
-		{ key: "approved", label: "Approved", count: approved },
-		{ key: "partial_ordered", label: "Partly ordered", count: partial },
+		{ key: "draft", label: "Draft", count: counts ? n("draft") : undefined },
+		{
+			key: "in_approval",
+			label: "In approval",
+			count: counts ? n("pending_approval") : undefined,
+		},
+		{
+			key: "to_send",
+			label: "To send",
+			count: counts ? n("approved") : undefined,
+		},
+		{
+			key: "open",
+			label: "Open",
+			count: counts ? n("dispatched") + n("partial_received") : undefined,
+		},
+		{ key: "late", label: "Late", count: result?.meta.lateCount },
 	];
 
-	const requisitions = useMemo(
-		() => queueQuery.data?.data ?? [],
-		[queueQuery.data],
-	);
-	const total = queueQuery.data?.meta.total ?? 0;
+	const today = IST_DAY.format(new Date());
+	const columns = useMemo(() => makeColumns(today), [today]);
 
 	const table = useTable({
 		features: dataTableFeatures,
-		data: requisitions,
+		data: orders,
 		columns,
 		manualPagination: true,
 		manualSorting: true,
@@ -162,12 +217,7 @@ export function PurchaseOrdersView() {
 			icon={IconFileOff}
 			title="Nothing matches these filters"
 			action={
-				<Button
-					type="button"
-					variant="outline"
-					size="sm"
-					onClick={resetFilters}
-				>
+				<Button type="button" variant="outline" onClick={resetFilters}>
 					Reset filters
 				</Button>
 			}
@@ -175,8 +225,16 @@ export function PurchaseOrdersView() {
 	) : (
 		<EmptyState
 			icon={IconFileOff}
-			title="No approved requisitions waiting for a purchase order"
-			description="Approved requisitions show up here when they are ready to order."
+			title="No purchase orders yet"
+			description="Orders are made from approved requisition lines."
+			action={
+				<Button asChild size="lg">
+					<Link href="/purchase-requisitions?toOrder=1">
+						<IconPlus />
+						Requisitions to order
+					</Link>
+				</Button>
+			}
 		/>
 	);
 
@@ -184,104 +242,109 @@ export function PurchaseOrdersView() {
 		<div className="flex w-full flex-col gap-4">
 			<PageHeader
 				title="Purchase orders"
-				description="Approved PR lines waiting for PO draft."
+				description="Track every order through approval, sending and receipt."
 				actions={
-					canSeeTracking ? (
-						<Button type="button" variant="outline" size="sm" asChild>
-							<Link href="/purchase-orders/tracking">
-								<IconListCheck />
-								PO tracking
-							</Link>
-						</Button>
-					) : undefined
+					<Button asChild size="lg" variant="outline">
+						<Link href="/purchase-requisitions?toOrder=1">To order</Link>
+					</Button>
 				}
 			/>
 
 			<FilterBar
 				quick={quick}
-				value={status}
-				onChange={(key) => onStatusChange(key as POQueueStatusFilter)}
+				value={group ?? "all"}
+				onChange={(key) =>
+					onGroupChange(key === "all" ? null : (key as PoGroup))
+				}
 				onReset={resetFilters}
 				filtersActive={filtersActive}
 			>
-				<Select
-					value={searchField}
-					onValueChange={(value) =>
-						onSearchFieldChange(value as POQueueSearchField)
-					}
-				>
-					<SelectTrigger className="w-36" aria-label="Filter field">
-						<SelectValue placeholder="Filter field" />
-					</SelectTrigger>
-					<SelectContent>
-						<SelectItem value="prNumber">PR Number</SelectItem>
-						<SelectItem value="type">Type</SelectItem>
-					</SelectContent>
-				</Select>
-
-				{searchField === "prNumber" ? (
-					<div className="relative w-48">
-						<IconSearch
-							aria-hidden="true"
-							className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground"
-						/>
-						<Input
-							value={prNumberSearch}
-							onChange={(event) => onPRNumberChange(event.target.value)}
-							placeholder="Search PR number"
-							aria-label="Search PR number"
-							className="pl-7"
-						/>
-					</div>
-				) : (
-					<Select
-						value={typeFilter}
-						onValueChange={(value) =>
-							onTypeFilterChange(value as "all" | PRType)
-						}
+				{mine ? (
+					<Button
+						type="button"
+						variant="outline"
+						className="h-10"
+						onClick={clearMine}
+						aria-label="Show everyone's orders"
 					>
-						<SelectTrigger className="w-40" aria-label="Type">
-							<SelectValue placeholder="Select type" />
+						Mine only
+						<IconX className="size-3.5" aria-hidden="true" />
+					</Button>
+				) : null}
+				{bucket && group !== "late" ? (
+					<Button
+						type="button"
+						variant="outline"
+						className="h-10"
+						onClick={clearBucket}
+						aria-label={`Clear the ${bucket} filter`}
+					>
+						{BUCKET_LABEL[bucket]} only
+						<IconX className="size-3.5" aria-hidden="true" />
+					</Button>
+				) : null}
+
+				<div className="relative w-56">
+					<IconSearch
+						aria-hidden="true"
+						className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground"
+					/>
+					<Input
+						value={qInput}
+						onChange={(event) => onQChange(event.target.value)}
+						placeholder="Search PO number or notes"
+						aria-label="Search PO number or notes"
+						className="h-10 pl-7"
+					/>
+				</div>
+
+				<div className="flex items-center gap-2">
+					<Select
+						value={sortBy}
+						onValueChange={(value) => onSortByChange(value as PoListSortField)}
+					>
+						<SelectTrigger className="h-10 w-40" aria-label="Sort by">
+							<SelectValue placeholder="Sort by" />
 						</SelectTrigger>
 						<SelectContent>
-							<SelectItem value="all">All types</SelectItem>
-							{prTypeValues.map((type) => (
-								<SelectItem key={type} value={type}>
-									{type}
+							{SORT_FIELDS.map((field) => (
+								<SelectItem key={field.value} value={field.value}>
+									{field.label}
 								</SelectItem>
 							))}
 						</SelectContent>
 					</Select>
-				)}
 
-				<div className="flex items-center gap-2 text-xs text-muted-foreground">
-					<span>Asc</span>
-					<Switch
-						checked={sortDir === "desc"}
-						onCheckedChange={onSortDirectionChange}
-						aria-label="Toggle sort direction"
-					/>
-					<span>Dsc</span>
+					<div className="flex items-center gap-2 text-sm text-muted-foreground">
+						<span>Asc</span>
+						<Switch
+							checked={sortDir === "desc"}
+							onCheckedChange={onSortDirectionChange}
+							aria-label="Toggle sort direction"
+						/>
+						<span>Dsc</span>
+					</div>
 				</div>
 			</FilterBar>
 
 			<DataTable
 				table={table}
-				isLoading={queueQuery.isLoading}
+				isLoading={poQuery.isLoading}
 				hidePagination
+				tight
 				emptyState={emptyState}
 				errorState={
-					queueQuery.isError ? (
+					poQuery.isError ? (
 						<ErrorState
 							message={
-								queueQuery.error instanceof Error
-									? queueQuery.error.message
+								poQuery.error instanceof Error
+									? poQuery.error.message
 									: "The list could not be loaded."
 							}
 							onRetry={() => {
-								void queueQuery.refetch();
+								void poQuery.refetch();
 							}}
-							retrying={queueQuery.isRefetching}
+							retrying={poQuery.isRefetching}
 						/>
 					) : undefined
 				}

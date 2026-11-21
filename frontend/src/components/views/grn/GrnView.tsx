@@ -1,6 +1,6 @@
 "use client";
 
-import { IconFileOff, IconSearch } from "@tabler/icons-react";
+import { IconFileOff, IconSearch, IconX } from "@tabler/icons-react";
 import { useTable } from "@tanstack/react-table";
 import Link from "next/link";
 import { useMemo } from "react";
@@ -25,82 +25,121 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { useGrnTrackingControls } from "@/components/views/grn/use-grn-tracking-controls";
+import {
+	type GrnGroup,
+	useGrnTrackingControls,
+} from "@/components/views/grn/use-grn-tracking-controls";
+import { useCan } from "@/hooks/use-can";
+import type { GrnListRowV2 } from "@/lib/api/grn/list-types";
 import { useGrnsQuery } from "@/lib/api/grn/queries";
 import { formatDate, formatDocNo } from "@/lib/format";
-import { getStatusTone } from "@/lib/status-tone";
-import {
-	type GrnListRow,
-	type GrnQaStatus,
-	type GrnSortField,
-	type GrnStatus,
-	grnQaStatusValues,
-	grnStatusValues,
-} from "@/types/grn";
+import type { GrnSortField } from "@/types/grn";
 
 const SORT_FIELDS: Array<{ label: string; value: GrnSortField }> = [
-	{ label: "ID", value: "id" },
+	{ label: "Newest first", value: "id" },
 	{ label: "GRN number", value: "grnNumber" },
 	{ label: "Status", value: "status" },
 	{ label: "Received date", value: "receivedDate" },
 ];
 
-const columns: DataTableColumnDef<GrnListRow>[] = [
-	{
-		accessorKey: "grnNumber",
-		header: "GRN no.",
-		cell: ({ row }) => (
-			<Link
-				href={`/grn/${row.original.id}`}
-				className="font-mono text-brand-accent hover:underline"
-			>
-				{formatDocNo(row.original.grnNumber)}
-			</Link>
-		),
-	},
-	{
-		accessorKey: "poNumber",
-		header: "PO",
-		cell: ({ row }) =>
-			row.original.poNumber ? (
-				<span className="font-mono">{formatDocNo(row.original.poNumber)}</span>
-			) : (
-				"–"
+const BUCKET_LABEL = { late: "Late", today: "Today", later: "Later" } as const;
+
+function makeColumns(): DataTableColumnDef<GrnListRowV2>[] {
+	return [
+		{
+			accessorKey: "grnNumber",
+			header: "GRN no.",
+			cell: ({ row }) => (
+				<Link
+					href={`/grn/${row.original.id}`}
+					className="font-mono text-brand-accent hover:underline"
+				>
+					{formatDocNo(row.original.grnNumber)}
+				</Link>
 			),
-	},
-	{
-		accessorKey: "status",
-		header: "Status",
-		cell: ({ row }) => <StatusBadge doc="grn" status={row.original.status} />,
-	},
-	{
-		accessorKey: "receivedDate",
-		header: "Received",
-		cell: ({ row }) => formatDate(row.original.receivedDate),
-	},
-];
+		},
+		{
+			accessorKey: "receivedDate",
+			header: "Date",
+			cell: ({ row }) => formatDate(row.original.receivedDate),
+		},
+		{
+			accessorKey: "poNumber",
+			header: "PO",
+			// Plain text unless the viewer may open POs (BR-FF-03).
+			cell: ({ row }) => {
+				const { poNumber, poId, poCanOpen } = row.original;
+				if (!poNumber) return "–";
+				return poCanOpen && poId ? (
+					<Link
+						href={`/purchase-orders/${poId}`}
+						className="font-mono text-brand-accent hover:underline"
+					>
+						{formatDocNo(poNumber)}
+					</Link>
+				) : (
+					<span className="font-mono">{formatDocNo(poNumber)}</span>
+				);
+			},
+		},
+		{
+			accessorKey: "supplierName",
+			header: "Supplier",
+			cell: ({ row }) => row.original.supplierName ?? "–",
+		},
+		{
+			accessorKey: "challanNo",
+			header: "Challan",
+			cell: ({ row }) => row.original.challanNo ?? "–",
+		},
+		{
+			accessorKey: "lineCount",
+			header: "Lines",
+			meta: { numeric: true },
+			cell: ({ row }) => row.original.lineCount ?? "–",
+		},
+		{
+			id: "qa",
+			header: "QA status",
+			cell: ({ row }) =>
+				row.original.qaSummary ? (
+					<StatusBadge doc="grnQa" status={row.original.qaSummary} />
+				) : (
+					"–"
+				),
+		},
+		{
+			accessorKey: "status",
+			header: "Status",
+			cell: ({ row }) => <StatusBadge doc="grn" status={row.original.status} />,
+		},
+	];
+}
+
+const columns = makeColumns();
 
 export function GrnView() {
+	const canReceive = useCan("grn.edit_draft");
 	const {
+		bucket,
+		clearBucket,
 		filtersActive,
+		group,
+		onGroupChange,
 		onPageSizeChange,
 		onQChange,
-		onQaStatusFilterChange,
 		onSortByChange,
 		onSortDirectionChange,
-		onStatusFilterChange,
 		page,
 		pageSize,
 		q,
 		qInput,
 		qaStatus,
-		qaStatusFilter,
 		resetFilters,
 		setPage,
 		sortBy,
 		sortDir,
 		status,
-		statusFilter,
 	} = useGrnTrackingControls();
 
 	const grnQuery = useGrnsQuery({
@@ -110,11 +149,35 @@ export function GrnView() {
 		sortDir,
 		status,
 		qaStatus,
+		bucket: bucket ?? undefined,
 		q,
 	});
 
 	const grns = useMemo(() => grnQuery.data?.data ?? [], [grnQuery.data]);
 	const total = grnQuery.data?.meta.total ?? 0;
+	const counts = grnQuery.data?.meta.statusCounts;
+
+	// BR-FF-109 groups. "All" = every status; Done = accepted + partly accepted.
+	// QA pending overlaps Draft (a draft can hold pending lines).
+	const sum = (...keys: string[]) =>
+		counts ? keys.reduce((n, k) => n + (counts[k] ?? 0), 0) : undefined;
+	const quick = [
+		{
+			key: "all",
+			label: "All",
+			count: counts
+				? Object.values(counts).reduce((n, v) => n + v, 0)
+				: undefined,
+		},
+		{ key: "draft", label: "Draft", count: sum("draft") },
+		{
+			key: "qa_pending",
+			label: "QA pending",
+			count: counts ? (counts.qa_pending ?? counts.pending_qa ?? 0) : undefined,
+		},
+		{ key: "done", label: "Done", count: sum("accepted", "partial_accepted") },
+		{ key: "rejected", label: "Rejected", count: sum("rejected") },
+	];
 
 	const table = useTable({
 		features: dataTableFeatures,
@@ -124,17 +187,18 @@ export function GrnView() {
 		manualSorting: true,
 	});
 
+	const receiveButton = canReceive ? (
+		<Button asChild size="lg">
+			<Link href="/grn/receive">Receive goods</Link>
+		</Button>
+	) : undefined;
+
 	const emptyState = filtersActive ? (
 		<EmptyState
 			icon={IconFileOff}
 			title="Nothing matches these filters"
 			action={
-				<Button
-					type="button"
-					variant="outline"
-					size="sm"
-					onClick={resetFilters}
-				>
+				<Button type="button" variant="outline" onClick={resetFilters}>
 					Reset filters
 				</Button>
 			}
@@ -144,6 +208,7 @@ export function GrnView() {
 			icon={IconFileOff}
 			title="No goods receipts yet"
 			description="A GRN shows up here when goods are received against a dispatched purchase order."
+			action={receiveButton}
 		/>
 	);
 
@@ -152,53 +217,32 @@ export function GrnView() {
 			<PageHeader
 				title="Goods receipt notes"
 				description="Track goods received against dispatched purchase orders."
+				actions={receiveButton}
 			/>
 
 			<FilterBar
-				value=""
-				onChange={() => {}}
+				quick={quick}
+				value={group ?? "all"}
+				onChange={(key) =>
+					onGroupChange(key === "all" ? null : (key as GrnGroup))
+				}
 				onReset={resetFilters}
 				filtersActive={filtersActive}
 			>
-				<Select
-					value={statusFilter}
-					onValueChange={(value) =>
-						onStatusFilterChange(value as "all" | GrnStatus)
-					}
-				>
-					<SelectTrigger className="w-40" aria-label="Status">
-						<SelectValue placeholder="Status" />
-					</SelectTrigger>
-					<SelectContent>
-						<SelectItem value="all">All statuses</SelectItem>
-						{grnStatusValues.map((option) => (
-							<SelectItem key={option} value={option}>
-								{getStatusTone("grn", option).label}
-							</SelectItem>
-						))}
-					</SelectContent>
-				</Select>
+				{bucket ? (
+					<Button
+						type="button"
+						variant="outline"
+						className="h-10"
+						onClick={clearBucket}
+						aria-label={`Clear the ${bucket} filter`}
+					>
+						{BUCKET_LABEL[bucket]} only
+						<IconX className="size-3.5" aria-hidden="true" />
+					</Button>
+				) : null}
 
-				<Select
-					value={qaStatusFilter}
-					onValueChange={(value) =>
-						onQaStatusFilterChange(value as "all" | GrnQaStatus)
-					}
-				>
-					<SelectTrigger className="w-40" aria-label="QA status">
-						<SelectValue placeholder="QA status" />
-					</SelectTrigger>
-					<SelectContent>
-						<SelectItem value="all">All QA statuses</SelectItem>
-						{grnQaStatusValues.map((option) => (
-							<SelectItem key={option} value={option}>
-								{getStatusTone("grnQa", option).label}
-							</SelectItem>
-						))}
-					</SelectContent>
-				</Select>
-
-				<div className="relative w-48">
+				<div className="relative w-56">
 					<IconSearch
 						aria-hidden="true"
 						className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground"
@@ -208,7 +252,7 @@ export function GrnView() {
 						onChange={(event) => onQChange(event.target.value)}
 						placeholder="Search GRN number"
 						aria-label="Search GRN number"
-						className="pl-7"
+						className="h-10 pl-7"
 					/>
 				</div>
 
@@ -217,7 +261,7 @@ export function GrnView() {
 						value={sortBy}
 						onValueChange={(value) => onSortByChange(value as GrnSortField)}
 					>
-						<SelectTrigger className="w-36" aria-label="Sort by">
+						<SelectTrigger className="h-10 w-40" aria-label="Sort by">
 							<SelectValue placeholder="Sort by" />
 						</SelectTrigger>
 						<SelectContent>
@@ -229,7 +273,7 @@ export function GrnView() {
 						</SelectContent>
 					</Select>
 
-					<div className="flex items-center gap-2 text-xs text-muted-foreground">
+					<div className="flex items-center gap-2 text-sm text-muted-foreground">
 						<span>Asc</span>
 						<Switch
 							checked={sortDir === "desc"}
@@ -245,6 +289,7 @@ export function GrnView() {
 				table={table}
 				isLoading={grnQuery.isLoading}
 				hidePagination
+				tight
 				emptyState={emptyState}
 				errorState={
 					grnQuery.isError ? (

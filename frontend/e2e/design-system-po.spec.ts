@@ -6,7 +6,7 @@
  * BR-DS-27 also needs a login WITHOUT the PO create permission: E2E_NOCREATE_EMAIL (+ E2E_NOCREATE_PASSWORD,
  * default = admin password); skipped when unset. Written by test-writer from the spec only.
  *
- * The PO list reads the requisition list endpoint GET /api/pr/getprs (not /po/getpos).
+ * The PO list reads GET /api/po/getpos.
  *
  * Not automated: BR-DS-08 (danger only for destructive actions: human review), BR-DS-25 (adoption changes
  * look only: commit review). BR-DS-18 and the rest are unit tests in tests/.
@@ -20,7 +20,7 @@ async function loginAs(page: Page, email: string, password: string) {
 	await page.getByLabel("Email").fill(email);
 	await page.getByLabel("Password").fill(password);
 	await page.getByRole("button", { name: "Sign in" }).click();
-	await page.waitForURL("**/landing");
+	await page.waitForURL("**/home");
 }
 
 async function openPoList(page: Page) {
@@ -46,7 +46,7 @@ test.describe("BR-DS-17 the PO list is header + filter bar + table + pagination"
 	test("BR-DS-17 a failed list request shows an alert with 'Try again', not an empty table", async ({
 		page,
 	}) => {
-		await page.route("**/pr/getprs*", (route) =>
+		await page.route("**/po/getpos*", (route) =>
 			route.fulfill({
 				status: 500,
 				contentType: "application/json",
@@ -65,7 +65,7 @@ test.describe("BR-DS-14 skeleton sweep only while loading", () => {
 	test("BR-DS-14 skeleton rows and aria-busy show while the list is slow; both are gone when it resolves", async ({
 		page,
 	}) => {
-		await page.route("**/pr/getprs*", async (route) => {
+		await page.route("**/po/getpos*", async (route) => {
 			await new Promise((r) => setTimeout(r, 1500));
 			await route.continue();
 		});

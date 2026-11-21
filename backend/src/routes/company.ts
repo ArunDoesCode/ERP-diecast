@@ -2,7 +2,10 @@ import { Hono } from "hono";
 
 import { companySettingsController } from "../controller/companySettingsController";
 import { asyncHandler } from "../lib/async-handler";
-import { requirePermission } from "../lib/auth-middleware";
+import {
+  requireAnyPermission,
+  requirePermission,
+} from "../lib/auth-middleware";
 import { paginatedResponse, successResponse } from "../lib/response-schemas";
 import { register } from "../lib/route-registry";
 import type { AppEnv } from "../lib/types";
@@ -12,6 +15,10 @@ import {
   companySettingsSchema,
   companySettingsUpsertSchema,
 } from "../types/sco.types";
+import {
+  invoiceTolerancesSchema,
+  updateInvoiceTolerancesSchema,
+} from "../types/supplierInvoice.types";
 import { END_POINTS } from "./end-points";
 
 const COMPANY_ROUTES = END_POINTS.company;
@@ -44,7 +51,7 @@ register({
   path: `${COMPANY_BASE_PATH}${COMPANY_ROUTES.settings}`,
   tags: ["company"],
   summary:
-    "Create or replace the single company-settings row (owner only, BR-SCO-09). All four fields required.",
+    "Create or replace the single company-settings row (owner only, BR-SCO-09). All four fields required; optional ewayIntraLimitPaise (paise, 1..10,000,000,000; omitted = unchanged, BR-DSP-42).",
   auth: { type: "permission", key: "company.manage" },
   request: { body: companySettingsUpsertSchema },
   responses: { "200": successResponse(companySettingsSchema) },
@@ -66,6 +73,41 @@ register({
   responses: {
     "200": paginatedResponse(companySettingsHistoryRowSchema),
   },
+});
+
+companyRouter.get(
+  COMPANY_ROUTES.invoiceTolerances,
+  requireAnyPermission("invoice.view", "invoice.manage"),
+  asyncHandler(companySettingsController.getInvoiceTolerances),
+);
+register({
+  method: "GET",
+  path: `${COMPANY_BASE_PATH}${COMPANY_ROUTES.invoiceTolerances}`,
+  tags: ["company"],
+  summary:
+    "Read the supplier-invoice match tolerances in percent (BR-SINV-32). Defaults 0% price, 0.5% weight until saved.",
+  auth: {
+    type: "permission",
+    key: "invoice.view",
+    alsoKeys: ["invoice.manage"],
+  },
+  responses: { "200": successResponse(invoiceTolerancesSchema) },
+});
+
+companyRouter.patch(
+  COMPANY_ROUTES.invoiceTolerances,
+  requirePermission("company.manage"),
+  asyncHandler(companySettingsController.updateInvoiceTolerances),
+);
+register({
+  method: "PATCH",
+  path: `${COMPANY_BASE_PATH}${COMPANY_ROUTES.invoiceTolerances}`,
+  tags: ["company"],
+  summary:
+    "Set the price and/or weight tolerance in percent (0-10, 2 decimals, at least one). Applies to the next submit. 409 SINV_COMPANY_NOT_SET before company details are saved.",
+  auth: { type: "permission", key: "company.manage" },
+  request: { body: updateInvoiceTolerancesSchema },
+  responses: { "200": successResponse(invoiceTolerancesSchema) },
 });
 
 export { companyRouter as companyRoutes };

@@ -445,8 +445,8 @@ describe("BR-AUTH-15 screens admin", () => {
     const grn = list.find((s) => s.key === "grn");
     expect(grn?.permissionKey).toBe("grn.view");
     expect(Array.isArray(grn?.roleIds)).toBe(true);
-    const landing = list.find((s) => s.key === "landing");
-    expect(landing?.permissionKey).toBeNull();
+    const home = list.find((s) => s.key === "home");
+    expect(home?.permissionKey).toBeNull();
     // super-admin is never listed in roleIds
     expect(grn?.roleIds).not.toContain(superAdminRoleId);
   });
@@ -493,16 +493,11 @@ describe("BR-AUTH-15 screens admin", () => {
     expect(grn.status).toBe(403);
   });
 
-  test("BR-AUTH-15 screen with no key (landing) cannot be ticked -> 400 SCREEN_HAS_NO_KEY", async () => {
-    const { status, json } = await call(
-      "sa",
-      "POST",
-      "/screens/landing/roles",
-      {
-        added: [roleId.viewer],
-        removed: [],
-      },
-    );
+  test("BR-AUTH-15 screen with no key (home) cannot be ticked -> 400 SCREEN_HAS_NO_KEY", async () => {
+    const { status, json } = await call("sa", "POST", "/screens/home/roles", {
+      added: [roleId.viewer],
+      removed: [],
+    });
     expect(status).toBe(400);
     expect(json.code).toBe("SCREEN_HAS_NO_KEY");
   });

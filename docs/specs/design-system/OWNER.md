@@ -8,30 +8,30 @@ approved_on: 2026-11-18
 The app feels "too boring and too black and white". Keep shadcn. Add "a few more colours" in light and dark
 mode and "little animations", with strict control over where they are used "so that it does not look childish".
 ## 2. What the user will be able to do
-- See the same colour for the same meaning: grey not started, amber waiting on someone, blue moving, green approved or done, red refused or late. Badge text is a little bigger (11 px, today 10 px) and each badge has a small icon.
-- Find their place faster: icons in the sidebar, a tinted active menu item, breadcrumbs on top, a blue outline on whatever the keyboard is on.
+- See the same colour for the same meaning: grey not started, amber waiting on someone, blue moving, green approved or done, red refused or late. Badge text is a little bigger (12 px, at first 10 px) and each badge has a small icon.
+- Find their place faster: icons in the sidebar, a tinted active menu item, breadcrumbs on top, an indigo outline on whatever the keyboard is on.
 - Read the purchase order pages in light and dark mode (today the status badges stay bright in dark mode), with one page title, filters, empty screen, error screen and page numbers. Other modules follow.
 - See small movement in eight places only. Nothing bounces, loops or slides between pages.
 > Example: PO-2026-0190 for ₹1,26,500.00 waits for approval. It shows an amber "Pending approval" badge with a clock icon on the order list and the order page.
-> You approve it: the row is tinted light blue once for 0.6 seconds, the badge turns green, and a message says "Purchase order approved".
+> You approve it: the row is tinted light indigo once for 0.6 seconds, the badge turns green, and a message says "Purchase order approved".
 ## 3. Screens
 **Open `docs/specs/design-system/preview.html` in your browser.** Use the two switches at the top (light or dark, table size) and press the buttons in the Motion section.
 ![Purchase order list, light](design/screens/option-A-light.png)
 ![Purchase order list, dark](design/screens/option-A-dark.png)
 The purchase order list in the direction you chose, light and dark: the user filters, opens an order, starts a new one.
 ## 4. Decisions for you
-### Card 1 — Which second colour goes next to the emerald?
-- **A (recommended):** Industrial calm. Steel blue, cool grey page and sidebar.
-- **B:** Warm foundry. Copper, warm grey page and sidebar.
-- **For the factory user:** In B the copper sits close to the amber "waiting" colour, so a selected filter can be read as a warning. A keeps every colour clearly apart. **Cost:** same for both.
-- **Your answer:** A (owner, 2026-11-18: "all recommended")
-### Card 2 — How big should table rows be?
-- **A:** Keep today's compact size only (12 px text, 30 px rows; about 24 rows on a 1080p screen).
-- **B (recommended):** Slightly larger by default (13 px text, 36 px rows; about 20 rows), with a "Compact" switch each user can turn on.
-- **For the factory user:** B is easier to read over a long shift; A shows about 4 more rows. **Cost:** B adds about half a day.
-- **Your answer:** B (owner, 2026-11-18: "all recommended")
+### Card 1 — Which colours? (asked again 2026-11-20: you said "change the color scheme completely")
+- **A (recommended):** Graphite and indigo. Neutral greys, near-black main button, one indigo colour for selection and links.
+- **B:** Slate and blue. **C:** Dark sidebar and violet.
+- **For the factory user:** In A colour appears only where it means something; the main button no longer shares green with "approved". Status colours stay the same. **Cost:** same for all.
+- **Your answer:** A (owner, 2026-11-20: "A graphite"; was emerald and steel blue, 2026-11-18)
+### Card 2 — How big should text, buttons and table rows be? (asked again 2026-11-20: you said "a little zoomed in")
+- **A (recommended):** One step up: 14 px text, 36 px buttons and fields, 44 px rows (about 16 rows on a 1080p screen), 24 px bold page titles, roomier cards. "Compact" switch gives 13 px text and 36 px rows.
+- **B:** Half a step: 13 px text, 32 px buttons and fields, 40 px rows (about 18 rows), 22 px page titles.
+- **For the factory user:** Today most text is 12 px in 28 px buttons. A reads easily at arm's length; B shows about 2 more rows. **Cost:** same for both; every screen is checked again.
+- **Your answer:** A (owner, 2026-11-20: "Size A (14 px)"; was 13 px text, 36 px rows, 2026-11-18)
 ### Card 3 — How strong should the sidebar be? (Icons are added in both.)
-- **A (recommended):** Soft. Light tinted sidebar, emerald tint on the active item.
+- **A (recommended):** Soft. Light tinted sidebar, indigo tint on the active item.
 - **B:** Strong. Dark sidebar in light mode too, so the app is recognised from across the room.
 - **For the factory user:** A is calmer for long sessions; B has more character but is a heavy dark block beside the tables all day. **Cost:** same for both.
 - **Your answer:** A (owner, 2026-11-18: "all recommended")
@@ -58,8 +58,9 @@ Answer like "1 yes, 2 no". A "no" becomes a card.
 3. A partly accepted GRN turns amber (today violet); a waived QA check turns grey (today blue).
 4. Status names read as plain words: "Partly ordered", "Partly received", "Pending QA", "Sent back" (today "partial ordered").
 5. Money shows paise in tables, documents and forms (₹4,82,000.00) and whole rupees on summary cards.
+6. (2026-11-20, yes: "a") Every form field gets one look: the label above the field. Today two looks are mixed.
 
-Everything else: 40 technical choices logged. No reading needed.
+Everything else: about 55 technical choices logged. No reading needed.
 ## 6. Not included
 - The new look on the other modules' pages. This work does the menu, the top bar and the purchase order pages (list, order, form); the rest follows as the next job.
 - The home page dashboard content, what the top-bar search finds, phone layout, print and PDF layouts.

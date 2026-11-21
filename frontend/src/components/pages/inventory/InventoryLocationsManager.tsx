@@ -32,7 +32,6 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { FloatingLabelInput } from "@/components/ui/floating-label";
 import {
 	Form,
 	FormControl,
@@ -41,6 +40,7 @@ import {
 	FormLabel,
 	FormMessage,
 } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 import {
 	Select,
 	SelectContent,
@@ -75,6 +75,7 @@ const TYPE_LABEL: Record<AssetLocationType, string> = {
 	vendor_premise: "Vendor premise",
 	finished_goods: "Finished goods",
 	scrap_yard: "Scrap yard",
+	store: "Store",
 };
 
 function toLocationOption(location: AssetLocation): SearchableSelectOption {
@@ -94,7 +95,12 @@ function buildLocationPayload(
 	return {
 		name: values.name.trim(),
 		type: values.type,
-		...(isVendor ? {} : { isVirtual: values.isVirtual ?? false }),
+		...(isVendor
+			? {}
+			: {
+					isVirtual:
+						values.type === "store" ? false : (values.isVirtual ?? false),
+				}),
 		linkedVendorId: isVendor ? (values.linkedVendorId ?? null) : null,
 	};
 }
@@ -249,13 +255,10 @@ function LocationEditorForm({
 					control={form.control}
 					name="name"
 					render={({ field }) => (
-						<FormItem className="min-h-19 mt-2">
+						<FormItem className="min-h-19 mt-2 gap-1.5">
+							<FormLabel htmlFor="location-name">Location name</FormLabel>
 							<FormControl>
-								<FloatingLabelInput
-									{...field}
-									id="location-name"
-									label="Location name"
-								/>
+								<Input {...field} id="location-name" />
 							</FormControl>
 							<FormMessage />
 						</FormItem>
@@ -287,6 +290,11 @@ function LocationEditorForm({
 									))}
 								</SelectContent>
 							</Select>
+							{selectedType === "store" ? (
+								<p className="text-[13px] text-muted-foreground">
+									Shop floor, quarantine, re-melt bin
+								</p>
+							) : null}
 							<FormMessage />
 						</FormItem>
 					)}
@@ -309,7 +317,7 @@ function LocationEditorForm({
 							</FormItem>
 						)}
 					/>
-				) : (
+				) : selectedType === "store" ? null : (
 					<FormField
 						control={form.control}
 						name="isVirtual"

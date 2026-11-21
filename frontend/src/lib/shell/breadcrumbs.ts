@@ -13,13 +13,23 @@ export type BreadcrumbOptions = {
 
 const LIST_LABELS: Record<string, string> = {
 	landing: "Home",
+	home: "Home",
 	"purchase-requisitions": "Purchase requisitions",
 	approvals: "Approvals",
 	"purchase-orders": "Purchase orders",
 	suppliers: "Suppliers",
+	"supplier-ratings": "Supplier rating",
 	grn: "Goods receipt",
+	"purchase-returns": "Purchase returns",
+	"supplier-invoices": "Supplier invoices",
+	rfq: "Requests for quotation",
+	"rate-contracts": "Rate contracts",
 	inventory: "Inventory",
 	subcontracting: "Subcontracting",
+	bom: "Bills of materials",
+	"sale-orders": "Sale orders",
+	"delivery-notes": "Delivery notes",
+	customers: "Customers",
 	"employee-directory": "Employee directory",
 	setup: "Setup",
 };
@@ -31,6 +41,25 @@ function labelFor(segment: string): string {
 	return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
+/** Last crumb before the document loads (or when it has no number): "#12" for an id, the page name otherwise. Never "Details". */
+function docFallback(segment: string): string {
+	return /^\d+$/.test(segment) ? `#${segment}` : labelFor(segment);
+}
+
+/** Screens that are not documents: name them instead of "Details". */
+function screenLabel(segments: string[]): string | undefined {
+	const [root, second, third] = segments;
+	if (second === "new") {
+		if (root === "purchase-requisitions") return "New requisition";
+		if (root === "grn") return "Receive goods";
+	}
+	if (root === "purchase-requisitions" && third === "edit")
+		return "Edit requisition";
+	if (root === "purchase-orders" && third === "edit") return "Edit order";
+	if (root === "grn" && second === "receive") return "Choose order";
+	return undefined;
+}
+
 /** Route + optional group / document number -> crumbs. Last crumb has no href. */
 export function buildBreadcrumbs(
 	pathname: string,
@@ -38,13 +67,132 @@ export function buildBreadcrumbs(
 ): Crumb[] {
 	const segments = pathname.split("/").filter(Boolean);
 	const crumbs: Crumb[] = [];
+	if (segments[0] === "inventory" && segments[1] === "reorder") {
+		// Nested screen: Inventory > Reorder > (Reorder runs >) run.
+		crumbs.push(
+			{ label: LIST_LABELS.inventory, href: "/inventory" },
+			{ label: "Reorder", href: "/inventory/reorder" },
+		);
+		if (segments[2] === "runs") {
+			crumbs.push({ label: "Reorder runs", href: "/inventory/reorder/runs" });
+			if (segments.length > 3) {
+				crumbs.push({ label: options?.docNumber ?? docFallback(segments[3]) });
+			}
+		}
+		delete crumbs[crumbs.length - 1].href;
+		return crumbs;
+	}
+	if (segments[0] === "inventory" && segments[1] === "stock-transfers") {
+		// Inventory > Stock transfers > (New transfer | ST no. > Edit).
+		crumbs.push(
+			{ label: LIST_LABELS.inventory, href: "/inventory" },
+			{ label: "Stock transfers", href: "/inventory/stock-transfers" },
+		);
+		if (segments[2] === "new") {
+			crumbs.push({ label: "New transfer" });
+		} else if (segments.length > 2) {
+			if (segments[3] === "edit") {
+				crumbs.push(
+					{
+						label: options?.docNumber ?? docFallback(segments[2]),
+						href: `/inventory/stock-transfers/${segments[2]}`,
+					},
+					{ label: "Edit" },
+				);
+			} else {
+				crumbs.push({ label: options?.docNumber ?? docFallback(segments[2]) });
+			}
+		}
+		delete crumbs[crumbs.length - 1].href;
+		return crumbs;
+	}
+	if (segments[0] === "inventory" && segments.length > 1) {
+		// Inventory > Stock | Movements | Locations | Items … (> doc / Details).
+		crumbs.push(
+			{ label: LIST_LABELS.inventory, href: "/inventory" },
+			{ label: labelFor(segments[1]), href: `/inventory/${segments[1]}` },
+		);
+		if (segments.length > 2) {
+			crumbs.push({ label: options?.docNumber ?? docFallback(segments[2]) });
+		}
+		delete crumbs[crumbs.length - 1].href;
+		return crumbs;
+	}
+	if (
+		segments[0] === "rfq" &&
+		segments.length > 2 &&
+		/^\d+$/.test(segments[1])
+	) {
+		// Nested RFQ screens: RFQ > RFQ no. > Compare / Quote / Print.
+		const leaf: Record<string, string> = {
+			compare: "Compare",
+			quotes: "Quote",
+			print: "Print",
+			edit: "Edit",
+		};
+		if (options?.group) crumbs.push({ label: options.group });
+		crumbs.push(
+			{ label: LIST_LABELS.rfq, href: "/rfq" },
+			{
+				label: options?.docNumber ?? docFallback(segments[1]),
+				href: `/rfq/${segments[1]}`,
+			},
+			{ label: leaf[segments[2]] ?? labelFor(segments[2]) },
+		);
+		delete crumbs[crumbs.length - 1].href;
+		return crumbs;
+	}
+	if (segments[0] === "delivery-notes") {
+		// Dispatch > Pending dispatch | Delivery notes > (New delivery note | DN no. > Edit | Print).
+		if (options?.group) crumbs.push({ label: options.group });
+		if (segments[1] === "pending") {
+			crumbs.push({ label: "Pending dispatch" });
+			return crumbs;
+		}
+		crumbs.push({
+			label: LIST_LABELS["delivery-notes"],
+			href: "/delivery-notes",
+		});
+		if (segments[1] === "new") {
+			crumbs.push({ label: "New delivery note" });
+		} else if (segments.length > 1) {
+			const leaf: Record<string, string> = { edit: "Edit", print: "Print" };
+			if (segments[2]) {
+				crumbs.push(
+					{
+						label: options?.docNumber ?? docFallback(segments[1]),
+						href: `/delivery-notes/${segments[1]}`,
+					},
+					{ label: leaf[segments[2]] ?? labelFor(segments[2]) },
+				);
+			} else {
+				crumbs.push({ label: options?.docNumber ?? docFallback(segments[1]) });
+			}
+		}
+		delete crumbs[crumbs.length - 1].href;
+		return crumbs;
+	}
 	if (options?.group) crumbs.push({ label: options.group });
 	if (segments.length === 0) {
 		crumbs.push({ label: LIST_LABELS.landing });
+	} else if (
+		(segments[0] === "home" || segments[0] === "landing") &&
+		options?.docNumber
+	) {
+		// The denied page: Home > No access.
+		crumbs.push(
+			{ label: LIST_LABELS.home, href: "/home" },
+			{ label: options.docNumber },
+		);
 	} else {
 		crumbs.push({ label: labelFor(segments[0]), href: `/${segments[0]}` });
 		if (segments.length > 1) {
-			crumbs.push({ label: options?.docNumber ?? "Details" });
+			crumbs.push({
+				label:
+					options?.docNumber ??
+					screenLabel(segments) ??
+					docFallback(segments[1]),
+			});
 		}
 	}
 	const last = crumbs[crumbs.length - 1];

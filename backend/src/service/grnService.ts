@@ -5,25 +5,32 @@ import {
   InternalServerError,
   NotFoundError,
 } from "../lib/errors";
+import { istDayKey } from "../lib/ist-day";
+import { toMilli } from "../lib/milli";
 import { grnRepository } from "../repository/grnRepository";
 import { poRepository } from "../repository/poRepository";
+import { purchaseReturnRepository } from "../repository/purchaseReturnRepository";
 import { postStock } from "../repository/stockPostingRepository";
+import {
+  LIVE_STATUSES,
+  supplierInvoiceRepository,
+} from "../repository/supplierInvoiceRepository";
 import { poService } from "../service/poService";
+import { supplierInvoiceLinkService } from "../service/supplierInvoiceLinkService";
 import {
   type createGrnSchemaType,
   type grnBypassSchemaType,
   type grnCorrectionSchemaType,
   type grnListQuerySchemaType,
   type grnQaActionSchemaType,
+  type receivablePosQuerySchemaType,
   type updateGrnSchemaType,
   WHOLE_NUMBER_UNITS,
 } from "../types/grn.types";
 
 // Over-receipt tolerance: 5% above the PO line's ordered qty (BR-GRN-15).
 // Beyond that, the actor needs the override right and a reason.
-const OVER_RECEIPT_TOLERANCE_RATIO = 1.05;
-
-const toMilli = (qty: number) => Math.round(qty * 1000);
+export const OVER_RECEIPT_TOLERANCE_RATIO = 1.05;
 
 // Accept / bypass only while the PO can still receive goods (BR-GRN-01).
 const RECEIVABLE_PO_STATUSES = ["dispatched", "partial_received"];
@@ -255,6 +262,15 @@ async function lockGrnAndPo(
 }
 
 export const grnService = {
+  async listReceivablePos(params: receivablePosQuerySchemaType) {
+    const { rows, total, today } =
+      await grnRepository.listReceivablePos(params);
+    return {
+      data: rows,
+      meta: { ...toPaginatedMeta(params.page, params.pageSize, total), today },
+    };
+  },
+
   async getDetails(grnId: number) {
     const row = await grnRepository.getDetails(grnId);
     if (!row) {
@@ -263,11 +279,18 @@ export const grnService = {
     return row;
   },
 
-  async list(params: grnListQuerySchemaType) {
-    const { rows, total } = await grnRepository.list(params);
+  async list(params: grnListQuerySchemaType, actor: Actor) {
+    const { rows, total, statusCounts } = await grnRepository.list(
+      params,
+      istDayKey(),
+    );
+    const poCanOpen = can(actor, "po.manage");
     return {
-      data: rows,
-      meta: toPaginatedMeta(params.page, params.pageSize, total),
+      data: rows.map((r) => ({ ...r, poCanOpen })),
+      meta: {
+        ...toPaginatedMeta(params.page, params.pageSize, total),
+        statusCounts,
+      },
     };
   },
 
@@ -603,6 +626,43 @@ export const grnService = {
         );
       }
 
+      // BR-PRT-42: accepted - corrections - this correction can't go below the
+      // accepted qty held by non-cancelled returns (drafts + posted).
+      const reservedByReturns =
+        await purchaseReturnRepository.reservedByGrnLine([lineId], tx);
+      const acceptedReserved = reservedByReturns.get(lineId)?.accepted ?? 0;
+      if (
+        toMilli(line.acceptedQty) -
+          toMilli(alreadyCorrected) -
+          toMilli(input.qty) <
+        acceptedReserved
+      ) {
+        throw new BadRequestError(
+          `A correction of ${input.qty} would take the accepted qty below what is on purchase returns (${acceptedReserved / 1000}).`,
+          "GRN_CORRECTION_BELOW_RETURNED",
+        );
+      }
+
+      // BR-SINV-30: net accepted after this correction can't go below the qty on live
+      // supplier invoices (drafts, blocked, approved); read under the GRN line lock.
+      const billed = await supplierInvoiceRepository.billedMilliByGrnItem(
+        [lineId],
+        LIVE_STATUSES,
+        tx,
+      );
+      const billedMilli = billed.get(lineId) ?? 0;
+      if (
+        toMilli(line.acceptedQty) -
+          toMilli(alreadyCorrected) -
+          toMilli(input.qty) <
+        billedMilli
+      ) {
+        throw new ConflictError(
+          `A correction of ${input.qty} would take the accepted qty below what is on supplier invoices (${billedMilli / 1000}) - cancel the invoice first.`,
+          "SINV_CORRECTION_BELOW_BILLED",
+        );
+      }
+
       const posted0 = await grnRepository.findPostedRow(lineId, tx);
       const locationId =
         posted0?.locationId ??
@@ -637,6 +697,12 @@ export const grnService = {
         tx,
       );
       await poService.recomputeReceiptStatus(line.poId, tx);
+      // BR-SINV-29: the net accepted qty moved; re-run the PO "invoiced" test (locks already held).
+      await supplierInvoiceLinkService.reevaluatePoInvoiced(
+        line.poId,
+        actorId,
+        tx,
+      );
       return posted;
     });
   },

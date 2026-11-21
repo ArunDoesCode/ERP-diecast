@@ -41,13 +41,15 @@ run every step even when an earlier one fails (except a dead DB, step 3).
    - Ports 4000 and 3000 must be free (`lsof -i :4000 -i :3000`); busy → `TEST-ENV`, skip this step.
    - `T=postgres://postgres:postgres@localhost:5433/diecast_test`; print the target first
      (`docs/runbooks/test-db-reset.md` step 2) — it must read `localhost:5433/diecast_test`, else stop.
-   - Demo data: `cd backend && DATABASE_URL=$T <testEnvPrefix> bun --env-file=<envFile> run db:reset` (with fixtures).
+   - Demo data: `cd backend && DATABASE_URL_TEST=$T <testEnvPrefix> bun --env-file=<envFile> run db:test:rebuild --fixtures`
+     (targets only `DATABASE_URL_TEST`, refuses any name not ending in `_test`; the plain reset command is
+     denied in `.claude/settings.json` on purpose).
    - API: `DATABASE_URL=$T PORT=4000 APP_ORIGIN=http://localhost:3000 <testEnvPrefix> bun --env-file=<envFile> src/index.ts`
      in the background; wait for `curl -fs http://localhost:4000/health`.
    - `cd frontend && bunx playwright install chromium` (once), then
      `NEXT_PUBLIC_API_URL=http://localhost:4000/api bun run e2e` (Playwright starts the UI on :3000).
    - Always afterwards: stop the API and the UI you started, then put the test DB back the way CI's backend
-     job has it: `DATABASE_URL=$T <testEnvPrefix> bun --env-file=<envFile> run db:reset --no-fixtures`.
+     job has it: `DATABASE_URL_TEST=$T <testEnvPrefix> bun --env-file=<envFile> run db:test:rebuild`.
    - Report gate row `e2e` (passed / failed / skipped counts); each failure as a `TEST-` finding with the
      spec file:line, the assertion and whether it looks like a test bug or a code bug.
 

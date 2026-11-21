@@ -66,7 +66,7 @@ add it rather than adding it yourself.
 - `any` types leaking across component/hook/fetcher boundaries.
 - Invalidation using ad-hoc string keys instead of the feature key factory.
 - A mutation invalidates its own list/detail query but misses a cache a sibling view depends on (e.g. submitting a PO for approval should invalidate both the approval queue and the PR/PO detail views that render its status).
-- Form fields using raw `Input` + `FormLabel` instead of `FloatingLabelInput`, or `FormItem` missing `min-h-19` spacing.
+- Form fields using a floating label, or a label not tied to its input with `htmlFor`, or `FormItem` missing `min-h-19` spacing.
 - A destructive/irreversible action (discard, cancel, delete) wired to a plain `Dialog`/`onClick` instead of `AlertDialog`.
 - Table/list page duplicates `<TableHeader>`/`<TableBody>`/skeleton JSX instead of reusing
   shared `DataTable`/`DataTableColumnHeader`/`DataTablePagination` (`components/common/`), or a

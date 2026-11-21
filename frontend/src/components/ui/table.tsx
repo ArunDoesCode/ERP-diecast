@@ -6,9 +6,12 @@ import { cn } from "@/lib/utils";
 
 function Table({ className, ...props }: React.ComponentProps<"table">) {
 	return (
-		<div
+		<fieldset
 			data-slot="table-container"
-			className="relative w-full overflow-x-auto"
+			aria-label="Table, scrolls sideways when wide"
+			// biome-ignore lint/a11y/noNoninteractiveTabindex: keyboard users must be able to scroll a wide table
+			tabIndex={0}
+			className="relative m-0 w-full min-w-0 overflow-x-auto border-0 p-0 rounded-sm focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2"
 		>
 			<table
 				data-slot="table"
@@ -18,7 +21,7 @@ function Table({ className, ...props }: React.ComponentProps<"table">) {
 				)}
 				{...props}
 			/>
-		</div>
+		</fieldset>
 	);
 }
 
@@ -73,7 +76,7 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
 		<th
 			data-slot="table-head"
 			className={cn(
-				"h-10 px-2 text-left align-middle font-medium whitespace-nowrap text-foreground [&:has([role=checkbox])]:pr-0",
+				"h-11 px-3 text-left align-middle font-medium whitespace-nowrap text-foreground [&:has([role=checkbox])]:pr-0",
 				className,
 			)}
 			{...props}
@@ -86,7 +89,7 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
 		<td
 			data-slot="table-cell"
 			className={cn(
-				"h-(--row-height) px-2 py-0 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0",
+				"h-(--row-height) px-3 py-0 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0",
 				className,
 			)}
 			{...props}
@@ -101,7 +104,7 @@ function TableCaption({
 	return (
 		<caption
 			data-slot="table-caption"
-			className={cn("mt-4 text-xs text-muted-foreground", className)}
+			className={cn("mt-4 text-sm text-muted-foreground", className)}
 			{...props}
 		/>
 	);

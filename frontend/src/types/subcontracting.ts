@@ -177,6 +177,8 @@ export interface CompanySettings {
 	address: string;
 	gstin: string;
 	stateCode: string;
+	/** E-way bill limit for same-state dispatch, paise (BR-DSP-42). */
+	ewayIntraLimitPaise?: number;
 	updatedBy: number | null;
 	updatedAt: string;
 }
@@ -214,10 +216,25 @@ export const companySettingsSchema = z.object({
 		.string()
 		.trim()
 		.regex(/^\d{2}$/, "State code must be 2 digits"),
+	// Rupees as typed; the form sends paise (BR-DSP-42: 1 paise to ₹10,00,00,000).
+	ewayIntraLimitRupees: z
+		.string()
+		.trim()
+		.regex(/^\d+(\.\d{1,2})?$/, "Enter a rupee amount, up to 2 decimals")
+		.refine(
+			(value) => Number(value) >= 0.01 && Number(value) <= 100_000_000,
+			"Limit must be between ₹0.01 and ₹10,00,00,000",
+		),
 });
 
 export type CompanySettingsInput = z.input<typeof companySettingsSchema>;
 export type CompanySettingsPayload = z.output<typeof companySettingsSchema>;
+
+/** Body of PATCH /api/company/settings (the four old fields stay required). */
+export type CompanySettingsSavePayload = Omit<
+	CompanySettingsPayload,
+	"ewayIntraLimitRupees"
+> & { ewayIntraLimitPaise?: number };
 
 // ---- S2: challan (issue material) ----
 

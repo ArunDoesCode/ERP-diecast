@@ -5,7 +5,7 @@ description: "Use whenever you build, change, design or review any screen or UI 
 
 # Design system — how every screen looks
 
-The rules are the frozen spec `docs/specs/design-system/spec.md` (BR-DS-01..27); exact token values and the
+The rules are the frozen spec `docs/specs/design-system/spec.md` (BR-DS-01..29, v2); exact token values and the
 full status table live there and in `src/app/globals.css` — this skill tells you **what to use and how**,
 it never repeats the values. Screen patterns: `docs/specs/design-system/design/screens.md`. As-built map:
 `docs/modules/design-system.md`. Reference module: purchase orders (`components/views/purchase-orders/`).
@@ -21,9 +21,9 @@ it never repeats the values. Screen patterns: `docs/specs/design-system/design/s
   (PageHeader / DetailHeader do it) · table header row · document-number links (accent, mono) · focus ring
   · StatCard left edge · the one primary button. Plus status tones, selection/position and the brand mark.
   No gradients, no coloured page background, no coloured card fill.
-- `--primary` (emerald) = **fill of the main action only**, never text. At most one primary button per page
+- `--primary` (graphite) = **fill of the main action only**, never text. At most one primary button per page
   header or dialog (BR-DS-06). Secondary actions: `variant="outline"` or `"secondary"`.
-- `--brand-accent` (steel blue) = selection, position and links only: selected filter chip, current page,
+- `--brand-accent` (indigo, same as the focus ring) = selection, position and links only: selected filter chip, current page,
   current step, avatar, link text. **Never a status and never a StatCard tone** (BR-DS-07).
 - Danger tone only for destructive actions, refused / failed / late statuses and error messages (BR-DS-08).
 - Every new colour pair must pass `bun run contrast:check` (4.5:1 text, 3:1 borders / rings / charts).
@@ -36,6 +36,7 @@ it never repeats the values. Screen patterns: `docs/specs/design-system/design/s
 - Dates, money, quantities **only** through `src/lib/format.ts`: `formatDate`, `formatDateTime` (IST),
   `formatMoney(paise, { whole? })` (`₹4,82,000.00`; `whole` only on stat cards), `formatQty(value, unit,
   decimals)`, `formatDocNo`. Empty → `–`. Money is paise in, rupees out — never divide by 100 yourself.
+- Body text is 14 px; buttons, inputs, selects and filter chips are 36 px (small 32, large 40); no text under 12 px (BR-DS-28). Table rows are 44 px comfortable / 36 px compact (13 px text); header row 44 px.
 - Row height and table text come from `html[data-density]` through `components/ui/table.tsx`; never set a
   row height on a table yourself. Icons: Tabler, 16 px, stroke 1.75.
 
@@ -72,11 +73,11 @@ not render what the user may not use — no disabled ghost, no gap (BR-DS-27).
 - **Detail** = `DetailHeader` + `DocumentFlow` + cards in one column (≤ 1100 px). Destructive actions in a
   "More" menu and always confirmed in a dialog that names the document. Running action: button disabled
   with an "…ing" label.
-- **Form** = ≤ 6 fields → dialog, else its own page; two columns from 768 px; every field keeps `min-h-19`;
+- **Form** = ≤ 6 fields → dialog, else its own page; two columns from 768 px; one field look (BR-DS-29): `<Label htmlFor>` above a 36 px field, never a floating label; every field keeps `min-h-19`;
   actions bottom right: "Cancel" then one primary named for what it does; money / qty right-aligned with
   the unit; submitting → "Saving…".
 - **Dashboard** = `StatCard`s (3–4 per row) + at most two short panels; each card loads on its own.
-Content area: the shell gives 20 px padding — do not add page padding (`p-6`) inside a view.
+Content area: the shell gives 24 px padding and a 52 px top bar — do not add page padding (`p-6`) inside a view.
 
 ## 6. Motion (BR-DS-09..14)
 Only these eight places move: dialog/sheet/popover/dropdown enter-exit · toast · sidebar fold · table row

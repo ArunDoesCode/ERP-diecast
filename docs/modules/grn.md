@@ -3,6 +3,7 @@ module: grn
 spec: docs/specs/grn.md (v1 frozen) + docs/specs/grn-stock.md (v1 frozen)
 last_verified_commit: eea4fb1
 last_verified_on: 2026-09-29
+partially_verified: de68fdf (2026-11-21) — Code locations rows schema/posting/service, Data model, GRN details + correction in API/Key flows, gotchas on returns/invoices, Known gaps; d386e04 — `grn_items.created_at`, `idx_grns_received_date` (supplier rating)
 depends_on: [purchase-order, inventory, suppliers]
 ---
 
@@ -23,11 +24,11 @@ ledger. All grn + grn-stock BRs are implemented and tested (`grnService.test.ts`
 ## Code locations
 | Layer | Path | Key symbols |
 |---|---|---|
-| schema | `backend/src/db/schemas/02_procurement-purchasing.ts` | `grns` (unique `uq_grns_supplier_challan`), `grnItems`, `grnCorrections`, `qaTests`, `grnStatusEnum` (+ schema-only purchase return / invoice / payment / subcontracting tables) |
+| schema | `backend/src/db/schemas/02_procurement-purchasing.ts` | `grns` (unique `uq_grns_supplier_challan`), `grnItems` (+ `rejectedReturnedQty`, `acceptedReturnedQty`, partial `idx_grn_items_awaiting_return`), `grnCorrections`, `qaTests`, `grnStatusEnum`. Purchase return and supplier invoice tables: see `purchase-returns.md`, `supplier-invoice.md` |
 | types | `backend/src/types/grn.types.ts` | `createGrnSchema`, `updateGrnSchema`, `updateGrnLineSchema`, `grnQaActionBodySchema` (registered in manifest) / `grnQaActionSchema`, `grnBypassSchema`, `grnCorrectionSchema`, `grnDetailsSchema`, `qty3` (≤ 3 decimals, ≤ 1e9) |
 | repository | `backend/src/repository/grnRepository.ts` | `createWithItems`, `findByChallan`, `lockGrnAndPo`, `lockDraftGrn`, `findGrnItemForUpdate`, `updateLineArrivedQty`, `insertQaTest`, `sumCorrections`, `findPostedRow`, `findLineUoms`, `getDetails`, `withTransaction` |
-| posting | `backend/src/repository/stockPostingRepository.ts` | `postStock` (only stock-posting path), `rowValuePaise` |
-| service | `backend/src/service/grnService.ts` | `create`, `update` (`applyDraftUpdate`), `remove`, `qaAction`, `bypass`, `correction`, `recomputeGrnHeaderStatus`, `mapChallanClash`, `WHOLE_NUMBER_UNITS`; takes an `Actor`, over-receipt via `can(actor, "grn.over_receipt_override")` |
+| posting | `backend/src/repository/stockPostingRepository.ts` | `postStock` (only stock-posting path; BigInt row value + average, `assertMoneyInRange` / `assertStockValueInRange`; `blockNegative` → 409 `INSUFFICIENT_STOCK`), `rowValuePaise` |
+| service | `backend/src/service/grnService.ts` | `create`, `update` (`applyDraftUpdate`), `remove`, `qaAction`, `bypass`, `correction`, `recomputeGrnHeaderStatus`, `mapChallanClash`, exported `OVER_RECEIPT_TOLERANCE_RATIO` (used by purchase-return cancel); `WHOLE_NUMBER_UNITS` now lives in `grn.types.ts`; takes an `Actor`, over-receipt via `can(actor, "grn.over_receipt_override")` |
 | PO hook | `backend/src/service/poService.ts` | `recomputeReceiptStatus` (both directions, BR-PO-10) |
 | routes | `backend/src/routes/grn.ts` + `END_POINTS.grn` | guards = `requirePermission("grn.*")`, registry `auth: {type:"permission"}` |
 | frontend | `frontend/src/lib/api/grn/{fetchers,queries}.ts` (`invalidateGrnAndPO`, `usePoItemUoms`), `frontend/src/lib/grn-units.ts`, `frontend/src/components/pages/grn/*`, `frontend/src/components/views/grn/*` | buttons gated by `useCan("grn.*")` (old `grn-permissions.ts` role list removed) |
@@ -35,6 +36,9 @@ ledger. All grn + grn-stock BRs are implemented and tested (`grnService.test.ts`
 ## Data model
 - `grns`: `grnNumber` `GRN-<YYYY-MM>-<seq>` (`allocateDocumentSequence`, never reused), `poId`, `supplierId` (copied from PO), `status`, `receivedDate` (server time only), `challanNo` (required; unique per supplier), vehicle/driver fields.
 - `grnItems`: `receivedQty` (= arrived), `acceptedQty` (never changed by corrections), `rejectedQty`, `qaStatus` (text: pending/passed/failed/waived), `isQaBypassed`, `qaBypassReason`, `qaBypassedBy`, `qaBypassedAt`, `batchNumber` (heat no.), `overReceiptExcessQty`, `overReceiptReason`, `overReceiptBy`.
+- `grnItems.createdAt` (timestamp, default now, not null; migration `20261121111608_old_marvel_apes`): the supplier rating reads arrival as `coalesce(grns.received_date, grn_items.created_at)` (`supplier-rating.md`). Older rows got the migration time.
+- Index `idx_grns_received_date` on `grns(received_date)` (migration `20261121105810_military_jasper_sitwell`, for the rating window).
+- `grnItems.rejectedReturnedQty` / `acceptedReturnedQty`: posted purchase-return qty per source, moved only by return post/cancel (BR-PRT-19).
 - `grnCorrections`: one row per correction (line, qty, reason, who, when). Details expose `correctedQty` and `netAcceptedQty` = accepted − corrections.
 - Ledger rows from GRN: accept → `grn`, bypass → `grn_bypass`, correction → `grn_correction` (type `adjustment`, −qty at the cost + location of the line's original posting). `referenceId` = GRN id, `referenceLineId` = GRN line id.
 
@@ -42,7 +46,7 @@ ledger. All grn + grn-stock BRs are implemented and tested (`grnService.test.ts`
 | Method | Path | Key (seed roles holding it) | Purpose |
 |---|---|---|---|
 | GET | `/api/grn/getgrns` | `grn.view` (ow, bo, fs, qa, dd) | List, paginated; rows carry `poNumber` (BR-GRN-45) |
-| GET | `/api/grn/getgrndetails/:id` | `grn.view` | Header + lines + corrected/net qty; `po` and linked `prs` for the document flow (BR-GRN-45) |
+| GET | `/api/grn/getgrndetails/:id` | `grn.view` | Header + lines + corrected/net qty + per line `rejectedReturnedQty` / `acceptedReturnedQty`; `po`, linked `prs` and `returns[]` (`{id, proNumber, status}`, newest first) for the document flow (BR-GRN-45, BR-PRT-38) |
 | POST | `/api/grn/creategrn` | `grn.edit_draft` (ow, bo, fs) | Create draft |
 | PATCH | `/api/grn/updategrn` | `grn.edit_draft` | Edit draft (header, arrived qty, batch no.) |
 | DELETE | `/api/grn/deletegrn/:id` | `grn.edit_draft` | Delete draft |
@@ -57,11 +61,13 @@ Full shapes: `cd backend && bun --env-file=… run contract:query "<METHOD /path
 - `create`: PO must be dispatched/partial_received (400) → each line on this PO, once, qty > 0, whole number for `WHOLE_NUMBER_UNITS` (unit from the PO line) → challan clash (409, also from unique index 23505) → `createWithItems`.
 - `update` / `remove`: one tx; `lockDraftGrn` (GRN FOR UPDATE), re-check draft and every line pending, else 400 "use the correction".
 - `qaAction` / `bypass`: one tx; `lockGrnAndPo` (GRN, then PO FOR UPDATE) → PO dispatched/partial_received (409) → `findGrnItemForUpdate` (line + PO line FOR UPDATE) → one decision per line (409) → accepted + rejected = arrived → over-receipt vs latest PO received qty (> ordered × 1.05 → 400 unless override key + reason; excess above 105% stored) → `postStock` → QA row / bypass info → PO received qty + `recomputeReceiptStatus` → `recomputeGrnHeaderStatus`. Full reject posts nothing and skips the PO check.
-- `correction`: one tx; same locks → line passed/waived, qty > 0, reason, sum of corrections ≤ accepted (400) → PO not invoiced/closed (409) → `postStock` with `blockNegative` (409) at the original posting's cost/location, average via BR-GRN-39 → PO received qty down + status recomputed (can go back to partial_received or dispatched).
+- `correction`: one tx; same locks → line passed/waived, qty > 0, reason, sum of corrections ≤ accepted (400) → PO not invoiced/closed (409) → BR-PRT-42 floor: accepted − corrections − this ≥ accepted qty on non-cancelled returns, drafts included (400 `GRN_CORRECTION_BELOW_RETURNED`) → BR-SINV-30 floor: same ≥ qty on live supplier invoices (409 `SINV_CORRECTION_BELOW_BILLED`) → `postStock` with `blockNegative` (409) at the original posting's cost/location, average via BR-GRN-39 → PO received qty down + status recomputed (can go back to partial_received or dispatched) → `supplierInvoiceLinkService.reevaluatePoInvoiced` (BR-SINV-29).
 
 ## Invariants & gotchas
 - **Lock order everywhere: GRN header → PO row → GRN line + PO line → item row.** Keep it or postings can deadlock.
 - Order ledger rows by `id`, never `createdAt` (created_at = tx start time, wrong under concurrency).
+- `postStock` refusal for negative stock has code `INSUFFICIENT_STOCK` (409) for every caller (GRN correction, SCO, purchase returns); was generic `CONFLICT`.
+- GRN detail screen: "Return to supplier" from `GET /api/purchase-return/prefill/:grnId` `mainAction`, Enter supplier invoice + Invoices card (`components/pages/supplier-invoices/`).
 - `postStock` is the only way to change stock. Never write `itemMaster.currentStock` / `averageCostPaise` elsewhere.
 - Ledger `unit_cost_paise` is int4 (cap 2,147,483,647); `total_value_change_paise` is bigint (number mode); a row value above `Number.MAX_SAFE_INTEGER` → 400.
 - A body schema with `.transform()` shows as `body: unknown` in the manifest — register the pre-transform schema (`grnQaActionBodySchema`).
@@ -78,7 +84,7 @@ Full shapes: `cd backend && bun --env-file=… run contract:query "<METHOD /path
 | `backend/tests/service/poReceiptStatus.test.ts` | BR-PO-10 receipt status from GRN postings (both directions) |
 
 ## Known gaps / debt
-- Schema-only, no code: purchase returns, supplier invoices, supplier payments, supplier bank details, subcontracting orders/GRNs.
+- Schema-only, no code: supplier payments, supplier bank details. (Purchase returns and supplier invoices are built — own maps; subcontracting has its map.)
 - `grnItems.qaStatus` is free text, not a pg enum.
 - `challanPhotoUrl` column unused (upload is "Not now").
 - Frontend over-receipt warning ignores earlier receipts (BL-042); server enforces.
@@ -91,3 +97,5 @@ Full shapes: `cd backend && bun --env-file=… run contract:query "<METHOD /path
 | 2026-09-27 | 0a406f4 | Initial as-built map written |
 | 2026-09-29 | work/m1-stock 8cab134..1fe3cfd | grn + grn-stock v1 built: one-tx posting engine, challan rules, QA/bypass/over-receipt rules, corrections with PO roll-back, lock order, tests |
 | 2026-09-29 | work/m1 da516f2..eea4fb1 | Merged into work/m1; routes on permission keys (`requirePermission`), service takes `Actor`, UI via `useCan`; test fixtures = real employees (MRG-T1) |
+| 2026-11-21 | c0f73b0..de68fdf (partial) | Purchase returns + supplier invoice: returned qty + `returns[]` on details, correction floors BR-PRT-42 / BR-SINV-30, invoiced re-test after correction, `INSUFFICIENT_STOCK` code. Other changes since eea4fb1 not re-verified |
+| 2026-11-21 | 20261121105810, 20261121111608 (partial) | Supplier rating: `grn_items.created_at` (arrival fallback) and index `grns(received_date)`. Rest not re-verified |

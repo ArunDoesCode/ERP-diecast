@@ -20,7 +20,7 @@ Other pictures: `screens/colours-*.png` (tokens with contrast ratios), `screens/
 Every pattern sits inside the shell: sidebar (icons, active tint and bar — BR-DS-21) + top bar (fold
 button, the one breadcrumb trail — BR-DS-22, search stub, user menu). A list and its detail are
 separate routes, never a split panel. Rules that hold on every pattern: tokens only (BR-DS-01), light
-and dark (BR-DS-15), one `h1` (BR-DS-22), solid blue focus ring (BR-DS-20), colour weight only in the
+and dark (BR-DS-15), one `h1` (BR-DS-22), solid indigo focus ring (BR-DS-20), colour weight only in the
 seven places (BR-DS-26), nothing rendered that the user has no permission for (BR-DS-27).
 
 ### List

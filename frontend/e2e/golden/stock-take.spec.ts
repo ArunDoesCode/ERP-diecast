@@ -36,7 +36,11 @@ test("T-5 (6) owner posts a stock-take; movement list shows it; stock check agre
 	// The movement list shows the new row: stock-take, +25 at the main store.
 	await page.getByText("Filter by item").click();
 	await page.keyboard.type(cat.itemSku);
-	await page.getByText(cat.itemName).click();
+	// The new movement row also shows the name: pick it from the open list only.
+	await page
+		.locator('[data-slot="popover-content"]')
+		.getByText(cat.itemName)
+		.click();
 	const row = page.getByRole("row").filter({ hasText: cat.itemName });
 	await expect(row).toBeVisible();
 	await expect(row).toContainText("Adjustment");

@@ -66,17 +66,17 @@ export function EmployeeCombobox({
 			/>
 
 			{open ? (
-				<div className="absolute z-50 mt-1 w-full rounded-lg bg-popover p-1 text-xs/relaxed text-popover-foreground shadow-md ring-1 ring-foreground/10">
+				<div className="absolute z-50 mt-1 w-full rounded-lg bg-popover p-1 text-sm/relaxed text-popover-foreground shadow-md ring-1 ring-foreground/10">
 					{!hasQuery ? (
-						<p className="p-2 text-xs/relaxed text-muted-foreground">
+						<p className="p-2 text-sm/relaxed text-muted-foreground">
 							Type to search employees...
 						</p>
 					) : isLoading ? (
-						<p className="p-2 text-xs/relaxed text-muted-foreground">
+						<p className="p-2 text-sm/relaxed text-muted-foreground">
 							Loading employees...
 						</p>
 					) : employees.length === 0 ? (
-						<p className="p-2 text-xs/relaxed text-muted-foreground">
+						<p className="p-2 text-sm/relaxed text-muted-foreground">
 							No employees found.
 						</p>
 					) : (
@@ -92,7 +92,7 @@ export function EmployeeCombobox({
 									onMouseDown={(event) => event.preventDefault()}
 									onClick={() => handleSelect(employee)}
 									className={cn(
-										"flex w-full items-center rounded-md px-2 py-1.5 text-left text-xs/relaxed hover:bg-accent hover:text-accent-foreground",
+										"flex w-full items-center rounded-md px-2 py-1.5 text-left text-sm/relaxed hover:bg-accent hover:text-accent-foreground",
 									)}
 								>
 									{employee.name}

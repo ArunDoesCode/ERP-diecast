@@ -32,7 +32,7 @@ export function ScreenRow({ screen, onEditRoles }: ScreenRowProps) {
 
 	return (
 		<TableRow>
-			<TableCell className="text-xs text-muted-foreground">
+			<TableCell className="text-sm text-muted-foreground">
 				{screen.path}
 			</TableCell>
 			<TableCell>
@@ -64,7 +64,7 @@ export function ScreenRow({ screen, onEditRoles }: ScreenRowProps) {
 						{screen.roleIds.length} role(s)
 					</Button>
 				) : (
-					<span className="text-xs text-muted-foreground">No key</span>
+					<span className="text-sm text-muted-foreground">No key</span>
 				)}
 			</TableCell>
 			<TableCell>

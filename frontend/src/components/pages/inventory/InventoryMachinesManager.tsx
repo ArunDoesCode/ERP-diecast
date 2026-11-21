@@ -32,7 +32,6 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { FloatingLabelInput } from "@/components/ui/floating-label";
 import {
 	Form,
 	FormControl,
@@ -41,6 +40,7 @@ import {
 	FormLabel,
 	FormMessage,
 } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 import {
 	Select,
 	SelectContent,
@@ -184,13 +184,10 @@ function MachineEditorForm({ mode, machine, onDone }: MachineEditorFormProps) {
 					control={form.control}
 					name="name"
 					render={({ field }) => (
-						<FormItem className="min-h-19 mt-2">
+						<FormItem className="min-h-19 mt-2 gap-1.5">
+							<FormLabel htmlFor="machine-name">Machine name</FormLabel>
 							<FormControl>
-								<FloatingLabelInput
-									{...field}
-									id="machine-name"
-									label="Machine name"
-								/>
+								<Input {...field} id="machine-name" />
 							</FormControl>
 							<FormMessage />
 						</FormItem>
@@ -201,13 +198,10 @@ function MachineEditorForm({ mode, machine, onDone }: MachineEditorFormProps) {
 					control={form.control}
 					name="code"
 					render={({ field }) => (
-						<FormItem className="min-h-19">
+						<FormItem className="min-h-19 gap-1.5">
+							<FormLabel htmlFor="machine-code">Machine code</FormLabel>
 							<FormControl>
-								<FloatingLabelInput
-									{...field}
-									id="machine-code"
-									label="Machine code"
-								/>
+								<Input {...field} id="machine-code" />
 							</FormControl>
 							<FormMessage />
 						</FormItem>
@@ -218,11 +212,11 @@ function MachineEditorForm({ mode, machine, onDone }: MachineEditorFormProps) {
 					control={form.control}
 					name="type"
 					render={({ field }) => (
-						<FormItem className="min-h-19">
+						<FormItem className="min-h-19 gap-1.5">
+							<FormLabel htmlFor="machine-type">Machine type</FormLabel>
 							<FormControl>
-								<FloatingLabelInput
+								<Input
 									id="machine-type"
-									label="Machine type"
 									name={field.name}
 									value={field.value ?? ""}
 									onBlur={field.onBlur}
@@ -271,11 +265,13 @@ function MachineEditorForm({ mode, machine, onDone }: MachineEditorFormProps) {
 					control={form.control}
 					name="lastMaintenanceAt"
 					render={({ field }) => (
-						<FormItem className="min-h-19">
+						<FormItem className="min-h-19 gap-1.5">
+							<FormLabel htmlFor="machine-last-maintenance">
+								Last maintenance date
+							</FormLabel>
 							<FormControl>
-								<FloatingLabelInput
+								<Input
 									id="machine-last-maintenance"
-									label="Last maintenance date"
 									type="date"
 									max={todayIso()}
 									name={field.name}

@@ -37,6 +37,7 @@ export function handleAppError(error: Error, c: Context) {
         success: false,
         message: error.message,
         code: error.code,
+        ...(error.details ? { details: error.details } : {}),
       },
       error.statusCode as ContentfulStatusCode,
     );

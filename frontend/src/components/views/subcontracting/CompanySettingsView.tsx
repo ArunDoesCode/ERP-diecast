@@ -2,6 +2,7 @@
 
 import { CompanySettingsForm } from "@/components/pages/subcontracting/CompanySettingsForm";
 import { CompanySettingsHistory } from "@/components/pages/subcontracting/CompanySettingsHistory";
+import { InvoiceToleranceCard } from "@/components/pages/supplier-invoices/InvoiceToleranceCard";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCan } from "@/hooks/use-can";
@@ -17,7 +18,7 @@ export function CompanySettingsView() {
 		<div className="flex w-full flex-col gap-4">
 			<PageHeader
 				title="Company details"
-				description="Printed on the job-work challan. Only the owner can change these."
+				description="Company details print on the job-work challan. Invoice matching tolerances below apply to supplier bills. Only the owner can change these."
 			/>
 			{!canEdit ? (
 				<p className="text-sm text-muted-foreground">
@@ -31,6 +32,7 @@ export function CompanySettingsView() {
 					settings={query.data?.data ?? null}
 				/>
 			)}
+			<InvoiceToleranceCard />
 			{canView || canEdit ? <CompanySettingsHistory /> : null}
 		</div>
 	);

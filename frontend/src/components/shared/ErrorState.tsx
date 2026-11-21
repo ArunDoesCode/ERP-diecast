@@ -24,7 +24,7 @@ export function ErrorState({
 				<IconAlertTriangle size={24} aria-hidden="true" />
 			</span>
 			<p className="text-sm font-medium">{title}</p>
-			<p className="max-w-sm text-xs text-muted-foreground">{message}</p>
+			<p className="max-w-sm text-sm text-muted-foreground">{message}</p>
 			{onRetry ? (
 				<Button
 					type="button"
