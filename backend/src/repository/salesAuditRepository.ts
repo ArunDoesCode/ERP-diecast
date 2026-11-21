@@ -7,7 +7,7 @@ import type { DbExecutor } from "./executor";
 export type SalesAuditEntry = {
   actorId: number;
   action: string;
-  targetType: "customer" | "sale_order" | "explosion";
+  targetType: "customer" | "sale_order" | "explosion" | "delivery_note";
   targetId: number;
   soId?: number | null;
   before?: unknown;
