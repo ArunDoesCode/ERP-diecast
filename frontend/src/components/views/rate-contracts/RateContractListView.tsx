@@ -79,6 +79,11 @@ const columns: DataTableColumnDef<ContractListRow>[] = [
 				? "–"
 				: `${row.original.orderedPercent} %`,
 	},
+	{
+		accessorKey: "createdByName",
+		header: "Created by",
+		cell: ({ row }) => row.original.createdByName ?? "-",
+	},
 ];
 
 export function RateContractListView() {

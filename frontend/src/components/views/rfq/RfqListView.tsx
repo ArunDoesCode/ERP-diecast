@@ -79,6 +79,11 @@ const columns: DataTableColumnDef<RfqListRow>[] = [
 		},
 	},
 	{
+		accessorKey: "createdByName",
+		header: "Created by",
+		cell: ({ row }) => row.original.createdByName ?? "-",
+	},
+	{
 		accessorKey: "createdAt",
 		header: "Created on",
 		cell: ({ row }) => formatDate(row.original.createdAt),

@@ -29,6 +29,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useCan } from "@/hooks/use-can";
 import {
 	poErrorMessage,
+	useItemsLastRatesQuery,
 	usePurchaseOrderDetailQuery,
 	useSupplierPriceRowsQuery,
 	useUpdatePurchaseOrderMutation,
@@ -114,6 +115,12 @@ export function EditPOModal({
 		pendingLines.map((line) => line.itemId),
 		open && Boolean(po),
 	);
+	// Qty left on each contract line, for the contract badge.
+	const lastRatesQuery = useItemsLastRatesQuery(
+		items.filter((item) => item.contractItemId != null).map((i) => i.itemId),
+		po?.supplierId ?? 0,
+		open && Boolean(po),
+	);
 	const catalogGstByItemId = useMemo(() => {
 		const map = new Map<number, number>();
 		for (const item of priceRowsQuery.data ?? []) {
@@ -157,6 +164,17 @@ export function EditPOModal({
 		setGsts(
 			Object.fromEntries(
 				items.map((item) => [item.id, String(item.gstPercent ?? 0)]),
+			),
+		);
+		// A line with a saved override starts in override mode (CR-01).
+		setOverrides(
+			Object.fromEntries(
+				items
+					.filter((item) => item.rateOverrideReason)
+					.map((item) => [
+						item.id,
+						{ on: true, reason: item.rateOverrideReason ?? "" },
+					]),
 			),
 		);
 	}, [open, po, items]);
@@ -398,22 +416,33 @@ export function EditPOModal({
 													),
 												)}
 											</div>
-											<Button
-												type="button"
-												variant="ghost"
-												size="sm"
-												onClick={() =>
-													setRemovedIds((current) =>
-														new Set(current).add(item.id),
-													)
-												}
-											>
-												Remove
-											</Button>
+											{/* A line from an RFQ award can't be removed (A-43). */}
+											{item.quoteItemId != null ? (
+												<span
+													className="text-[13px] text-muted-foreground"
+													title="This line came from an RFQ award. Cancel the PO to undo the award."
+												>
+													From award
+												</span>
+											) : (
+												<Button
+													type="button"
+													variant="ghost"
+													size="sm"
+													onClick={() =>
+														setRemovedIds((current) =>
+															new Set(current).add(item.id),
+														)
+													}
+												>
+													Remove
+												</Button>
+											)}
 											{contractLinked ? (
 												<ContractRateControls
 													idPrefix={`po-edit-line-${item.id}`}
 													contractNumber={item.contractNumber}
+													qtyLeft={lastRatesQuery.data?.[item.itemId]?.qtyLeft}
 													canOverride={canOverrideRate}
 													overriding={override?.on ?? false}
 													onOverridingChange={(on) => {
@@ -429,7 +458,10 @@ export function EditPOModal({
 														if (!on) {
 															setRates((current) => ({
 																...current,
-																[item.id]: String(item.unitPricePaise / 100),
+																[item.id]: String(
+																	(item.contractRatePaise ??
+																		item.unitPricePaise) / 100,
+																),
 															}));
 														}
 													}}

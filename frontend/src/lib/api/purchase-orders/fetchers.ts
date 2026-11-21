@@ -3,6 +3,7 @@ import { API_ROUTES } from "@/lib/api/routes";
 import type {
 	ClosePoPayload,
 	ConfirmPoPayload,
+	LastRateData,
 	LastRateResult,
 	LogPoCommunicationPayload,
 	POCancelResult,
@@ -69,6 +70,29 @@ export function getItemLastRate(
 	return api.get<LastRateResult>(
 		`${API_ROUTES.assets.itemLastRate(itemId)}${toQueryString({ supplierId, onDate })}`,
 	);
+}
+
+/**
+ * Last rates for many items at once, keyed by item id (PERF-01/02).
+ * Adapter: the backend's batched `GET /api/asset/items/last-rates` is not in the
+ * contract manifest yet, so this fans out to the single-item endpoint. Swap the body
+ * for one call when the batched route lands; callers stay the same.
+ */
+export async function getItemsLastRates(
+	itemIds: number[],
+	supplierId: number,
+	onDate?: string,
+): Promise<Record<number, LastRateData | undefined>> {
+	const ids = [...new Set(itemIds)].sort((a, b) => a - b);
+	const results = await Promise.all(
+		ids.map((itemId) => getItemLastRate(itemId, supplierId, onDate)),
+	);
+	const byItem: Record<number, LastRateData | undefined> = {};
+	ids.forEach((itemId, index) => {
+		const result = results[index];
+		byItem[itemId] = result.success ? result.data : undefined;
+	});
+	return byItem;
 }
 
 // Ids per call: the supplier item list takes at most 100 ids, one page.

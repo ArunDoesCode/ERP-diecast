@@ -29,6 +29,7 @@ import {
 	createPurchaseOrder,
 	escalatePurchaseOrder,
 	getItemLastRate,
+	getItemsLastRates,
 	getPurchaseOrderById,
 	getPurchaseOrderCommunications,
 	getPurchaseOrders,
@@ -48,8 +49,17 @@ export const purchaseOrderKeys = {
 	detail: (poId: number) => ["purchase-orders", "detail", poId] as const,
 	communications: (poId: number) =>
 		["purchase-orders", "communications", poId] as const,
-	lastRate: (itemId: number, supplierId: number) =>
-		["purchase-orders", "last-rate", itemId, supplierId] as const,
+	lastRate: (itemId: number, supplierId: number, onDate?: string) =>
+		["purchase-orders", "last-rate", itemId, supplierId, onDate ?? ""] as const,
+	lastRates: (itemIds: number[], supplierId: number, onDate?: string) =>
+		[
+			"purchase-orders",
+			"last-rate",
+			"batch",
+			[...new Set(itemIds)].sort((a, b) => a - b),
+			supplierId,
+			onDate ?? "",
+		] as const,
 	priceRows: (supplierId: number, itemIds: number[]) =>
 		["purchase-orders", "price-rows", supplierId, itemIds] as const,
 };
@@ -65,6 +75,8 @@ const PO_ERROR_MESSAGES: Record<string, string> = {
 	PO_NOT_EDITABLE: "Only a draft PO can be edited.",
 	DOC_LOCKED_IN_APPROVAL:
 		"This PO is waiting for approval and cannot be changed. Withdraw it first.",
+	PO_LINE_FROM_AWARD:
+		"This line came from an RFQ award. Cancel the PO to undo the award.",
 	PO_LINE_ALREADY_DRAFTED: "One of those PR lines is already on another PO.",
 };
 
@@ -120,15 +132,31 @@ export function useItemLastRateQuery(
 	supplierId: number,
 	enabled: boolean,
 ) {
+	const onDate = istTodayIso();
 	return useQuery({
-		queryKey: purchaseOrderKeys.lastRate(itemId, supplierId),
-		queryFn: () => getItemLastRate(itemId, supplierId, istTodayIso()),
+		queryKey: purchaseOrderKeys.lastRate(itemId, supplierId, onDate),
+		queryFn: () => getItemLastRate(itemId, supplierId, onDate),
 		enabled:
 			enabled &&
 			Number.isFinite(itemId) &&
 			itemId > 0 &&
 			Number.isFinite(supplierId) &&
 			supplierId > 0,
+	});
+}
+
+/** One query for the last rate of every line on a PO (PERF-01/02). */
+export function useItemsLastRatesQuery(
+	itemIds: number[],
+	supplierId: number,
+	enabled: boolean,
+) {
+	const onDate = istTodayIso();
+	const ids = [...new Set(itemIds)].sort((a, b) => a - b);
+	return useQuery({
+		queryKey: purchaseOrderKeys.lastRates(ids, supplierId, onDate),
+		queryFn: () => getItemsLastRates(ids, supplierId, onDate),
+		enabled: enabled && supplierId > 0 && ids.length > 0,
 	});
 }
 

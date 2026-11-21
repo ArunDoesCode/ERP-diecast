@@ -88,7 +88,7 @@ import {
 	toPOCreatePayload,
 	useCancelPurchaseOrderMutation,
 	useCreatePurchaseOrderMutation,
-	useItemLastRateQuery,
+	useItemsLastRatesQuery,
 	usePurchaseOrderDetailQuery,
 	useSupplierPriceRowsQuery,
 } from "@/lib/api/purchase-orders/queries";
@@ -96,7 +96,7 @@ import {
 	purchaseRequisitionKeys,
 	usePurchaseRequisitionDetailQuery,
 } from "@/lib/api/purchase-requisitions/queries";
-import { usePrLinesQuery } from "@/lib/api/rfq/queries";
+import { usePrLinesQuery, useRfqsQuery } from "@/lib/api/rfq/queries";
 import { useSupplierInvoicesQuery } from "@/lib/api/supplier-invoice/queries";
 import {
 	useSupplierDetailQuery,
@@ -116,6 +116,7 @@ import { useAuthSessionStore } from "@/lib/store/auth-session-store";
 import {
 	GST_PERCENT_VALUES,
 	LAST_RATE_SOURCE_LABEL,
+	type LastRateData,
 	PO_REASON_MAX,
 	PO_REASON_MIN,
 	type POStatus,
@@ -260,15 +261,7 @@ export function PurchaseOrderDetailView({ prId }: { prId: number }) {
 							pendingLines(lines).some((line) => !onRfq.has(line.id))
 						}
 					/>
-					<PrDocumentFlow
-						pr={pr}
-						linkedPos={detail.linkedPos}
-						rfqs={[
-							...new Map(
-								[...onRfq.values()].map((rfq) => [rfq.id, rfq] as const),
-							).values(),
-						]}
-					/>
+					<PrDocumentFlow pr={pr} linkedPos={detail.linkedPos} />
 
 					<Card>
 						<CardHeader className="gap-3">
@@ -407,13 +400,23 @@ const RECEIVED_PO_STATUSES = new Set([
 function PrDocumentFlow({
 	pr,
 	linkedPos,
-	rfqs,
 }: {
 	pr: PurchaseRequisition;
 	linkedPos: PRLinkedPo[];
-	/** Open RFQs this requisition's lines are on (needs rfq.manage to read). */
-	rfqs: Array<{ id: number; number: string }>;
 }) {
+	// Every RFQ with a line from this PR, any status (needs rfq.view).
+	const canViewRfq = useCan("rfq.view");
+	const rfqsQuery = useRfqsQuery(
+		{
+			page: 1,
+			pageSize: 50,
+			sortBy: "createdAt",
+			sortDir: "asc",
+			prId: pr.id,
+		},
+		canViewRfq,
+	);
+	const rfqs = rfqsQuery.data?.data ?? [];
 	const livePos = linkedPos.filter((po) => po.status !== "cancelled");
 	const firstPo = livePos[0];
 	const received = livePos.some((po) => RECEIVED_PO_STATUSES.has(po.status));
@@ -450,8 +453,9 @@ function PrDocumentFlow({
 				},
 				...rfqs.map((rfq) => ({
 					label: "RFQ",
-					docNo: rfq.number,
+					docNo: rfq.rfqNumber,
 					href: `/rfq/${rfq.id}`,
+					status: <StatusBadge doc="rfq" status={rfq.status} />,
 					state: "done" as const,
 				})),
 				{
@@ -1174,6 +1178,12 @@ function CreatePOModal({
 		lines.map((line) => line.itemId),
 		Boolean(supplierId),
 	);
+	// One call for every line's last rate (PERF-01/02).
+	const lastRatesQuery = useItemsLastRatesQuery(
+		lines.map((line) => line.itemId),
+		supplierId ?? 0,
+		Boolean(supplierId),
+	);
 	const supplierDetailQuery = useSupplierDetailQuery(supplierId ?? 0);
 	const supplierDefaultTerms = supplierDetailQuery.data?.success
 		? supplierDetailQuery.data.data.supplier.defaultPaymentTermsDays
@@ -1366,6 +1376,8 @@ function CreatePOModal({
 								key={line.id}
 								line={line}
 								supplierId={supplierId}
+								lastRate={lastRatesQuery.data?.[line.itemId]}
+								lastRateLoading={lastRatesQuery.isLoading}
 								catalogRatePaise={catalogRateByItemId.get(line.itemId)}
 								value={rates[line.id] ?? ""}
 								onChange={(value) =>
@@ -1459,6 +1471,8 @@ function CreatePOModal({
 function CreatePOLine({
 	line,
 	supplierId,
+	lastRate,
+	lastRateLoading,
 	catalogRatePaise,
 	value,
 	onChange,
@@ -1472,6 +1486,8 @@ function CreatePOLine({
 }: {
 	line: PurchaseRequisitionItem;
 	supplierId?: number;
+	lastRate?: LastRateData;
+	lastRateLoading: boolean;
 	catalogRatePaise?: number;
 	value: string;
 	onChange: (value: string) => void;
@@ -1486,14 +1502,6 @@ function CreatePOLine({
 	// Rate-prefill priority (BR-PO-03): contract > last PO > price list > item
 	// average / standard rate. The last-rate endpoint walks that chain; the price
 	// list already fetched with the supplier covers a missing or weaker answer.
-	const lastRateQuery = useItemLastRateQuery(
-		line.itemId,
-		supplierId ?? 0,
-		Boolean(supplierId),
-	);
-	const lastRate = lastRateQuery.data?.success
-		? lastRateQuery.data.data
-		: undefined;
 	const isContract = lastRate?.source === "contract";
 	const catalogBeatsLastRate =
 		catalogRatePaise != null &&
@@ -1511,7 +1519,7 @@ function CreatePOLine({
 						label: LAST_RATE_SOURCE_LABEL.supplier_catalog,
 					}
 				: undefined;
-	const isReferenceRateLoading = Boolean(supplierId) && lastRateQuery.isLoading;
+	const isReferenceRateLoading = Boolean(supplierId) && lastRateLoading;
 	const referenceRatePaise = referenceRate?.ratePaise;
 	const contractGst = isContract ? lastRate?.gstPercent : undefined;
 
@@ -1632,6 +1640,8 @@ function CreatePOLine({
 			{isContract ? (
 				<ContractRateControls
 					idPrefix={`po-create-line-${line.id}`}
+					contractNumber={lastRate?.contractNumber}
+					qtyLeft={lastRate?.qtyLeft}
 					canOverride={canOverride}
 					overriding={overriding}
 					onOverridingChange={(on) => {

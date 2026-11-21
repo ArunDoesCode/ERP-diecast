@@ -63,6 +63,7 @@ export type RfqListRow = {
 	status: RfqStatus;
 	dueDate: string;
 	notes: string | null;
+	createdByName: string | null;
 	createdAt: string;
 	supplierCount: number;
 	quotedCount: number;
@@ -76,6 +77,8 @@ export type RfqListParams = {
 	q?: string;
 	status?: RfqStatus;
 	supplierId?: number;
+	/** RFQs with a line from this requisition, any status. */
+	prId?: number;
 	from?: string;
 	to?: string;
 };

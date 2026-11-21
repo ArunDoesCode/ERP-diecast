@@ -198,8 +198,14 @@ export type LastRateResult = ApiResult<{
 	source: LastRateSource;
 	/** Source "contract" only (inventory BR-INV-30): the line is bound to this contract line. */
 	contractItemId?: number;
+	contractId?: number;
+	contractNumber?: string;
+	/** Contract quantity still open on the date (a number, or a decimal string). */
+	qtyLeft?: number | string;
 	gstPercent?: number;
 }>;
+
+export type LastRateData = Extract<LastRateResult, { success: true }>["data"];
 
 export const poCommunicationChannelValues = [
 	"email",

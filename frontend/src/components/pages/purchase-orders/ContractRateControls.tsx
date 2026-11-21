@@ -20,6 +20,7 @@ export function overrideReasonValid(reason: string) {
 export function ContractRateControls({
 	idPrefix,
 	contractNumber,
+	qtyLeft,
 	canOverride,
 	overriding,
 	onOverridingChange,
@@ -29,6 +30,8 @@ export function ContractRateControls({
 }: {
 	idPrefix: string;
 	contractNumber?: string | null;
+	/** Contract quantity still open (from the last-rate answer). */
+	qtyLeft?: number | string | null;
 	canOverride: boolean;
 	overriding: boolean;
 	onOverridingChange: (on: boolean) => void;
@@ -49,6 +52,9 @@ export function ContractRateControls({
 				>
 					{label}
 				</Badge>
+				{qtyLeft != null && qtyLeft !== "" ? (
+					<span className="text-muted-foreground">Qty left {qtyLeft}</span>
+				) : null}
 				{overriding ? (
 					<>
 						<span className="text-muted-foreground">

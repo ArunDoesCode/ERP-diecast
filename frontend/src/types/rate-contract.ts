@@ -30,6 +30,7 @@ export type ContractListRow = {
 	validTo: string;
 	itemCount: number;
 	orderedPercent: number | null;
+	createdByName: string | null;
 	createdAt: string;
 };
 export type ContractListParams = {
