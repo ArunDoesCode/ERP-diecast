@@ -41,7 +41,12 @@ import { signAccessToken } from "../../src/lib/token";
 
 // biome-ignore lint/suspicious/noExplicitAny: test helper reads arbitrary JSON
 export type Json = any;
-export type Actor = { id: number; token: string };
+export type Actor = {
+  id: number;
+  token: string;
+  userName?: string;
+  role?: string;
+};
 export type Res = { status: number; json: Json };
 
 export type Rfq = {
@@ -130,7 +135,7 @@ export function makeRfqFx(tag: string) {
       role: roleName,
       allowedPages: [],
     });
-    const a = { id: e!.id, token };
+    const a = { id: e!.id, token, userName: `${RUN}_${key}`, role: roleName };
     actorCache.set(key, a);
     return a;
   }
@@ -147,7 +152,19 @@ export function makeRfqFx(tag: string) {
     body?: unknown,
   ): Promise<Res> {
     const headers: Record<string, string> = {};
-    if (who) headers.Authorization = `Bearer ${who.token}`;
+    if (who) {
+      // sign per request so a shifted clock (setSystemTime) always gets a fresh, unexpired token
+      const token =
+        who.userName && who.role
+          ? await signAccessToken({
+              userId: who.id,
+              userName: who.userName,
+              role: who.role,
+              allowedPages: [],
+            })
+          : who.token;
+      headers.Authorization = `Bearer ${token}`;
+    }
     if (body !== undefined) headers["Content-Type"] = "application/json";
     const res = await app.request(path, {
       method,
