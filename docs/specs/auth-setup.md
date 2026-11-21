@@ -63,6 +63,14 @@ Super-admin needs no grants (bypass). ow = owner, bo = back_office, fs = floor_s
 | `sco.qa_decide` | QA accept / reject SCO receipt lines | ow, bo, qa |
 | `sco.loss_override` | close an SCO with a loss write-off (BR-SCO-19) | ow |
 | `company.manage` | edit company settings: plant name, address, GSTIN, state (subcontracting BR-SCO-09) | ow |
+| `bom.view` | BOM list, detail, where-used (`bom/spec.md`) | ow, bo, fs |
+| `bom.manage` | BOM create, edit drafts, start revision | ow, bo |
+| `bom.release` | release / retire a BOM | ow |
+| `customer.manage` | customer master (`sale-order/spec.md` BR-SO-01..03) | ow, bo |
+| `so.view` | sale order list, detail | ow, bo |
+| `so.manage` | sale order create, edit, confirm, close, cancel | ow, bo |
+| `so.explode` | run explosion, create drafts from it | ow, bo |
+| `reorder.manage` | reorder settings, check now, owner candidates (`reorder/spec.md`) | ow, bo |
 | Approval submit / act / trail stay "any signed-in user"; who may act is decided by the approval chain. | | |
 
 ## Flow
