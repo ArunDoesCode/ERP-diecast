@@ -125,22 +125,32 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  if (customerIds.length > 0) {
-    await db
-      .delete(salesAuditLog)
-      .where(
-        and(
-          eq(salesAuditLog.targetType, "customer"),
-          inArray(salesAuditLog.targetId, customerIds),
-        ),
-      );
-    await db.delete(customers).where(inArray(customers.id, customerIds));
-  }
   const empRows = await db
     .select({ id: employees.id })
     .from(employees)
     .where(like(employees.email, `${EMAIL_PREFIX}%`));
   const empIds = empRows.map((e) => e.id);
+  const strayRows =
+    empIds.length > 0
+      ? await db
+          .select({ id: customers.id })
+          .from(customers)
+          .where(inArray(customers.createdBy, empIds))
+      : [];
+  const allCustomerIds = [
+    ...new Set([...customerIds, ...strayRows.map((c) => c.id)]),
+  ];
+  if (allCustomerIds.length > 0) {
+    await db
+      .delete(salesAuditLog)
+      .where(
+        and(
+          eq(salesAuditLog.targetType, "customer"),
+          inArray(salesAuditLog.targetId, allCustomerIds),
+        ),
+      );
+    await db.delete(customers).where(inArray(customers.id, allCustomerIds));
+  }
   if (empIds.length > 0) {
     await db
       .update(documentNumberCounters)
@@ -201,14 +211,15 @@ describe("BR-SO-01 customer master", () => {
   });
 
   test("BR-SO-01 GSTIN of the wrong length or format -> 400", async () => {
-    for (const gstin of [
-      "33AAAAA0000A1Z",
-      "33aaaaa0000a1z5",
-      "XXAAAAA0000A1Z5",
-    ]) {
+    for (const gstin of ["33AAAAA0000A1Z", "XXAAAAA0000A1Z5"]) {
       const res = await call("bo", "POST", "", body({ gstin }));
       expect(res.status).toBe(400);
     }
+  });
+
+  test("BR-SO-01 lowercase GSTIN is stored upper-case", async () => {
+    const c = await mk({ gstin: VALID_GSTIN_33.toLowerCase() });
+    expect(c.gstin).toBe(VALID_GSTIN_33);
   });
 
   test("BR-SO-01 patch can change the GSTIN and null clears it", async () => {
