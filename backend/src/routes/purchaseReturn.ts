@@ -3,12 +3,12 @@ import { Hono } from "hono";
 import { purchaseReturnController } from "../controller/purchaseReturnController";
 import { asyncHandler } from "../lib/async-handler";
 import { requirePermission } from "../lib/auth-middleware";
-import { paginatedResponse, successResponse } from "../lib/response-schemas";
+import { successResponse } from "../lib/response-schemas";
 import { register } from "../lib/route-registry";
 import type { AppEnv } from "../lib/types";
 import {
+  awaitingReturnListResponseSchema,
   awaitingReturnQuerySchema,
-  awaitingReturnRowSchema,
   cancelPurchaseReturnSchema,
   createPurchaseReturnSchema,
   purchaseReturnCancelledDraftSchema,
@@ -58,10 +58,10 @@ register({
   path: `${PRT_BASE_PATH}${PRT_ROUTES.awaiting}`,
   tags: ["purchase-return"],
   summary:
-    "Awaiting-return GRN lines (rejected qty not yet reserved by a non-cancelled return), paginated. Filter by supplierId.",
+    "Awaiting-return GRN lines (rejected qty not yet reserved by a non-cancelled return), paginated. Filter by supplierId. meta adds statusCounts and awaitingCount.",
   auth: { type: "permission", key: "purchase_return.view" },
   request: { query: awaitingReturnQuerySchema },
-  responses: { "200": paginatedResponse(awaitingReturnRowSchema) },
+  responses: { "200": awaitingReturnListResponseSchema },
   pagination: {
     sortableFields: ["grnId", "grnNumber", "receivedDate"],
     searchable: false,

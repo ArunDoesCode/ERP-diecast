@@ -257,11 +257,12 @@ function previewOf(
     gstPercent: number;
   }[],
   replacementExpected: boolean,
+  interstate: boolean,
 ) {
   const results = lines.map((l) =>
     computeReturnLine(
       { qty: l.qty, ratePaise: l.ratePaise, gstPercent: l.gstPercent },
-      false,
+      interstate,
     ),
   );
   const stock = new Map<number, { itemId: number; qty: number; uom: string }>();
@@ -328,7 +329,11 @@ export const purchaseReturnService = {
   },
 
   async awaiting(params: AwaitingReturnQuery) {
-    const { rows, total } = await repo.listAwaiting(params);
+    const [{ rows, total }, statusCounts, awaitingCount] = await Promise.all([
+      repo.listAwaiting(params),
+      repo.statusCounts(),
+      repo.countAwaiting(),
+    ]);
     return {
       data: rows.map((r) => {
         const rejected = Number(r.rejectedQty);
@@ -349,16 +354,17 @@ export const purchaseReturnService = {
           uom: r.uom,
         };
       }),
-      meta: toPaginatedMeta(params.page, params.pageSize, total),
+      meta: {
+        ...toPaginatedMeta(params.page, params.pageSize, total),
+        statusCounts,
+        awaitingCount,
+      },
     };
   },
 
   // Writes nothing (BR-PRT-36).
   async prefill(grnId: number) {
-    const grn = await repo.findGrnForReturn(
-      grnId,
-      (await import("../db/client")).db,
-    );
+    const grn = await repo.findGrnForReturn(grnId);
     if (!grn) {
       throw new NotFoundError("GRN not found");
     }
@@ -427,6 +433,20 @@ export const purchaseReturnService = {
       repo.reservedByGrnLine(grnLineIds),
       repo.correctionsMilliByGrnLine(grnLineIds),
     ]);
+    // Same supplier-vs-company state test post uses, so the preview total matches (CR-03).
+    let previewInterstate = false;
+    if (header.status === "draft") {
+      const [company, supplier] = await Promise.all([
+        repo.findCompanySettings(),
+        repo.findSupplier(header.supplierId),
+      ]);
+      if (company?.stateCode.trim() && supplier) {
+        previewInterstate = isInterstateSupply(
+          supplier.gstNumber,
+          company.stateCode,
+        );
+      }
+    }
 
     const detailLines = lines.map((l) => ({
       id: l.id,
@@ -557,6 +577,7 @@ export const purchaseReturnService = {
                 gstPercent: l.gstPercent,
               })),
               header.replacementExpected,
+              previewInterstate,
             )
           : null,
     };

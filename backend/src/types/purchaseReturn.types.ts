@@ -203,6 +203,12 @@ export const awaitingReturnRowSchema = z.object({
   uom: z.string(),
 });
 
+export const awaitingReturnListResponseSchema = z.object({
+  success: z.literal(true),
+  data: z.array(awaitingReturnRowSchema),
+  meta: purchaseReturnListResponseSchema.shape.meta,
+});
+
 const capFields = {
   rejectedQty: z.number(),
   rejectedReserved: z.number(),

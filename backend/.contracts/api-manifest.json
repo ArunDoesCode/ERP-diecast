@@ -3604,7 +3604,7 @@
       "tags": [
         "purchase-return"
       ],
-      "summary": "Awaiting-return GRN lines (rejected qty not yet reserved by a non-cancelled return), paginated. Filter by supplierId.",
+      "summary": "Awaiting-return GRN lines (rejected qty not yet reserved by a non-cancelled return), paginated. Filter by supplierId. meta adds statusCounts and awaitingCount.",
       "auth": {
         "type": "permission",
         "key": "purchase_return.view"
@@ -3626,7 +3626,13 @@
             "page": "integer.nonnegative.required",
             "pageSize": "integer.nonnegative.required",
             "total": "integer.nonnegative.required",
-            "totalPages": "integer.nonnegative.required"
+            "totalPages": "integer.nonnegative.required",
+            "statusCounts": {
+              "draft": "integer.required",
+              "posted": "integer.required",
+              "cancelled": "integer.required"
+            },
+            "awaitingCount": "integer.required"
           }
         }
       },

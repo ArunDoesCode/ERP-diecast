@@ -5,7 +5,6 @@ import {
   desc,
   eq,
   getTableColumns,
-  gt,
   gte,
   inArray,
   isNotNull,
@@ -375,12 +374,12 @@ export const purchaseReturnRepository = {
       .where(inArray(itemMaster.id, ids));
   },
 
-  async findCompanySettings(tx: Tx) {
-    const [row] = await tx.select().from(companySettings).limit(1);
+  async findCompanySettings(executor: Executor = db) {
+    const [row] = await executor.select().from(companySettings).limit(1);
     return row;
   },
 
-  async findSupplier(id: number, executor: Executor) {
+  async findSupplier(id: number, executor: Executor = db) {
     const [row] = await executor
       .select({
         id: supplierMaster.id,
@@ -576,7 +575,8 @@ export const purchaseReturnRepository = {
     const reservedQty = sql<string>`coalesce(${reserved.qty}, 0)`;
     const rejectedQty = sql<string>`round(coalesce(${grnItems.rejectedQty}, 0)::numeric, 3)`;
     const predicate = and(
-      gt(grnItems.rejectedQty, 0), // partial index idx_grn_items_awaiting_return
+      // literal (not a bound param) so the partial index idx_grn_items_awaiting_return is usable
+      sql`${grnItems.rejectedQty} > 0`,
       isNotNull(grns.poId),
       sql`${rejectedQty} - ${reservedQty} > 0`,
       params.supplierId !== undefined
@@ -636,6 +636,19 @@ export const purchaseReturnRepository = {
     return { rows, total: totalRow?.value ?? 0 };
   },
 
+  // Status tallies over every return (no filters), for the awaiting tab meta.
+  async statusCounts() {
+    const rows = await db
+      .select({ status: purchaseReturns.status, value: count() })
+      .from(purchaseReturns)
+      .groupBy(purchaseReturns.status);
+    const result = { draft: 0, posted: 0, cancelled: 0 };
+    for (const row of rows) {
+      result[row.status] = row.value;
+    }
+    return result;
+  },
+
   // The header badge: awaiting lines over every supplier.
   async countAwaiting() {
     const reserved = db
@@ -665,7 +678,7 @@ export const purchaseReturnRepository = {
       .leftJoin(reserved, eq(reserved.grnItemId, grnItems.id))
       .where(
         and(
-          gt(grnItems.rejectedQty, 0),
+          sql`${grnItems.rejectedQty} > 0`,
           isNotNull(grns.poId),
           sql`round(coalesce(${grnItems.rejectedQty}, 0)::numeric, 3) - coalesce(${reserved.qty}, 0) > 0`,
         ),
