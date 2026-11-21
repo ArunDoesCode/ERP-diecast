@@ -36,6 +36,12 @@ test("T-5 (2) PR is raised, approved, ordered, approved and sent: PO dispatched,
 	await page.keyboard.type(cat.itemSku);
 	await page.getByText(cat.itemName).click();
 	await page.getByLabel("Quantity").fill("500");
+	// BR-FF-48 / BR-PO-18: Create PO copies the earliest required-by into the PO, and a PO cannot be
+	// sent without an expected delivery date, so the line needs a (future) required-by date.
+	const requiredBy = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
+		.toISOString()
+		.slice(0, 10);
+	await page.getByLabel("Required by").first().fill(requiredBy);
 	await page.getByRole("button", { name: "Save and submit" }).click();
 
 	// BR-FF-46: the saved requisition's own page opens, waiting for approval.
