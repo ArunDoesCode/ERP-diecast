@@ -36,6 +36,7 @@ import type {
 } from "../types/purchaseReturn.types";
 import { OVER_RECEIPT_TOLERANCE_RATIO } from "./grnService";
 import { poService } from "./poService";
+import { supplierInvoiceLinkService } from "./supplierInvoiceLinkService";
 
 type Source = "rejected" | "accepted";
 
@@ -932,6 +933,12 @@ export const purchaseReturnService = {
       if (replacement) {
         await poService.recomputeReceiptStatus(pro.poId, tx); // BR-PO-10
       }
+      // BR-SINV-29: the PO "invoiced" test is re-run after the counters moved.
+      await supplierInvoiceLinkService.reevaluatePoInvoiced(
+        pro.poId,
+        actorId,
+        tx,
+      );
 
       // Numbers last (counter rows lock until commit). BR-PRT-30, 35.
       const now = new Date();
@@ -950,6 +957,16 @@ export const purchaseReturnService = {
       );
       const challanNumber = `PRC/${prc.fy}/${String(prc.seq).padStart(4, "0")}`;
 
+      // BR-PRT-44, 45: link the oldest approved bill covering a returned line, with its offset.
+      const billLink = await supplierInvoiceLinkService.findBillForReturnPost(
+        lines.map((line, index) => ({
+          grnItemId: line.grnItemId,
+          source: line.source,
+          taxablePaise: amounts[index]?.taxablePaise ?? 0,
+          gstPaise: amounts[index]?.gstPaise ?? 0,
+        })),
+        tx,
+      );
       const debitNote = await repo.insertDebitNote(
         {
           dnNumber,
@@ -962,7 +979,8 @@ export const purchaseReturnService = {
           igstPaise: totals.igstPaise,
           totalPaise: totals.totalPaise,
           isInterstate: interstate,
-          billOffsetPaise: 0,
+          supplierInvoiceId: billLink.supplierInvoiceId,
+          billOffsetPaise: billLink.billOffsetPaise,
           plantName: company.name,
           plantAddress: company.address,
           plantGstin: company.gstin,
@@ -1129,6 +1147,12 @@ export const purchaseReturnService = {
 
       const now = new Date();
       await repo.cancelDebitNote(id, actorId, now, tx);
+      // BR-SINV-29: the PO "invoiced" test is re-run after the counters moved back.
+      await supplierInvoiceLinkService.reevaluatePoInvoiced(
+        pro.poId,
+        actorId,
+        tx,
+      );
       await repo.updateHeader(
         id,
         {

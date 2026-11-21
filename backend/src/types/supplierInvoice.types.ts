@@ -255,6 +255,8 @@ export const billableLineSchema = z.object({
 export const billableLinesSchema = z.object({
   po: z.object({
     id: z.number().int(),
+    // PO detail pages are keyed by PR id; null when the PO has no PR link
+    prId: z.number().int().nullable(),
     poNumber: z.string(),
     status: z.string(),
     paymentTermsDays: z.number().int(),
@@ -326,6 +328,7 @@ export const supplierInvoiceDetailsSchema = z.object({
   fy: z.string(),
   status: supplierInvoiceStatusSchema,
   poId: z.number().int(),
+  prId: z.number().int().nullable(),
   poNumber: z.string(),
   supplier: z.object({
     id: z.number().int(),

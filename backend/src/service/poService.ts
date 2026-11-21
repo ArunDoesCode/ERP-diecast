@@ -810,6 +810,11 @@ export const poService = {
       throw new NotFoundError("Purchase order not found");
     }
 
+    // BR-SINV-29: `invoiced` is set and cleared only by the supplier-invoice service.
+    if (po.status === "invoiced") {
+      return po;
+    }
+
     const items = await poRepository.findPoItemQuantitiesByPoId(poId, tx);
     if (items.length === 0) {
       return po;

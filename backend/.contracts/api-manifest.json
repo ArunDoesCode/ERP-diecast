@@ -7004,6 +7004,7 @@
           "data": {
             "po": {
               "id": "integer.required",
+              "prId": "integer.nullable.required",
               "poNumber": "string.required",
               "status": "string.required",
               "paymentTermsDays": "integer.required"
@@ -7045,6 +7046,7 @@
             "fy": "string.required",
             "status": "enum:draft,blocked,approved,cancelled,legacy.required",
             "poId": "integer.required",
+            "prId": "integer.nullable.required",
             "poNumber": "string.required",
             "supplier": {
               "id": "integer.required",
@@ -7149,6 +7151,7 @@
             "fy": "string.required",
             "status": "enum:draft,blocked,approved,cancelled,legacy.required",
             "poId": "integer.required",
+            "prId": "integer.nullable.required",
             "poNumber": "string.required",
             "supplier": {
               "id": "integer.required",
@@ -7254,6 +7257,7 @@
             "fy": "string.required",
             "status": "enum:draft,blocked,approved,cancelled,legacy.required",
             "poId": "integer.required",
+            "prId": "integer.nullable.required",
             "poNumber": "string.required",
             "supplier": {
               "id": "integer.required",
@@ -7366,6 +7370,7 @@
             "fy": "string.required",
             "status": "enum:draft,blocked,approved,cancelled,legacy.required",
             "poId": "integer.required",
+            "prId": "integer.nullable.required",
             "poNumber": "string.required",
             "supplier": {
               "id": "integer.required",
@@ -7455,6 +7460,7 @@
             "fy": "string.required",
             "status": "enum:draft,blocked,approved,cancelled,legacy.required",
             "poId": "integer.required",
+            "prId": "integer.nullable.required",
             "poNumber": "string.required",
             "supplier": {
               "id": "integer.required",
@@ -7546,6 +7552,7 @@
             "fy": "string.required",
             "status": "enum:draft,blocked,approved,cancelled,legacy.required",
             "poId": "integer.required",
+            "prId": "integer.nullable.required",
             "poNumber": "string.required",
             "supplier": {
               "id": "integer.required",
@@ -7637,6 +7644,7 @@
             "fy": "string.required",
             "status": "enum:draft,blocked,approved,cancelled,legacy.required",
             "poId": "integer.required",
+            "prId": "integer.nullable.required",
             "poNumber": "string.required",
             "supplier": {
               "id": "integer.required",

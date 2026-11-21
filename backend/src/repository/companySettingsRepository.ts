@@ -60,6 +60,47 @@ export const companySettingsRepository = {
     });
   },
 
+  // BR-SINV-32: change one or both tolerances (basis points) on the existing row; one
+  // history row per changed field, same transaction. Returns undefined when there is
+  // no company row yet.
+  async updateTolerances(
+    input: { priceToleranceBp?: number; weightToleranceBp?: number },
+    actorId: number,
+  ) {
+    return db.transaction(async (tx) => {
+      const [current] = await tx
+        .select()
+        .from(companySettings)
+        .where(eq(companySettings.id, 1))
+        .limit(1)
+        .for("update");
+      if (!current) {
+        return undefined;
+      }
+      const changes = (["priceToleranceBp", "weightToleranceBp"] as const)
+        .filter(
+          (field) =>
+            input[field] !== undefined && input[field] !== current[field],
+        )
+        .map((field) => ({
+          field,
+          oldValue: String(current[field]),
+          newValue: String(input[field]),
+          createdBy: actorId,
+        }));
+      if (changes.length === 0) {
+        return current;
+      }
+      const [row] = await tx
+        .update(companySettings)
+        .set({ ...input, updatedBy: actorId, updatedAt: new Date() })
+        .where(eq(companySettings.id, 1))
+        .returning();
+      await tx.insert(companySettingsHistory).values(changes);
+      return row;
+    });
+  },
+
   // BR-SCO-29: newest first.
   async listHistory(page: number, pageSize: number) {
     const [rows, [totalRow]] = await Promise.all([

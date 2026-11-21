@@ -9,6 +9,10 @@ import { grnRepository } from "../repository/grnRepository";
 import { poRepository } from "../repository/poRepository";
 import { purchaseReturnRepository } from "../repository/purchaseReturnRepository";
 import { postStock } from "../repository/stockPostingRepository";
+import {
+  LIVE_STATUSES,
+  supplierInvoiceRepository,
+} from "../repository/supplierInvoiceRepository";
 import { poService } from "../service/poService";
 import {
   type createGrnSchemaType,
@@ -618,6 +622,26 @@ export const grnService = {
         throw new BadRequestError(
           `A correction of ${input.qty} would take the accepted qty below what is on purchase returns (${acceptedReserved / 1000}).`,
           "GRN_CORRECTION_BELOW_RETURNED",
+        );
+      }
+
+      // BR-SINV-30: net accepted after this correction can't go below the qty on live
+      // supplier invoices (drafts, blocked, approved); read under the GRN line lock.
+      const billed = await supplierInvoiceRepository.billedMilliByGrnItem(
+        [lineId],
+        LIVE_STATUSES,
+        tx,
+      );
+      const billedMilli = billed.get(lineId) ?? 0;
+      if (
+        toMilli(line.acceptedQty) -
+          toMilli(alreadyCorrected) -
+          toMilli(input.qty) <
+        billedMilli
+      ) {
+        throw new ConflictError(
+          `A correction of ${input.qty} would take the accepted qty below what is on supplier invoices (${billedMilli / 1000}) - cancel the invoice first.`,
+          "SINV_CORRECTION_BELOW_BILLED",
         );
       }
 
