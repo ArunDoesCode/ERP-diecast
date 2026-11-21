@@ -296,17 +296,6 @@ export const confirmPoSchema = z.object({
 });
 export type confirmPoSchemaType = z.infer<typeof confirmPoSchema>;
 
-// POST /po/:id/invoice — records a supplier invoice against a fully-received
-// PO and moves it to `invoiced`. Full 3-way-match/payment workflow is a
-// future AP feature; this only creates the supplierInvoices row.
-export const markPoInvoicedSchema = z.object({
-  invoiceNumber: z.string().trim().min(1).max(100),
-  invoiceDate: z.coerce.date(),
-  billedAmountPaise: z.number().int().nonnegative().max(MAX_MONEY_PAISE),
-  dueDate: z.coerce.date().optional(),
-});
-export type markPoInvoicedSchemaType = z.infer<typeof markPoInvoicedSchema>;
-
 // POST /po/:id/close — terminal close, legal from `fully_received` or
 // `invoiced`.
 export const closePoSchema = z.object({

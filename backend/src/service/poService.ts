@@ -1,5 +1,4 @@
 import { db } from "../db/client";
-import { isUniqueViolation } from "../lib/db-errors";
 import { allocateDocumentSequence } from "../lib/document-number";
 import {
   AppError,
@@ -21,7 +20,6 @@ import type {
   confirmPoSchemaType,
   createPoSchemaType,
   logPoCommunicationSchemaType,
-  markPoInvoicedSchemaType,
   markPoSentSchemaType,
   poListQuerySchemaType,
   poStatusSchemaType,
@@ -46,7 +44,8 @@ const PO_STATUS_TRANSITIONS: Record<poStatusSchemaType, poStatusSchemaType[]> =
     dispatched: ["partial_received", "fully_received", "cancelled"],
     partial_received: ["fully_received", "cancelled"],
     fully_received: ["invoiced", "closed"],
-    invoiced: ["closed"],
+    // invoiced is set and cleared only by the supplier-invoice service (BR-SINV-29)
+    invoiced: ["fully_received", "closed"],
     closed: [],
     cancelled: [],
   };
@@ -748,56 +747,6 @@ export const poService = {
         },
         tx,
       );
-      return reloadPo(poId, tx);
-    });
-  },
-
-  // BR-PO-15: fully_received only; same invoice number from the same supplier twice = 409.
-  async markInvoiced(
-    poId: number,
-    input: markPoInvoicedSchemaType,
-    actorId: number,
-  ) {
-    return withLockedPo(poId, ["fully_received"], "invoice", async (tx, po) => {
-      const duplicate = () =>
-        new ConflictError(
-          `Invoice ${input.invoiceNumber} is already recorded for this supplier`,
-          "SUPPLIER_INVOICE_DUPLICATE",
-        );
-
-      if (
-        await poRepository.findSupplierInvoice(
-          po.supplierId,
-          input.invoiceNumber,
-          tx,
-        )
-      ) {
-        throw duplicate();
-      }
-
-      try {
-        await poRepository.insertSupplierInvoice(
-          {
-            invoiceNumber: input.invoiceNumber,
-            invoiceDate: input.invoiceDate,
-            poId,
-            supplierId: po.supplierId,
-            billedAmountPaise: input.billedAmountPaise,
-            dueDate: input.dueDate ?? null,
-          },
-          tx,
-        );
-      } catch (error) {
-        if (isUniqueViolation(error)) {
-          throw duplicate();
-        }
-        throw error;
-      }
-
-      await poRepository.setStatus(poId, "invoiced", tx, {
-        invoicedBy: actorId,
-        invoicedAt: new Date(),
-      });
       return reloadPo(poId, tx);
     });
   },

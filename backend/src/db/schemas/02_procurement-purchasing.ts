@@ -3,13 +3,17 @@ import {
   type AnyPgColumn,
   bigint,
   boolean,
+  check,
+  date,
   doublePrecision,
   index,
   integer,
+  jsonb,
   numeric,
   pgEnum,
   pgTable,
   serial,
+  smallint,
   text,
   timestamp,
   uniqueIndex,
@@ -983,35 +987,255 @@ export const purchaseReturnEvents = pgTable(
   ],
 );
 
-// --- 5. SUPPLIER INVOICE & 3-WAY MATCH ---
+// --- 5. SUPPLIER INVOICE & 3-WAY MATCH (supplier-invoice spec, design/data.md) ---
+export const supplierInvoiceStatusEnum = pgEnum("supplier_invoice_status", [
+  "draft",
+  "blocked",
+  "approved", // shown as "Payable"
+  "cancelled",
+  "legacy", // read-only rows from the old manual BR-PO-15 path
+]);
+
+export const supplierInvoiceTaxTypeEnum = pgEnum("supplier_invoice_tax_type", [
+  "cgst_sgst",
+  "igst",
+  "none", // unregistered supplier
+]);
+
+export const supplierInvoiceLineKindEnum = pgEnum(
+  "supplier_invoice_line_kind",
+  ["item", "charge"],
+);
+
+export const supplierInvoiceChargeTypeEnum = pgEnum(
+  "supplier_invoice_charge_type",
+  ["freight", "packing", "tooling", "other"],
+);
+
+export const supplierInvoiceMismatchCheckEnum = pgEnum(
+  "supplier_invoice_mismatch_check",
+  ["qty", "price", "tax", "tax_rate", "total", "charge"],
+);
+
+export const supplierInvoiceMismatchUnitEnum = pgEnum(
+  "supplier_invoice_mismatch_unit",
+  ["paise", "milli_qty", "bp"],
+);
+
+export const supplierInvoiceHistoryActionEnum = pgEnum(
+  "supplier_invoice_history_action",
+  ["create", "edit", "submit", "back_to_draft", "release", "cancel", "delete"],
+);
+
 export const supplierInvoices = pgTable(
   "supplier_invoices",
   {
     id: serial("id").primaryKey(),
-    // no-index: covered:uq_supplier_invoice_number supplier_id always given
-    invoiceNumber: text("invoice_number").notNull(), //supplier invoice number
-    invoiceDate: timestamp("invoice_date").notNull(),
-    poId: integer("po_id").references(() => purchaseOrders.id),
+    // SINV-<YYYY-MM>-<seq> (BR-SINV-11); old rows LEGACY-<id>
+    ourNumber: text("our_number").unique().notNull(),
+    // supplier's own bill number: trimmed, upper-cased, 1-16 of A-Z 0-9 - / (BR-SINV-05)
+    invoiceNumber: text("invoice_number").notNull(),
+    // IST calendar day (BR-SINV-07)
+    invoiceDate: date("invoice_date").notNull(),
+    // financial year of invoice_date, "26-27" (BR-SINV-06)
+    fy: text("fy").generatedAlwaysAs(
+      sql`lpad((((extract(year from invoice_date)::int - (case when extract(month from invoice_date) < 4 then 1 else 0 end)) % 100))::text, 2, '0') || '-' || lpad((((extract(year from invoice_date)::int - (case when extract(month from invoice_date) < 4 then 1 else 0 end) + 1) % 100))::text, 2, '0')`,
+    ),
+    poId: integer("po_id")
+      .references(() => purchaseOrders.id)
+      .notNull(),
     supplierId: integer("supplier_id")
       .references(() => supplierMaster.id)
       .notNull(),
+    status: supplierInvoiceStatusEnum("status").default("draft").notNull(),
+    // printed bill total (BR-SINV-10)
     billedAmountPaise: bigint("billed_amount_paise", {
       mode: "number",
     }).notNull(),
-    // 3-way match status
-    matchStatus: text("match_status").default("pending"), // 'matched', 'exception', 'approved'
-    paymentStatus: text("payment_status").default("unpaid"), // 'unpaid', 'scheduled', 'paid'
-    dueDate: timestamp("due_date"), // Calculated: GRN Date + paymentTermsDays
-    createdAt: timestamp("created_at").defaultNow(),
+    printedTaxablePaise: bigint("printed_taxable_paise", { mode: "number" })
+      .default(0)
+      .notNull(),
+    printedCgstPaise: bigint("printed_cgst_paise", { mode: "number" })
+      .default(0)
+      .notNull(),
+    printedSgstPaise: bigint("printed_sgst_paise", { mode: "number" })
+      .default(0)
+      .notNull(),
+    printedIgstPaise: bigint("printed_igst_paise", { mode: "number" })
+      .default(0)
+      .notNull(),
+    // computed by the server, sums of lines (BR-SINV-13, 15)
+    taxablePaise: bigint("taxable_paise", { mode: "number" })
+      .default(0)
+      .notNull(),
+    cgstPaise: bigint("cgst_paise", { mode: "number" }).default(0).notNull(),
+    sgstPaise: bigint("sgst_paise", { mode: "number" }).default(0).notNull(),
+    igstPaise: bigint("igst_paise", { mode: "number" }).default(0).notNull(),
+    totalPaise: bigint("total_paise", { mode: "number" }).default(0).notNull(),
+    taxType: supplierInvoiceTaxTypeEnum("tax_type"),
+    // snapshot at submit (BR-SINV-14, 18)
+    supplierGstin: text("supplier_gstin"),
+    supplierStateCode: text("supplier_state_code"),
+    plantStateCode: text("plant_state_code"),
+    reverseCharge: boolean("reverse_charge").default(false).notNull(),
+    itcIneligible: boolean("itc_ineligible").default(false).notNull(),
+    // snapshot of PO terms; due = invoice_date + terms (BR-SINV-28)
+    paymentTermsDays: integer("payment_terms_days").default(0).notNull(),
+    dueDate: date("due_date"),
+    paymentStatus: text("payment_status").default("unpaid").notNull(),
+    // tolerance used at submit, basis points (BR-SINV-23, 32)
+    priceTolBpUsed: smallint("price_tol_bp_used"),
+    weightTolBpUsed: smallint("weight_tol_bp_used"),
+    // no-index: audit who-did-it columns, read only by joining to employees
+    submittedBy: integer("submitted_by").references(() => employees.id),
+    submittedAt: timestamp("submitted_at"),
+    // no-index: audit who-did-it column, read only by joining to employees
+    releasedBy: integer("released_by").references(() => employees.id),
+    releasedAt: timestamp("released_at"),
+    releaseReason: text("release_reason"),
+    // no-index: audit who-did-it column, read only by joining to employees
+    cancelledBy: integer("cancelled_by").references(() => employees.id),
+    cancelledAt: timestamp("cancelled_at"),
+    cancelReason: text("cancel_reason"),
+    // no-index: audit who-did-it column, read only by joining to employees
+    createdBy: integer("created_by")
+      .references(() => employees.id)
+      .notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    // no-index: audit who-did-it column, read only by joining to employees
+    lastUpdatedBy: integer("last_updated_by").references(() => employees.id),
+    lastUpdatedAt: timestamp("last_updated_at"),
   },
-  (table) => ({
-    poIdIdx: index("idx_supplier_invoices_po_id").on(table.poId),
-    // BR-PO-15: the same invoice number from the same supplier is refused.
-    supplierInvoiceNumberUq: uniqueIndex("uq_supplier_invoice_number").on(
-      table.supplierId,
-      table.invoiceNumber,
+  (table) => [
+    // BR-SINV-06: one live bill number per supplier and financial year
+    // (legacy rows are excluded here and checked by the service)
+    uniqueIndex("uq_supplier_invoice_live_number")
+      .on(table.supplierId, table.invoiceNumber, table.fy)
+      .where(sql`status in ('draft', 'blocked', 'approved')`),
+    index("idx_sinv_po_id").on(table.poId),
+    index("idx_sinv_supplier_id").on(table.supplierId),
+    index("idx_sinv_created").on(table.createdAt.desc(), table.id.desc()),
+    index("idx_sinv_status_date").on(
+      table.status,
+      table.invoiceDate.desc(),
+      table.id.desc(),
     ),
-  }),
+    // overdue chip and sort (BR-SINV-28)
+    index("idx_sinv_due_open")
+      .on(table.dueDate)
+      .where(sql`status = 'approved'`),
+    // List `q` search (BR-SINV-37): pg_trgm GIN indexes
+    index("idx_sinv_our_number_trgm").using(
+      "gin",
+      table.ourNumber.op("gin_trgm_ops"),
+    ),
+    index("idx_sinv_invoice_number_trgm").using(
+      "gin",
+      table.invoiceNumber.op("gin_trgm_ops"),
+    ),
+    check(
+      "chk_sinv_invoice_number_format",
+      sql`status = 'legacy' or invoice_number ~ '^[A-Z0-9/-]{1,16}$'`,
+    ),
+  ],
+);
+
+export const supplierInvoiceLines = pgTable(
+  "supplier_invoice_lines",
+  {
+    id: serial("id").primaryKey(),
+    // cascade: only a draft is ever deleted (BR-SINV-11)
+    invoiceId: integer("invoice_id")
+      .references(() => supplierInvoices.id, { onDelete: "cascade" })
+      .notNull(),
+    lineNo: smallint("line_no").notNull(),
+    kind: supplierInvoiceLineKindEnum("kind").notNull(),
+    // item lines only (BR-SINV-01, 02)
+    grnItemId: integer("grn_item_id").references(() => grnItems.id),
+    // charge lines only (BR-SINV-09)
+    chargeType: supplierInvoiceChargeTypeEnum("charge_type"),
+    description: text("description"),
+    // snapshot of the PO line unit; decides weight tolerance (BR-SINV-22)
+    uom: text("uom"),
+    qty: qty3Col("qty"),
+    ratePaise: bigint("rate_paise", { mode: "number" }),
+    gstBp: integer("gst_bp").notNull(),
+    taxablePaise: bigint("taxable_paise", { mode: "number" }).notNull(),
+    cgstPaise: bigint("cgst_paise", { mode: "number" }).default(0).notNull(),
+    sgstPaise: bigint("sgst_paise", { mode: "number" }).default(0).notNull(),
+    igstPaise: bigint("igst_paise", { mode: "number" }).default(0).notNull(),
+    // snapshot at submit for the stored result (BR-SINV-21, 22, 40)
+    poRatePaise: bigint("po_rate_paise", { mode: "number" }),
+    poGstBp: integer("po_gst_bp"),
+    billableQty: qty3Col("billable_qty"),
+    belowPoRate: boolean("below_po_rate").default(false).notNull(),
+  },
+  (table) => [
+    // billable-qty sum per GRN line (hot query, BR-SINV-02/03/30)
+    index("idx_sinv_lines_grn_item").on(table.grnItemId),
+    index("idx_sinv_lines_invoice").on(table.invoiceId),
+    // BR-SINV-01: a GRN line at most once per bill
+    uniqueIndex("uq_sinv_lines_invoice_grn_item")
+      .on(table.invoiceId, table.grnItemId)
+      .where(sql`grn_item_id is not null`),
+    check(
+      "chk_sinv_lines_kind_grn_item",
+      sql`(kind = 'item') = (grn_item_id is not null)`,
+    ),
+  ],
+);
+
+// The stored match result (BR-SINV-23, 24, 39); deleted on back-to-draft.
+export const supplierInvoiceMismatches = pgTable(
+  "supplier_invoice_mismatches",
+  {
+    id: serial("id").primaryKey(),
+    invoiceId: integer("invoice_id")
+      .references(() => supplierInvoices.id, { onDelete: "cascade" })
+      .notNull(),
+    // null for tax and total checks
+    lineId: integer("line_id").references(() => supplierInvoiceLines.id, {
+      onDelete: "cascade",
+    }),
+    check: supplierInvoiceMismatchCheckEnum("check").notNull(),
+    // whole numbers per `unit`
+    expected: bigint("expected", { mode: "number" }).notNull(),
+    billed: bigint("billed", { mode: "number" }).notNull(),
+    unit: supplierInvoiceMismatchUnitEnum("unit").notNull(),
+    // cgst | sgst | igst
+    head: text("head"),
+  },
+  (table) => [
+    index("idx_sinv_mismatches_invoice").on(table.invoiceId),
+    index("idx_sinv_mismatches_line").on(table.lineId),
+  ],
+);
+
+// Append-only (BR-SINV-35): rows are never edited; a deleted draft keeps its rows.
+export const supplierInvoiceHistory = pgTable(
+  "supplier_invoice_history",
+  {
+    id: serial("id").primaryKey(),
+    invoiceId: integer("invoice_id").references(() => supplierInvoices.id, {
+      onDelete: "set null",
+    }),
+    // snapshot, survives a delete
+    ourNumber: text("our_number").notNull(),
+    action: supplierInvoiceHistoryActionEnum("action").notNull(),
+    fromStatus: supplierInvoiceStatusEnum("from_status"),
+    toStatus: supplierInvoiceStatusEnum("to_status"),
+    reason: text("reason"),
+    // field diff on edit; mismatch list on submit / release (BR-SINV-25)
+    detail: jsonb("detail"),
+    // no-index: audit who-did-it column, read only by joining to employees
+    createdBy: integer("created_by")
+      .references(() => employees.id)
+      .notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_sinv_history_invoice_id").on(table.invoiceId, table.id.desc()),
+  ],
 );
 
 export const supplierBankDetails = pgTable(

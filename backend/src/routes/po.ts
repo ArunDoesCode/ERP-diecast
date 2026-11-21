@@ -17,7 +17,6 @@ import {
   confirmPoSchema,
   createPoSchema,
   logPoCommunicationSchema,
-  markPoInvoicedSchema,
   markPoSentSchema,
   poCommunicationDetailSchema,
   poCommunicationSchema,
@@ -203,22 +202,6 @@ register({
     "Record supplier confirmation of the PO. Informational only, never blocks a status transition.",
   auth: { type: "permission", key: "po.manage" },
   request: { body: confirmPoSchema },
-  responses: { "200": successResponse(poResponseSchema) },
-});
-
-poRouter.post(
-  PO_ROUTES.invoice,
-  requirePermission("po.manage"),
-  asyncHandler(poController.markInvoiced),
-);
-register({
-  method: "POST",
-  path: `${PO_BASE_PATH}${PO_ROUTES.invoice}`,
-  tags: ["po"],
-  summary:
-    "Record a supplier invoice against a fully-received PO and move it to invoiced.",
-  auth: { type: "permission", key: "po.manage" },
-  request: { body: markPoInvoicedSchema },
   responses: { "200": successResponse(poResponseSchema) },
 });
 

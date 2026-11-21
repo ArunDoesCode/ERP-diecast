@@ -18,6 +18,10 @@ export const WHOLE_NUMBER_UNITS: readonly string[] = [
   "nos",
 ];
 
+// Weight units: the supplier-invoice weight tolerance applies to lines in these
+// units (BR-SINV-22). Frontend copy must match.
+export const WEIGHT_UNITS: readonly string[] = ["kg", "g", "tonne"];
+
 // Quantities: up to 3 decimals (BR-GRN-02). Whole-number rule for pcs/set items
 // needs the item's unit, so the service enforces that one (400).
 const qty3 = (schema: z.ZodNumber) =>

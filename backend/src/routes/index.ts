@@ -15,6 +15,7 @@ import { saleOrderRoutes } from "./saleOrder";
 import { scoRoutes } from "./sco";
 import { setupRoutes } from "./setup";
 import { supplierRoutes } from "./supplier";
+import { supplierInvoiceRoutes } from "./supplierInvoice";
 
 const MAIN_ROUTES = {
   auth: "/auth",
@@ -25,6 +26,7 @@ const MAIN_ROUTES = {
   po: "/po",
   grn: "/grn",
   purchaseReturn: "/purchase-return",
+  supplierInvoice: "/supplier-invoice",
   approval: "/approval",
   sco: "/sco",
   bom: "/bom",
@@ -46,6 +48,7 @@ mainRouter.route(MAIN_ROUTES.pr, prRoutes);
 mainRouter.route(MAIN_ROUTES.po, poRoutes);
 mainRouter.route(MAIN_ROUTES.grn, grnRoutes);
 mainRouter.route(MAIN_ROUTES.purchaseReturn, purchaseReturnRoutes);
+mainRouter.route(MAIN_ROUTES.supplierInvoice, supplierInvoiceRoutes);
 mainRouter.route(MAIN_ROUTES.approval, approvalRoutes);
 mainRouter.route(MAIN_ROUTES.sco, scoRoutes);
 mainRouter.route(MAIN_ROUTES.bom, bomRoutes);

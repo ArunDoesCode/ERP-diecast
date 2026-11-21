@@ -543,7 +543,7 @@ export const purchaseReturnService = {
                 ? {
                     id: debitNote.supplierInvoiceId,
                     invoiceNumber: debitNote.billNumber,
-                    invoiceDate: debitNote.billDate.toISOString(),
+                    invoiceDate: debitNote.billDate,
                   }
                 : null,
             plantName: debitNote.plantName,

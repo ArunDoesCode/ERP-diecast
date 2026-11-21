@@ -22,7 +22,6 @@ import {
   purchaseRequestItems,
   purchaseRequests,
   purchaseReturns,
-  supplierInvoices,
 } from "../db/schemas/02_procurement-purchasing";
 import {
   supplierItems,
@@ -900,52 +899,6 @@ export const poRepository = {
         toEmail: data.toEmail ?? null,
         note: data.note ?? null,
         sentBy: data.sentBy,
-      })
-      .returning();
-
-    return row;
-  },
-
-  async findSupplierInvoice(
-    supplierId: number,
-    invoiceNumber: string,
-    tx?: Tx,
-  ) {
-    const executor = tx ?? db;
-    const [row] = await executor
-      .select({ id: supplierInvoices.id })
-      .from(supplierInvoices)
-      .where(
-        and(
-          eq(supplierInvoices.supplierId, supplierId),
-          eq(supplierInvoices.invoiceNumber, invoiceNumber),
-        ),
-      )
-      .limit(1);
-    return row;
-  },
-
-  async insertSupplierInvoice(
-    data: {
-      invoiceNumber: string;
-      invoiceDate: Date;
-      poId: number;
-      supplierId: number;
-      billedAmountPaise: number;
-      dueDate?: Date | null;
-    },
-    tx?: Tx,
-  ) {
-    const executor = tx ?? db;
-    const [row] = await executor
-      .insert(supplierInvoices)
-      .values({
-        invoiceNumber: data.invoiceNumber,
-        invoiceDate: data.invoiceDate,
-        poId: data.poId,
-        supplierId: data.supplierId,
-        billedAmountPaise: data.billedAmountPaise,
-        dueDate: data.dueDate ?? null,
       })
       .returning();
 

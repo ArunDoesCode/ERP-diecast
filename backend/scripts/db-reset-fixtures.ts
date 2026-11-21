@@ -708,15 +708,8 @@ export async function runFixtures(opts: {
   // PO7: full delivery, accepted, invoiced
   const g7 = await makeGrn(po7, [{ sku: "CN-GLOVES", qty: 2000 }], "CH-7001");
   await qa(g7.id, g7.line(po7, "CN-GLOVES"), 2000, null, "Count and size OK");
-  await poService.markInvoiced(
-    po7.id,
-    {
-      invoiceNumber: "SM/INV/0042",
-      invoiceDate: new Date(),
-      billedAmountPaise: po7.totalPaise,
-    },
-    userId.back_office,
-  );
+  // TODO(scm-supplier-invoice): record + approve a supplier invoice here through the
+  // invoice service once it exists (next slice). PO7 stays fully_received until then.
 
   // PO8: QA bypass by the owner, then closed
   const g8 = await makeGrn(po8, [{ sku: "RM-ADC12", qty: 500 }], "CH-8001");

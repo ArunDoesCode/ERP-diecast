@@ -21,12 +21,23 @@ export const companySettings = pgTable(
     gstin: text("gstin").notNull(),
     // Two-digit GST state code (first two digits of the GSTIN), used by BR-SCO-10.
     stateCode: text("state_code").notNull(),
+    // supplier-invoice BR-SINV-32: match tolerances in basis points (50 = 0.5%), 0-10%.
+    priceToleranceBp: integer("price_tolerance_bp").notNull().default(0),
+    weightToleranceBp: integer("weight_tolerance_bp").notNull().default(50),
     // no-index: audit one row
     updatedBy: integer("updated_by").references(() => employees.id),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (t) => ({
     singleRow: check("company_settings_single_row", sql`${t.id} = 1`),
+    priceTolRange: check(
+      "company_settings_price_tol_range",
+      sql`${t.priceToleranceBp} between 0 and 1000`,
+    ),
+    weightTolRange: check(
+      "company_settings_weight_tol_range",
+      sql`${t.weightToleranceBp} between 0 and 1000`,
+    ),
   }),
 );
 
@@ -36,7 +47,7 @@ export const companySettingsHistory = pgTable(
   "company_settings_history",
   {
     id: serial("id").primaryKey(),
-    // name | address | gstin | stateCode
+    // name | address | gstin | stateCode | priceToleranceBp | weightToleranceBp
     field: text("field").notNull(),
     // null on the first save (nothing before it)
     oldValue: text("old_value"),

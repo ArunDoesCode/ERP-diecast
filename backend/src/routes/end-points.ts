@@ -96,7 +96,6 @@ export const END_POINTS = {
     escalate: "/:id/escalate",
     delay: "/:id/delay",
     confirm: "/:id/confirm",
-    invoice: "/:id/invoice",
     close: "/:id/close",
     shortClose: "/:id/short-close",
     communications: "/:id/communications",
@@ -121,6 +120,18 @@ export const END_POINTS = {
     update: "/updatereturn",
     cancelDraft: "/:id/cancel-draft",
     post: "/:id/post",
+    cancel: "/:id/cancel",
+  },
+  supplierInvoice: {
+    list: "/getsupplierinvoices",
+    details: "/getsupplierinvoicedetails/:id",
+    billableLines: "/getbillablelines",
+    create: "/createsupplierinvoice",
+    update: "/updatesupplierinvoice",
+    remove: "/deletesupplierinvoice/:id",
+    submit: "/:id/submit",
+    backToDraft: "/:id/back-to-draft",
+    release: "/:id/release",
     cancel: "/:id/cancel",
   },
   sco: {
@@ -191,6 +202,7 @@ export const END_POINTS = {
   company: {
     settings: "/settings",
     settingsHistory: "/settings/history",
+    invoiceTolerances: "/invoice-tolerances",
   },
   approval: {
     getPolicies: "/getPolicies",

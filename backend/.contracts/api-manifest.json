@@ -1892,6 +1892,8 @@
             "address": "string.required",
             "gstin": "string.required",
             "stateCode": "string.required",
+            "priceToleranceBp": "unrepresentable.required",
+            "weightToleranceBp": "unrepresentable.required",
             "updatedBy": "unrepresentable.nullable.required",
             "updatedAt": "unrepresentable.required"
           }
@@ -1927,6 +1929,8 @@
             "address": "string.required",
             "gstin": "string.required",
             "stateCode": "string.required",
+            "priceToleranceBp": "unrepresentable.required",
+            "weightToleranceBp": "unrepresentable.required",
             "updatedBy": "unrepresentable.nullable.required",
             "updatedAt": "unrepresentable.required"
           }
@@ -1960,6 +1964,60 @@
             "pageSize": "integer.nonnegative.required",
             "total": "integer.nonnegative.required",
             "totalPages": "integer.nonnegative.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "GET /api/company/invoice-tolerances",
+      "method": "GET",
+      "path": "/api/company/invoice-tolerances",
+      "tags": [
+        "company"
+      ],
+      "summary": "Read the supplier-invoice match tolerances in percent (BR-SINV-32). Defaults 0% price, 0.5% weight until saved.",
+      "auth": {
+        "type": "permission",
+        "key": "invoice.view",
+        "alsoKeys": [
+          "invoice.manage"
+        ]
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "priceTolerancePercent": "number.required",
+            "weightTolerancePercent": "number.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "PATCH /api/company/invoice-tolerances",
+      "method": "PATCH",
+      "path": "/api/company/invoice-tolerances",
+      "tags": [
+        "company"
+      ],
+      "summary": "Set the price and/or weight tolerance in percent (0-10, 2 decimals, at least one). Applies to the next submit. 409 SINV_COMPANY_NOT_SET before company details are saved.",
+      "auth": {
+        "type": "permission",
+        "key": "company.manage"
+      },
+      "request": {
+        "body": {
+          "priceTolerancePercent": "number.nonnegative.optional",
+          "weightTolerancePercent": "number.nonnegative.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "priceTolerancePercent": "number.required",
+            "weightTolerancePercent": "number.required"
           }
         }
       }
@@ -2997,69 +3055,6 @@
         "body": {
           "confirmationMethod": "enum:email,whatsapp,phone,in_person.required",
           "note": "string.optional"
-        }
-      },
-      "responses": {
-        "200": {
-          "success": "boolean.required",
-          "data": {
-            "id": "unrepresentable.required",
-            "poNumber": "string.required",
-            "supplierId": "unrepresentable.required",
-            "status": "enum:draft,pending_approval,approved,dispatched,partial_received,fully_received,invoiced,closed,cancelled.required",
-            "subtotalPaise": "unrepresentable.required",
-            "taxAmountPaise": "unrepresentable.required",
-            "totalAmountPaise": "unrepresentable.required",
-            "paymentTermsDays": "unrepresentable.nullable.required",
-            "deliveryTerms": "unknown.required",
-            "notes": "unknown.required",
-            "expectedDeliveryDate": "unrepresentable.nullable.required",
-            "approvedBy": "unrepresentable.nullable.required",
-            "currentApprovalLevel": "unrepresentable.required",
-            "totalApprovalLevels": "unrepresentable.required",
-            "createdAt": "unrepresentable.required",
-            "createdBy": "unrepresentable.required",
-            "revisedDeliveryDate": "unrepresentable.nullable.required",
-            "delayReason": "unknown.required",
-            "supplierConfirmed": "boolean.required",
-            "confirmationMethod": "unknown.required",
-            "confirmedAt": "unrepresentable.nullable.required",
-            "confirmedBy": "unrepresentable.nullable.required",
-            "confirmationNote": "unknown.required",
-            "closedAt": "unrepresentable.nullable.required",
-            "closedBy": "unrepresentable.nullable.required",
-            "closeNote": "unknown.required",
-            "cancelledBy": "unrepresentable.nullable.required",
-            "cancelledAt": "unrepresentable.nullable.required",
-            "cancelReason": "unknown.required",
-            "shortClosed": "boolean.required",
-            "invoicedBy": "unrepresentable.nullable.required",
-            "invoicedAt": "unrepresentable.nullable.required",
-            "cancelledByName": "unknown.required",
-            "supplierName": "string.required",
-            "dueDate": "unrepresentable.nullable.required"
-          }
-        }
-      }
-    },
-    {
-      "id": "POST /api/po/:id/invoice",
-      "method": "POST",
-      "path": "/api/po/:id/invoice",
-      "tags": [
-        "po"
-      ],
-      "summary": "Record a supplier invoice against a fully-received PO and move it to invoiced.",
-      "auth": {
-        "type": "permission",
-        "key": "po.manage"
-      },
-      "request": {
-        "body": {
-          "invoiceNumber": "string.nonempty.required",
-          "invoiceDate": "unrepresentable.required",
-          "billedAmountPaise": "integer.nonnegative.required",
-          "dueDate": "unrepresentable.optional"
         }
       },
       "responses": {
@@ -5476,6 +5471,8 @@
               "address": "string.required",
               "gstin": "string.required",
               "stateCode": "string.required",
+              "priceToleranceBp": "unrepresentable.required",
+              "weightToleranceBp": "unrepresentable.required",
               "updatedBy": "unrepresentable.nullable.required",
               "updatedAt": "unrepresentable.required"
             },
@@ -6922,6 +6919,785 @@
       "pagination": {
         "sortableFields": [],
         "searchable": false
+      }
+    },
+    {
+      "id": "GET /api/supplier-invoice/getsupplierinvoices",
+      "method": "GET",
+      "path": "/api/supplier-invoice/getsupplierinvoices",
+      "tags": [
+        "supplier-invoice"
+      ],
+      "summary": "List supplier invoices, paginated. Filter by status (draft|blocked|payable|overdue|cancelled|all), supplierId, poId, grnId, q. meta adds statusCounts.",
+      "auth": {
+        "type": "permission",
+        "key": "invoice.view",
+        "alsoKeys": [
+          "invoice.manage"
+        ]
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "sortBy": "enum:ourNumber,invoiceNumber,invoiceDate,dueDate,totalPaise,createdAt.required",
+          "sortDir": "enum:asc,desc.required",
+          "status": "enum:draft,blocked,payable,overdue,cancelled,all.required",
+          "grnId": "integer.positive.optional",
+          "supplierId": "integer.positive.optional",
+          "poId": "integer.positive.optional",
+          "q": "string.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required",
+            "statusCounts": {
+              "draft": "integer.required",
+              "blocked": "integer.required",
+              "payable": "integer.required",
+              "overdue": "integer.required",
+              "cancelled": "integer.required"
+            }
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "ourNumber",
+          "invoiceNumber",
+          "invoiceDate",
+          "dueDate",
+          "totalPaise",
+          "createdAt"
+        ],
+        "searchable": true
+      }
+    },
+    {
+      "id": "GET /api/supplier-invoice/getbillablelines",
+      "method": "GET",
+      "path": "/api/supplier-invoice/getbillablelines",
+      "tags": [
+        "supplier-invoice"
+      ],
+      "summary": "Billable GRN lines of a PO (optional grnId filter), prefilled at PO rate and GST. Only lines with billableQty > 0. 409 SINV_PO_NOT_BILLABLE when the PO status is not billable.",
+      "auth": {
+        "type": "permission",
+        "key": "invoice.manage"
+      },
+      "request": {
+        "query": {
+          "poId": "integer.positive.required",
+          "grnId": "integer.positive.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "po": {
+              "id": "integer.required",
+              "poNumber": "string.required",
+              "status": "string.required",
+              "paymentTermsDays": "integer.required"
+            },
+            "supplier": {
+              "id": "integer.required",
+              "name": "string.required",
+              "gstin": "unknown.required"
+            },
+            "lines": "array<object>.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "GET /api/supplier-invoice/getsupplierinvoicedetails/:id",
+      "method": "GET",
+      "path": "/api/supplier-invoice/getsupplierinvoicedetails/:id",
+      "tags": [
+        "supplier-invoice"
+      ],
+      "summary": "Supplier invoice details: header, lines, mismatches, history, document flow, linked debit notes, net payable, tolerances used.",
+      "auth": {
+        "type": "permission",
+        "key": "invoice.view",
+        "alsoKeys": [
+          "invoice.manage"
+        ]
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "ourNumber": "string.required",
+            "invoiceNumber": "string.required",
+            "invoiceDate": "string.required",
+            "fy": "string.required",
+            "status": "enum:draft,blocked,approved,cancelled,legacy.required",
+            "poId": "integer.required",
+            "poNumber": "string.required",
+            "supplier": {
+              "id": "integer.required",
+              "name": "string.required",
+              "gstin": "unknown.required"
+            },
+            "billedAmountPaise": "integer.required",
+            "printed": {
+              "taxablePaise": "integer.nonnegative.required",
+              "cgstPaise": "integer.nonnegative.required",
+              "sgstPaise": "integer.nonnegative.required",
+              "igstPaise": "integer.nonnegative.required",
+              "totalPaise": "integer.nonnegative.required"
+            },
+            "taxablePaise": "integer.required",
+            "cgstPaise": "integer.required",
+            "sgstPaise": "integer.required",
+            "igstPaise": "integer.required",
+            "totalPaise": "integer.required",
+            "taxType": "enum:cgst_sgst,igst,none.nullable.required",
+            "supplierGstin": "unknown.required",
+            "supplierStateCode": "unknown.required",
+            "plantStateCode": "unknown.required",
+            "reverseCharge": "boolean.required",
+            "itcIneligible": "boolean.required",
+            "paymentTermsDays": "integer.required",
+            "dueDate": "unknown.required",
+            "overdue": "boolean.required",
+            "paymentStatus": "string.required",
+            "tolerances": {
+              "priceTolBpUsed": "integer.nullable.required",
+              "weightTolBpUsed": "integer.nullable.required"
+            },
+            "submittedBy": "integer.nullable.required",
+            "submittedAt": "unknown.required",
+            "releasedBy": "integer.nullable.required",
+            "releasedAt": "unknown.required",
+            "releaseReason": "unknown.required",
+            "cancelledBy": "integer.nullable.required",
+            "cancelledAt": "unknown.required",
+            "cancelReason": "unknown.required",
+            "createdBy": "integer.required",
+            "createdAt": "string.required",
+            "lastUpdatedBy": "integer.nullable.required",
+            "lastUpdatedAt": "unknown.required",
+            "lines": "array<object>.required",
+            "mismatches": "array<object>.required",
+            "history": "array<object>.required",
+            "debitNotes": "array<object>.required",
+            "netPayablePaise": "integer.required",
+            "flow": {
+              "pr": "array<object>.required",
+              "po": {
+                "id": "integer.required",
+                "number": "string.required",
+                "status": "string.required"
+              },
+              "grns": "array<object>.required"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/supplier-invoice/createsupplierinvoice",
+      "method": "POST",
+      "path": "/api/supplier-invoice/createsupplierinvoice",
+      "tags": [
+        "supplier-invoice"
+      ],
+      "summary": "Create a draft supplier invoice against a PO. Computed values (line taxable, tax heads, totals, tax type, due date) are server-set; extra body keys are 400.",
+      "auth": {
+        "type": "permission",
+        "key": "invoice.manage"
+      },
+      "request": {
+        "body": {
+          "poId": "integer.positive.required",
+          "invoiceNumber": "string.required",
+          "invoiceDate": "string.required",
+          "reverseCharge": "boolean.optional",
+          "itcNotEligible": "boolean.optional",
+          "printed": {
+            "taxablePaise": "integer.nonnegative.required",
+            "cgstPaise": "integer.nonnegative.required",
+            "sgstPaise": "integer.nonnegative.required",
+            "igstPaise": "integer.nonnegative.required",
+            "totalPaise": "integer.nonnegative.required"
+          },
+          "lines": "array<object>.required",
+          "charges": "array<object>.optional"
+        }
+      },
+      "responses": {
+        "201": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "ourNumber": "string.required",
+            "invoiceNumber": "string.required",
+            "invoiceDate": "string.required",
+            "fy": "string.required",
+            "status": "enum:draft,blocked,approved,cancelled,legacy.required",
+            "poId": "integer.required",
+            "poNumber": "string.required",
+            "supplier": {
+              "id": "integer.required",
+              "name": "string.required",
+              "gstin": "unknown.required"
+            },
+            "billedAmountPaise": "integer.required",
+            "printed": {
+              "taxablePaise": "integer.nonnegative.required",
+              "cgstPaise": "integer.nonnegative.required",
+              "sgstPaise": "integer.nonnegative.required",
+              "igstPaise": "integer.nonnegative.required",
+              "totalPaise": "integer.nonnegative.required"
+            },
+            "taxablePaise": "integer.required",
+            "cgstPaise": "integer.required",
+            "sgstPaise": "integer.required",
+            "igstPaise": "integer.required",
+            "totalPaise": "integer.required",
+            "taxType": "enum:cgst_sgst,igst,none.nullable.required",
+            "supplierGstin": "unknown.required",
+            "supplierStateCode": "unknown.required",
+            "plantStateCode": "unknown.required",
+            "reverseCharge": "boolean.required",
+            "itcIneligible": "boolean.required",
+            "paymentTermsDays": "integer.required",
+            "dueDate": "unknown.required",
+            "overdue": "boolean.required",
+            "paymentStatus": "string.required",
+            "tolerances": {
+              "priceTolBpUsed": "integer.nullable.required",
+              "weightTolBpUsed": "integer.nullable.required"
+            },
+            "submittedBy": "integer.nullable.required",
+            "submittedAt": "unknown.required",
+            "releasedBy": "integer.nullable.required",
+            "releasedAt": "unknown.required",
+            "releaseReason": "unknown.required",
+            "cancelledBy": "integer.nullable.required",
+            "cancelledAt": "unknown.required",
+            "cancelReason": "unknown.required",
+            "createdBy": "integer.required",
+            "createdAt": "string.required",
+            "lastUpdatedBy": "integer.nullable.required",
+            "lastUpdatedAt": "unknown.required",
+            "lines": "array<object>.required",
+            "mismatches": "array<object>.required",
+            "history": "array<object>.required",
+            "debitNotes": "array<object>.required",
+            "netPayablePaise": "integer.required",
+            "flow": {
+              "pr": "array<object>.required",
+              "po": {
+                "id": "integer.required",
+                "number": "string.required",
+                "status": "string.required"
+              },
+              "grns": "array<object>.required"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "PATCH /api/supplier-invoice/updatesupplierinvoice",
+      "method": "PATCH",
+      "path": "/api/supplier-invoice/updatesupplierinvoice",
+      "tags": [
+        "supplier-invoice"
+      ],
+      "summary": "Edit a draft supplier invoice (id in body, at least one other field; lines and charges replace the set; poId is immutable).",
+      "auth": {
+        "type": "permission",
+        "key": "invoice.manage"
+      },
+      "request": {
+        "body": {
+          "id": "integer.positive.required",
+          "poId": "integer.positive.optional",
+          "invoiceNumber": "string.optional",
+          "invoiceDate": "string.optional",
+          "reverseCharge": "boolean.optional",
+          "itcNotEligible": "boolean.optional",
+          "printed": {
+            "taxablePaise": "integer.nonnegative.required",
+            "cgstPaise": "integer.nonnegative.required",
+            "sgstPaise": "integer.nonnegative.required",
+            "igstPaise": "integer.nonnegative.required",
+            "totalPaise": "integer.nonnegative.required"
+          },
+          "lines": "array<object>.optional",
+          "charges": "array<object>.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "ourNumber": "string.required",
+            "invoiceNumber": "string.required",
+            "invoiceDate": "string.required",
+            "fy": "string.required",
+            "status": "enum:draft,blocked,approved,cancelled,legacy.required",
+            "poId": "integer.required",
+            "poNumber": "string.required",
+            "supplier": {
+              "id": "integer.required",
+              "name": "string.required",
+              "gstin": "unknown.required"
+            },
+            "billedAmountPaise": "integer.required",
+            "printed": {
+              "taxablePaise": "integer.nonnegative.required",
+              "cgstPaise": "integer.nonnegative.required",
+              "sgstPaise": "integer.nonnegative.required",
+              "igstPaise": "integer.nonnegative.required",
+              "totalPaise": "integer.nonnegative.required"
+            },
+            "taxablePaise": "integer.required",
+            "cgstPaise": "integer.required",
+            "sgstPaise": "integer.required",
+            "igstPaise": "integer.required",
+            "totalPaise": "integer.required",
+            "taxType": "enum:cgst_sgst,igst,none.nullable.required",
+            "supplierGstin": "unknown.required",
+            "supplierStateCode": "unknown.required",
+            "plantStateCode": "unknown.required",
+            "reverseCharge": "boolean.required",
+            "itcIneligible": "boolean.required",
+            "paymentTermsDays": "integer.required",
+            "dueDate": "unknown.required",
+            "overdue": "boolean.required",
+            "paymentStatus": "string.required",
+            "tolerances": {
+              "priceTolBpUsed": "integer.nullable.required",
+              "weightTolBpUsed": "integer.nullable.required"
+            },
+            "submittedBy": "integer.nullable.required",
+            "submittedAt": "unknown.required",
+            "releasedBy": "integer.nullable.required",
+            "releasedAt": "unknown.required",
+            "releaseReason": "unknown.required",
+            "cancelledBy": "integer.nullable.required",
+            "cancelledAt": "unknown.required",
+            "cancelReason": "unknown.required",
+            "createdBy": "integer.required",
+            "createdAt": "string.required",
+            "lastUpdatedBy": "integer.nullable.required",
+            "lastUpdatedAt": "unknown.required",
+            "lines": "array<object>.required",
+            "mismatches": "array<object>.required",
+            "history": "array<object>.required",
+            "debitNotes": "array<object>.required",
+            "netPayablePaise": "integer.required",
+            "flow": {
+              "pr": "array<object>.required",
+              "po": {
+                "id": "integer.required",
+                "number": "string.required",
+                "status": "string.required"
+              },
+              "grns": "array<object>.required"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "DELETE /api/supplier-invoice/deletesupplierinvoice/:id",
+      "method": "DELETE",
+      "path": "/api/supplier-invoice/deletesupplierinvoice/:id",
+      "tags": [
+        "supplier-invoice"
+      ],
+      "summary": "Delete a draft supplier invoice (hard delete, its history rows are kept). 409 SINV_NOT_DRAFT otherwise.",
+      "auth": {
+        "type": "permission",
+        "key": "invoice.manage"
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "deleted": "boolean.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/supplier-invoice/:id/submit",
+      "method": "POST",
+      "path": "/api/supplier-invoice/:id/submit",
+      "tags": [
+        "supplier-invoice"
+      ],
+      "summary": "Submit a draft: run the 3-way match. Returns approved or blocked (a blocked bill is a 200 with mismatches). PO moves to invoiced when this bill covers it.",
+      "auth": {
+        "type": "permission",
+        "key": "invoice.manage"
+      },
+      "request": {
+        "body": {}
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "ourNumber": "string.required",
+            "invoiceNumber": "string.required",
+            "invoiceDate": "string.required",
+            "fy": "string.required",
+            "status": "enum:draft,blocked,approved,cancelled,legacy.required",
+            "poId": "integer.required",
+            "poNumber": "string.required",
+            "supplier": {
+              "id": "integer.required",
+              "name": "string.required",
+              "gstin": "unknown.required"
+            },
+            "billedAmountPaise": "integer.required",
+            "printed": {
+              "taxablePaise": "integer.nonnegative.required",
+              "cgstPaise": "integer.nonnegative.required",
+              "sgstPaise": "integer.nonnegative.required",
+              "igstPaise": "integer.nonnegative.required",
+              "totalPaise": "integer.nonnegative.required"
+            },
+            "taxablePaise": "integer.required",
+            "cgstPaise": "integer.required",
+            "sgstPaise": "integer.required",
+            "igstPaise": "integer.required",
+            "totalPaise": "integer.required",
+            "taxType": "enum:cgst_sgst,igst,none.nullable.required",
+            "supplierGstin": "unknown.required",
+            "supplierStateCode": "unknown.required",
+            "plantStateCode": "unknown.required",
+            "reverseCharge": "boolean.required",
+            "itcIneligible": "boolean.required",
+            "paymentTermsDays": "integer.required",
+            "dueDate": "unknown.required",
+            "overdue": "boolean.required",
+            "paymentStatus": "string.required",
+            "tolerances": {
+              "priceTolBpUsed": "integer.nullable.required",
+              "weightTolBpUsed": "integer.nullable.required"
+            },
+            "submittedBy": "integer.nullable.required",
+            "submittedAt": "unknown.required",
+            "releasedBy": "integer.nullable.required",
+            "releasedAt": "unknown.required",
+            "releaseReason": "unknown.required",
+            "cancelledBy": "integer.nullable.required",
+            "cancelledAt": "unknown.required",
+            "cancelReason": "unknown.required",
+            "createdBy": "integer.required",
+            "createdAt": "string.required",
+            "lastUpdatedBy": "integer.nullable.required",
+            "lastUpdatedAt": "unknown.required",
+            "lines": "array<object>.required",
+            "mismatches": "array<object>.required",
+            "history": "array<object>.required",
+            "debitNotes": "array<object>.required",
+            "netPayablePaise": "integer.required",
+            "flow": {
+              "pr": "array<object>.required",
+              "po": {
+                "id": "integer.required",
+                "number": "string.required",
+                "status": "string.required"
+              },
+              "grns": "array<object>.required"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/supplier-invoice/:id/back-to-draft",
+      "method": "POST",
+      "path": "/api/supplier-invoice/:id/back-to-draft",
+      "tags": [
+        "supplier-invoice"
+      ],
+      "summary": "Send a blocked invoice back to draft for correction; the stored mismatches are cleared.",
+      "auth": {
+        "type": "permission",
+        "key": "invoice.manage"
+      },
+      "request": {
+        "body": {}
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "ourNumber": "string.required",
+            "invoiceNumber": "string.required",
+            "invoiceDate": "string.required",
+            "fy": "string.required",
+            "status": "enum:draft,blocked,approved,cancelled,legacy.required",
+            "poId": "integer.required",
+            "poNumber": "string.required",
+            "supplier": {
+              "id": "integer.required",
+              "name": "string.required",
+              "gstin": "unknown.required"
+            },
+            "billedAmountPaise": "integer.required",
+            "printed": {
+              "taxablePaise": "integer.nonnegative.required",
+              "cgstPaise": "integer.nonnegative.required",
+              "sgstPaise": "integer.nonnegative.required",
+              "igstPaise": "integer.nonnegative.required",
+              "totalPaise": "integer.nonnegative.required"
+            },
+            "taxablePaise": "integer.required",
+            "cgstPaise": "integer.required",
+            "sgstPaise": "integer.required",
+            "igstPaise": "integer.required",
+            "totalPaise": "integer.required",
+            "taxType": "enum:cgst_sgst,igst,none.nullable.required",
+            "supplierGstin": "unknown.required",
+            "supplierStateCode": "unknown.required",
+            "plantStateCode": "unknown.required",
+            "reverseCharge": "boolean.required",
+            "itcIneligible": "boolean.required",
+            "paymentTermsDays": "integer.required",
+            "dueDate": "unknown.required",
+            "overdue": "boolean.required",
+            "paymentStatus": "string.required",
+            "tolerances": {
+              "priceTolBpUsed": "integer.nullable.required",
+              "weightTolBpUsed": "integer.nullable.required"
+            },
+            "submittedBy": "integer.nullable.required",
+            "submittedAt": "unknown.required",
+            "releasedBy": "integer.nullable.required",
+            "releasedAt": "unknown.required",
+            "releaseReason": "unknown.required",
+            "cancelledBy": "integer.nullable.required",
+            "cancelledAt": "unknown.required",
+            "cancelReason": "unknown.required",
+            "createdBy": "integer.required",
+            "createdAt": "string.required",
+            "lastUpdatedBy": "integer.nullable.required",
+            "lastUpdatedAt": "unknown.required",
+            "lines": "array<object>.required",
+            "mismatches": "array<object>.required",
+            "history": "array<object>.required",
+            "debitNotes": "array<object>.required",
+            "netPayablePaise": "integer.required",
+            "flow": {
+              "pr": "array<object>.required",
+              "po": {
+                "id": "integer.required",
+                "number": "string.required",
+                "status": "string.required"
+              },
+              "grns": "array<object>.required"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/supplier-invoice/:id/release",
+      "method": "POST",
+      "path": "/api/supplier-invoice/:id/release",
+      "tags": [
+        "supplier-invoice"
+      ],
+      "summary": "Release a blocked invoice to payable with a reason. 403 SINV_SELF_RELEASE if the caller created, edited, sent back or submitted it (super-admin included).",
+      "auth": {
+        "type": "permission",
+        "key": "invoice.release"
+      },
+      "request": {
+        "body": {
+          "reason": "string.nonempty.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "ourNumber": "string.required",
+            "invoiceNumber": "string.required",
+            "invoiceDate": "string.required",
+            "fy": "string.required",
+            "status": "enum:draft,blocked,approved,cancelled,legacy.required",
+            "poId": "integer.required",
+            "poNumber": "string.required",
+            "supplier": {
+              "id": "integer.required",
+              "name": "string.required",
+              "gstin": "unknown.required"
+            },
+            "billedAmountPaise": "integer.required",
+            "printed": {
+              "taxablePaise": "integer.nonnegative.required",
+              "cgstPaise": "integer.nonnegative.required",
+              "sgstPaise": "integer.nonnegative.required",
+              "igstPaise": "integer.nonnegative.required",
+              "totalPaise": "integer.nonnegative.required"
+            },
+            "taxablePaise": "integer.required",
+            "cgstPaise": "integer.required",
+            "sgstPaise": "integer.required",
+            "igstPaise": "integer.required",
+            "totalPaise": "integer.required",
+            "taxType": "enum:cgst_sgst,igst,none.nullable.required",
+            "supplierGstin": "unknown.required",
+            "supplierStateCode": "unknown.required",
+            "plantStateCode": "unknown.required",
+            "reverseCharge": "boolean.required",
+            "itcIneligible": "boolean.required",
+            "paymentTermsDays": "integer.required",
+            "dueDate": "unknown.required",
+            "overdue": "boolean.required",
+            "paymentStatus": "string.required",
+            "tolerances": {
+              "priceTolBpUsed": "integer.nullable.required",
+              "weightTolBpUsed": "integer.nullable.required"
+            },
+            "submittedBy": "integer.nullable.required",
+            "submittedAt": "unknown.required",
+            "releasedBy": "integer.nullable.required",
+            "releasedAt": "unknown.required",
+            "releaseReason": "unknown.required",
+            "cancelledBy": "integer.nullable.required",
+            "cancelledAt": "unknown.required",
+            "cancelReason": "unknown.required",
+            "createdBy": "integer.required",
+            "createdAt": "string.required",
+            "lastUpdatedBy": "integer.nullable.required",
+            "lastUpdatedAt": "unknown.required",
+            "lines": "array<object>.required",
+            "mismatches": "array<object>.required",
+            "history": "array<object>.required",
+            "debitNotes": "array<object>.required",
+            "netPayablePaise": "integer.required",
+            "flow": {
+              "pr": "array<object>.required",
+              "po": {
+                "id": "integer.required",
+                "number": "string.required",
+                "status": "string.required"
+              },
+              "grns": "array<object>.required"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/supplier-invoice/:id/cancel",
+      "method": "POST",
+      "path": "/api/supplier-invoice/:id/cancel",
+      "tags": [
+        "supplier-invoice"
+      ],
+      "summary": "Cancel a blocked or approved invoice with a reason (3-500 chars blocked, 10-500 approved). Moves the PO invoiced -> fully_received when it was the covering invoice.",
+      "auth": {
+        "type": "permission",
+        "key": "invoice.manage"
+      },
+      "request": {
+        "body": {
+          "reason": "string.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "ourNumber": "string.required",
+            "invoiceNumber": "string.required",
+            "invoiceDate": "string.required",
+            "fy": "string.required",
+            "status": "enum:draft,blocked,approved,cancelled,legacy.required",
+            "poId": "integer.required",
+            "poNumber": "string.required",
+            "supplier": {
+              "id": "integer.required",
+              "name": "string.required",
+              "gstin": "unknown.required"
+            },
+            "billedAmountPaise": "integer.required",
+            "printed": {
+              "taxablePaise": "integer.nonnegative.required",
+              "cgstPaise": "integer.nonnegative.required",
+              "sgstPaise": "integer.nonnegative.required",
+              "igstPaise": "integer.nonnegative.required",
+              "totalPaise": "integer.nonnegative.required"
+            },
+            "taxablePaise": "integer.required",
+            "cgstPaise": "integer.required",
+            "sgstPaise": "integer.required",
+            "igstPaise": "integer.required",
+            "totalPaise": "integer.required",
+            "taxType": "enum:cgst_sgst,igst,none.nullable.required",
+            "supplierGstin": "unknown.required",
+            "supplierStateCode": "unknown.required",
+            "plantStateCode": "unknown.required",
+            "reverseCharge": "boolean.required",
+            "itcIneligible": "boolean.required",
+            "paymentTermsDays": "integer.required",
+            "dueDate": "unknown.required",
+            "overdue": "boolean.required",
+            "paymentStatus": "string.required",
+            "tolerances": {
+              "priceTolBpUsed": "integer.nullable.required",
+              "weightTolBpUsed": "integer.nullable.required"
+            },
+            "submittedBy": "integer.nullable.required",
+            "submittedAt": "unknown.required",
+            "releasedBy": "integer.nullable.required",
+            "releasedAt": "unknown.required",
+            "releaseReason": "unknown.required",
+            "cancelledBy": "integer.nullable.required",
+            "cancelledAt": "unknown.required",
+            "cancelReason": "unknown.required",
+            "createdBy": "integer.required",
+            "createdAt": "string.required",
+            "lastUpdatedBy": "integer.nullable.required",
+            "lastUpdatedAt": "unknown.required",
+            "lines": "array<object>.required",
+            "mismatches": "array<object>.required",
+            "history": "array<object>.required",
+            "debitNotes": "array<object>.required",
+            "netPayablePaise": "integer.required",
+            "flow": {
+              "pr": "array<object>.required",
+              "po": {
+                "id": "integer.required",
+                "number": "string.required",
+                "status": "string.required"
+              },
+              "grns": "array<object>.required"
+            }
+          }
+        }
       }
     }
   ]

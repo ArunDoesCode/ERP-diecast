@@ -9,7 +9,6 @@ import {
   confirmPoSchema,
   createPoSchema,
   logPoCommunicationSchema,
-  markPoInvoicedSchema,
   markPoSentSchema,
   poListQuerySchema,
   shortClosePoSchema,
@@ -126,17 +125,6 @@ export const poController = {
     const body = confirmPoSchema.parse(await c.req.json());
     const actorId = parseActorId(c);
     const data = await poService.confirmSupplier(id, body, actorId);
-    return c.json({ success: true, data });
-  },
-
-  async markInvoiced(c: Context<AppEnv>) {
-    const id = Number(c.req.param("id"));
-    if (!Number.isInteger(id) || id <= 0) {
-      throw new BadRequestError("Invalid PO id");
-    }
-
-    const body = markPoInvoicedSchema.parse(await c.req.json());
-    const data = await poService.markInvoiced(id, body, parseActorId(c));
     return c.json({ success: true, data });
   },
 

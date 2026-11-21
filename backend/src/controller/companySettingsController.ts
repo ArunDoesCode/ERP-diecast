@@ -7,6 +7,7 @@ import {
   companySettingsHistoryQuerySchema,
   companySettingsUpsertSchema,
 } from "../types/sco.types";
+import { notImplemented } from "./notImplemented";
 
 export const companySettingsController = {
   async get(c: Context<AppEnv>) {
@@ -23,6 +24,10 @@ export const companySettingsController = {
     const data = await companySettingsService.upsert(body, actorId);
     return c.json({ success: true, data });
   },
+
+  // supplier-invoice BR-SINV-32: contract stubs, logic in the next slice.
+  getInvoiceTolerances: notImplemented,
+  updateInvoiceTolerances: notImplemented,
 
   async listHistory(c: Context<AppEnv>) {
     const query = companySettingsHistoryQuerySchema.parse(c.req.query());
