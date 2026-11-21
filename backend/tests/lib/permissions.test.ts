@@ -78,6 +78,13 @@ const SPEC: Record<string, R[]> = {
   "invoice.view": ["ow", "bo"],
   "invoice.manage": ["ow", "bo"],
   "invoice.release": ["ow"],
+  // rfq spec "Who can do what" (BR-RFQ-70)
+  "rfq.view": ["ow", "bo"],
+  "rfq.manage": ["ow", "bo"],
+  "rfq.award": ["ow", "bo"],
+  "contract.view": ["ow", "bo"],
+  "contract.manage": ["ow"],
+  "contract.override_rate": ["ow"],
 };
 
 describe("BR-AUTH-06 permission catalog defined in code", () => {
@@ -182,6 +189,61 @@ describe("supplier-invoice keys and screen (BR-SINV-33)", () => {
         .sort();
       expect(holders).toEqual(["back_office", "owner"]);
     }
+  });
+});
+
+describe("rfq and rate-contract keys and screens (BR-RFQ-70)", () => {
+  const KEYS = [
+    "rfq.view",
+    "rfq.manage",
+    "rfq.award",
+    "contract.view",
+    "contract.manage",
+    "contract.override_rate",
+  ];
+
+  test("BR-RFQ-70 the six rfq / contract keys are in the catalog", () => {
+    for (const k of KEYS) expect(PERMISSION_KEYS as string[]).toContain(k);
+  });
+
+  test("BR-RFQ-70 the rfq screen is /rfq behind rfq.view", () => {
+    expect(SCREENS.rfq.path).toBe("/rfq");
+    expect(SCREENS.rfq.permission).toBe("rfq.view");
+  });
+
+  test("BR-RFQ-70 the rate-contracts screen is /rate-contracts behind contract.view", () => {
+    expect(SCREENS["rate-contracts"].path).toBe("/rate-contracts");
+    expect(SCREENS["rate-contracts"].permission).toBe("contract.view");
+  });
+
+  test("BR-RFQ-70 owner holds all six keys; back_office holds rfq.view, rfq.manage, rfq.award, contract.view only", () => {
+    for (const k of KEYS) expect(SEED_GRANTS.owner as string[]).toContain(k);
+    const bo = (SEED_GRANTS.back_office as string[]).filter((k) =>
+      KEYS.includes(k),
+    );
+    expect(bo.sort()).toEqual(
+      ["rfq.view", "rfq.manage", "rfq.award", "contract.view"].sort(),
+    );
+  });
+
+  test("BR-RFQ-70 contract.manage and contract.override_rate are owner only", () => {
+    for (const k of ["contract.manage", "contract.override_rate"]) {
+      const holders = Object.entries(SEED_GRANTS)
+        .filter(([, ks]) => (ks as string[]).includes(k))
+        .map(([n]) => n);
+      expect(holders).toEqual(["owner"]);
+    }
+  });
+
+  test("BR-RFQ-70 floor_supervisor, qa_inspector, die_designer and operator hold none of the six", () => {
+    for (const role of [
+      "floor_supervisor",
+      "qa_inspector",
+      "die_designer",
+      "operator",
+    ] as const)
+      for (const k of KEYS)
+        expect(SEED_GRANTS[role] as string[]).not.toContain(k);
   });
 });
 
