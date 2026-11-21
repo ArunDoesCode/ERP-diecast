@@ -1,2 +1,2 @@
 
-- 2026-11-21 — change after freeze, owner pre-approved in chat 2026-11-20 ("take ur own decision and record them"), carried from the frozen stock-transfer spec: BR-INV-11 location types add `store` (BR-STR-32); BR-INV-27 `store` is not virtual (already derived from type). Correction: the 2026-11-21 note above said BR-STR-32 was applied with stock-transfer — it lands with the stock-transfer build.
+- 2026-11-21 — change after freeze, owner pre-approved in chat 2026-11-20 ("take ur own decision and record them"), carried from the frozen dispatch spec: ledger reference types `delivery_note` and `delivery_note_cancel` (CR-INV-1).
