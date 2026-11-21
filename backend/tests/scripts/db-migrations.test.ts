@@ -656,8 +656,27 @@ describe("db:migrate behaviour (BR-MIG-04, 13, 14, 15, 22)", () => {
           `ALTER TABLE IF EXISTS public."${m[1]}" DROP CONSTRAINT IF EXISTS "${m[2]}"`,
         );
       }
+      // CHECK constraints and columns added to tables that outlive the replay
+      for (const m of later.matchAll(
+        /ALTER TABLE "([^"]+)" ADD CONSTRAINT "([^"]+)" CHECK/g,
+      )) {
+        await s.unsafe(
+          `ALTER TABLE IF EXISTS public."${m[1]}" DROP CONSTRAINT IF EXISTS "${m[2]}"`,
+        );
+      }
+      for (const m of later.matchAll(
+        /ALTER TABLE "([^"]+)" ADD COLUMN "([^"]+)"/g,
+      )) {
+        await s.unsafe(
+          `ALTER TABLE IF EXISTS public."${m[1]}" DROP COLUMN IF EXISTS "${m[2]}" CASCADE`,
+        );
+      }
       for (const m of later.matchAll(/CREATE TABLE "([^"]+)"/g)) {
         await s.unsafe(`DROP TABLE IF EXISTS public."${m[1]}" CASCADE`);
+      }
+      // enum types last (tables using them are gone)
+      for (const m of later.matchAll(/CREATE TYPE "([^"]+)"/g)) {
+        await s.unsafe(`DROP TYPE IF EXISTS public."${m[1]}" CASCADE`);
       }
     });
     const modulesBefore = await q(SCRATCH, (s) => count(s, "modules"));

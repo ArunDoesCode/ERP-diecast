@@ -60,6 +60,15 @@ const SPEC: Record<string, R[]> = {
   "sco.qa_decide": ["ow", "bo", "qa"],
   "sco.loss_override": ["ow"],
   "company.manage": ["ow"],
+  // bom spec who-table, sale-order spec who-table, reorder spec who-table
+  "bom.view": ["ow", "bo", "fs"],
+  "bom.manage": ["ow", "bo"],
+  "bom.release": ["ow"],
+  "customer.manage": ["ow", "bo"],
+  "reorder.manage": ["ow", "bo"],
+  "so.view": ["ow", "bo"],
+  "so.manage": ["ow", "bo"],
+  "so.explode": ["ow", "bo"],
 };
 
 describe("BR-AUTH-06 permission catalog defined in code", () => {
