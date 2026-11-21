@@ -52,6 +52,16 @@ export const PERMISSIONS = {
     "View inventory",
     "See items, stock and movement list",
   ),
+  "stock_transfer.manage": p(
+    "inventory",
+    "Manage stock transfers",
+    "Create, edit, cancel and post a stock transfer between locations",
+  ),
+  "stock_transfer.reverse": p(
+    "inventory",
+    "Reverse stock transfers",
+    "Reverse a posted stock transfer",
+  ),
   "supplier.view": p(
     "supplier",
     "View suppliers",
@@ -361,6 +371,13 @@ export const SCREENS = {
     182,
     "Inventory",
   ),
+  "stock-transfers": s(
+    "/inventory/stock-transfers",
+    "inventory.view",
+    "Stock Transfers",
+    183,
+    "Inventory",
+  ),
   "sale-orders": s("/sale-orders", "so.view", "Sale Orders", 120, "Sales"),
   customers: s("/customers", "so.view", "Customers", 125, "Sales"),
 } as const satisfies Record<string, ScreenDef>;
@@ -384,6 +401,8 @@ export const SEED_GRANTS: Record<RoleSeedName, PermissionKey[]> = {
     "employees.directory.view",
     "inventory.adjust",
     "inventory.view",
+    "stock_transfer.manage",
+    "stock_transfer.reverse",
     "supplier.view",
     "pr.manage",
     "po.manage",
@@ -430,6 +449,8 @@ export const SEED_GRANTS: Record<RoleSeedName, PermissionKey[]> = {
     "asset.manage",
     "inventory.adjust",
     "inventory.view",
+    "stock_transfer.manage",
+    "stock_transfer.reverse",
     "supplier.view",
     "supplier.manage",
     "pr.manage",

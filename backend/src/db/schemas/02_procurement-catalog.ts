@@ -152,6 +152,8 @@ export const inventoryRefTypeEnum = pgEnum("inventory_ref_type", [
   "grn_correction", // Correction of a posted GRN line (BR-GRN-32)
   "opening_stock", // Manual opening balance (BR-GRN-40, 43)
   "sco_loss", // Loss at a subcontractor (BR-SCO-19)
+  "stock_transfer", // Move between two of our locations (BR-STR-11)
+  "stock_transfer_reversal", // Counter rows of a reversed transfer (BR-STR-20)
 ]);
 
 export const locationTypeEnum = pgEnum("location_type", [
@@ -159,6 +161,7 @@ export const locationTypeEnum = pgEnum("location_type", [
   "vendor_premise", // Where SCO/Job Work materials live (Virtual)
   "finished_goods", // Where packed, QA-passed customer orders live
   "scrap_yard", // Where dross and rejected parts live before selling
+  "store", // Any other physical store, e.g. tool crib, line store (BR-STR-32). Not virtual.
 ]);
 
 export const locations = pgTable(
@@ -261,6 +264,114 @@ export const inventoryLedger = pgTable(
     scoLossIdx: index("idx_inventory_ledger_sco_loss")
       .on(table.createdAt.desc(), table.id)
       .where(sql`${table.referenceType} = 'sco_loss'`),
+  }),
+);
+
+// 4. Stock transfer: move stock between two of our own locations (BR-STR-01..).
+export const stockTransferStatusEnum = pgEnum("stock_transfer_status", [
+  "draft",
+  "posted",
+  "cancelled",
+  "reversed",
+]);
+
+export const stockTransfers = pgTable(
+  "stock_transfers",
+  {
+    id: serial("id").primaryKey(),
+    // BR-STR-08: ST-<IST year>-<seq>
+    transferNumber: text("transfer_number").unique().notNull(),
+    status: stockTransferStatusEnum("status").default("draft").notNull(),
+    sourceLocationId: integer("source_location_id")
+      .references(() => locations.id)
+      .notNull(),
+    destinationLocationId: integer("destination_location_id")
+      .references(() => locations.id)
+      .notNull(),
+    notes: text("notes"),
+    // no-index: audit who-did-it column, read only by joining to employees
+    createdBy: integer("created_by")
+      .references(() => employees.id)
+      .notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    // no-index: audit who-did-it column, read only by joining to employees
+    lastUpdatedBy: integer("last_updated_by")
+      .references(() => employees.id)
+      .notNull(),
+    lastUpdatedAt: timestamp("last_updated_at").defaultNow().notNull(),
+    // no-index: audit who-did-it column, read only by joining to employees
+    cancelledBy: integer("cancelled_by").references(() => employees.id),
+    cancelledAt: timestamp("cancelled_at"),
+    // no-index: audit who-did-it column, read only by joining to employees
+    postedBy: integer("posted_by").references(() => employees.id),
+    postedAt: timestamp("posted_at"),
+    // no-index: audit who-did-it column, read only by joining to employees
+    reversedBy: integer("reversed_by").references(() => employees.id),
+    reversedAt: timestamp("reversed_at"),
+    reverseReason: text("reverse_reason"),
+  },
+  (t) => ({
+    differentLocationsCk: check(
+      "stock_transfers_locations_differ_ck",
+      sql`${t.sourceLocationId} <> ${t.destinationLocationId}`,
+    ),
+    reverseReasonCk: check(
+      "stock_transfers_reverse_reason_ck",
+      sql`${t.reversedAt} is null or ${t.reverseReason} is not null`,
+    ),
+    postedAtCk: check(
+      "stock_transfers_posted_at_ck",
+      sql`${t.status} <> 'posted' or ${t.postedAt} is not null`,
+    ),
+    cancelledAtCk: check(
+      "stock_transfers_cancelled_at_ck",
+      sql`${t.status} <> 'cancelled' or ${t.cancelledAt} is not null`,
+    ),
+    reversedAtCk: check(
+      "stock_transfers_reversed_at_ck",
+      sql`${t.status} <> 'reversed' or ${t.reversedAt} is not null`,
+    ),
+    statusIdIdx: index("idx_stock_transfers_status_id").on(
+      t.status,
+      t.id.desc(),
+    ),
+    sourceIdx: index("idx_stock_transfers_source").on(t.sourceLocationId),
+    destinationIdx: index("idx_stock_transfers_destination").on(
+      t.destinationLocationId,
+    ),
+    createdAtIdx: index("idx_stock_transfers_created_at").on(
+      t.createdAt.desc(),
+    ),
+  }),
+);
+
+export const stockTransferItems = pgTable(
+  "stock_transfer_items",
+  {
+    // This id is the ledger reference_line_id (BR-STR-11).
+    id: serial("id").primaryKey(),
+    transferId: integer("transfer_id")
+      .references(() => stockTransfers.id)
+      .notNull(),
+    itemId: integer("item_id")
+      .references(() => itemMaster.id)
+      .notNull(),
+    // BR-STR-04, 05: item unit, 3 dp, whole for pcs/set (checked by the API).
+    qty: numeric("qty", { precision: 13, scale: 3, mode: "number" }).notNull(),
+    // BR-STR-14, 20, 23: item average read at post; null until posted.
+    postedUnitCostPaise: bigint("posted_unit_cost_paise", { mode: "number" }),
+    postedValuePaise: bigint("posted_value_paise", { mode: "number" }),
+  },
+  (t) => ({
+    transferItemUq: uniqueIndex("uq_stock_transfer_items_transfer_item").on(
+      t.transferId,
+      t.itemId,
+    ),
+    itemIdx: index("idx_stock_transfer_items_item").on(t.itemId),
+    qtyCk: check(
+      "stock_transfer_items_qty_ck",
+      sql`${t.qty} > 0 and ${t.qty} <= 1000000000`,
+    ),
   }),
 );
 

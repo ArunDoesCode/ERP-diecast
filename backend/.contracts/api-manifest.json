@@ -916,7 +916,7 @@
           "pageSize": "integer.nonnegative.required",
           "itemId": "integer.positive.optional",
           "locationId": "integer.positive.optional",
-          "referenceType": "enum:grn,grn_bypass,pro,pro_cancel,sco_issue,sco_receipt,job_order_issue,scrap_dispatch,stock_adjustment,grn_correction,opening_stock,sco_loss.optional",
+          "referenceType": "enum:grn,grn_bypass,pro,pro_cancel,sco_issue,sco_receipt,job_order_issue,scrap_dispatch,stock_adjustment,grn_correction,opening_stock,sco_loss,stock_transfer,stock_transfer_reversal.optional",
           "transactionType": "enum:in,out,adjustment.optional",
           "fromDate": "unrepresentable.optional",
           "toDate": "unrepresentable.optional",
@@ -969,7 +969,7 @@
             "locationId": "unrepresentable.required",
             "batchNumber": "unknown.required",
             "transactionType": "enum:in,out,adjustment.required",
-            "referenceType": "enum:grn,grn_bypass,pro,pro_cancel,sco_issue,sco_receipt,job_order_issue,scrap_dispatch,stock_adjustment,grn_correction,opening_stock,sco_loss.required",
+            "referenceType": "enum:grn,grn_bypass,pro,pro_cancel,sco_issue,sco_receipt,job_order_issue,scrap_dispatch,stock_adjustment,grn_correction,opening_stock,sco_loss,stock_transfer,stock_transfer_reversal.required",
             "referenceId": "unrepresentable.required",
             "referenceLineId": "unrepresentable.nullable.required",
             "quantityChange": "unrepresentable.required",
@@ -1130,7 +1130,7 @@
       "request": {
         "body": {
           "name": "string.nonempty.required",
-          "type": "enum:main_store,vendor_premise,finished_goods,scrap_yard.required",
+          "type": "enum:main_store,vendor_premise,finished_goods,scrap_yard,store.required",
           "isVirtual": "boolean.optional",
           "linkedVendorId": "integer.positive.nullable.optional"
         }
@@ -1141,7 +1141,7 @@
           "data": {
             "id": "unrepresentable.required",
             "name": "string.required",
-            "type": "enum:main_store,vendor_premise,finished_goods,scrap_yard.required",
+            "type": "enum:main_store,vendor_premise,finished_goods,scrap_yard,store.required",
             "isVirtual": "boolean.required",
             "linkedVendorId": "unrepresentable.nullable.required",
             "isActive": "boolean.required",
@@ -1168,7 +1168,7 @@
       "request": {
         "body": {
           "name": "string.nonempty.optional",
-          "type": "enum:main_store,vendor_premise,finished_goods,scrap_yard.optional",
+          "type": "enum:main_store,vendor_premise,finished_goods,scrap_yard,store.optional",
           "isVirtual": "boolean.optional",
           "linkedVendorId": "integer.positive.nullable.optional",
           "isActive": "boolean.optional"
@@ -1180,7 +1180,7 @@
           "data": {
             "id": "unrepresentable.required",
             "name": "string.required",
-            "type": "enum:main_store,vendor_premise,finished_goods,scrap_yard.required",
+            "type": "enum:main_store,vendor_premise,finished_goods,scrap_yard,store.required",
             "isVirtual": "boolean.required",
             "linkedVendorId": "unrepresentable.nullable.required",
             "isActive": "boolean.required",
@@ -2555,7 +2555,7 @@
             "locationId": "unrepresentable.required",
             "batchNumber": "unknown.required",
             "transactionType": "enum:in,out,adjustment.required",
-            "referenceType": "enum:grn,grn_bypass,pro,pro_cancel,sco_issue,sco_receipt,job_order_issue,scrap_dispatch,stock_adjustment,grn_correction,opening_stock,sco_loss.required",
+            "referenceType": "enum:grn,grn_bypass,pro,pro_cancel,sco_issue,sco_receipt,job_order_issue,scrap_dispatch,stock_adjustment,grn_correction,opening_stock,sco_loss,stock_transfer,stock_transfer_reversal.required",
             "referenceId": "unrepresentable.required",
             "referenceLineId": "unrepresentable.nullable.required",
             "quantityChange": "unrepresentable.required",
@@ -4839,6 +4839,8 @@
             "validTill": "string.required",
             "paymentTermsDays": "integer.required",
             "isLate": "boolean.required",
+            "linesPriced": "integer.required",
+            "totalLandedPaise": "integer.required",
             "submittedAt": "unknown.required",
             "cancelledByName": "unknown.required",
             "cancelledAt": "unknown.required",
@@ -4887,6 +4889,8 @@
             "validTill": "string.required",
             "paymentTermsDays": "integer.required",
             "isLate": "boolean.required",
+            "linesPriced": "integer.required",
+            "totalLandedPaise": "integer.required",
             "submittedAt": "unknown.required",
             "cancelledByName": "unknown.required",
             "cancelledAt": "unknown.required",
@@ -4929,6 +4933,8 @@
             "validTill": "string.required",
             "paymentTermsDays": "integer.required",
             "isLate": "boolean.required",
+            "linesPriced": "integer.required",
+            "totalLandedPaise": "integer.required",
             "submittedAt": "unknown.required",
             "cancelledByName": "unknown.required",
             "cancelledAt": "unknown.required",
@@ -4973,6 +4979,8 @@
             "validTill": "string.required",
             "paymentTermsDays": "integer.required",
             "isLate": "boolean.required",
+            "linesPriced": "integer.required",
+            "totalLandedPaise": "integer.required",
             "submittedAt": "unknown.required",
             "cancelledByName": "unknown.required",
             "cancelledAt": "unknown.required",
@@ -5190,6 +5198,8 @@
             "validTill": "string.required",
             "paymentTermsDays": "integer.required",
             "isLate": "boolean.required",
+            "linesPriced": "integer.required",
+            "totalLandedPaise": "integer.required",
             "submittedAt": "unknown.required",
             "cancelledByName": "unknown.required",
             "cancelledAt": "unknown.required",
@@ -7550,6 +7560,275 @@
       "notes": [
         "400 non-integer id; 404 unknown id. Read-only."
       ]
+    },
+    {
+      "id": "GET /api/stock-transfer",
+      "method": "GET",
+      "path": "/api/stock-transfer",
+      "tags": [
+        "stock-transfer"
+      ],
+      "summary": "List stock transfers, paginated (BR-STR-27). Filter by status/sourceLocationId/destinationLocationId/itemId/fromDate/toDate. Default sort createdAt desc.",
+      "auth": {
+        "type": "permission",
+        "key": "inventory.view"
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "sortBy": "enum:createdAt,transferNumber,status,postedAt.optional",
+          "sortDir": "enum:asc,desc.optional",
+          "status": "enum:draft,posted,cancelled,reversed.optional",
+          "sourceLocationId": "integer.positive.optional",
+          "destinationLocationId": "integer.positive.optional",
+          "itemId": "integer.positive.optional",
+          "fromDate": "string.optional",
+          "toDate": "string.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "createdAt",
+          "transferNumber",
+          "status",
+          "postedAt"
+        ],
+        "searchable": false
+      }
+    },
+    {
+      "id": "GET /api/stock-transfer/:id",
+      "method": "GET",
+      "path": "/api/stock-transfer/:id",
+      "tags": [
+        "stock-transfer"
+      ],
+      "summary": "Stock transfer detail: header, lines (with source balance hint while draft), audit, ledger rows (BR-STR-25, 30).",
+      "auth": {
+        "type": "permission",
+        "key": "inventory.view"
+      },
+      "request": {
+        "params": {
+          "id": "integer.positive.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "transferNumber": "string.required",
+            "status": "enum:draft,posted,cancelled,reversed.required",
+            "source": {
+              "id": "integer.required",
+              "name": "string.required",
+              "type": "enum:main_store,vendor_premise,finished_goods,scrap_yard,store.required"
+            },
+            "destination": {
+              "id": "integer.required",
+              "name": "string.required",
+              "type": "enum:main_store,vendor_premise,finished_goods,scrap_yard,store.required"
+            },
+            "notes": "unknown.required",
+            "createdBy": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "createdAt": "string.required",
+            "lastUpdatedBy": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "lastUpdatedAt": "string.required",
+            "postedBy": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "postedAt": "unknown.required",
+            "cancelledBy": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "cancelledAt": "unknown.required",
+            "reversedBy": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "reversedAt": "unknown.required",
+            "reverseReason": "unknown.required",
+            "lines": "array<object>.required",
+            "ledgerRows": "array<object>.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/stock-transfer",
+      "method": "POST",
+      "path": "/api/stock-transfer",
+      "tags": [
+        "stock-transfer"
+      ],
+      "summary": "Create a draft stock transfer (BR-STR-01..08). Any cost field or unknown key is 400.",
+      "auth": {
+        "type": "permission",
+        "key": "stock_transfer.manage"
+      },
+      "request": {
+        "body": {
+          "sourceLocationId": "integer.positive.required",
+          "destinationLocationId": "integer.positive.required",
+          "notes": "string.nonempty.optional",
+          "lines": "array<object>.required"
+        }
+      },
+      "responses": {
+        "201": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "transferNumber": "string.required",
+            "status": "enum:draft,posted,cancelled,reversed.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "PATCH /api/stock-transfer/:id",
+      "method": "PATCH",
+      "path": "/api/stock-transfer/:id",
+      "tags": [
+        "stock-transfer"
+      ],
+      "summary": "Edit a draft transfer (BR-STR-09). lines, if sent, replace all lines. 409 STR_NOT_DRAFT otherwise.",
+      "auth": {
+        "type": "permission",
+        "key": "stock_transfer.manage"
+      },
+      "request": {
+        "body": {
+          "sourceLocationId": "integer.positive.optional",
+          "destinationLocationId": "integer.positive.optional",
+          "notes": "string.nonempty.nullable.optional",
+          "lines": "array<object>.optional"
+        },
+        "params": {
+          "id": "integer.positive.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "transferNumber": "string.required",
+            "status": "enum:draft,posted,cancelled,reversed.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/stock-transfer/:id/cancel",
+      "method": "POST",
+      "path": "/api/stock-transfer/:id/cancel",
+      "tags": [
+        "stock-transfer"
+      ],
+      "summary": "Cancel a draft transfer (BR-STR-10). Empty body.",
+      "auth": {
+        "type": "permission",
+        "key": "stock_transfer.manage"
+      },
+      "request": {
+        "body": {},
+        "params": {
+          "id": "integer.positive.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "status": "string.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/stock-transfer/:id/post",
+      "method": "POST",
+      "path": "/api/stock-transfer/:id/post",
+      "tags": [
+        "stock-transfer"
+      ],
+      "summary": "Post a draft transfer: per line one out row at the source and one in row at the destination (BR-STR-11..18). Empty body. Nothing is saved on any error.",
+      "auth": {
+        "type": "permission",
+        "key": "stock_transfer.manage"
+      },
+      "request": {
+        "body": {},
+        "params": {
+          "id": "integer.positive.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "status": "string.required",
+            "postedAt": "string.required",
+            "lines": "array<object>.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/stock-transfer/:id/reverse",
+      "method": "POST",
+      "path": "/api/stock-transfer/:id/reverse",
+      "tags": [
+        "stock-transfer"
+      ],
+      "summary": "Reverse a posted transfer with a reason: counter rows at posted cost (BR-STR-19..24).",
+      "auth": {
+        "type": "permission",
+        "key": "stock_transfer.reverse"
+      },
+      "request": {
+        "body": {
+          "reason": "string.nonempty.required"
+        },
+        "params": {
+          "id": "integer.positive.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "status": "string.required",
+            "reversedAt": "string.required"
+          }
+        }
+      }
     },
     {
       "id": "GET /api/supplier/listSuppliers",

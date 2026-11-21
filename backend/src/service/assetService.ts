@@ -94,7 +94,12 @@ function getConflictError(error: unknown) {
 // BR-INV-12, 13 on the values the location will have.
 async function checkLocationRules(
   next: {
-    type: "main_store" | "vendor_premise" | "finished_goods" | "scrap_yard";
+    type:
+      | "main_store"
+      | "vendor_premise"
+      | "finished_goods"
+      | "scrap_yard"
+      | "store";
     linkedVendorId: number | null;
   },
   currentId: number | undefined,

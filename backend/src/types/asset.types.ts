@@ -273,6 +273,8 @@ export const inventoryReferenceTypeSchema = z.enum([
   "grn_correction",
   "opening_stock",
   "sco_loss",
+  "stock_transfer",
+  "stock_transfer_reversal",
 ]);
 
 // The only reference types the manual movement screen may post (BR-GRN-43).
@@ -298,6 +300,8 @@ export const documentMovementReferenceTypeSchema = z.enum([
   "sco_loss",
   "job_order_issue",
   "scrap_dispatch",
+  "stock_transfer",
+  "stock_transfer_reversal",
 ]);
 
 export const assetInventoryMovementListQuerySchema = z
@@ -475,6 +479,7 @@ export const assetStockLocationBalanceSchema = z.object({
     "vendor_premise",
     "finished_goods",
     "scrap_yard",
+    "store",
   ]),
   // last ledger balanceAfter for that item+location
   balance: z.number(),

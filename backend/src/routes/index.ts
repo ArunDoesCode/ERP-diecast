@@ -16,6 +16,7 @@ import { rfqRoutes } from "./rfq";
 import { saleOrderRoutes } from "./saleOrder";
 import { scoRoutes } from "./sco";
 import { setupRoutes } from "./setup";
+import { stockTransferRoutes } from "./stockTransfer";
 import { supplierRoutes } from "./supplier";
 import { supplierInvoiceRoutes } from "./supplierInvoice";
 
@@ -29,6 +30,7 @@ const MAIN_ROUTES = {
   grn: "/grn",
   purchaseReturn: "/purchase-return",
   supplierInvoice: "/supplier-invoice",
+  stockTransfer: "/stock-transfer",
   rfq: "/rfq",
   rateContract: "/rate-contract",
   approval: "/approval",
@@ -52,6 +54,7 @@ mainRouter.route(MAIN_ROUTES.pr, prRoutes);
 mainRouter.route(MAIN_ROUTES.po, poRoutes);
 mainRouter.route(MAIN_ROUTES.grn, grnRoutes);
 mainRouter.route(MAIN_ROUTES.purchaseReturn, purchaseReturnRoutes);
+mainRouter.route(MAIN_ROUTES.stockTransfer, stockTransferRoutes);
 mainRouter.route(MAIN_ROUTES.supplierInvoice, supplierInvoiceRoutes);
 mainRouter.route(MAIN_ROUTES.rfq, rfqRoutes);
 mainRouter.route(MAIN_ROUTES.rateContract, rateContractRoutes);

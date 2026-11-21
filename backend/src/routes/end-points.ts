@@ -123,6 +123,16 @@ export const END_POINTS = {
     post: "/:id/post",
     cancel: "/:id/cancel",
   },
+  // REST style (design/api.md). Static-segment routes first is not needed: only /:id paths.
+  stockTransfer: {
+    list: "/",
+    details: "/:id",
+    create: "/",
+    update: "/:id",
+    cancel: "/:id/cancel",
+    post: "/:id/post",
+    reverse: "/:id/reverse",
+  },
   supplierInvoice: {
     list: "/getsupplierinvoices",
     details: "/getsupplierinvoicedetails/:id",
