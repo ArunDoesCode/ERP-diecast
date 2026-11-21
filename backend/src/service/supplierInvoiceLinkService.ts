@@ -31,6 +31,10 @@ export const supplierInvoiceLinkService = {
     if (!po || (po.status !== "fully_received" && po.status !== "invoiced")) {
       return;
     }
+    // A legacy invoice record keeps the PO invoiced whatever the bills do (CR-01).
+    if (await repo.hasLegacyInvoice(poId, tx)) {
+      return;
+    }
     const lines = await repo.listPoGrnLines(poId, tx);
     const ids = lines.map((l) => l.id);
     const [corrections, counters, approved] = await Promise.all([

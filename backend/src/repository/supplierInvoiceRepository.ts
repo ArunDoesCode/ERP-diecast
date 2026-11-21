@@ -349,15 +349,43 @@ export const supplierInvoiceRepository = {
       .where(eq(supplierInvoiceLines.invoiceId, invoiceId));
   },
 
-  async updateLine(
-    id: number,
-    values: Partial<SupplierInvoiceLineInsert>,
+  // One statement for every line of a bill (UPDATE ... FROM (VALUES ...)).
+  async updateLinesAmounts(
+    rows: {
+      id: number;
+      cgstPaise: number;
+      sgstPaise: number;
+      igstPaise: number;
+      item: boolean;
+      poRatePaise: number | null;
+      poGstBp: number | null;
+      billableQty: number | null;
+      belowPoRate: boolean;
+    }[],
     tx: Tx,
   ) {
-    await tx
-      .update(supplierInvoiceLines)
-      .set(values)
-      .where(eq(supplierInvoiceLines.id, id));
+    if (rows.length === 0) {
+      return;
+    }
+    const values = sql.join(
+      rows.map(
+        (r) =>
+          sql`(${r.id}::int, ${r.cgstPaise}::bigint, ${r.sgstPaise}::bigint, ${r.igstPaise}::bigint, ${r.item}::boolean, ${r.poRatePaise}::bigint, ${r.poGstBp}::int, ${r.billableQty}::numeric, ${r.belowPoRate}::boolean)`,
+      ),
+      sql`, `,
+    );
+    await tx.execute(sql`
+      update ${supplierInvoiceLines} as l set
+        cgst_paise = v.cgst,
+        sgst_paise = v.sgst,
+        igst_paise = v.igst,
+        po_rate_paise = case when v.item then v.po_rate else l.po_rate_paise end,
+        po_gst_bp = case when v.item then v.po_gst else l.po_gst_bp end,
+        billable_qty = case when v.item then v.billable else l.billable_qty end,
+        below_po_rate = case when v.item then v.below else l.below_po_rate end
+      from (values ${values}) as v(id, cgst, sgst, igst, item, po_rate, po_gst, billable, below)
+      where l.id = v.id
+    `);
   },
 
   async listLines(invoiceId: number, executor: Executor) {
@@ -542,11 +570,10 @@ export const supplierInvoiceRepository = {
         ? eq(supplierInvoices.poId, params.poId)
         : undefined,
       params.grnId !== undefined
-        ? sql`exists (
-            select 1 from ${supplierInvoiceLines}
+        ? sql`${supplierInvoices.id} in (
+            select ${supplierInvoiceLines.invoiceId} from ${supplierInvoiceLines}
             inner join ${grnItems} on ${grnItems.id} = ${supplierInvoiceLines.grnItemId}
-            where ${supplierInvoiceLines.invoiceId} = ${supplierInvoices.id}
-              and ${grnItems.grnId} = ${params.grnId}
+            where ${grnItems.grnId} = ${params.grnId}
           )`
         : undefined,
     ].filter((f) => f !== undefined);

@@ -678,7 +678,7 @@ export const supplierInvoiceService = {
       throw new NotFoundError("Purchase order not found");
     }
     if (
-      !SUBMIT_PO_STATUSES.includes(po.status) ||
+      !CREATE_PO_STATUSES.includes(po.status) ||
       (await repo.hasLegacyInvoice(po.id))
     ) {
       throw conflict(
@@ -1004,29 +1004,28 @@ export const supplierInvoiceService = {
         weightTolBp: company.weightToleranceBp,
       });
 
-      for (const [index, line] of lines.entries()) {
-        const amount = amounts.lines[index];
-        const poFact = poFacts.get(line.grnItemId ?? 0);
-        await repo.updateLine(
-          line.id,
-          {
+      await repo.updateLinesAmounts(
+        lines.map((line, index) => {
+          const amount = amounts.lines[index];
+          const poFact = poFacts.get(line.grnItemId ?? 0);
+          const item = line.kind === "item";
+          return {
+            id: line.id,
             cgstPaise: amount?.cgstPaise ?? 0,
             sgstPaise: amount?.sgstPaise ?? 0,
             igstPaise: amount?.igstPaise ?? 0,
-            ...(line.kind === "item"
-              ? {
-                  poRatePaise: poFact?.poRatePaise ?? null,
-                  poGstBp: poFact ? gstPercentToBp(poFact.poGstPercent) : null,
-                  billableQty: fromMilli(
-                    facts.get(line.grnItemId ?? 0)?.billableMilli ?? 0,
-                  ),
-                  belowPoRate: match.belowPoRate.has(String(line.id)),
-                }
-              : {}),
-          },
-          tx,
-        );
-      }
+            item,
+            poRatePaise: item ? (poFact?.poRatePaise ?? null) : null,
+            poGstBp:
+              item && poFact ? gstPercentToBp(poFact.poGstPercent) : null,
+            billableQty: item
+              ? fromMilli(facts.get(line.grnItemId ?? 0)?.billableMilli ?? 0)
+              : null,
+            belowPoRate: item && match.belowPoRate.has(String(line.id)),
+          };
+        }),
+        tx,
+      );
       await repo.deleteMismatches(id, tx);
       await repo.insertMismatches(
         match.mismatches.map((m: MatchMismatch) => ({
@@ -1138,7 +1137,25 @@ export const supplierInvoiceService = {
         );
       }
       const lines = await repo.listLines(id, tx);
-      const { po } = await lockBillRows(inv.poId, itemGrnIds(lines), tx);
+      const { po, lines: locked } = await lockBillRows(
+        inv.poId,
+        itemGrnIds(lines),
+        tx,
+      );
+      // A-52: the qty may have dropped since submit (return, correction, other bill).
+      const facts = await billableFacts([...locked.values()], id, tx);
+      for (const line of lines) {
+        if (
+          line.kind === "item" &&
+          toMilli(line.qty ?? 0) >
+            (facts.get(line.grnItemId ?? 0)?.billableMilli ?? 0)
+        ) {
+          throw conflict(
+            "The qty on this invoice is no longer billable - send it back to draft and check the GRN, returns and other invoices",
+            "SINV_STALE_QTY",
+          );
+        }
+      }
       const mismatches = mismatchesForHistory(
         await repo.listMismatches(id, tx),
       );
@@ -1171,18 +1188,10 @@ export const supplierInvoiceService = {
 
   // BR-SINV-26, 27, 29, 31.
   async cancel(id: number, input: CancelSupplierInvoiceInput, actorId: number) {
-    // Status the caller saw before the lock: if it moved under the lock, the loser gets 409 (BR-SINV-34).
-    const seen = await repo.findInvoice(id);
     await repo.withTransaction(async (tx) => {
       const inv = await repo.lockInvoice(id, tx);
       if (!inv) {
         throw new NotFoundError("Supplier invoice not found");
-      }
-      if (seen && seen.status !== inv.status) {
-        throw conflict(
-          "The invoice changed while you were cancelling it - reload and try again",
-          "SINV_BUSY",
-        );
       }
       if (inv.status !== "blocked" && inv.status !== "approved") {
         throw conflict(

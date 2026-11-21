@@ -14,6 +14,7 @@ import {
   supplierInvoiceRepository,
 } from "../repository/supplierInvoiceRepository";
 import { poService } from "../service/poService";
+import { supplierInvoiceLinkService } from "../service/supplierInvoiceLinkService";
 import {
   type createGrnSchemaType,
   type grnBypassSchemaType,
@@ -679,6 +680,12 @@ export const grnService = {
         tx,
       );
       await poService.recomputeReceiptStatus(line.poId, tx);
+      // BR-SINV-29: the net accepted qty moved; re-run the PO "invoiced" test (locks already held).
+      await supplierInvoiceLinkService.reevaluatePoInvoiced(
+        line.poId,
+        actorId,
+        tx,
+      );
       return posted;
     });
   },

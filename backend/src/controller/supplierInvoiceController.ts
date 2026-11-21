@@ -35,7 +35,14 @@ const queryOf = (c: Context<AppEnv>) =>
 // An absent body on an action route counts as `{}`; anything else must parse.
 async function jsonOrEmpty(c: Context<AppEnv>) {
   const text = await c.req.text();
-  return text.trim() === "" ? {} : JSON.parse(text);
+  if (text.trim() === "") {
+    return {};
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new BadRequestError("Request body is not valid JSON");
+  }
 }
 
 export const supplierInvoiceController = {
