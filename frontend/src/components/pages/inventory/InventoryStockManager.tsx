@@ -5,6 +5,7 @@ import {
 	type SortingState,
 	useTable,
 } from "@tanstack/react-table";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { DataTable } from "@/components/common/DataTable";
 import { DataTableColumnHeader } from "@/components/common/DataTableColumnHeader";
@@ -19,6 +20,7 @@ import {
 import { PageHeader } from "@/components/shared/PageHeader";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -28,6 +30,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { useCan } from "@/hooks/use-can";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useStockQuery } from "@/lib/api/asset/queries";
 import { formatMoney } from "@/lib/format";
@@ -62,6 +65,7 @@ export function InventoryStockManager() {
 	const [category, setCategory] = useState<"all" | AssetItemCategory>("all");
 	const [reorderFilter, setReorderFilter] = useState<"all" | "below">("all");
 
+	const canTransfer = useCan("stock_transfer.manage");
 	const debouncedSearch = useDebouncedValue(searchValue, 350);
 	const activeSort = sorting[0];
 
@@ -158,15 +162,33 @@ export function InventoryStockManager() {
 					) : (
 						<ul className="text-sm">
 							{row.original.locations.map((location) => (
-								<li key={location.locationId}>
-									{location.locationName}: {location.balance} {row.original.uom}
+								<li
+									key={location.locationId}
+									className="flex flex-wrap items-center gap-x-2"
+								>
+									<span>
+										{location.locationName}: {location.balance}{" "}
+										{row.original.uom}
+									</span>
+									{canTransfer &&
+									location.balance > 0 &&
+									location.locationType !== "vendor_premise" ? (
+										<Button type="button" size="sm" variant="outline" asChild>
+											<Link
+												href={`/inventory/stock-transfers/new?item=${row.original.itemId}&from=${location.locationId}`}
+												aria-label={`Move ${row.original.name} from ${location.locationName}`}
+											>
+												Move stock
+											</Link>
+										</Button>
+									) : null}
 								</li>
 							))}
 						</ul>
 					),
 			},
 		],
-		[],
+		[canTransfer],
 	);
 
 	const table = useTable({

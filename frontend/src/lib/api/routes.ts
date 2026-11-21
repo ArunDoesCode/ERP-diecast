@@ -8,6 +8,7 @@ const API_Header = {
 	po: "/po",
 	grn: "/grn",
 	purchaseReturn: "/purchase-return",
+	stockTransfer: "/stock-transfer",
 	sco: "/sco",
 	bom: "/bom",
 	customers: "/customers",
@@ -226,6 +227,15 @@ export const API_ROUTES = {
 			`${API_Header.purchaseReturn}/${id}/cancel-draft`,
 		post: (id: number) => `${API_Header.purchaseReturn}/${id}/post`,
 		cancel: (id: number) => `${API_Header.purchaseReturn}/${id}/cancel`,
+	},
+	stockTransfers: {
+		list: API_Header.stockTransfer,
+		detail: (id: number) => `${API_Header.stockTransfer}/${id}`,
+		create: API_Header.stockTransfer,
+		update: (id: number) => `${API_Header.stockTransfer}/${id}`,
+		cancel: (id: number) => `${API_Header.stockTransfer}/${id}/cancel`,
+		post: (id: number) => `${API_Header.stockTransfer}/${id}/post`,
+		reverse: (id: number) => `${API_Header.stockTransfer}/${id}/reverse`,
 	},
 	subcontracting: {
 		list: `${API_Header.sco}/getscos`,

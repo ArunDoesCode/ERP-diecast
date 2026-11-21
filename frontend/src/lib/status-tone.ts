@@ -26,6 +26,7 @@ export type StatusDoc =
 	| "grn"
 	| "grnQa"
 	| "purchaseReturn"
+	| "st"
 	| "debitNote"
 	| "supplierInvoice"
 	| "supplierInvoiceMatch"
@@ -129,6 +130,12 @@ const MAP: Record<StatusDoc, Record<string, Entry>> = Object.assign(
 			draft: ["Draft", "neutral"],
 			posted: ["Posted", "success"],
 			cancelled: ["Cancelled", "closed"],
+		}),
+		st: table({
+			draft: ["Draft", "neutral"],
+			posted: ["Posted", "success"],
+			cancelled: ["Cancelled", "closed"],
+			reversed: ["Reversed", "closed"],
 		}),
 		debitNote: table({
 			issued: ["Issued", "success"],

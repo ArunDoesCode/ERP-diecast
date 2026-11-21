@@ -60,6 +60,30 @@ export function buildBreadcrumbs(
 		delete crumbs[crumbs.length - 1].href;
 		return crumbs;
 	}
+	if (segments[0] === "inventory" && segments[1] === "stock-transfers") {
+		// Inventory > Stock transfers > (New transfer | ST no. > Edit).
+		crumbs.push(
+			{ label: LIST_LABELS.inventory, href: "/inventory" },
+			{ label: "Stock transfers", href: "/inventory/stock-transfers" },
+		);
+		if (segments[2] === "new") {
+			crumbs.push({ label: "New transfer" });
+		} else if (segments.length > 2) {
+			if (segments[3] === "edit") {
+				crumbs.push(
+					{
+						label: options?.docNumber ?? "Details",
+						href: `/inventory/stock-transfers/${segments[2]}`,
+					},
+					{ label: "Edit" },
+				);
+			} else {
+				crumbs.push({ label: options?.docNumber ?? "Details" });
+			}
+		}
+		delete crumbs[crumbs.length - 1].href;
+		return crumbs;
+	}
 	if (
 		segments[0] === "rfq" &&
 		segments.length > 2 &&

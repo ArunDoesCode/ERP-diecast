@@ -75,6 +75,7 @@ const TYPE_LABEL: Record<AssetLocationType, string> = {
 	vendor_premise: "Vendor premise",
 	finished_goods: "Finished goods",
 	scrap_yard: "Scrap yard",
+	store: "Store",
 };
 
 function toLocationOption(location: AssetLocation): SearchableSelectOption {
@@ -94,7 +95,12 @@ function buildLocationPayload(
 	return {
 		name: values.name.trim(),
 		type: values.type,
-		...(isVendor ? {} : { isVirtual: values.isVirtual ?? false }),
+		...(isVendor
+			? {}
+			: {
+					isVirtual:
+						values.type === "store" ? false : (values.isVirtual ?? false),
+				}),
 		linkedVendorId: isVendor ? (values.linkedVendorId ?? null) : null,
 	};
 }
@@ -284,6 +290,11 @@ function LocationEditorForm({
 									))}
 								</SelectContent>
 							</Select>
+							{selectedType === "store" ? (
+								<p className="text-[13px] text-muted-foreground">
+									Shop floor, quarantine, re-melt bin
+								</p>
+							) : null}
 							<FormMessage />
 						</FormItem>
 					)}
@@ -306,7 +317,7 @@ function LocationEditorForm({
 							</FormItem>
 						)}
 					/>
-				) : (
+				) : selectedType === "store" ? null : (
 					<FormField
 						control={form.control}
 						name="isVirtual"

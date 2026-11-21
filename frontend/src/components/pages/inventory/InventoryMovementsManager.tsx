@@ -63,6 +63,7 @@ import {
 	type AssetTransactionType,
 	assetManualReferenceTypeValues,
 	assetMovementFormSchema,
+	assetReferenceTypeValues,
 } from "@/types/asset";
 
 const REFERENCE_TYPE_LABEL: Record<AssetReferenceType, string> = {
@@ -78,6 +79,8 @@ const REFERENCE_TYPE_LABEL: Record<AssetReferenceType, string> = {
 	job_order_issue: "Job order issue",
 	scrap_dispatch: "Scrap dispatch",
 	stock_adjustment: "Stock-take",
+	stock_transfer: "Stock transfer",
+	stock_transfer_reversal: "Transfer reversed",
 };
 
 const MANUAL_REFERENCE_LABEL = {
@@ -103,7 +106,10 @@ function SourceCell({ movement }: { movement: AssetMovement }) {
 	const source = movement.sourceDocument;
 	const isReturn =
 		movement.referenceType === "pro" || movement.referenceType === "pro_cancel";
-	if (!isReturn || !source || source.id === 0) {
+	const isTransfer =
+		movement.referenceType === "stock_transfer" ||
+		movement.referenceType === "stock_transfer_reversal";
+	if (!(isReturn || isTransfer) || !source || source.id === 0) {
 		return <>{sourceLabel(movement)}</>;
 	}
 	const id = source.id || movement.referenceId;
@@ -111,7 +117,11 @@ function SourceCell({ movement }: { movement: AssetMovement }) {
 		<span>
 			{REFERENCE_TYPE_LABEL[movement.referenceType]}{" "}
 			<Link
-				href={`/purchase-returns/${id}`}
+				href={
+					isTransfer
+						? `/inventory/stock-transfers/${id}`
+						: `/purchase-returns/${id}`
+				}
 				className="font-mono text-brand-accent hover:underline"
 			>
 				{source.number ?? `#${id}`}
@@ -466,7 +476,16 @@ function MovementCreateForm({ onDone }: MovementCreateFormProps) {
 	);
 }
 
-export function InventoryMovementsManager() {
+const TRANSFER_FILTER_ALL = "all";
+
+export function InventoryMovementsManager({
+	initialReferenceType,
+}: {
+	initialReferenceType?: AssetReferenceType;
+}) {
+	const [referenceType, setReferenceType] = useState<
+		AssetReferenceType | undefined
+	>(initialReferenceType);
 	const [pagination, setPagination] = useState<PaginationState>({
 		pageIndex: 0,
 		pageSize: 10,
@@ -481,6 +500,7 @@ export function InventoryMovementsManager() {
 		page: pagination.pageIndex + 1,
 		pageSize: pagination.pageSize,
 		itemId: selectedItemId,
+		referenceType,
 	});
 
 	const movements = movementsQuery.data?.data ?? [];
@@ -569,7 +589,30 @@ export function InventoryMovementsManager() {
 				}
 			/>
 			<FilterBar value="" onChange={() => {}}>
-				<div className="flex w-full gap-2 sm:max-w-lg">
+				<div className="flex w-full flex-wrap gap-2 sm:max-w-2xl">
+					<Select
+						value={referenceType ?? TRANSFER_FILTER_ALL}
+						onValueChange={(value) => {
+							setReferenceType(
+								value === TRANSFER_FILTER_ALL
+									? undefined
+									: (value as AssetReferenceType),
+							);
+							setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+						}}
+					>
+						<SelectTrigger className="w-44" aria-label="Source type">
+							<SelectValue placeholder="Source type" />
+						</SelectTrigger>
+						<SelectContent>
+							<SelectItem value={TRANSFER_FILTER_ALL}>All sources</SelectItem>
+							{assetReferenceTypeValues.map((type) => (
+								<SelectItem key={type} value={type}>
+									{REFERENCE_TYPE_LABEL[type]}
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
 					<div className="flex-1">
 						<ItemPicker
 							value={selectedItemId}
@@ -586,6 +629,7 @@ export function InventoryMovementsManager() {
 						variant="outline"
 						onClick={() => {
 							setSelectedItemId(undefined);
+							setReferenceType(undefined);
 							setPagination((prev) => ({ ...prev, pageIndex: 0 }));
 						}}
 					>

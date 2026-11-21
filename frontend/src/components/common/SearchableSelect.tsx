@@ -19,6 +19,8 @@ export type SearchableSelectOption = {
 	value: string;
 	label: string;
 	secondaryLabel?: string;
+	/** Shown but not pickable (e.g. already used on another line). */
+	disabled?: boolean;
 };
 
 type SearchableSelectProps = {
@@ -122,7 +124,8 @@ export function SearchableSelect({
 								<button
 									key={option.value}
 									type="button"
-									className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent"
+									disabled={option.disabled}
+									className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
 									onClick={() => {
 										onValueChange(option.value);
 										setOpen(false);

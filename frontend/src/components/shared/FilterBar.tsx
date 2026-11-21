@@ -3,7 +3,12 @@ import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-export type QuickFilter = { key: string; label: string; count?: number };
+/** `count: null` hides the number (the API gives no counts); `undefined` shows "–" while loading. */
+export type QuickFilter = {
+	key: string;
+	label: string;
+	count?: number | null;
+};
 
 export type FilterBarProps = {
 	quick?: QuickFilter[];
@@ -47,7 +52,9 @@ export function FilterBar({
 									: "border-border bg-card text-foreground hover:bg-muted",
 							)}
 						>
-							<span className="tabular-nums">{q.count ?? "–"}</span>
+							{q.count === null ? null : (
+								<span className="tabular-nums">{q.count ?? "–"}</span>
+							)}
 							<span>{q.label}</span>
 						</button>
 					);

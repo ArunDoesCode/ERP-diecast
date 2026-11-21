@@ -162,6 +162,7 @@ export const assetLocationTypeValues = [
 	"vendor_premise",
 	"finished_goods",
 	"scrap_yard",
+	"store",
 ] as const;
 
 export type AssetLocationType = (typeof assetLocationTypeValues)[number];
@@ -183,6 +184,8 @@ export const assetReferenceTypeValues = [
 	"job_order_issue",
 	"scrap_dispatch",
 	"stock_adjustment",
+	"stock_transfer",
+	"stock_transfer_reversal",
 ] as const;
 
 export type AssetReferenceType = (typeof assetReferenceTypeValues)[number];
