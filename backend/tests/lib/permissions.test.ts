@@ -85,6 +85,9 @@ const SPEC: Record<string, R[]> = {
   "contract.view": ["ow", "bo"],
   "contract.manage": ["ow"],
   "contract.override_rate": ["ow"],
+  // stock-transfer spec "Who can do what" (BR-STR-34)
+  "stock_transfer.manage": ["ow", "bo"],
+  "stock_transfer.reverse": ["ow", "bo"],
 };
 
 describe("BR-AUTH-06 permission catalog defined in code", () => {
@@ -244,6 +247,37 @@ describe("rfq and rate-contract keys and screens (BR-RFQ-70)", () => {
     ] as const)
       for (const k of KEYS)
         expect(SEED_GRANTS[role] as string[]).not.toContain(k);
+  });
+});
+
+describe("stock-transfer keys and screen (BR-STR-34)", () => {
+  const KEYS = ["stock_transfer.manage", "stock_transfer.reverse"];
+
+  test("BR-STR-34 the two stock_transfer keys are in the catalog", () => {
+    for (const k of KEYS) expect(PERMISSION_KEYS as string[]).toContain(k);
+  });
+
+  test("BR-STR-34 the stock-transfers screen is /inventory/stock-transfers behind inventory.view", () => {
+    expect(SCREENS["stock-transfers"].path).toBe("/inventory/stock-transfers");
+    expect(SCREENS["stock-transfers"].permission).toBe("inventory.view");
+  });
+
+  test("BR-STR-34 only owner and back_office hold the two keys", () => {
+    for (const k of KEYS) {
+      const holders = Object.entries(SEED_GRANTS)
+        .filter(([, ks]) => (ks as string[]).includes(k))
+        .map(([n]) => n)
+        .sort();
+      expect(holders).toEqual(["back_office", "owner"]);
+    }
+  });
+
+  test("BR-STR-34 floor_supervisor holds inventory.view but neither transfer key", () => {
+    expect(SEED_GRANTS.floor_supervisor as string[]).toContain(
+      "inventory.view",
+    );
+    for (const k of KEYS)
+      expect(SEED_GRANTS.floor_supervisor as string[]).not.toContain(k);
   });
 });
 
