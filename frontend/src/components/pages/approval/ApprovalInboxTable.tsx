@@ -126,6 +126,7 @@ export function ApprovalInboxTable({
 			table={table}
 			isLoading={isLoading}
 			hidePagination
+			onRowClick={splitView ? onSelect : undefined}
 			errorState={errorState}
 			rowClassName={(row) => (row.id === selectedId ? "bg-muted" : undefined)}
 			emptyState={

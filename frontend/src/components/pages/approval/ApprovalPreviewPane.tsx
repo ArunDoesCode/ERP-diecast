@@ -217,7 +217,7 @@ export function ApprovalPreviewPane({
 		if (!request) return;
 		const typed = note.trim();
 		if (typed.length === 0) {
-			setNoteError("Type a note before you continue.");
+			setNoteError("Note is required");
 			return;
 		}
 		setNoteError(null);
@@ -418,7 +418,7 @@ export function ApprovalPreviewPane({
 							disabled={actMutation.isPending}
 							onClick={() => {
 								if (note.trim().length === 0) {
-									setNoteError("Type a note before you continue.");
+									setNoteError("Note is required");
 									return;
 								}
 								setRejectOpen(true);

@@ -30,6 +30,8 @@ type DataTableProps<TData extends RowData> = {
 	table: DataTableInstance<TData>;
 	isLoading?: boolean;
 	rowClassName?: (row: TData) => string | undefined;
+	/** Mouse click anywhere on a row. Keyboard users act through a control inside the row. */
+	onRowClick?: (row: TData) => void;
 	/** Rendered in place of the empty row. */
 	emptyState?: ReactNode;
 	/** Rendered when set instead of the body. */
@@ -47,6 +49,7 @@ export function DataTable<TData extends RowData>({
 	table,
 	isLoading,
 	rowClassName,
+	onRowClick,
 	emptyState,
 	errorState,
 	skeletonRows = SKELETON_ROWS,
@@ -113,7 +116,16 @@ export function DataTable<TData extends RowData>({
 						</TableRow>
 					) : (
 						rows.map((row) => (
-							<TableRow key={row.id} className={rowClassName?.(row.original)}>
+							<TableRow
+								key={row.id}
+								className={cn(
+									onRowClick && "cursor-pointer",
+									rowClassName?.(row.original),
+								)}
+								onClick={
+									onRowClick ? () => onRowClick(row.original) : undefined
+								}
+							>
 								{row.getVisibleCells().map((cell) => (
 									<TableCell
 										key={cell.id}

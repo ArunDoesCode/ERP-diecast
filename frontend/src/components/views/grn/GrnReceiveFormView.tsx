@@ -91,7 +91,10 @@ export function GrnReceiveFormView() {
 		vehicleNo.trim() !== "" ||
 		driverName.trim() !== "" ||
 		Object.values(arrived).some((v) => v.trim() !== "");
-	useUnsavedChangesGuard(dirty && !finished);
+	// The guard stays on while the save navigates: ending it first would let its history clean-up
+	// step back over the navigation (the sentinel is still on top until the new page has loaded).
+	// It ends by itself when this view unmounts.
+	useUnsavedChangesGuard(dirty);
 
 	const po = query.data?.data[0];
 	const today = query.data?.meta.today;
@@ -119,7 +122,9 @@ export function GrnReceiveFormView() {
 		);
 	}
 
-	if (query.isLoading) {
+	// After a save the order list refetches and the order drops out of it; keep a loading state
+	// until the new receipt opens instead of flashing "can no longer be received".
+	if (query.isLoading || (finished && !po)) {
 		return (
 			<div className="flex flex-col gap-4">
 				<PageHeader title="Receive goods" />
