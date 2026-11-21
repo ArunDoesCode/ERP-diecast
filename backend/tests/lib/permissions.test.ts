@@ -69,6 +69,11 @@ const SPEC: Record<string, R[]> = {
   "so.view": ["ow", "bo"],
   "so.manage": ["ow", "bo"],
   "so.explode": ["ow", "bo"],
+  // purchase-returns spec "Who can do what" (BR-PRT)
+  "purchase_return.view": ["ow", "bo", "fs", "qa"],
+  "purchase_return.edit_draft": ["ow", "bo", "fs"],
+  "purchase_return.post": ["ow", "bo"],
+  "purchase_return.cancel_posted": ["ow", "bo"],
 };
 
 describe("BR-AUTH-06 permission catalog defined in code", () => {
@@ -115,6 +120,34 @@ describe("BR-AUTH-06 permission catalog defined in code", () => {
     expect(SCREENS["employee-directory"].permission).toBe(
       "employees.directory.view",
     );
+  });
+});
+
+describe("purchase-returns keys and screen (BR-PRT who-can-do-what)", () => {
+  test("BR-PRT-37 the four purchase_return keys are in the catalog", () => {
+    for (const k of [
+      "purchase_return.view",
+      "purchase_return.edit_draft",
+      "purchase_return.post",
+      "purchase_return.cancel_posted",
+    ]) {
+      expect(PERMISSION_KEYS as string[]).toContain(k);
+    }
+  });
+
+  test("BR-PRT-37 the purchase-returns screen is /purchase-returns behind purchase_return.view", () => {
+    expect(SCREENS["purchase-returns"].path).toBe("/purchase-returns");
+    expect(SCREENS["purchase-returns"].permission).toBe("purchase_return.view");
+  });
+
+  test("BR-PRT-12 only owner and back_office hold post and cancel_posted; floor_supervisor cannot post", () => {
+    for (const k of ["purchase_return.post", "purchase_return.cancel_posted"]) {
+      const holders = Object.entries(SEED_GRANTS)
+        .filter(([, ks]) => (ks as string[]).includes(k))
+        .map(([n]) => n)
+        .sort();
+      expect(holders).toEqual(["back_office", "owner"]);
+    }
   });
 });
 
