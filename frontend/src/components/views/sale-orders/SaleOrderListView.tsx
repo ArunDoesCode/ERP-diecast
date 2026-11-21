@@ -173,7 +173,7 @@ export function SaleOrderListView() {
 						controls.onCustomerChange(value === "all" ? null : Number(value))
 					}
 				>
-					<SelectTrigger className="w-48" aria-label="Customer">
+					<SelectTrigger className="w-40" aria-label="Customer">
 						<SelectValue placeholder="Customer" />
 					</SelectTrigger>
 					<SelectContent>
@@ -185,7 +185,7 @@ export function SaleOrderListView() {
 						))}
 					</SelectContent>
 				</Select>
-				<div className="relative w-64">
+				<div className="relative w-48">
 					<IconSearch
 						aria-hidden="true"
 						className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground"
@@ -193,7 +193,7 @@ export function SaleOrderListView() {
 					<Input
 						value={controls.searchInput}
 						onChange={(event) => controls.onSearchChange(event.target.value)}
-						placeholder="Search SO no. or customer PO"
+						placeholder="Search SO or customer PO"
 						aria-label="Search SO no. or customer PO"
 						className="pl-7"
 					/>

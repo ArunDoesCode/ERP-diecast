@@ -3,10 +3,7 @@
 import { IconAlertTriangle } from "@tabler/icons-react";
 import Link from "next/link";
 
-import {
-	runNo,
-	startedByText,
-} from "@/components/pages/reorder/reorder-format";
+import { startedByText } from "@/components/pages/reorder/reorder-format";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { useCan } from "@/hooks/use-can";
 import {
@@ -47,9 +44,9 @@ export function ReorderLastRunStrip({
 						</span>
 						<Link
 							href={`/inventory/reorder/runs/${run.id}`}
-							className="font-mono whitespace-nowrap text-brand-accent hover:underline"
+							className="whitespace-nowrap text-brand-accent hover:underline"
 						>
-							{runNo(run.id)}
+							Run <span className="font-mono">{run.id}</span>
 						</Link>
 						<StatusBadge doc="reorderRun" status={run.state} />
 						{run.pr ? (
