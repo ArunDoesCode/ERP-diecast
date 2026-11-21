@@ -72,11 +72,12 @@ export function getItemLastRate(
 	);
 }
 
+// The batched last-rates endpoint takes at most 200 ids per call.
+const LAST_RATE_CHUNK = 200;
+
 /**
- * Last rates for many items at once, keyed by item id (PERF-01/02).
- * Adapter: the backend's batched `GET /api/asset/items/last-rates` is not in the
- * contract manifest yet, so this fans out to the single-item endpoint. Swap the body
- * for one call when the batched route lands; callers stay the same.
+ * Last rates for many items at once, keyed by item id (PERF-01/02): one call per
+ * 200 items. Items the backend does not know are omitted (undefined).
  */
 export async function getItemsLastRates(
 	itemIds: number[],
@@ -84,14 +85,29 @@ export async function getItemsLastRates(
 	onDate?: string,
 ): Promise<Record<number, LastRateData | undefined>> {
 	const ids = [...new Set(itemIds)].sort((a, b) => a - b);
-	const results = await Promise.all(
-		ids.map((itemId) => getItemLastRate(itemId, supplierId, onDate)),
+	const chunks: number[][] = [];
+	for (let i = 0; i < ids.length; i += LAST_RATE_CHUNK) {
+		chunks.push(ids.slice(i, i + LAST_RATE_CHUNK));
+	}
+	const pages = await Promise.all(
+		chunks.map((chunk) =>
+			api.get<{
+				success: boolean;
+				data: (LastRateData & { itemId: number })[];
+			}>(
+				`${API_ROUTES.assets.itemsLastRates}${toQueryString({
+					supplierId,
+					itemIds: chunk.join(","),
+					onDate,
+				})}`,
+			),
+		),
 	);
 	const byItem: Record<number, LastRateData | undefined> = {};
-	ids.forEach((itemId, index) => {
-		const result = results[index];
-		byItem[itemId] = result.success ? result.data : undefined;
-	});
+	for (const id of ids) byItem[id] = undefined;
+	for (const page of pages) {
+		for (const { itemId, ...rest } of page.data) byItem[itemId] = rest;
+	}
 	return byItem;
 }
 

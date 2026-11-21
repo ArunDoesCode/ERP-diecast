@@ -103,6 +103,7 @@ export const API_ROUTES = {
 		items: `${API_Header.asset}/items`,
 		itemLastRate: (itemId: number) =>
 			`${API_Header.asset}/items/${itemId}/last-rate`,
+		itemsLastRates: `${API_Header.asset}/items/last-rates`,
 		services: `${API_Header.asset}/services`,
 		machines: {
 			list: `${API_Header.asset}/machines`,
