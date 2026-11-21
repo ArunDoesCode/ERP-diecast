@@ -1128,7 +1128,7 @@ describe("prefill, awaiting, list, details (BR-PRT-36, 39, 40, 41)", () => {
     expect(p.poEffect).toBe("credit_only");
   });
 
-  test("BR-PRT-40 a rejected line is not in stock out; replacement shows as PO effect", async () => {
+  test("BR-PRT-40 a rejected line is not in stock out; PO effect stays credit_only even with replacementExpected", async () => {
     const g = await mkGrn([{ qty: 1000, accepted: 980, rejected: 20 }]);
     const id = await mkDraft(g, [ln(g, 0, "rejected", 20)], {
       replacementExpected: true,
@@ -1136,6 +1136,15 @@ describe("prefill, awaiting, list, details (BR-PRT-36, 39, 40, 41)", () => {
     const p = (await details(id)).preview;
     expect(p.stockOut).toEqual([]);
     expect(p.debitNoteTotalPaise).toBe(495600);
+    expect(p.poEffect).toBe("credit_only");
+  });
+
+  test("BR-PRT-40 an accepted line with replacementExpected shows replacement as PO effect", async () => {
+    const g = await mkGrn([{ qty: 1000, accepted: 980, rejected: 20 }]);
+    const id = await mkDraft(g, [ln(g, 0, "accepted", 30)], {
+      replacementExpected: true,
+    });
+    const p = (await details(id)).preview;
     expect(p.poEffect).toBe("replacement");
   });
 
