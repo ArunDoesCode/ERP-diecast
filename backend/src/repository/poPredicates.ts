@@ -1,14 +1,27 @@
 import { type SQL, sql } from "drizzle-orm";
-
 import {
   purchaseOrderItems,
   purchaseOrders,
 } from "../db/schemas/02_procurement-purchasing";
+import { istDayBoundsOfKey } from "../lib/ist-day";
 
 /** BR-PO-19: due date = revised date if set, else expected date. */
 export const poDueSql = sql`coalesce(${purchaseOrders.revisedDeliveryDate}, ${purchaseOrders.expectedDeliveryDate})`;
 
 export const poInTransitSql = sql`${purchaseOrders.status} in ('dispatched', 'partial_received')`;
+
+/**
+ * IST day bounds of a YYYY-MM-DD key as timestamp literals. Due dates are
+ * timestamps; they are compared as instants against these bounds so a time of
+ * day near midnight IST lands on the right plant day (BR-FF-08).
+ */
+export function istBoundsSql(today: string) {
+  const { start, next } = istDayBoundsOfKey(today);
+  return {
+    start: sql`${start.toISOString()}::timestamp`,
+    next: sql`${next.toISOString()}::timestamp`,
+  };
+}
 
 /** The plant day of a timestamp expression, as a date. */
 export const dayOfSql = (e: SQL) => sql`(${e})::date`;
@@ -19,7 +32,7 @@ export const dayOfSql = (e: SQL) => sql`(${e})::date`;
  * Shared by the Home tile, the PO list `bucket=late`, `overdue` and `lateCount`.
  */
 export const poLateSql = (today: string) => sql`(${poInTransitSql}
-  and ${dayOfSql(poDueSql)} < ${today}::date
+  and ${poDueSql} < ${istBoundsSql(today).start}
   and exists (
     select 1 from ${purchaseOrderItems}
     where ${purchaseOrderItems.poId} = ${purchaseOrders.id}
@@ -32,7 +45,8 @@ export function poBucketSql(
   today: string,
 ): SQL {
   if (bucket === "late") return poLateSql(today);
-  const due = dayOfSql(poDueSql);
-  if (bucket === "today") return sql`${due} = ${today}::date`;
-  return sql`(${due} is null or ${due} > ${today}::date)`;
+  const { start, next } = istBoundsSql(today);
+  if (bucket === "today")
+    return sql`(${poDueSql} >= ${start} and ${poDueSql} < ${next})`;
+  return sql`(${poDueSql} is null or ${poDueSql} >= ${next})`;
 }

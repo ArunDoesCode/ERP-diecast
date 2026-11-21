@@ -1,5 +1,6 @@
 import { type Actor, can } from "../lib/auth-middleware";
 import { ForbiddenError, NotFoundError } from "../lib/errors";
+import { grnQaSummaryOfStatuses } from "../lib/grn-qa-summary";
 import type { PermissionKey } from "../lib/permissions";
 import { approvalRepository } from "../repository/approvalRepository";
 import {
@@ -65,23 +66,6 @@ const SUPPLIER_COMM_KINDS = new Set([
   "comm_confirmation",
 ]);
 
-// BR-FF-115: same rule as the GRN list qaSummary.
-export function qaSummaryOf(
-  statuses: (string | null)[],
-): "pending" | "passed" | "failed" | "mixed" {
-  const all = statuses.map((s) => s ?? "pending");
-  if (all.length === 0 || all.includes("pending")) {
-    return "pending";
-  }
-  if (all.every((s) => s === "passed" || s === "waived")) {
-    return "passed";
-  }
-  if (all.every((s) => s === "failed")) {
-    return "failed";
-  }
-  return "mixed";
-}
-
 function eventName(kind: string) {
   return TRAIL_EVENTS[kind] ?? KIND_EVENTS[kind] ?? kind;
 }
@@ -133,14 +117,17 @@ function toLinked(actor: Actor, rows: LinkedRow[]): Linked[] {
 }
 
 function toGrnLinked(actor: Actor, rows: GrnLinkedRow[]): Linked[] {
-  return rows.map((row) => ({
-    docType: "grn" as const,
-    id: row.id,
-    number: row.number,
-    status: row.status,
-    qaStatus: qaSummaryOf(row.qaStatuses),
-    canOpen: can(actor, OPEN_KEYS.grn),
-  }));
+  return rows.map((row) => {
+    const qaStatus = grnQaSummaryOfStatuses(row.qaStatuses);
+    return {
+      docType: "grn" as const,
+      id: row.id,
+      number: row.number,
+      status: row.status,
+      ...(qaStatus ? { qaStatus } : {}),
+      canOpen: can(actor, OPEN_KEYS.grn),
+    };
+  });
 }
 
 /** Approvals block + the trail the caller may see (latest request only for via-approval readers). */

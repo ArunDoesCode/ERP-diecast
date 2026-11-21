@@ -21,6 +21,7 @@ import { AppError } from "../lib/errors";
 import { assertMoneyInRange } from "../lib/money";
 import { safeSearch } from "../lib/safe-search";
 import type { prListQuerySchemaType } from "../types/pr.types";
+import { istBoundsSql } from "./poPredicates";
 
 const purchaseRequestColumns = {
   id: purchaseRequests.id,
@@ -171,8 +172,6 @@ const prSortColumns = {
   estimatedAmountPaise: purchaseRequests.estimatedAmountPaise,
 } as const;
 
-const dayOf = (e: SQL) => sql`(${e})::date`;
-
 /** Earliest required-by among a PR's pending lines (BR-FF-23). */
 const earliestPendingSql = sql`(select min(${purchaseRequestItems.expectedDate}) from ${purchaseRequestItems}
   where ${purchaseRequestItems.prId} = ${purchaseRequests.id} and ${purchaseRequestItems.status} = 'pending')`;
@@ -185,11 +184,12 @@ const prToOrderSql = sql`(${purchaseRequests.status} in ('approved', 'partial_or
 const prOrderedSql = sql`(${purchaseRequests.status} in ('approved', 'partial_ordered', 'fully_ordered') and not ${hasPendingLineSql})`;
 
 function prBucketSql(bucket: "late" | "today" | "later", today: string) {
-  const due = dayOf(earliestPendingSql);
+  const due = earliestPendingSql;
+  const { start, next } = istBoundsSql(today);
   // No required-by date counts as Later (BR-FF-23).
-  if (bucket === "late") return sql`${due} < ${today}::date`;
-  if (bucket === "today") return sql`${due} = ${today}::date`;
-  return sql`(${due} is null or ${due} > ${today}::date)`;
+  if (bucket === "late") return sql`${due} < ${start}`;
+  if (bucket === "today") return sql`(${due} >= ${start} and ${due} < ${next})`;
+  return sql`(${due} is null or ${due} >= ${next})`;
 }
 
 export const prRepository = {

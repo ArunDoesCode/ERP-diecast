@@ -47,3 +47,12 @@ export function istDayStartInstant(date: Date): Date {
 export function istNextDayStartInstant(date: Date): Date {
   return new Date(istDayStartInstant(date).getTime() + DAY_MS);
 }
+
+/** [start, next start) instants of the IST calendar day named by a YYYY-MM-DD key. */
+export function istDayBoundsOfKey(key: string): { start: Date; next: Date } {
+  const anchor = new Date(`${key}T12:00:00.000Z`);
+  return {
+    start: istDayStartInstant(anchor),
+    next: istNextDayStartInstant(anchor),
+  };
+}

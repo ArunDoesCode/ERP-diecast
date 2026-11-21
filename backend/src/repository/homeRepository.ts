@@ -15,9 +15,10 @@ import {
   scoChallanLines,
   scoChallans,
 } from "../db/schemas/02_procurement-purchasing";
+import { istDayBoundsOfKey } from "../lib/ist-day";
 import type { HomeTileKey } from "../types/home.types";
 import { hasOpenQtySql } from "./openQty";
-import { dayOfSql, poDueSql, poInTransitSql, poLateSql } from "./poPredicates";
+import { poDueSql, poInTransitSql, poLateSql } from "./poPredicates";
 
 // Raw per-tile numbers; the service adds tone and the hint shape.
 export type HomeTileRaw = {
@@ -46,7 +47,11 @@ type TileSpec = {
   sentBack?: SQL;
 };
 
-const dayOf = dayOfSql;
+// The plant day of a timestamp, as a date (display key for hints). `due` and
+// `hint` are timestamp columns: buckets compare instants against the IST day
+// bounds (BR-FF-08), never `::date`.
+const istDaySql = (e: SQL) =>
+  sql`((${e}) at time zone 'UTC' at time zone 'Asia/Kolkata')::date`;
 
 // Builds the `count(*) filter (where …)` columns for the wanted tiles of one
 // source table and runs a single SELECT (PERF-01).
@@ -56,23 +61,27 @@ async function runTable(
   specs: Partial<Record<HomeTileKey, TileSpec>>,
   wanted: HomeTileKey[],
   today: string,
+  source?: SQL,
 ): Promise<Map<HomeTileKey, HomeTileResult>> {
   const keys = wanted.filter((k) => specs[k]);
   const out = new Map<HomeTileKey, HomeTileResult>();
   if (keys.length === 0) return out;
   const fields: Record<string, SQL> = {};
+  const day = istDayBoundsOfKey(today);
+  const startIso = day.start.toISOString();
+  const nextIso = day.next.toISOString();
   for (const k of keys) {
     const s = specs[k] as TileSpec;
     fields[`${k}__count`] = sql`count(*) filter (where ${s.where})`;
     if (s.due) {
       fields[`${k}__late`] =
-        sql`count(*) filter (where ${s.where} and ${dayOf(s.due)} < ${today}::date)`;
+        sql`count(*) filter (where ${s.where} and ${s.due} < ${startIso}::timestamp)`;
       fields[`${k}__today`] =
-        sql`count(*) filter (where ${s.where} and ${dayOf(s.due)} = ${today}::date)`;
+        sql`count(*) filter (where ${s.where} and ${s.due} >= ${startIso}::timestamp and ${s.due} < ${nextIso}::timestamp)`;
     }
     if (s.hint) {
       fields[`${k}__hint`] =
-        sql`to_char(min(${dayOf(s.hint)}) filter (where ${s.where}), 'YYYY-MM-DD')`;
+        sql`to_char(min(${istDaySql(s.hint)}) filter (where ${s.where}), 'YYYY-MM-DD')`;
     }
     if (s.sentBack) {
       fields[`${k}__sent`] =
@@ -80,7 +89,7 @@ async function runTable(
     }
   }
   try {
-    const [row] = (await db.select(fields).from(table)) as Record<
+    const [row] = (await db.select(fields).from(source ?? table)) as Record<
       string,
       unknown
     >[];
@@ -138,8 +147,13 @@ export const homeRepository = {
       },
     };
 
-    const earliestPending = sql`(select min(${purchaseRequestItems.expectedDate}) from ${purchaseRequestItems}
-      where ${purchaseRequestItems.prId} = ${purchaseRequests.id} and ${purchaseRequestItems.status} = 'pending')`;
+    // PERF-06: earliest pending required-by computed once per PR row (lateral),
+    // not once per tile column.
+    const earliestPending = sql`pr_ep.earliest`;
+    const prSource = sql`${purchaseRequests} left join lateral (
+      select min(${purchaseRequestItems.expectedDate}) as earliest from ${purchaseRequestItems}
+      where ${purchaseRequestItems.prId} = ${purchaseRequests.id} and ${purchaseRequestItems.status} = 'pending'
+    ) pr_ep on true`;
     const prSpecs: Partial<Record<HomeTileKey, TileSpec>> = {
       my_prs_draft: {
         where: sql`(${purchaseRequests.requestedBy} = ${actorId} and ${purchaseRequests.status} = 'draft')`,
@@ -209,7 +223,7 @@ export const homeRepository = {
 
     const parts = await Promise.all([
       runTable(approvalRequests, approvalSpecs, wanted, today),
-      runTable(purchaseRequests, prSpecs, wanted, today),
+      runTable(purchaseRequests, prSpecs, wanted, today, prSource),
       runTable(purchaseOrders, poSpecs, wanted, today),
       runTable(grns, grnSpecs, wanted, today),
       runTable(scoChallans, challanSpecs, wanted, today),

@@ -25,7 +25,7 @@ export const prController = {
       throw new BadRequestError("Invalid PR id");
     }
 
-    const data = await prService.getDetails(id);
+    const data = await prService.getDetails(id, c.get("actor"));
     return c.json({ success: true, data });
   },
 

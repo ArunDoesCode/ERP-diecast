@@ -252,18 +252,20 @@ function toPaginatedMeta(page: number, pageSize: number, total: number) {
 }
 
 export const prService = {
-  async getDetails(prId: number) {
+  async getDetails(prId: number, actor: Actor) {
     const row = await prRepository.findPrDetailsById(prId);
     if (!row) {
       throw new NotFoundError("Purchase request not found");
     }
 
+    // BR-FF-06 / SEC-01: PO pricing only for callers holding po.manage.
+    const canSeeRates = can(actor, "po.manage");
     // BR-FF-49, 92: the frozen BR-PO-25 rate for the line's default supplier
     // (one lookup per distinct supplier, not per line). No default supplier
     // or no rate -> null and the Create PO dialog asks.
     const itemsBySupplier = new Map<number, number[]>();
     for (const item of row.items) {
-      if (item.defaultSupplierId == null) continue;
+      if (!canSeeRates || item.defaultSupplierId == null) continue;
       const ids = itemsBySupplier.get(item.defaultSupplierId) ?? [];
       ids.push(item.itemId);
       itemsBySupplier.set(item.defaultSupplierId, ids);

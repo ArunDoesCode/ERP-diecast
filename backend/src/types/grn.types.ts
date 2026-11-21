@@ -57,7 +57,7 @@ export const grnListRowSchema = grnSchema.extend({
   supplierName: z.string().nullable(),
   lineCount: z.number().int().min(0),
   /** pending if any line pending; passed (passed/waived); failed; else mixed. */
-  qaSummary: grnQaSummarySchema,
+  qaSummary: grnQaSummarySchema.nullable(),
   /** Caller holds po.manage; else the PO number is plain text (BR-FF-03). */
   poCanOpen: z.boolean(),
 });

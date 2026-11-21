@@ -35,7 +35,9 @@ import {
 import { supplierMaster } from "../db/schemas/02_procurement-suppliers";
 import { allocateDocumentSequence } from "../lib/document-number";
 import { NotFoundError } from "../lib/errors";
+import { grnQaSummary } from "../lib/grn-qa-summary";
 import {
+  istDayBoundsOfKey,
   istDayKey,
   istDayStartInstant,
   istNextDayStartInstant,
@@ -780,7 +782,7 @@ export const grnRepository = {
       safeSearch(params.q, grns.grnNumber),
       params.poId !== undefined ? eq(grns.poId, params.poId) : undefined,
     ].filter((filter) => filter !== undefined);
-    const receivedDay = sql`(${grns.receivedDate})::date`;
+    const day = istDayBoundsOfKey(today);
     // bucket=late implies QA pending (CR-05).
     const qaStatus = params.bucket === "late" ? "pending" : params.qaStatus;
     const filters = [
@@ -798,15 +800,16 @@ export const grnRepository = {
               and ${grnItems.qaStatus} = ${qaStatus}
           )`
         : undefined,
-      params.bucket === "late"
-        ? sql`${receivedDay} < ${today}::date`
-        : undefined,
+      // received_date is a real timestamp: compare instants against the IST
+      // day bounds (BR-FF-08), which also keeps idx_grns_received_date usable.
+      params.bucket === "late" ? lt(grns.receivedDate, day.start) : undefined,
       params.bucket === "today"
-        ? sql`${receivedDay} = ${today}::date`
+        ? and(
+            gte(grns.receivedDate, day.start),
+            lt(grns.receivedDate, day.next),
+          )
         : undefined,
-      params.bucket === "later"
-        ? sql`${receivedDay} > ${today}::date`
-        : undefined,
+      params.bucket === "later" ? gte(grns.receivedDate, day.next) : undefined,
     ].filter((filter) => filter !== undefined);
 
     const whereClause = filters.length > 0 ? and(...filters) : undefined;
@@ -870,15 +873,7 @@ export const grnRepository = {
         const pending = Number(a?.pending ?? 0);
         const passed = Number(a?.passed ?? 0);
         const failed = Number(a?.failed ?? 0);
-        // BR-FF-115: pending > passed (passed / waived) > failed > mixed.
-        const qaSummary: "pending" | "passed" | "failed" | "mixed" =
-          pending > 0
-            ? "pending"
-            : lines > 0 && passed === lines
-              ? "passed"
-              : lines > 0 && failed === lines
-                ? "failed"
-                : "mixed";
+        const qaSummary = grnQaSummary({ lines, pending, passed, failed });
         return { ...r, lineCount: lines, qaSummary };
       }),
       total: totalRow?.value ?? 0,

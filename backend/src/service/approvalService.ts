@@ -317,7 +317,10 @@ export const approvalService = {
           data: Awaited<ReturnType<typeof scoService.getDetails>>;
         };
     if (docType === "pr") {
-      body = { kind: "pr", data: await prService.getDetails(docId) };
+      body = {
+        kind: "pr",
+        data: await prService.getDetails(docId, actor.actor),
+      };
     } else if (docType === "po") {
       body = { kind: "po", data: await poService.getDetails(docId) };
     } else {
