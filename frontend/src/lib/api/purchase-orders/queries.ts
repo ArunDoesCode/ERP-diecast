@@ -10,7 +10,7 @@ import { toast } from "sonner";
 
 import { ApiClientError } from "@/lib/api/client";
 import { documentKeys } from "@/lib/api/document/queries";
-import { grnKeys } from "@/lib/api/grn/queries";
+import { grnKeys } from "@/lib/api/grn/keys";
 import { homeKeys } from "@/lib/api/home/queries";
 import { purchaseRequisitionKeys } from "@/lib/api/purchase-requisitions/queries";
 import type {
@@ -43,20 +43,7 @@ import {
 	updatePurchaseOrder,
 	updatePurchaseOrderDelay,
 } from "./fetchers";
-
-export const purchaseOrderKeys = {
-	cards: (params?: PurchaseOrderListParams) =>
-		params
-			? (["purchase-orders", "cards", params] as const)
-			: (["purchase-orders", "cards"] as const),
-	detail: (poId: number) => ["purchase-orders", "detail", poId] as const,
-	communications: (poId: number) =>
-		["purchase-orders", "communications", poId] as const,
-	lastRate: (itemId: number, supplierId: number) =>
-		["purchase-orders", "last-rate", itemId, supplierId] as const,
-	priceRows: (supplierId: number, itemIds: number[]) =>
-		["purchase-orders", "price-rows", supplierId, itemIds] as const,
-};
+import { purchaseOrderKeys } from "./keys";
 
 const PO_ERROR_MESSAGES: Record<string, string> = {
 	PO_NOT_EDITABLE: "Only a draft PO can be edited.",

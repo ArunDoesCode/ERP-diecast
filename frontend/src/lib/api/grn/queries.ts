@@ -12,7 +12,7 @@ import { assetKeys } from "@/lib/api/asset/queries";
 import { ApiClientError } from "@/lib/api/client";
 import { documentKeys } from "@/lib/api/document/queries";
 import { homeKeys } from "@/lib/api/home/queries";
-import { purchaseOrderKeys } from "@/lib/api/purchase-orders/queries";
+import { purchaseOrderKeys } from "@/lib/api/purchase-orders/keys";
 import type {
 	GrnBypassPayload,
 	GrnCreatePayload,
@@ -31,18 +31,9 @@ import {
 	getReceivablePos,
 	updateGrn,
 } from "./fetchers";
+import { grnKeys } from "./keys";
 import type { GrnListQuery } from "./list-types";
 import type { ReceivableParams } from "./receivable-types";
-
-export const grnKeys = {
-	list: (params?: GrnListQuery) =>
-		params ? (["grn", "list", params] as const) : (["grn", "list"] as const),
-	detail: (grnId: number) => ["grn", "detail", grnId] as const,
-	receivable: (params?: ReceivableParams) =>
-		params
-			? (["grn", "receivable", params] as const)
-			: (["grn", "receivable"] as const),
-};
 
 function errorMessage(error: unknown, fallback: string) {
 	return error instanceof ApiClientError ? error.message : fallback;
