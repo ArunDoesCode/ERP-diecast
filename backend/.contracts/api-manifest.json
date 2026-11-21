@@ -937,7 +937,7 @@
             "locationId": "unrepresentable.required",
             "batchNumber": "unknown.required",
             "transactionType": "enum:in,out,adjustment.required",
-            "referenceType": "enum:grn,grn_bypass,pro,sco_issue,sco_receipt,job_order_issue,scrap_dispatch,stock_adjustment,grn_correction,opening_stock,sco_loss.required",
+            "referenceType": "enum:grn,grn_bypass,pro,pro_cancel,sco_issue,sco_receipt,job_order_issue,scrap_dispatch,stock_adjustment,grn_correction,opening_stock,sco_loss.required",
             "referenceId": "unrepresentable.required",
             "referenceLineId": "unrepresentable.nullable.required",
             "quantityChange": "unrepresentable.required",
@@ -2382,7 +2382,9 @@
             "batchNumber": "unknown.required",
             "overReceiptExcessQty": "unrepresentable.nullable.required",
             "overReceiptReason": "unknown.required",
-            "overReceiptBy": "unrepresentable.nullable.required"
+            "overReceiptBy": "unrepresentable.nullable.required",
+            "rejectedReturnedQty": "number.required",
+            "acceptedReturnedQty": "number.required"
           }
         }
       }
@@ -2426,7 +2428,9 @@
             "batchNumber": "unknown.required",
             "overReceiptExcessQty": "unrepresentable.nullable.required",
             "overReceiptReason": "unknown.required",
-            "overReceiptBy": "unrepresentable.nullable.required"
+            "overReceiptBy": "unrepresentable.nullable.required",
+            "rejectedReturnedQty": "number.required",
+            "acceptedReturnedQty": "number.required"
           }
         }
       }
@@ -2458,7 +2462,7 @@
             "locationId": "unrepresentable.required",
             "batchNumber": "unknown.required",
             "transactionType": "enum:in,out,adjustment.required",
-            "referenceType": "enum:grn,grn_bypass,pro,sco_issue,sco_receipt,job_order_issue,scrap_dispatch,stock_adjustment,grn_correction,opening_stock,sco_loss.required",
+            "referenceType": "enum:grn,grn_bypass,pro,pro_cancel,sco_issue,sco_receipt,job_order_issue,scrap_dispatch,stock_adjustment,grn_correction,opening_stock,sco_loss.required",
             "referenceId": "unrepresentable.required",
             "referenceLineId": "unrepresentable.nullable.required",
             "quantityChange": "unrepresentable.required",
@@ -3530,6 +3534,362 @@
               "expectedDate": "unrepresentable.nullable.required",
               "status": "enum:pending,po_draft,ordered,closed,cancelled.required"
             }
+          }
+        }
+      }
+    },
+    {
+      "id": "GET /api/purchase-return/getreturns",
+      "method": "GET",
+      "path": "/api/purchase-return/getreturns",
+      "tags": [
+        "purchase-return"
+      ],
+      "summary": "List purchase returns, paginated. Filter by status/supplierId/grnId/poId/dateFrom/dateTo/q. meta adds statusCounts and awaitingCount.",
+      "auth": {
+        "type": "permission",
+        "key": "purchase_return.view"
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "sortBy": "enum:id,proNumber,createdAt,status.required",
+          "sortDir": "enum:asc,desc.required",
+          "status": "enum:draft,posted,cancelled.optional",
+          "supplierId": "integer.positive.optional",
+          "grnId": "integer.positive.optional",
+          "poId": "integer.positive.optional",
+          "dateFrom": "string.optional",
+          "dateTo": "string.optional",
+          "q": "string.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required",
+            "statusCounts": {
+              "draft": "integer.required",
+              "posted": "integer.required",
+              "cancelled": "integer.required"
+            },
+            "awaitingCount": "integer.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "id",
+          "proNumber",
+          "createdAt",
+          "status"
+        ],
+        "searchable": true
+      }
+    },
+    {
+      "id": "GET /api/purchase-return/awaiting",
+      "method": "GET",
+      "path": "/api/purchase-return/awaiting",
+      "tags": [
+        "purchase-return"
+      ],
+      "summary": "Awaiting-return GRN lines (rejected qty not yet reserved by a non-cancelled return), paginated. Filter by supplierId.",
+      "auth": {
+        "type": "permission",
+        "key": "purchase_return.view"
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "sortBy": "enum:grnId,grnNumber,receivedDate.required",
+          "sortDir": "enum:asc,desc.required",
+          "supplierId": "integer.positive.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "grnId",
+          "grnNumber",
+          "receivedDate"
+        ],
+        "searchable": false
+      }
+    },
+    {
+      "id": "GET /api/purchase-return/getreturndetails/:id",
+      "method": "GET",
+      "path": "/api/purchase-return/getreturndetails/:id",
+      "tags": [
+        "purchase-return"
+      ],
+      "summary": "Purchase return details: header, lines, document flow, debit note, events, draft post preview. Also feeds the debit note and return challan prints.",
+      "auth": {
+        "type": "permission",
+        "key": "purchase_return.view"
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "proNumber": "string.required",
+            "status": "enum:draft,posted,cancelled.required",
+            "reason": "string.required",
+            "vendorReturnRef": "unknown.required",
+            "transporter": "unknown.required",
+            "vehicleNo": "unknown.required",
+            "remarks": "unknown.required",
+            "challanNumber": "unknown.required",
+            "replacementExpected": "boolean.required",
+            "grnId": "integer.required",
+            "grnNumber": "string.required",
+            "grnChallanNo": "unknown.required",
+            "poId": "integer.required",
+            "poNumber": "string.required",
+            "supplierId": "integer.required",
+            "supplierName": "string.required",
+            "postedBy": "integer.nullable.required",
+            "postedAt": "unknown.required",
+            "cancelledBy": "integer.nullable.required",
+            "cancelledAt": "unknown.required",
+            "cancelReason": "unknown.required",
+            "createdBy": "integer.required",
+            "createdAt": "string.required",
+            "lastUpdatedBy": "integer.required",
+            "lastUpdatedAt": "string.required",
+            "lines": "array<object>.required",
+            "documentFlow": "array<object>.required",
+            "debitNote": {
+              "id": "integer.required",
+              "dnNumber": "string.required",
+              "debitNoteDate": "string.required",
+              "status": "enum:issued,cancelled.required",
+              "taxablePaise": "integer.required",
+              "cgstPaise": "integer.required",
+              "sgstPaise": "integer.required",
+              "igstPaise": "integer.required",
+              "totalPaise": "integer.required",
+              "isInterstate": "boolean.required",
+              "billOffsetPaise": "integer.required",
+              "supplierBill": {
+                "id": "integer.required",
+                "invoiceNumber": "string.required",
+                "invoiceDate": "string.required"
+              },
+              "plantName": "string.required",
+              "plantAddress": "string.required",
+              "plantGstin": "string.required",
+              "plantStateCode": "string.required",
+              "supplierName": "string.required",
+              "supplierAddress": "unknown.required",
+              "supplierGstin": "unknown.required"
+            },
+            "events": "array<object>.required",
+            "preview": {
+              "stockOut": "array<object>.required",
+              "debitNoteTotalPaise": "integer.required",
+              "poEffect": "enum:credit_only,replacement.required"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "GET /api/purchase-return/prefill/:grnId",
+      "method": "GET",
+      "path": "/api/purchase-return/prefill/:grnId",
+      "tags": [
+        "purchase-return"
+      ],
+      "summary": "Suggested draft for Return to supplier from a GRN. Writes nothing.",
+      "auth": {
+        "type": "permission",
+        "key": "purchase_return.edit_draft"
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "grnId": "integer.required",
+            "grnNumber": "string.required",
+            "poId": "integer.required",
+            "supplierId": "integer.required",
+            "supplierName": "string.required",
+            "poNumber": "string.required",
+            "replacementExpected": "boolean.required",
+            "lines": "array<object>.required",
+            "mainAction": "enum:prefilled,secondary,none.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/purchase-return/createreturn",
+      "method": "POST",
+      "path": "/api/purchase-return/createreturn",
+      "tags": [
+        "purchase-return"
+      ],
+      "summary": "Create a draft purchase return from one posted GRN. Rate, GST %, item, unit and heat no. are server-set (extra body key is 400).",
+      "auth": {
+        "type": "permission",
+        "key": "purchase_return.edit_draft"
+      },
+      "request": {
+        "body": {
+          "grnId": "integer.positive.required",
+          "reason": "string.nonempty.required",
+          "vendorReturnRef": "string.optional",
+          "transporter": "string.optional",
+          "vehicleNo": "string.optional",
+          "remarks": "string.optional",
+          "replacementExpected": "boolean.optional",
+          "lines": "array<object>.required"
+        }
+      },
+      "responses": {
+        "201": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "proNumber": "string.required",
+            "status": "enum:draft,posted,cancelled.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "PATCH /api/purchase-return/updatereturn",
+      "method": "PATCH",
+      "path": "/api/purchase-return/updatereturn",
+      "tags": [
+        "purchase-return"
+      ],
+      "summary": "Edit a draft return (id in body). lines, if sent, replace all lines.",
+      "auth": {
+        "type": "permission",
+        "key": "purchase_return.edit_draft"
+      },
+      "request": {
+        "body": {
+          "id": "integer.positive.required",
+          "reason": "string.nonempty.optional",
+          "vendorReturnRef": "string.optional",
+          "transporter": "string.optional",
+          "vehicleNo": "string.optional",
+          "remarks": "string.optional",
+          "replacementExpected": "boolean.optional",
+          "lines": "array<object>.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "proNumber": "string.required",
+            "status": "enum:draft,posted,cancelled.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/purchase-return/:id/cancel-draft",
+      "method": "POST",
+      "path": "/api/purchase-return/:id/cancel-draft",
+      "tags": [
+        "purchase-return"
+      ],
+      "summary": "Cancel a draft return. Empty body allowed.",
+      "auth": {
+        "type": "permission",
+        "key": "purchase_return.edit_draft"
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "status": "string.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/purchase-return/:id/post",
+      "method": "POST",
+      "path": "/api/purchase-return/:id/post",
+      "tags": [
+        "purchase-return"
+      ],
+      "summary": "Post a draft return: accepted lines leave stock (ledger pro), debit note and challan numbers are made, counters move. Empty body allowed.",
+      "auth": {
+        "type": "permission",
+        "key": "purchase_return.post"
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "status": "string.required",
+            "debitNoteId": "integer.required",
+            "dnNumber": "string.required",
+            "challanNumber": "string.required",
+            "totalPaise": "integer.required",
+            "ledgerRowIds": "array<integer>.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/purchase-return/:id/cancel",
+      "method": "POST",
+      "path": "/api/purchase-return/:id/cancel",
+      "tags": [
+        "purchase-return"
+      ],
+      "summary": "Cancel a posted return with a reason: stock comes back (ledger pro_cancel), debit note cancelled, counters reversed.",
+      "auth": {
+        "type": "permission",
+        "key": "purchase_return.cancel_posted"
+      },
+      "request": {
+        "body": {
+          "reason": "string.nonempty.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "status": "string.required",
+            "debitNoteStatus": "string.required"
           }
         }
       }

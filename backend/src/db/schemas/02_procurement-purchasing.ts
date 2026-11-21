@@ -6,6 +6,7 @@ import {
   doublePrecision,
   index,
   integer,
+  numeric,
   pgEnum,
   pgTable,
   serial,
@@ -13,11 +14,15 @@ import {
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { itemMaster, serviceMaster } from "./02_procurement-catalog";
+import { itemMaster, locations, serviceMaster } from "./02_procurement-catalog";
 import { reorderRuns } from "./02_procurement-reorder";
 import { supplierMaster } from "./02_procurement-suppliers";
 import { employees } from "./03_hcm";
 import { saleOrders } from "./05_sales";
+
+// numeric(14,3) read as number; cap maths runs on integer thousandths.
+const qty3Col = (name: string) =>
+  numeric(name, { precision: 14, scale: 3, mode: "number" });
 
 // 1. Define the Enum
 export const prTypeEnum = pgEnum("pr_type", [
@@ -247,6 +252,8 @@ export const purchaseOrderItems = pgTable(
       .notNull(), // Add reference,
     qty: doublePrecision("qty").notNull(),
     receivedQty: doublePrecision("received_qty").default(0), // Updated by GRN
+    // Posted purchase returns (BR-PRT-20, 38)
+    returnedQty: qty3Col("returned_qty").default(0).notNull(),
     unitPricePaise: bigint("unit_price_paise", { mode: "number" }).notNull(),
     uom: text("uom").notNull(),
     // BR-PO-04: GST % per line (allowed set BR-SUP-13) and the paise maths,
@@ -607,10 +614,18 @@ export const grnItems = pgTable(
     overReceiptReason: text("over_receipt_reason"),
     // no-index: audit who-did-it column, read only by joining to employees
     overReceiptBy: integer("over_receipt_by").references(() => employees.id),
+
+    // Posted purchase returns only (BR-PRT-19, 38); caps read purchase_return_items.
+    rejectedReturnedQty: qty3Col("rejected_returned_qty").default(0).notNull(),
+    acceptedReturnedQty: qty3Col("accepted_returned_qty").default(0).notNull(),
   },
   (table) => ({
     grnIdIdx: index("idx_grn_items_grn_id").on(table.grnId),
     poItemIdIdx: index("idx_grn_items_po_item_id").on(table.poItemId),
+    // "Awaiting return" (BR-PRT-39)
+    awaitingReturnIdx: index("idx_grn_items_awaiting_return")
+      .on(table.id)
+      .where(sql`${table.rejectedQty} > 0`),
   }),
 );
 
@@ -756,30 +771,82 @@ export const scoReceiptSettlements = pgTable(
   }),
 );
 
-// --- GAP 2: PURCHASE RETURN ORDERS (PRO) ---
+// --- PURCHASE RETURNS (BR-PRT, docs/specs/purchase-returns/design/data.md) ---
+export const purchaseReturnStatusEnum = pgEnum("purchase_return_status", [
+  "draft",
+  "posted",
+  "cancelled",
+]);
+export const purchaseReturnSourceEnum = pgEnum("purchase_return_source", [
+  "rejected",
+  "accepted",
+]);
+export const debitNoteStatusEnum = pgEnum("debit_note_status", [
+  "issued",
+  "cancelled",
+]);
+export const purchaseReturnEventActionEnum = pgEnum(
+  "purchase_return_event_action",
+  ["create", "edit", "post", "cancel_draft", "cancel_posted"],
+);
+
 export const purchaseReturns = pgTable(
   "purchase_returns",
   {
     id: serial("id").primaryKey(),
+    // PRT-<YYYY-MM>-<seq 4>, counter doc_type `purchase_return`, IST month (BR-PRT-23)
     proNumber: text("pro_number").unique().notNull(),
+    grnId: integer("grn_id")
+      .references(() => grns.id)
+      .notNull(),
     poId: integer("po_id")
       .references(() => purchaseOrders.id)
       .notNull(),
     supplierId: integer("supplier_id")
       .references(() => supplierMaster.id)
       .notNull(),
-    status: text("status").default("draft").notNull(), // draft, dispatched, closed
+    status: purchaseReturnStatusEnum("status").default("draft").notNull(),
     reason: text("reason").notNull(),
-    debitNoteAmountPaise: bigint("debit_note_amount_paise", { mode: "number" })
-      .default(0)
+    vendorReturnRef: text("vendor_return_ref"),
+    transporter: text("transporter"),
+    vehicleNo: text("vehicle_no"),
+    remarks: text("remarks"),
+    // PRC/<yy>-<yy+1>/<seq 4>, allocated at post (BR-PRT-35); null in draft
+    challanNumber: text("challan_number").unique(),
+    replacementExpected: boolean("replacement_expected")
+      .default(false)
       .notNull(),
     // no-index: audit who-did-it column, read only by joining to employees
-    createdBy: integer("created_by").references(() => employees.id),
+    postedBy: integer("posted_by").references(() => employees.id),
+    postedAt: timestamp("posted_at"),
+    // no-index: audit who-did-it column, read only by joining to employees
+    cancelledBy: integer("cancelled_by").references(() => employees.id),
+    cancelledAt: timestamp("cancelled_at"),
+    cancelReason: text("cancel_reason"),
+    // no-index: audit who-did-it column, read only by joining to employees
+    createdBy: integer("created_by")
+      .references(() => employees.id)
+      .notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
+    // no-index: audit who-did-it column, read only by joining to employees
+    lastUpdatedBy: integer("last_updated_by")
+      .references(() => employees.id)
+      .notNull(),
+    lastUpdatedAt: timestamp("last_updated_at").defaultNow().notNull(),
   },
   (table) => [
     index("idx_purchase_returns_po_id").on(table.poId),
     index("idx_purchase_returns_supplier_id").on(table.supplierId),
+    index("idx_purchase_returns_grn_id").on(table.grnId),
+    index("idx_purchase_returns_status_id").on(table.status, table.id.desc()),
+    index("idx_purchase_returns_created_at_id").on(
+      table.createdAt.desc(),
+      table.id,
+    ),
+    index("idx_purchase_returns_pro_number_trgm").using(
+      "gin",
+      table.proNumber.op("gin_trgm_ops"),
+    ),
   ],
 );
 
@@ -790,14 +857,128 @@ export const purchaseReturnItems = pgTable(
     proId: integer("pro_id")
       .references(() => purchaseReturns.id)
       .notNull(),
-    // no-index: pk-join no code reads this table yet
+    grnItemId: integer("grn_item_id")
+      .references(() => grnItems.id)
+      .notNull(),
+    poItemId: integer("po_item_id")
+      .references(() => purchaseOrderItems.id)
+      .notNull(),
     itemId: integer("item_id")
       .references(() => itemMaster.id)
       .notNull(),
-    returnQty: doublePrecision("return_qty").notNull(),
+    source: purchaseReturnSourceEnum("source").notNull(),
+    returnQty: qty3Col("return_qty").notNull(),
+    uom: text("uom").notNull(),
+    batchNumber: text("batch_number"),
+    // server-set from the PO line (BR-PRT-09)
     unitPricePaise: bigint("unit_price_paise", { mode: "number" }).notNull(),
+    gstPercent: numeric("gst_percent", {
+      precision: 5,
+      scale: 2,
+      mode: "number",
+    }).notNull(),
+    // set at post (BR-PRT-31..34)
+    hsnCode: text("hsn_code"),
+    taxablePaise: bigint("taxable_paise", { mode: "number" }),
+    gstPaise: bigint("gst_paise", { mode: "number" }),
+    cgstPaise: bigint("cgst_paise", { mode: "number" }),
+    sgstPaise: bigint("sgst_paise", { mode: "number" }),
+    igstPaise: bigint("igst_paise", { mode: "number" }),
+    locationId: integer("location_id").references(() => locations.id),
+    unitCostPaise: bigint("unit_cost_paise", { mode: "number" }),
+    // no-index: pk-join ledger row read by id; the ledger points back by reference
+    ledgerId: integer("ledger_id"),
+    cancelLedgerId: integer("cancel_ledger_id"),
   },
-  (table) => [index("idx_purchase_return_items_pro_id").on(table.proId)],
+  (table) => [
+    index("idx_purchase_return_items_pro_id").on(table.proId),
+    // BR-PRT-03: one line + source once per return
+    uniqueIndex("uq_purchase_return_items_pro_grn_item_source").on(
+      table.proId,
+      table.grnItemId,
+      table.source,
+    ),
+    // cap sums per GRN line (BR-PRT-05/06/07/42)
+    index("idx_purchase_return_items_grn_item_source").on(
+      table.grnItemId,
+      table.source,
+    ),
+    index("idx_purchase_return_items_po_item_id").on(table.poItemId),
+    index("idx_purchase_return_items_item_id").on(table.itemId),
+    index("idx_purchase_return_items_location_id").on(table.locationId),
+  ],
+);
+
+export const purchaseDebitNotes = pgTable(
+  "purchase_debit_notes",
+  {
+    id: serial("id").primaryKey(),
+    // DN/<yy>-<yy+1>/<seq>, doc_type `debit_note` (BR-PRT-30)
+    dnNumber: text("dn_number").unique().notNull(),
+    proId: integer("pro_id")
+      .references(() => purchaseReturns.id)
+      .notNull()
+      .unique(),
+    debitNoteDate: timestamp("debit_note_date").notNull(),
+    status: debitNoteStatusEnum("status").default("issued").notNull(),
+    taxablePaise: bigint("taxable_paise", { mode: "number" }).notNull(),
+    cgstPaise: bigint("cgst_paise", { mode: "number" }).notNull(),
+    sgstPaise: bigint("sgst_paise", { mode: "number" }).notNull(),
+    igstPaise: bigint("igst_paise", { mode: "number" }).notNull(),
+    totalPaise: bigint("total_paise", { mode: "number" }).notNull(),
+    isInterstate: boolean("is_interstate").notNull(),
+    // BR-PRT-33, 44: oldest approved bill covering the returned lines, or null
+    supplierInvoiceId: integer("supplier_invoice_id").references(
+      () => supplierInvoices.id,
+    ),
+    billOffsetPaise: bigint("bill_offset_paise", { mode: "number" })
+      .default(0)
+      .notNull(),
+    // snapshots copied at post (BR-PRT-33, 34)
+    plantName: text("plant_name").notNull(),
+    plantAddress: text("plant_address").notNull(),
+    plantGstin: text("plant_gstin").notNull(),
+    plantStateCode: text("plant_state_code").notNull(),
+    supplierName: text("supplier_name").notNull(),
+    supplierAddress: text("supplier_address"),
+    supplierGstin: text("supplier_gstin"),
+    // no-index: audit who-did-it columns, read only by joining to employees
+    createdBy: integer("created_by")
+      .references(() => employees.id)
+      .notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    // no-index: audit who-did-it column, read only by joining to employees
+    cancelledBy: integer("cancelled_by").references(() => employees.id),
+    cancelledAt: timestamp("cancelled_at"),
+  },
+  (table) => [
+    index("idx_purchase_debit_notes_supplier_invoice_id").on(
+      table.supplierInvoiceId,
+    ),
+  ],
+);
+
+// Append-only history (BR-PRT-41): rows are never edited or deleted.
+export const purchaseReturnEvents = pgTable(
+  "purchase_return_events",
+  {
+    id: serial("id").primaryKey(),
+    proId: integer("pro_id")
+      .references(() => purchaseReturns.id)
+      .notNull(),
+    action: purchaseReturnEventActionEnum("action").notNull(),
+    fromStatus: purchaseReturnStatusEnum("from_status"),
+    toStatus: purchaseReturnStatusEnum("to_status").notNull(),
+    reason: text("reason"),
+    // no-index: audit who-did-it column, read only by joining to employees
+    actorId: integer("actor_id")
+      .references(() => employees.id)
+      .notNull(),
+    at: timestamp("at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_purchase_return_events_pro_id_id").on(table.proId, table.id),
+  ],
 );
 
 // --- 5. SUPPLIER INVOICE & 3-WAY MATCH ---

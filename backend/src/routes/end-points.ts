@@ -111,6 +111,18 @@ export const END_POINTS = {
     bypass: "/:id/lines/:lineId/bypass",
     correction: "/:id/lines/:lineId/correction",
   },
+  // Register /awaiting and /prefill/:grnId before the /:id/... routes (design/api.md).
+  purchaseReturn: {
+    list: "/getreturns",
+    awaiting: "/awaiting",
+    details: "/getreturndetails/:id",
+    prefill: "/prefill/:grnId",
+    create: "/createreturn",
+    update: "/updatereturn",
+    cancelDraft: "/:id/cancel-draft",
+    post: "/:id/post",
+    cancel: "/:id/cancel",
+  },
   sco: {
     list: "/getscos",
     details: "/getscodetails/:id",

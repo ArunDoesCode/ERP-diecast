@@ -143,6 +143,7 @@ export const inventoryRefTypeEnum = pgEnum("inventory_ref_type", [
   "grn", // Standard Supplier Receipt
   "grn_bypass", // Fast-track QA bypass Receipt
   "pro", // Purchase Return (Sent back to supplier)
+  "pro_cancel", // Counter row of a cancelled posted purchase return (BR-PRT-26)
   "sco_issue", // Sent out to Subcontractor
   "sco_receipt", // Received back from Subcontractor
   "job_order_issue", // AUTOMATIC: Consumed by furnace/machine (Backflush)
