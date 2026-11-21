@@ -677,8 +677,9 @@ export const supplierInvoiceService = {
     if (!po) {
       throw new NotFoundError("Purchase order not found");
     }
+    // `invoiced` has nothing left to bill (BR-SINV-04): an empty list is fine, a non-empty one is not.
     if (
-      !CREATE_PO_STATUSES.includes(po.status) ||
+      !SUBMIT_PO_STATUSES.includes(po.status) ||
       (await repo.hasLegacyInvoice(po.id))
     ) {
       throw conflict(
@@ -695,6 +696,15 @@ export const supplierInvoiceService = {
       candidates.map((c) => ({ id: c.grnItemId, acceptedQty: c.acceptedQty })),
       undefined,
     );
+    const billable = candidates.filter(
+      (c) => (facts.get(c.grnItemId)?.billableMilli ?? 0) > 0,
+    );
+    if (po.status === "invoiced" && billable.length > 0) {
+      throw conflict(
+        "Purchase order is invoiced - it cannot be billed",
+        "SINV_PO_NOT_BILLABLE",
+      );
+    }
     return {
       po: {
         id: po.id,
@@ -1143,12 +1153,19 @@ export const supplierInvoiceService = {
         tx,
       );
       // A-52: the qty may have dropped since submit (return, correction, other bill).
+      // A qty over billable that the submit match already flagged is the owner's override
+      // (BR-SINV-22, 24); only a further drop since submit is stale.
       const facts = await billableFacts([...locked.values()], id, tx);
+      const flagged = await repo.listMismatches(id, tx);
       for (const line of lines) {
+        const billable = facts.get(line.grnItemId ?? 0)?.billableMilli ?? 0;
+        const seenQty = flagged.find(
+          (m) => m.check === "qty" && m.lineId === line.id,
+        );
         if (
           line.kind === "item" &&
-          toMilli(line.qty ?? 0) >
-            (facts.get(line.grnItemId ?? 0)?.billableMilli ?? 0)
+          toMilli(line.qty ?? 0) > billable &&
+          (!seenQty || billable < Number(seenQty.expected))
         ) {
           throw conflict(
             "The qty on this invoice is no longer billable - send it back to draft and check the GRN, returns and other invoices",
@@ -1188,10 +1205,18 @@ export const supplierInvoiceService = {
 
   // BR-SINV-26, 27, 29, 31.
   async cancel(id: number, input: CancelSupplierInvoiceInput, actorId: number) {
+    // Status the caller saw before the lock: if it moved under the lock, the loser gets 409 (BR-SINV-34).
+    const seen = await repo.findInvoice(id);
     await repo.withTransaction(async (tx) => {
       const inv = await repo.lockInvoice(id, tx);
       if (!inv) {
         throw new NotFoundError("Supplier invoice not found");
+      }
+      if (seen && seen.status !== inv.status) {
+        throw conflict(
+          "The invoice changed while you were cancelling it - reload and try again",
+          "SINV_BUSY",
+        );
       }
       if (inv.status !== "blocked" && inv.status !== "approved") {
         throw conflict(
