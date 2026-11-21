@@ -14,7 +14,14 @@ test("T-5 (7) QA inspector sees no PO menu and no New SCO button; typed PO URL r
 	const boCtx = await browser.newContext();
 	const bo = await boCtx.newPage();
 	await uiLogin(bo, "back_office");
-	await expect(bo.getByRole("link", { name: /^POs/ })).toBeVisible();
+	await expect(
+		bo
+			.getByRole("navigation")
+			.first()
+			.getByRole("link", {
+				name: /^Purchase orders/,
+			}),
+	).toBeVisible();
 	await bo.getByRole("link", { name: "Subcontracting" }).first().click();
 	await expect(
 		bo
@@ -25,9 +32,16 @@ test("T-5 (7) QA inspector sees no PO menu and no New SCO button; typed PO URL r
 
 	// QA inspector: the menu has no PO entry, the SCO list has no "New SCO".
 	await uiLogin(page, "qa_inspector");
-	const nav = page;
-	await expect(nav.getByRole("link", { name: /^GRN/ })).toBeVisible();
-	for (const hidden of [/^POs/, /^PRs/, /^Suppliers/, /^Inventory/]) {
+	const nav = page.getByRole("navigation").first();
+	await expect(
+		nav.getByRole("link", { name: /^Goods receipts/ }),
+	).toBeVisible();
+	for (const hidden of [
+		/^Purchase orders/,
+		/^Requisitions/,
+		/^Suppliers/,
+		/^Inventory/,
+	]) {
 		await expect(nav.getByRole("link", { name: hidden })).toHaveCount(0);
 	}
 	await nav.getByRole("link", { name: "Subcontracting" }).click();

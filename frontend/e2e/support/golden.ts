@@ -265,20 +265,31 @@ export async function expectNoErrorToast(page: Page) {
 
 // ---------------------------------------------------------------- shared screen steps
 
-/** Back office: open the PO's requisition page and record a GRN for `qty` (the first line). */
+/**
+ * Receive goods the way the store keeper does (BR-FF-60, 63, 64, 67, 111): GRN list -> "Receive goods" ->
+ * pick the order by number -> receive form -> "Save goods receipt" opens the new GRN page.
+ * Returns the id of the new GRN.
+ */
 export async function receiveGoodsOnScreen(
 	page: Page,
-	prId: number,
+	poNumber: string,
 	challanNo: string,
 	qty: number,
-) {
-	await page.goto(`/purchase-orders/${prId}`);
-	await page.getByRole("button", { name: "Receive goods" }).click();
-	const dlg = page.getByRole("dialog", { name: /Receive goods/ });
-	await dlg.getByLabel("Challan no").fill(challanNo);
-	await dlg.getByRole("spinbutton").first().fill(String(qty));
-	await dlg.getByRole("button", { name: /Record GRN/ }).click();
-	await expect(dlg).toBeHidden();
+): Promise<number> {
+	await page.goto("/grn");
+	await page.getByRole("link", { name: "Receive goods" }).first().click();
+	await expect(page).toHaveURL(/\/grn\/receive/);
+	await page.getByLabel("Search order number or supplier").fill(poNumber);
+	const row = page
+		.getByRole("listitem")
+		.filter({ hasText: new RegExp(`${poNumber}(?!\\d)`) });
+	await row.getByRole("link", { name: "Receive", exact: true }).click();
+	await expect(page).toHaveURL(/\/grn\/new\?po=\d+/);
+	await page.getByLabel("Challan number").fill(challanNo);
+	await page.getByLabel("Arrived").first().fill(String(qty));
+	await page.getByRole("button", { name: "Save goods receipt" }).click();
+	await page.waitForURL(/\/grn\/\d+$/, { timeout: 20_000 });
+	return Number(new URL(page.url()).pathname.split("/").pop());
 }
 
 /** Open the GRN of a PO from the GRN list (newest GRN of that PO) and return its number. */
@@ -296,14 +307,14 @@ export async function openGrnOfPo(page: Page, poNumber: string) {
 	return grnNumber;
 }
 
-/** On a GRN page: decide the first pending line (accepted + rejected = arrived). */
+/** On a GRN page: inspect (QA-decide) the first pending line (accepted + rejected = arrived). */
 export async function qaDecideOnScreen(
 	page: Page,
 	accepted: number,
 	rejected = 0,
 	overrideReason?: string,
 ) {
-	await page.getByRole("button", { name: "Decide" }).first().click();
+	await page.getByRole("button", { name: "Inspect" }).first().click();
 	const dlg = page.getByRole("dialog", { name: /QA decision/ });
 	await dlg.getByLabel("Accepted qty").fill(String(accepted));
 	await dlg.getByLabel("Rejected qty").fill(String(rejected));
@@ -430,14 +441,24 @@ export async function makeScoSetup(t: {
 
 // ---------------------------------------------------------------- approval queue
 
-/** Approval queue: the signed-in approver approves the request for one document number. */
+/**
+ * Approvals inbox (BR-FF-77..82): the signed-in approver opens the row of one document number, types the
+ * required note in the preview pane and approves; the row leaves the list.
+ */
 export async function approveInQueue(ownerPage: Page, docNumber: string) {
 	await ownerPage.goto("/approvals");
-	const row = ownerPage.getByRole("row").filter({ hasText: docNumber });
-	await expect(row).toBeVisible({ timeout: 15_000 });
-	await row.getByRole("button", { name: "Approve" }).click();
-	const dlg = ownerPage.getByRole("dialog", { name: "Approve request" });
-	await dlg.getByRole("textbox").fill("Approved in the e2e golden path");
-	await dlg.getByRole("button", { name: "Approve", exact: true }).click();
-	await expect(row).toBeHidden({ timeout: 15_000 });
+	const rowLink = ownerPage.getByRole("button", {
+		name: docNumber,
+		exact: true,
+	});
+	await expect(rowLink).toBeVisible({ timeout: 15_000 });
+	await rowLink.click();
+	const pane = ownerPage.getByRole("complementary", {
+		name: `Preview of ${docNumber}`,
+	});
+	await pane
+		.getByLabel("Note (required)")
+		.fill("Approved in the e2e golden path");
+	await pane.getByRole("button", { name: "Approve", exact: true }).click();
+	await expect(rowLink).toBeHidden({ timeout: 15_000 });
 }

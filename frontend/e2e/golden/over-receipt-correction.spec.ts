@@ -9,7 +9,6 @@ import {
 	dispatchedPo,
 	type Json,
 	makeCatalog,
-	openGrnOfPo,
 	receiveGoodsOnScreen,
 	stockRowOnScreen,
 	tokens,
@@ -26,14 +25,19 @@ test("T-5 (4) accepting above 105 % asks for a reason; a correction lowers stock
 	const po = await dispatchedPo(t, cat, 100);
 
 	await uiLogin(page, "back_office");
-	await receiveGoodsOnScreen(page, po.prId, `${po.poNumber}-OVER`, 110);
+	const grnId = await receiveGoodsOnScreen(
+		page,
+		po.poNumber,
+		`${po.poNumber}-OVER`,
+		110,
+	);
 
 	// The QA inspector has no override right: the decision screen says so.
 	const qaCtx = await browser.newContext();
 	const qa = await qaCtx.newPage();
 	await uiLogin(qa, "qa_inspector");
-	await openGrnOfPo(qa, po.poNumber);
-	await qa.getByRole("button", { name: "Decide" }).first().click();
+	await qa.goto(`/grn/${grnId}`);
+	await qa.getByRole("button", { name: "Inspect" }).first().click();
 	const qaDlg = qa.getByRole("dialog", { name: /QA decision/ });
 	await qaDlg.getByLabel("Accepted qty").fill("110");
 	await qaDlg.getByLabel("Rejected qty").fill("0");
@@ -42,8 +46,8 @@ test("T-5 (4) accepting above 105 % asks for a reason; a correction lowers stock
 	await qaCtx.close();
 
 	// Back office is asked for the reason: no reason, no submit.
-	await openGrnOfPo(page, po.poNumber);
-	await page.getByRole("button", { name: "Decide" }).first().click();
+	await page.goto(`/grn/${grnId}`);
+	await page.getByRole("button", { name: "Inspect" }).first().click();
 	const dlg = page.getByRole("dialog", { name: /QA decision/ });
 	await dlg.getByLabel("Accepted qty").fill("110");
 	await dlg.getByLabel("Rejected qty").fill("0");
@@ -61,8 +65,11 @@ test("T-5 (4) accepting above 105 % asks for a reason; a correction lowers stock
 	await expect(row).toContainText(`${cat.mainStoreName}: 110 kg`);
 
 	// Correction of 10: stock 100, PO received qty 100.
-	await openGrnOfPo(page, po.poNumber);
-	await page.getByRole("button", { name: "Correct" }).first().click();
+	await page.goto(`/grn/${grnId}`);
+	await page
+		.getByRole("button", { name: `More actions for ${cat.itemName}` })
+		.click();
+	await page.getByRole("menuitem", { name: "Correction" }).click();
 	const fix = page.getByRole("alertdialog");
 	await fix.getByLabel("Correction qty").fill("10");
 	await fix.getByLabel("Reason").fill("Ten kg were short-weighed");
