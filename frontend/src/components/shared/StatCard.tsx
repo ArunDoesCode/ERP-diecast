@@ -218,7 +218,7 @@ export function StatCard({
 								key={c.key}
 								href={chip.href}
 								className={cn(
-									"inline-flex h-6 items-center rounded-full px-2 text-xs font-semibold tabular-nums focus-visible:outline-2 focus-visible:outline-ring",
+									"inline-flex h-6 items-center rounded-full px-2 text-sm font-semibold tabular-nums focus-visible:outline-2 focus-visible:outline-ring",
 									CHIP[c.tone],
 								)}
 							>

@@ -121,7 +121,7 @@ export function NavSidebar() {
 															<span>{page.title}</span>
 															{page.path === "/approvals" &&
 																approvalsCount > 0 && (
-																	<span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-warning-subtle px-1.5 text-xs font-semibold text-warning tabular-nums group-data-[collapsible=icon]:hidden">
+																	<span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-warning-subtle px-1.5 text-sm font-semibold text-warning tabular-nums group-data-[collapsible=icon]:hidden">
 																		{approvalsCount > 99
 																			? "99+"
 																			: approvalsCount}
