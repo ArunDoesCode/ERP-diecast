@@ -14,6 +14,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { itemMaster, serviceMaster } from "./02_procurement-catalog";
+import { reorderRuns } from "./02_procurement-reorder";
 import { supplierMaster } from "./02_procurement-suppliers";
 import { employees } from "./03_hcm";
 import { saleOrders } from "./05_sales";
@@ -50,6 +51,10 @@ export const purchaseRequests = pgTable(
     saleOrderId: integer("sale_order_id").references(
       (): AnyPgColumn => saleOrders.id,
     ),
+    // BR-RO-17: set only by the reorder run; read-only for every PR endpoint
+    reorderRunId: integer("reorder_run_id").references(
+      (): AnyPgColumn => reorderRuns.id,
+    ),
     assetId: integer("asset_id"), // Only populated if type is 'maintenance' or 'tooling' (Optional: link to a specific machine/die)
     status: prStatusEnum("status").default("draft").notNull(),
     // no-index: audit no "my PRs" filter exists
@@ -79,6 +84,10 @@ export const purchaseRequests = pgTable(
     saleOrderIdx: index("idx_purchase_requests_sale_order_id").on(
       table.saleOrderId,
     ),
+    // BR-RO-13, 17: one PR per run; serves the FK and the "raised by reorder" filter
+    reorderRunUq: uniqueIndex("uq_purchase_requests_reorder_run")
+      .on(table.reorderRunId)
+      .where(sql`${table.reorderRunId} is not null`),
     // List `q` search (ilike %q%, #54): pg_trgm GIN indexes
     prNumberTrgm: index("idx_purchase_requests_pr_number_trgm").using(
       "gin",
@@ -127,6 +136,10 @@ export const purchaseRequestItems = pgTable(
     itemOpenIdx: index("idx_pr_items_item_open")
       .on(table.itemId)
       .where(sql`${table.status} in ('pending', 'po_draft')`),
+    // BR-RO-04: on-the-way sum of pending lines
+    itemPendingIdx: index("idx_pr_items_pending_item")
+      .on(table.itemId)
+      .where(sql`${table.status} = 'pending'`),
     itemIdIdx: index("idx_pr_items_item_id").on(table.itemId),
   }),
 );

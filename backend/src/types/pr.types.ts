@@ -277,6 +277,12 @@ export const prListQuerySchema = z
       .pipe(z.array(prStatusSchema).max(20).optional()),
     type: prTypeSchema.optional(),
     q: searchTermSchema,
+    // BR-RO-17: "true" = raised by an automatic reorder run, "false" = not
+    raisedByReorder: z
+      .enum(["true", "false"])
+      .transform((v) => v === "true")
+      .optional(),
+    reorderRunId: z.coerce.number().int().min(1).optional(),
   })
   .strict();
 

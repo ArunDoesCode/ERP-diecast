@@ -185,6 +185,11 @@ export const PERMISSIONS = {
     "Manage customers",
     "Create and edit customers, activate and deactivate them",
   ),
+  "reorder.manage": p(
+    "reorder",
+    "Manage automatic reorder",
+    "Change the daily check (on or off, run time, draft owner) and press Check now",
+  ),
   "company.manage": p(
     "company",
     "Manage company settings",
@@ -256,6 +261,13 @@ export const SCREENS = {
     "Procurement",
   ),
   bom: s("/bom", "bom.view", "BOM (Bill of Materials)", 175, "Inventory"),
+  reorder: s(
+    "/inventory/reorder",
+    "inventory.view",
+    "Reorder",
+    182,
+    "Inventory",
+  ),
   "sale-orders": s("/sale-orders", "so.view", "Sale Orders", 120, "Sales"),
   customers: s("/customers", "so.view", "Customers", 125, "Sales"),
 } as const satisfies Record<string, ScreenDef>;
@@ -304,6 +316,7 @@ export const SEED_GRANTS: Record<RoleSeedName, PermissionKey[]> = {
     "so.manage",
     "so.explode",
     "customer.manage",
+    "reorder.manage",
     "company.manage",
   ],
   back_office: [
@@ -334,6 +347,7 @@ export const SEED_GRANTS: Record<RoleSeedName, PermissionKey[]> = {
     "so.manage",
     "so.explode",
     "customer.manage",
+    "reorder.manage",
   ],
   floor_supervisor: [
     "inventory.view",

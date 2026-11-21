@@ -9,6 +9,7 @@ import { customerRoutes } from "./customer";
 import { grnRoutes } from "./grn";
 import { poRoutes } from "./po";
 import { prRoutes } from "./pr";
+import { reorderRoutes } from "./reorder";
 import { saleOrderRoutes } from "./saleOrder";
 import { scoRoutes } from "./sco";
 import { setupRoutes } from "./setup";
@@ -28,6 +29,7 @@ const MAIN_ROUTES = {
   company: "/company",
   customer: "/customers",
   saleOrder: "/sale-orders",
+  reorder: "/reorder",
 } as const;
 
 export { authRoutes } from "./auth";
@@ -47,3 +49,4 @@ mainRouter.route(MAIN_ROUTES.bom, bomRoutes);
 mainRouter.route(MAIN_ROUTES.company, companyRoutes);
 mainRouter.route(MAIN_ROUTES.customer, customerRoutes);
 mainRouter.route(MAIN_ROUTES.saleOrder, saleOrderRoutes);
+mainRouter.route(MAIN_ROUTES.reorder, reorderRoutes);

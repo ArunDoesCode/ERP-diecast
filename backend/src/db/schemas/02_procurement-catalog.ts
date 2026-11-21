@@ -2,9 +2,11 @@ import { sql } from "drizzle-orm";
 import {
   bigint,
   boolean,
+  check,
   doublePrecision,
   index,
   integer,
+  numeric,
   pgEnum,
   pgTable,
   serial,
@@ -27,6 +29,28 @@ export const itemMaster = pgTable(
     category: text("category").notNull(), // 'Raw Material', 'Consumable', 'Spare Part'
     uom: text("uom").notNull(), // 'kg', 'pcs', 'ltr'
     reorderLevel: doublePrecision("reorder_level").default(0).notNull(),
+    // BR-RO-09: reorder quantities, item unit, 3 decimals; 0 = not set
+    reorderQty: numeric("reorder_qty", {
+      precision: 14,
+      scale: 3,
+      mode: "number",
+    })
+      .default(0)
+      .notNull(),
+    minOrderQty: numeric("min_order_qty", {
+      precision: 14,
+      scale: 3,
+      mode: "number",
+    })
+      .default(0)
+      .notNull(),
+    orderMultiple: numeric("order_multiple", {
+      precision: 14,
+      scale: 3,
+      mode: "number",
+    })
+      .default(0)
+      .notNull(),
     currentStock: doublePrecision("current_stock").default(0).notNull(),
     averageCostPaise: bigint("average_cost_paise", { mode: "number" })
       .default(0)
@@ -49,6 +73,22 @@ export const itemMaster = pgTable(
     lastUpdatedAt: timestamp("last_updated_at").defaultNow().notNull(),
   },
   (t) => ({
+    reorderQtyCk: check(
+      "item_master_reorder_qty_ck",
+      sql`${t.reorderQty} >= 0`,
+    ),
+    minOrderQtyCk: check(
+      "item_master_min_order_qty_ck",
+      sql`${t.minOrderQty} >= 0`,
+    ),
+    orderMultipleCk: check(
+      "item_master_order_multiple_ck",
+      sql`${t.orderMultiple} >= 0`,
+    ),
+    // BR-RO-01: base set of the live reorder list and the run
+    reorderIdx: index("idx_item_master_reorder")
+      .on(t.id)
+      .where(sql`${t.reorderLevel} > 0`),
     // BR-INV-01: unique ignoring case and outer spaces
     skuNormUq: uniqueIndex("uq_item_master_sku_norm").on(
       sql`lower(btrim(${t.sku}))`,

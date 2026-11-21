@@ -627,6 +627,9 @@
           "category": "enum:Raw Material,Consumable,Spare Part,Tooling,Packing,Manufactured part.required",
           "uom": "enum:kg,pcs,ltr,m,set.required",
           "reorderLevel": "number.nonnegative.optional",
+          "reorderQty": "number.nonnegative.optional",
+          "minOrderQty": "number.nonnegative.optional",
+          "orderMultiple": "number.nonnegative.optional",
           "standardRatePaise": "integer.nonnegative.required"
         }
       },
@@ -641,6 +644,9 @@
             "category": "string.required",
             "uom": "string.required",
             "reorderLevel": "unrepresentable.required",
+            "reorderQty": "number.required",
+            "minOrderQty": "number.required",
+            "orderMultiple": "number.required",
             "currentStock": "unrepresentable.required",
             "averageCostPaise": "unrepresentable.required",
             "isActive": "boolean.required",
@@ -674,6 +680,9 @@
           "category": "enum:Raw Material,Consumable,Spare Part,Tooling,Packing,Manufactured part.optional",
           "uom": "enum:kg,pcs,ltr,m,set.optional",
           "reorderLevel": "number.nonnegative.optional",
+          "reorderQty": "number.nonnegative.optional",
+          "minOrderQty": "number.nonnegative.optional",
+          "orderMultiple": "number.nonnegative.optional",
           "standardRatePaise": "integer.nonnegative.optional",
           "hsnCode": "string.nonempty.nullable.optional",
           "isActive": "boolean.optional"
@@ -690,6 +699,9 @@
             "category": "string.required",
             "uom": "string.required",
             "reorderLevel": "unrepresentable.required",
+            "reorderQty": "number.required",
+            "minOrderQty": "number.required",
+            "orderMultiple": "number.required",
             "currentStock": "unrepresentable.required",
             "averageCostPaise": "unrepresentable.required",
             "isActive": "boolean.required",
@@ -3245,7 +3257,9 @@
           "sortDir": "enum:asc,desc.required",
           "status": "array<enum:draft,pending_approval,approved,rejected,partial_ordered,fully_ordered,cancelled>.optional",
           "type": "enum:sale_order,stock_reorder,maintenance,tooling,subcontracting,misc.optional",
-          "q": "string.optional"
+          "q": "string.optional",
+          "raisedByReorder": "unrepresentable.optional",
+          "reorderRunId": "integer.nonnegative.optional"
         }
       },
       "responses": {
@@ -3294,6 +3308,7 @@
               "prNumber": "string.required",
               "type": "enum:sale_order,stock_reorder,maintenance,tooling,subcontracting,misc.required",
               "saleOrderId": "unrepresentable.nullable.required",
+              "reorderRunId": "unrepresentable.nullable.required",
               "assetId": "unrepresentable.nullable.required",
               "status": "enum:draft,pending_approval,approved,rejected,partial_ordered,fully_ordered,cancelled.required",
               "requestedBy": "unrepresentable.required",
@@ -3346,6 +3361,7 @@
               "prNumber": "string.required",
               "type": "enum:sale_order,stock_reorder,maintenance,tooling,subcontracting,misc.required",
               "saleOrderId": "unrepresentable.nullable.required",
+              "reorderRunId": "unrepresentable.nullable.required",
               "assetId": "unrepresentable.nullable.required",
               "status": "enum:draft,pending_approval,approved,rejected,partial_ordered,fully_ordered,cancelled.required",
               "requestedBy": "unrepresentable.required",
@@ -3398,6 +3414,7 @@
               "prNumber": "string.required",
               "type": "enum:sale_order,stock_reorder,maintenance,tooling,subcontracting,misc.required",
               "saleOrderId": "unrepresentable.nullable.required",
+              "reorderRunId": "unrepresentable.nullable.required",
               "assetId": "unrepresentable.nullable.required",
               "status": "enum:draft,pending_approval,approved,rejected,partial_ordered,fully_ordered,cancelled.required",
               "requestedBy": "unrepresentable.required",
@@ -3443,6 +3460,7 @@
               "prNumber": "string.required",
               "type": "enum:sale_order,stock_reorder,maintenance,tooling,subcontracting,misc.required",
               "saleOrderId": "unrepresentable.nullable.required",
+              "reorderRunId": "unrepresentable.nullable.required",
               "assetId": "unrepresentable.nullable.required",
               "status": "enum:draft,pending_approval,approved,rejected,partial_ordered,fully_ordered,cancelled.required",
               "requestedBy": "unrepresentable.required",
@@ -3487,6 +3505,7 @@
               "prNumber": "string.required",
               "type": "enum:sale_order,stock_reorder,maintenance,tooling,subcontracting,misc.required",
               "saleOrderId": "unrepresentable.nullable.required",
+              "reorderRunId": "unrepresentable.nullable.required",
               "assetId": "unrepresentable.nullable.required",
               "status": "enum:draft,pending_approval,approved,rejected,partial_ordered,fully_ordered,cancelled.required",
               "requestedBy": "unrepresentable.required",
@@ -3513,6 +3532,317 @@
             }
           }
         }
+      }
+    },
+    {
+      "id": "GET /api/reorder/items",
+      "method": "GET",
+      "path": "/api/reorder/items",
+      "tags": [
+        "reorder"
+      ],
+      "summary": "Live low-stock list, saves nothing (BR-RO-01..08, 21). Rows carry state will_be_ordered | covered | needs_reorder_qty | ok; meta.stateCounts ignore the state filter.",
+      "auth": {
+        "type": "permission",
+        "key": "inventory.view"
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "sortBy": "enum:sku,name,usableQty,projectedQty,state.required",
+          "sortDir": "enum:asc,desc.required",
+          "state": "array<enum:will_be_ordered,covered,needs_reorder_qty,ok>.optional",
+          "q": "string.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required",
+            "stateCounts": {
+              "will_be_ordered": "integer.nonnegative.required",
+              "covered": "integer.nonnegative.required",
+              "needs_reorder_qty": "integer.nonnegative.required",
+              "ok": "integer.nonnegative.required"
+            }
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "sku",
+          "name",
+          "usableQty",
+          "projectedQty",
+          "state"
+        ],
+        "searchable": true
+      }
+    },
+    {
+      "id": "GET /api/reorder/runs",
+      "method": "GET",
+      "path": "/api/reorder/runs",
+      "tags": [
+        "reorder"
+      ],
+      "summary": "Run history, newest first (BR-RO-22). Filters `state` (comma list of running, done, failed) and `trigger`.",
+      "auth": {
+        "type": "permission",
+        "key": "inventory.view"
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "sortBy": "enum:startedAt,id,state.required",
+          "sortDir": "enum:asc,desc.required",
+          "state": "array<enum:running,done,failed>.optional",
+          "trigger": "enum:schedule,manual.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "startedAt",
+          "id",
+          "state"
+        ],
+        "searchable": false
+      }
+    },
+    {
+      "id": "GET /api/reorder/runs/:id",
+      "method": "GET",
+      "path": "/api/reorder/runs/:id",
+      "tags": [
+        "reorder"
+      ],
+      "summary": "One run with its raised / skipped / deferred items, PR and PO link (BR-RO-22). 404 REORDER_RUN_NOT_FOUND.",
+      "auth": {
+        "type": "permission",
+        "key": "inventory.view"
+      },
+      "request": {
+        "params": {
+          "id": "integer.nonnegative.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "trigger": "enum:schedule,manual.required",
+            "state": "enum:running,done,failed.required",
+            "startedBy": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "startedAt": "unrepresentable.required",
+            "finishedAt": "unrepresentable.nullable.required",
+            "draftOwner": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "itemsChecked": "integer.required",
+            "itemsRaised": "integer.required",
+            "itemsSkipped": "integer.required",
+            "itemsDeferred": "integer.required",
+            "pr": {
+              "id": "integer.required",
+              "prNumber": "string.required",
+              "status": "string.required"
+            },
+            "po": {
+              "id": "integer.required",
+              "poNumber": "string.required",
+              "status": "string.required"
+            },
+            "failureReason": "unknown.required",
+            "items": "array<object>.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "POST /api/reorder/check-now",
+      "method": "POST",
+      "path": "/api/reorder/check-now",
+      "tags": [
+        "reorder"
+      ],
+      "summary": "Start a reorder run now (BR-RO-11..16). 201 returns the finished run: state done (pr null = nothing to order) or failed (failureReason). 409 REORDER_RUN_BUSY.",
+      "auth": {
+        "type": "permission",
+        "key": "reorder.manage"
+      },
+      "request": {
+        "body": {}
+      },
+      "responses": {
+        "201": {
+          "success": "boolean.required",
+          "data": {
+            "id": "integer.required",
+            "trigger": "enum:schedule,manual.required",
+            "state": "enum:running,done,failed.required",
+            "startedBy": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "startedAt": "unrepresentable.required",
+            "finishedAt": "unrepresentable.nullable.required",
+            "draftOwner": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "itemsChecked": "integer.required",
+            "itemsRaised": "integer.required",
+            "itemsSkipped": "integer.required",
+            "itemsDeferred": "integer.required",
+            "pr": {
+              "id": "integer.required",
+              "prNumber": "string.required",
+              "status": "string.required"
+            },
+            "po": {
+              "id": "integer.required",
+              "poNumber": "string.required",
+              "status": "string.required"
+            },
+            "failureReason": "unknown.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "GET /api/reorder/settings",
+      "method": "GET",
+      "path": "/api/reorder/settings",
+      "tags": [
+        "reorder"
+      ],
+      "summary": "Reorder settings: switch, run hour (IST), draft owner, draftOwnerValid, last changed by (BR-RO-20).",
+      "auth": {
+        "type": "permission",
+        "key": "inventory.view"
+      },
+      "request": {},
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "enabled": "boolean.required",
+            "runHour": "integer.nonnegative.required",
+            "draftOwner": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "draftOwnerValid": "boolean.required",
+            "updatedBy": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "updatedAt": "unrepresentable.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "PATCH /api/reorder/settings",
+      "method": "PATCH",
+      "path": "/api/reorder/settings",
+      "tags": [
+        "reorder"
+      ],
+      "summary": "Change switch / run hour / draft owner, one history row per changed field (BR-RO-20). draftOwnerId null clears. 400 REORDER_OWNER_INVALID.",
+      "auth": {
+        "type": "permission",
+        "key": "reorder.manage"
+      },
+      "request": {
+        "body": {
+          "enabled": "boolean.optional",
+          "runHour": "integer.nonnegative.optional",
+          "draftOwnerId": "integer.nonnegative.nullable.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "enabled": "boolean.required",
+            "runHour": "integer.nonnegative.required",
+            "draftOwner": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "draftOwnerValid": "boolean.required",
+            "updatedBy": {
+              "id": "integer.required",
+              "name": "string.required"
+            },
+            "updatedAt": "unrepresentable.required"
+          }
+        }
+      }
+    },
+    {
+      "id": "GET /api/reorder/owner-candidates",
+      "method": "GET",
+      "path": "/api/reorder/owner-candidates",
+      "tags": [
+        "reorder"
+      ],
+      "summary": "Active employees holding pr.manage (super-admin included) for the draft owner select (BR-RO-20).",
+      "auth": {
+        "type": "permission",
+        "key": "reorder.manage"
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "sortBy": "enum:name.required",
+          "sortDir": "enum:asc,desc.required",
+          "q": "string.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "name"
+        ],
+        "searchable": true
       }
     },
     {

@@ -168,6 +168,14 @@ export const END_POINTS = {
     explosionRows: "/:id/explosions/:eid/rows",
     createDrafts: "/:id/explosions/:eid/drafts",
   },
+  reorder: {
+    items: "/items",
+    runs: "/runs",
+    runDetails: "/runs/:id",
+    checkNow: "/check-now",
+    settings: "/settings",
+    ownerCandidates: "/owner-candidates",
+  },
   company: {
     settings: "/settings",
     settingsHistory: "/settings/history",

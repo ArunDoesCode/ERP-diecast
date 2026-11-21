@@ -41,6 +41,11 @@ const reorderLevelSchema = z
     message: "Quantity can have at most 3 decimals",
   });
 
+// BR-RO-09: reorder qty / min order qty / order multiple. >= 0, up to 3
+// decimals, at most 1 000 000 000; whole for pcs / set is a service check
+// (same as reorderLevel).
+const reorderQtyFieldSchema = reorderLevelSchema.max(1_000_000_000);
+
 // Whole paise > 0 per unit (BR-INV-03); cost columns are int4.
 const standardRateSchema = z.number().int().min(1).max(MAX_MONEY_PAISE);
 
@@ -96,6 +101,9 @@ export const assetItemCreateSchema = z
     category: itemCategorySchema,
     uom: itemUnitSchema,
     reorderLevel: reorderLevelSchema.optional(),
+    reorderQty: reorderQtyFieldSchema.optional(),
+    minOrderQty: reorderQtyFieldSchema.optional(),
+    orderMultiple: reorderQtyFieldSchema.optional(),
     standardRatePaise: standardRateSchema,
   })
   .strict();
@@ -134,6 +142,9 @@ export const assetItemUpdateSchema = z
     category: itemCategorySchema.optional(),
     uom: itemUnitSchema.optional(),
     reorderLevel: reorderLevelSchema.optional(),
+    reorderQty: reorderQtyFieldSchema.optional(),
+    minOrderQty: reorderQtyFieldSchema.optional(),
+    orderMultiple: reorderQtyFieldSchema.optional(),
     standardRatePaise: standardRateSchema.optional(),
     // BR-SCO-09: HSN for the job-work challan; null clears it.
     hsnCode: z.string().trim().min(1).max(20).nullable().optional(),
