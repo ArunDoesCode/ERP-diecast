@@ -230,6 +230,12 @@ export const END_POINTS = {
     explosionRows: "/:id/explosions/:eid/rows",
     createDrafts: "/:id/explosions/:eid/drafts",
   },
+  supplierRating: {
+    list: "/list",
+    card: "/:supplierId/card",
+    lines: "/:supplierId/lines",
+    trend: "/:supplierId/trend",
+  },
   reorder: {
     items: "/items",
     runs: "/runs",

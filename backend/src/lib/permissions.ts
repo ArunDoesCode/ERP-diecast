@@ -72,6 +72,11 @@ export const PERMISSIONS = {
     "Manage suppliers",
     "Create, edit, deactivate suppliers and price lists",
   ),
+  "supplier.rating.view": p(
+    "supplier",
+    "View supplier ratings",
+    "Supplier rating list, rating card, line drill-down and 12-month trend",
+  ),
   "pr.manage": p(
     "pr",
     "Manage purchase requisitions",
@@ -378,6 +383,13 @@ export const SCREENS = {
     183,
     "Inventory",
   ),
+  "supplier-ratings": s(
+    "/supplier-ratings",
+    "supplier.rating.view",
+    "Supplier Ratings",
+    145,
+    "Procurement",
+  ),
   "sale-orders": s("/sale-orders", "so.view", "Sale Orders", 120, "Sales"),
   customers: s("/customers", "so.view", "Customers", 125, "Sales"),
 } as const satisfies Record<string, ScreenDef>;
@@ -404,6 +416,7 @@ export const SEED_GRANTS: Record<RoleSeedName, PermissionKey[]> = {
     "stock_transfer.manage",
     "stock_transfer.reverse",
     "supplier.view",
+    "supplier.rating.view",
     "pr.manage",
     "po.manage",
     "grn.view",
@@ -452,6 +465,7 @@ export const SEED_GRANTS: Record<RoleSeedName, PermissionKey[]> = {
     "stock_transfer.manage",
     "stock_transfer.reverse",
     "supplier.view",
+    "supplier.rating.view",
     "supplier.manage",
     "pr.manage",
     "po.manage",

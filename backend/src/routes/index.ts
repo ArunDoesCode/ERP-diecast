@@ -19,6 +19,7 @@ import { setupRoutes } from "./setup";
 import { stockTransferRoutes } from "./stockTransfer";
 import { supplierRoutes } from "./supplier";
 import { supplierInvoiceRoutes } from "./supplierInvoice";
+import { supplierRatingRoutes } from "./supplierRating";
 
 const MAIN_ROUTES = {
   auth: "/auth",
@@ -40,6 +41,7 @@ const MAIN_ROUTES = {
   customer: "/customers",
   saleOrder: "/sale-orders",
   reorder: "/reorder",
+  supplierRating: "/supplier-rating",
 } as const;
 
 export { authRoutes } from "./auth";
@@ -65,3 +67,4 @@ mainRouter.route(MAIN_ROUTES.company, companyRoutes);
 mainRouter.route(MAIN_ROUTES.customer, customerRoutes);
 mainRouter.route(MAIN_ROUTES.saleOrder, saleOrderRoutes);
 mainRouter.route(MAIN_ROUTES.reorder, reorderRoutes);
+mainRouter.route(MAIN_ROUTES.supplierRating, supplierRatingRoutes);

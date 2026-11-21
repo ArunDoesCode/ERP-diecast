@@ -235,6 +235,11 @@ export const purchaseOrders = pgTable(
   (table) => ({
     statusIdx: index("idx_purchase_orders_status").on(table.status),
     supplierIdx: index("idx_purchase_orders_supplier_id").on(table.supplierId),
+    // Supplier rating window scan (BR-SRT): one supplier's POs by creation date
+    supplierCreatedIdx: index("idx_purchase_orders_supplier_created").on(
+      table.supplierId,
+      table.createdAt,
+    ),
     // List `q` search (ilike %q%, #54): pg_trgm GIN indexes
     poNumberTrgm: index("idx_purchase_orders_po_number_trgm").using(
       "gin",
@@ -599,6 +604,8 @@ export const grns = pgTable(
       table.challanNo,
     ),
     poIdIdx: index("idx_grns_po_id").on(table.poId),
+    // Supplier rating: GRN lines inside the 12-month window
+    receivedDateIdx: index("idx_grns_received_date").on(table.receivedDate),
     // GRN list `q` search (ilike %q%, #54)
     grnNumberTrgm: index("idx_grns_grn_number_trgm").using(
       "gin",

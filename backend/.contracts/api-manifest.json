@@ -9042,6 +9042,193 @@
           }
         }
       }
+    },
+    {
+      "id": "GET /api/supplier-rating/list",
+      "method": "GET",
+      "path": "/api/supplier-rating/list",
+      "tags": [
+        "supplier-rating"
+      ],
+      "summary": "Ratings of all suppliers, live over the last 12 IST months (BR-SRT-01..26, 29). Filters `status` (default active) and `q`; no-PO suppliers appear with null measures.",
+      "auth": {
+        "type": "permission",
+        "key": "supplier.rating.view"
+      },
+      "request": {
+        "query": {
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "sortBy": "enum:name,score,onTimePct,rejectionPct,priceVariancePct,judgedLines,decidedLines.optional",
+          "sortDir": "enum:asc,desc.optional",
+          "status": "enum:active,inactive,all.required",
+          "q": "string.optional"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<object>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "name",
+          "score",
+          "onTimePct",
+          "rejectionPct",
+          "priceVariancePct",
+          "judgedLines",
+          "decidedLines"
+        ],
+        "searchable": true
+      }
+    },
+    {
+      "id": "GET /api/supplier-rating/:supplierId/card",
+      "method": "GET",
+      "path": "/api/supplier-rating/:supplierId/card",
+      "tags": [
+        "supplier-rating"
+      ],
+      "summary": "One supplier's rating card (BR-SRT-01..25, 28, 29). 404 if the supplier does not exist; inactive suppliers are found.",
+      "auth": {
+        "type": "permission",
+        "key": "supplier.rating.view"
+      },
+      "request": {
+        "params": {
+          "supplierId": "integer.nonnegative.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "supplierId": "integer.required",
+            "supplierName": "string.required",
+            "isActive": "boolean.required",
+            "windowFrom": "string.required",
+            "windowTo": "string.required",
+            "onTime": {
+              "pctTenths": "integer.nullable.required",
+              "lines": "integer.nonnegative.required",
+              "onTimeLines": "integer.nonnegative.required",
+              "lateLines": "integer.nonnegative.required",
+              "openLateLines": "integer.nonnegative.required",
+              "shortClosedLateCount": "integer.nonnegative.required",
+              "cancelledAfterDispatchCount": "integer.nonnegative.required",
+              "noDueDateCount": "integer.nonnegative.required"
+            },
+            "rejection": {
+              "pctTenths": "integer.nullable.required",
+              "lines": "integer.nonnegative.required",
+              "linesWithRejects": "integer.nonnegative.required",
+              "decidedLines": "integer.nonnegative.required",
+              "notInspectedLines": "integer.nonnegative.required",
+              "notInspectedRejectedQty": "array<object>.required"
+            },
+            "priceVariance": {
+              "pctTenths": "integer.nullable.required",
+              "lines": "integer.nonnegative.required",
+              "comparedLines": "integer.nonnegative.required",
+              "notComparedLines": "integer.nonnegative.required"
+            },
+            "score": "integer.nonnegative.nullable.required",
+            "label": "enum:good,watch,poor.nullable.required",
+            "notEnoughData": {
+              "judgedLines": "integer.nonnegative.required",
+              "decidedLines": "integer.nonnegative.required",
+              "required": "number.required"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "GET /api/supplier-rating/:supplierId/lines",
+      "method": "GET",
+      "path": "/api/supplier-rating/:supplierId/lines",
+      "tags": [
+        "supplier-rating"
+      ],
+      "summary": "Lines behind one measure (BR-SRT-27, 29). `measure` on_time | rejection | price decides the row shape; sortBy is checked per measure; `verdict` only for on_time. Row shape: on_time -> onTimeLineSchema, rejection -> rejectionLineSchema, price -> priceLineSchema.",
+      "auth": {
+        "type": "permission",
+        "key": "supplier.rating.view"
+      },
+      "request": {
+        "query": {
+          "measure": "enum:on_time,rejection,price.required",
+          "page": "integer.nonnegative.required",
+          "pageSize": "integer.nonnegative.required",
+          "sortBy": "enum:dueDate,completionDate,daysLate,poNumber,itemSku,receivedDate,grnNumber,rejectedValuePaise,poDate,variancePaise.optional",
+          "sortDir": "enum:asc,desc.optional",
+          "verdict": "enum:all,late,on_time,no_due_date.optional"
+        },
+        "params": {
+          "supplierId": "integer.nonnegative.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": "array<union<[object Object]|[object Object]|[object Object]>>.required",
+          "meta": {
+            "page": "integer.nonnegative.required",
+            "pageSize": "integer.nonnegative.required",
+            "total": "integer.nonnegative.required",
+            "totalPages": "integer.nonnegative.required"
+          }
+        }
+      },
+      "pagination": {
+        "sortableFields": [
+          "dueDate",
+          "completionDate",
+          "daysLate",
+          "poNumber",
+          "itemSku",
+          "receivedDate",
+          "grnNumber",
+          "rejectedValuePaise",
+          "poDate",
+          "variancePaise"
+        ],
+        "searchable": false
+      }
+    },
+    {
+      "id": "GET /api/supplier-rating/:supplierId/trend",
+      "method": "GET",
+      "path": "/api/supplier-rating/:supplierId/trend",
+      "tags": [
+        "supplier-rating"
+      ],
+      "summary": "12 monthly buckets, oldest first, one call (BR-SRT-28, 29). Not a list: fixed 12-row array, no pagination.",
+      "auth": {
+        "type": "permission",
+        "key": "supplier.rating.view"
+      },
+      "request": {
+        "params": {
+          "supplierId": "integer.nonnegative.required"
+        }
+      },
+      "responses": {
+        "200": {
+          "success": "boolean.required",
+          "data": {
+            "months": "array<object>.required"
+          }
+        }
+      }
     }
   ]
 }
