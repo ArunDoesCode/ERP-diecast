@@ -238,6 +238,15 @@ export function makeDispatchFx(tag: string) {
     locIds.push(r.json.data.id);
     return r.json.data.id as number;
   }
+  /** A store location flagged virtual directly in the DB (the route derives it from type). */
+  async function mkVirtualLoc() {
+    const id = await mkLoc("store");
+    await db
+      .update(locations)
+      .set({ isVirtual: true })
+      .where(eq(locations.id, id));
+    return id;
+  }
   const setLocActive = (id: number, isActive: boolean) =>
     db.update(locations).set({ isActive }).where(eq(locations.id, id));
 
@@ -603,6 +612,7 @@ export function makeDispatchFx(tag: string) {
     setCompany,
     mkItem,
     mkLoc,
+    mkVirtualLoc,
     mkVendorLoc,
     setLocActive,
     mkCustomer,

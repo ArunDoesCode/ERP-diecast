@@ -90,7 +90,7 @@ describe("pending-dispatch list (BR-DSP-39)", () => {
   });
 
   test("BR-DSP-39 a stock location that is virtual, inactive or a vendor location is refused with 400", async () => {
-    const virt = await fx.mkLoc("store", { isVirtual: true });
+    const virt = await fx.mkVirtualLoc();
     const off = await fx.mkLoc();
     await fx.setLocActive(off, false);
     const vendor = await fx.mkVendorLoc();
@@ -358,7 +358,7 @@ describe("create a draft (BR-DSP-01..09)", () => {
     const so = await fx.mkSo({ customerId: c, lines: [{ qty: 100 }] });
     const id = so.lineIds[0] as number;
     const vendor = await fx.mkVendorLoc();
-    const virt = await fx.mkLoc("store", { isVirtual: true });
+    const virt = await fx.mkVirtualLoc();
     const off = await fx.mkLoc();
     await fx.setLocActive(off, false);
     for (const loc of [vendor, virt, off]) {
