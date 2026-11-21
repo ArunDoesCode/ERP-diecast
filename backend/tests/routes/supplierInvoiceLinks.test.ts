@@ -18,9 +18,12 @@ import {
   grnCorrections,
   grnItems,
   grns,
+  prPoItemLinks,
   purchaseDebitNotes,
   purchaseOrderItems,
   purchaseOrders,
+  purchaseRequestItems,
+  purchaseRequests,
   purchaseReturnEvents,
   purchaseReturnItems,
   purchaseReturns,
@@ -112,6 +115,7 @@ const istDay = (offsetDays = 0) =>
 const supplierIds: number[] = [];
 const poIds: number[] = [];
 const itemIds: number[] = [];
+const prIds: number[] = [];
 let mainStoreId = 0;
 let createdMainStore = false;
 let savedCompany: typeof companySettings.$inferSelect | undefined;
@@ -489,6 +493,23 @@ afterAll(async () => {
     await db
       .delete(inventoryLedger)
       .where(inArray(inventoryLedger.itemId, itemIds));
+  if (prIds.length) {
+    const prItemRows = await db
+      .select({ id: purchaseRequestItems.id })
+      .from(purchaseRequestItems)
+      .where(inArray(purchaseRequestItems.prId, prIds));
+    const prItemIds = prItemRows.map((r) => r.id);
+    if (prItemIds.length)
+      await db
+        .delete(prPoItemLinks)
+        .where(inArray(prPoItemLinks.prItemId, prItemIds));
+    await db
+      .delete(purchaseRequestItems)
+      .where(inArray(purchaseRequestItems.prId, prIds));
+    await db
+      .delete(purchaseRequests)
+      .where(inArray(purchaseRequests.id, prIds));
+  }
   if (lineIds.length)
     await db.delete(grnItems).where(inArray(grnItems.id, lineIds));
   if (grnIds.length) await db.delete(grns).where(inArray(grns.id, grnIds));
@@ -957,5 +978,117 @@ describe("BR-SINV-39 document flow on the detail", () => {
       (await sinv("GET", "/getsupplierinvoicedetails/2147483000", await bo()))
         .status,
     ).toBe(404);
+  });
+});
+
+/** a PR with one line, linked to the PO's first line (pr_po_item_links) */
+async function linkPr(g: G): Promise<number> {
+  const [pr] = await db
+    .insert(purchaseRequests)
+    .values({
+      prNumber: uid(),
+      type: "misc",
+      status: "fully_ordered",
+      requestedBy: (await ownerA()).id,
+    })
+    .returning({ id: purchaseRequests.id });
+  prIds.push(pr!.id);
+  const [pi] = await db
+    .insert(purchaseRequestItems)
+    .values({
+      prId: pr!.id,
+      itemId: g.itemIds[0]!,
+      requestedQty: 1000,
+      uom: "kg",
+      status: "ordered",
+    })
+    .returning({ id: purchaseRequestItems.id });
+  await db
+    .insert(prPoItemLinks)
+    .values({ prItemId: pi!.id, poItemId: g.poItemIds[0]!, linkedQty: 1000 });
+  return pr!.id;
+}
+
+describe("A-49 draft details carry the live billable qty, own qty included", () => {
+  test("A-49 a draft of 300 kg shows billableQty 980 on its line", async () => {
+    const g = await std();
+    const d = await mkDraft(g, { lines: ln1(g, { qty: 300 }) });
+    const det = await detail(d.id);
+    expect(det.lines[0].billableQty).toBe(980);
+  });
+  test("A-49 it drops when another bill takes some: 400 kg on another draft leaves 580", async () => {
+    const g = await std();
+    const a = await mkDraft(g, { lines: ln1(g, { qty: 300 }) });
+    await mkDraft(g, { lines: ln1(g, { qty: 400 }) });
+    const det = await detail(a.id);
+    expect(det.lines[0].billableQty).toBe(580);
+  });
+});
+
+describe("A-50 prId links back to the PO page", () => {
+  test("A-50 billable lines po.prId is the lowest PR linked to the PO", async () => {
+    const g = await std();
+    const first = await linkPr(g);
+    const second = await linkPr(g);
+    expect(second).toBeGreaterThan(first);
+    expect((await billable(g)).po.prId).toBe(first);
+  });
+  test("A-50 invoice details prId is the lowest PR linked to the PO", async () => {
+    const g = await std();
+    const first = await linkPr(g);
+    await linkPr(g);
+    const d = await mkDraft(g);
+    expect((await detail(d.id)).prId).toBe(first);
+  });
+});
+
+describe("A-52 release re-checks the billable qty", () => {
+  test("A-52 release after a credit-only return took the billable below the bill qty is 409 SINV_STALE_QTY", async () => {
+    const g = await std();
+    const d = await mkSubmitted(g, { lines: ln1(g, { ratePaise: 24100 }) });
+    expect(d.status).toBe("blocked");
+    await postReturn(g, [[0, "accepted", 20]]);
+    const r = await release(d.id);
+    expect(r.status).toBe(409);
+    expect(r.json.code).toBe("SINV_STALE_QTY");
+    expect((await invRow(d.id))!.status).toBe("blocked");
+  });
+  test("A-52 release still works when the qty fits (bill of 960 kg after a 20 kg return)", async () => {
+    const g = await std();
+    const d = await mkSubmitted(g, {
+      lines: ln1(g, { qty: 960, ratePaise: 24100 }),
+    });
+    expect(d.status).toBe("blocked");
+    await postReturn(g, [[0, "accepted", 20]]);
+    expect((await release(d.id)).status).toBe(200);
+  });
+});
+
+describe("BR-SINV-29 legacy: a PO invoiced through a legacy row stays invoiced", () => {
+  async function legacyInvoicedPo() {
+    const g = await mkGrn([{ qty: 1000 }]);
+    await db.insert(supplierInvoices).values({
+      ourNumber: `LEGACY-${uid()}`,
+      invoiceNumber: "OLD-29",
+      invoiceDate: istDay(-3),
+      poId: g.poId,
+      supplierId: g.supplierId,
+      status: "legacy",
+      billedAmountPaise: 1000,
+      createdBy: (await ownerA()).id,
+    });
+    await setPoStatus(g.poId, "invoiced");
+    return g;
+  }
+  test("BR-SINV-29 a purchase return posted on it leaves the PO invoiced", async () => {
+    const g = await legacyInvoicedPo();
+    await postReturn(g, [[0, "accepted", 20]]);
+    expect((await poRow(g.poId)).status).toBe("invoiced");
+  });
+  test("BR-SINV-29 cancelling that return leaves the PO invoiced too", async () => {
+    const g = await legacyInvoicedPo();
+    const ret = await postReturn(g, [[0, "accepted", 20]]);
+    expect((await cancelReturn(ret)).status).toBe(200);
+    expect((await poRow(g.poId)).status).toBe("invoiced");
   });
 });

@@ -1633,3 +1633,117 @@ describe("BR-SINV-11 stock is never touched by an invoice", () => {
     expect(await ledgerCount(g.itemIds)).toBe(before);
   });
 });
+
+describe("BR-SINV-10 / A-48 strict bodies: computed and unknown fields are 400", () => {
+  test.each([
+    ["status", "approved"],
+    ["totalCgstPaise", 100],
+    ["totalPaise", 100],
+    ["dueDate", "2030-01-01"],
+    ["supplierId", 1],
+    ["notAField", "x"],
+  ])("A-48 create with %s in the body is 400", async (field, value) => {
+    const g = await std();
+    const b = await bo();
+    const r = await sinv("POST", "/createsupplierinvoice", b, {
+      ...payload(g),
+      [field]: value,
+    });
+    expect(r.status).toBe(400);
+  });
+  test("A-48 create with a computed taxablePaise on a line is 400", async () => {
+    const g = await std();
+    const b = await bo();
+    const body = payload(g);
+    const r = await sinv("POST", "/createsupplierinvoice", b, {
+      ...body,
+      lines: body.lines.map((l) => ({ ...l, taxablePaise: 23520000 })),
+    });
+    expect(r.status).toBe(400);
+  });
+  test("A-48 a refused create leaves no invoice behind", async () => {
+    const g = await std();
+    const b = await bo();
+    await sinv("POST", "/createsupplierinvoice", b, {
+      ...payload(g),
+      totalCgstPaise: 1,
+    });
+    const rows = await db
+      .select({ id: supplierInvoices.id })
+      .from(supplierInvoices)
+      .where(eq(supplierInvoices.poId, g.poId));
+    expect(rows).toHaveLength(0);
+  });
+  test.each([
+    ["status", "approved"],
+    ["totalCgstPaise", 100],
+    ["notAField", "x"],
+  ])("A-48 update with %s in the body is 400", async (field, value) => {
+    const g = await std();
+    const d = await mkDraft(g);
+    const r = await sinv("PATCH", "/updatesupplierinvoice", await bo(), {
+      id: d.id,
+      invoiceNumber: "STRICT-1",
+      [field]: value,
+    });
+    expect(r.status).toBe(400);
+    expect((await invRow(d.id))!.invoiceNumber).toBe(d.invoiceNumber);
+  });
+  test("A-48 update with a computed taxablePaise on a line is 400", async () => {
+    const g = await std();
+    const d = await mkDraft(g);
+    const r = await sinv("PATCH", "/updatesupplierinvoice", await bo(), {
+      id: d.id,
+      lines: [
+        {
+          grnItemId: g.lineIds[0],
+          qty: 980,
+          ratePaise: 24000,
+          gstPercent: 18,
+          taxablePaise: 1,
+        },
+      ],
+    });
+    expect(r.status).toBe(400);
+  });
+});
+
+describe("BR-SINV-04 / 38 getbillablelines by PO status", () => {
+  test.each([
+    "invoiced",
+    "cancelled",
+    "draft",
+    "pending_approval",
+    "approved",
+    "dispatched",
+  ])(
+    "BR-SINV-04 getbillablelines on a PO in %s is 409 SINV_PO_NOT_BILLABLE",
+    async (status) => {
+      const g = await std();
+      await setPoStatus(g.poId, status);
+      const r = await sinv(
+        "GET",
+        `/getbillablelines?poId=${g.poId}`,
+        await bo(),
+      );
+      expect(r.status).toBe(409);
+      expect(r.json.code).toBe("SINV_PO_NOT_BILLABLE");
+    },
+  );
+  test.each(["partial_received", "fully_received", "closed"])(
+    "BR-SINV-38 getbillablelines on a PO in %s lists the billable line",
+    async (status) => {
+      const g = await std();
+      await setPoStatus(g.poId, status);
+      const r = await sinv(
+        "GET",
+        `/getbillablelines?poId=${g.poId}`,
+        await bo(),
+      );
+      expect(r.status).toBe(200);
+      expect(r.json.data.lines.map((l: any) => l.grnItemId)).toContain(
+        g.lineIds[0],
+      );
+    },
+  );
+});

@@ -1026,6 +1026,40 @@ describe("BR-SINV-26 / 27 cancel", () => {
   });
 });
 
+describe("BR-SINV-26 / A-51 cancel after release, submit on an invoiced PO", () => {
+  test("BR-SINV-26 an approved bill can be cancelled right after its release (no SINV_BUSY)", async () => {
+    const g = await std();
+    const d = await mkBlocked(g);
+    expect((await release(d.id)).status).toBe(200);
+    const r = await cancel(d.id);
+    expect(r.status).toBe(200);
+    expect(r.json.code).not.toBe("SINV_BUSY");
+    expect((await invRow(d.id))!.status).toBe("cancelled");
+  });
+  test("A-51 an existing draft can still be submitted after the PO became invoiced", async () => {
+    const g = await mkGrn([{ qty: 1000 }]);
+    const d = await mkDraft(g, { lines: ln1(g, { qty: 400 }) });
+    await setPoStatus(g.poId, "invoiced");
+    const r = await submit(d.id);
+    expect(r.status).toBe(200);
+    expect(r.json.data.status).toBe("approved");
+  });
+  test("BR-SINV-34 submit with a malformed JSON body is 400", async () => {
+    const g = await std();
+    const d = await mkDraft(g);
+    const res = await app.request(`/api/supplier-invoice/${d.id}/submit`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${(await bo()).token}`,
+        "Content-Type": "application/json",
+      },
+      body: "{not json",
+    });
+    expect(res.status).toBe(400);
+    expect((await invRow(d.id))!.status).toBe("draft");
+  });
+});
+
 describe("BR-SINV-34 races: one result, the other 409", () => {
   test("BR-SINV-34 two submits at once: one 200, one 409", async () => {
     const g = await std();
