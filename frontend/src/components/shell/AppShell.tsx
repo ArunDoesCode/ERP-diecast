@@ -77,7 +77,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 			...ALWAYS_ALLOWED_PATHS,
 			...screens.map((screen) => screen.path),
 		];
-		if (!isPathAllowed(pathname, allowed)) router.replace("/landing");
+		if (!isPathAllowed(pathname, allowed))
+			router.replace(`/landing?denied=${encodeURIComponent(pathname)}`);
 	}, [sessionReady, screens, pathname, router]);
 
 	const changeFolded = (next: boolean) => {

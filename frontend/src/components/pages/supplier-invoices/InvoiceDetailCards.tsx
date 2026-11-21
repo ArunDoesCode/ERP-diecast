@@ -100,12 +100,9 @@ export function InvoiceItemsCard({ inv }: { inv: SinvDetail }) {
 				<Table>
 					<TableHeader>
 						<TableRow>
-							<TableHead>GRN</TableHead>
 							<TableHead>Item</TableHead>
 							<TableHead className="text-right">Billed qty</TableHead>
 							<TableHead className="text-right">Rate</TableHead>
-							<TableHead className="text-right">PO rate</TableHead>
-							<TableHead className="text-right">GST %</TableHead>
 							<TableHead className="text-right">Taxable</TableHead>
 							<TableHead className="text-right">Tax</TableHead>
 							<TableHead className="text-right">Line total</TableHead>
@@ -118,35 +115,35 @@ export function InvoiceItemsCard({ inv }: { inv: SinvDetail }) {
 							const checks = lineChecks(line, inv.mismatches);
 							return (
 								<TableRow key={line.id}>
-									<TableCell className="font-mono">
-										{line.grnNumber ?? "–"}
-									</TableCell>
 									<TableCell className="whitespace-normal">
-										{line.itemName}
+										<span className="block">{line.itemName}</span>
+										<span className="block font-mono text-[13px] text-muted-foreground">
+											{line.grnNumber ?? "–"}
+										</span>
 									</TableCell>
 									<TableCell className="text-right tabular-nums">
 										{formatQty(line.qty, line.uom, 3)}
 									</TableCell>
 									<TableCell className="text-right tabular-nums">
 										{formatMoney(line.ratePaise)}
-									</TableCell>
-									<TableCell className="text-right tabular-nums">
-										{formatMoney(line.poRatePaise)}
-									</TableCell>
-									<TableCell className="text-right tabular-nums">
-										{bpText(line.gstBp)}
+										<span className="block text-[13px] text-muted-foreground">
+											PO {formatMoney(line.poRatePaise)}
+										</span>
 									</TableCell>
 									<TableCell className="text-right tabular-nums">
 										{formatMoney(line.taxablePaise)}
 									</TableCell>
 									<TableCell className="text-right tabular-nums">
 										{formatMoney(tax)}
+										<span className="block text-[13px] text-muted-foreground">
+											{bpText(line.gstBp)}
+										</span>
 									</TableCell>
 									<TableCell className="text-right tabular-nums">
 										{formatMoney(line.taxablePaise + tax)}
 									</TableCell>
 									{showMatch ? (
-										<TableCell>
+										<TableCell className="whitespace-normal">
 											<span className="flex flex-wrap gap-1">
 												{checks.length === 0 ? (
 													<StatusBadge doc="supplierInvoiceMatch" status="ok" />
@@ -346,9 +343,18 @@ export function InvoiceTotalsCard({ inv }: { inv: SinvDetail }) {
 										<span className="font-mono">{note.number}</span>
 										<StatusBadge doc="debitNote" status={note.status} />
 									</span>
-									<span className="tabular-nums">
-										−{formatMoney(note.billOffsetPaise)}
-									</span>
+									{note.status === "cancelled" ? (
+										<span className="text-muted-foreground tabular-nums">
+											<span className="line-through">
+												−{formatMoney(note.billOffsetPaise)}
+											</span>{" "}
+											<span className="text-[13px]">not counted</span>
+										</span>
+									) : (
+										<span className="tabular-nums">
+											−{formatMoney(note.billOffsetPaise)}
+										</span>
+									)}
 								</li>
 							))}
 						</ul>

@@ -220,13 +220,15 @@ function GrnDocumentFlow({
 					status: <StatusBadge doc="grn" status={grn.status} />,
 					state: "current",
 				},
-				...returns.map((entry) => ({
-					label: "Purchase return",
-					docNo: entry.proNumber,
-					href: `/purchase-returns/${entry.id}`,
-					status: <StatusBadge doc="purchaseReturn" status={entry.status} />,
-					state: "done" as const,
-				})),
+				...[...returns]
+					.sort((a, b) => a.proNumber.localeCompare(b.proNumber))
+					.map((entry) => ({
+						label: "Purchase return",
+						docNo: entry.proNumber,
+						href: `/purchase-returns/${entry.id}`,
+						status: <StatusBadge doc="purchaseReturn" status={entry.status} />,
+						state: "done" as const,
+					})),
 			]}
 		/>
 	);

@@ -18,7 +18,7 @@ export function CompanySettingsView() {
 		<div className="flex w-full flex-col gap-4">
 			<PageHeader
 				title="Company details"
-				description="Printed on the job-work challan. Only the owner can change these."
+				description="Company details print on the job-work challan. Invoice matching tolerances below apply to supplier bills. Only the owner can change these."
 			/>
 			{!canEdit ? (
 				<p className="text-sm text-muted-foreground">

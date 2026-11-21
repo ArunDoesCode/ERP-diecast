@@ -538,7 +538,7 @@ export function InvoiceForm({
 				</CardContent>
 			</Card>
 
-			<div className="grid gap-4 min-[1280px]:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
+			<div className="grid gap-4 min-[1536px]:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
 				<div className="flex min-w-0 flex-col gap-4">
 					<Card>
 						<CardHeader>

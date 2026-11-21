@@ -68,12 +68,20 @@ const columns: DataTableColumnDef<ReorderRun>[] = [
 	{
 		accessorKey: "startedAt",
 		header: "Started",
-		cell: ({ row }) => formatDateTime(row.original.startedAt),
+		cell: ({ row }) => (
+			<span className="block max-w-28 whitespace-normal">
+				{formatDateTime(row.original.startedAt)}
+			</span>
+		),
 	},
 	{
 		id: "startedBy",
 		header: "Started by",
-		cell: ({ row }) => startedByText(row.original),
+		cell: ({ row }) => (
+			<span className="block max-w-28 whitespace-normal">
+				{startedByText(row.original)}
+			</span>
+		),
 	},
 	{
 		accessorKey: "itemsChecked",
@@ -117,7 +125,7 @@ const columns: DataTableColumnDef<ReorderRun>[] = [
 				run.failureReason ??
 				(run.state === "done" && !run.pr ? "Nothing to order" : null);
 			return text ? (
-				<span className="line-clamp-1 max-w-xs text-muted-foreground">
+				<span className="line-clamp-2 block max-w-40 whitespace-normal text-muted-foreground">
 					{text}
 				</span>
 			) : (

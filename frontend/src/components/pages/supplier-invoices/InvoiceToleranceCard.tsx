@@ -36,8 +36,10 @@ function ToleranceForm({
 	canEdit: boolean;
 }) {
 	const mutation = useSaveInvoiceTolerancesMutation();
-	const [price, setPrice] = useState(String(values.priceTolerancePercent));
-	const [weight, setWeight] = useState(String(values.weightTolerancePercent));
+	const [price, setPrice] = useState(values.priceTolerancePercent.toFixed(2));
+	const [weight, setWeight] = useState(
+		values.weightTolerancePercent.toFixed(2),
+	);
 	const [showErrors, setShowErrors] = useState(false);
 	const [serverError, setServerError] = useState<string | null>(null);
 

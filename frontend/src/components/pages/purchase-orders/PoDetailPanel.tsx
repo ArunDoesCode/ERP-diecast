@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -16,7 +15,7 @@ import {
 	usePoCommunicationsQuery,
 	usePurchaseOrderDetailQuery,
 } from "@/lib/api/purchase-orders/queries";
-import { formatDateTime, formatMoney } from "@/lib/format";
+import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
 import type { PoCommunicationType } from "@/types/purchase-orders";
 
 const COMM_TYPE_LABEL: Record<PoCommunicationType, string> = {
@@ -49,7 +48,7 @@ export function PoDetailPanel({ poId }: { poId: number }) {
 					Payment terms:{" "}
 					{po.paymentTermsDays != null ? `${po.paymentTermsDays} days` : "-"}
 				</span>
-				<span>Expected delivery: {po.expectedDeliveryDate ?? "-"}</span>
+				<span>Expected delivery: {formatDate(po.expectedDeliveryDate)}</span>
 				<span>Delivery terms: {po.deliveryTerms ?? "-"}</span>
 				{po.status === "cancelled" && po.cancelReason ? (
 					<span className="sm:col-span-3">

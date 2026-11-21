@@ -84,12 +84,14 @@ import {
 	useCancelPurchaseOrderMutation,
 	useCreatePurchaseOrderMutation,
 	useItemLastRateQuery,
+	usePurchaseOrderDetailQuery,
 	useSupplierPriceRowsQuery,
 } from "@/lib/api/purchase-orders/queries";
 import {
 	purchaseRequisitionKeys,
 	usePurchaseRequisitionDetailQuery,
 } from "@/lib/api/purchase-requisitions/queries";
+import { useSupplierInvoicesQuery } from "@/lib/api/supplier-invoice/queries";
 import {
 	useSupplierDetailQuery,
 	useSuppliersQuery,
@@ -360,6 +362,28 @@ function PrDocumentFlow({
 	const livePos = linkedPos.filter((po) => po.status !== "cancelled");
 	const firstPo = livePos[0];
 	const received = livePos.some((po) => RECEIVED_PO_STATUSES.has(po.status));
+	// Returns and bills of the first live PO (same PO the flow shows); invoices need invoice.view.
+	const canViewInvoices = useCan("invoice.view");
+	const poDetail = usePurchaseOrderDetailQuery(
+		firstPo?.id ?? 0,
+		Boolean(firstPo),
+	);
+	const invoices = useSupplierInvoicesQuery(
+		{
+			page: 1,
+			pageSize: 20,
+			sortBy: "createdAt",
+			sortDir: "asc",
+			poId: firstPo?.id,
+		},
+		Boolean(firstPo) && canViewInvoices,
+	);
+	const returns = [
+		...(poDetail.data?.success ? (poDetail.data.data.returns ?? []) : []),
+	].sort((a, b) => a.proNumber.localeCompare(b.proNumber));
+	const bills = [...(invoices.data?.data ?? [])].sort((a, b) =>
+		a.ourNumber.localeCompare(b.ourNumber),
+	);
 	return (
 		<DocumentFlow
 			steps={[
@@ -386,6 +410,20 @@ function PrDocumentFlow({
 					status: received ? <span>Received</span> : undefined,
 					state: received ? "done" : "todo",
 				},
+				...returns.map((entry) => ({
+					label: "Purchase return",
+					docNo: entry.proNumber,
+					href: `/purchase-returns/${entry.id}`,
+					status: <StatusBadge doc="purchaseReturn" status={entry.status} />,
+					state: "done" as const,
+				})),
+				...bills.map((row) => ({
+					label: "Supplier invoice",
+					docNo: row.ourNumber,
+					href: `/supplier-invoices/${row.id}`,
+					status: <StatusBadge doc="supplierInvoice" status={row.status} />,
+					state: "done" as const,
+				})),
 			]}
 		/>
 	);

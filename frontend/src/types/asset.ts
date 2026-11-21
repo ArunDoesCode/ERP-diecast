@@ -177,6 +177,7 @@ export const assetReferenceTypeValues = [
 	"opening_stock",
 	"sco_loss",
 	"pro",
+	"pro_cancel",
 	"sco_issue",
 	"sco_receipt",
 	"job_order_issue",

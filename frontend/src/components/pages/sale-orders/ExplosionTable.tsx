@@ -95,7 +95,7 @@ export function ExplosionTable({
 	return (
 		<Table aria-busy={loading || undefined}>
 			<TableHeader>
-				<TableRow>
+				<TableRow className="bg-table-header hover:bg-table-header">
 					<TableHead className="sticky left-0 z-10 w-10 bg-table-header">
 						{pickable.length > 0 ? (
 							<Checkbox
@@ -107,7 +107,7 @@ export function ExplosionTable({
 							<span className="sr-only">Pick</span>
 						)}
 					</TableHead>
-					<TableHead className="sticky left-10 z-10 min-w-40 bg-table-header">
+					<TableHead className="sticky left-10 z-10 min-w-32 bg-table-header">
 						Item
 					</TableHead>
 					<TableHead>Type</TableHead>
@@ -117,7 +117,7 @@ export function ExplosionTable({
 						Stock and supply
 					</TableHead>
 					<TableHead className={NUM}>Net</TableHead>
-					<TableHead className="min-w-32">Raise</TableHead>
+					<TableHead className="min-w-28">Raise</TableHead>
 				</TableRow>
 			</TableHeader>
 			<TableBody>

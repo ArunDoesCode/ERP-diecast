@@ -27,6 +27,7 @@ export function totalsOf(prt: PrtDetail) {
 export function ReturnLinesCard({ prt }: { prt: PrtDetail }) {
 	const totals = totalsOf(prt);
 	const note = totals.note;
+	const isDraft = prt.status === "draft";
 	return (
 		<Card>
 			<CardHeader>
@@ -37,8 +38,6 @@ export function ReturnLinesCard({ prt }: { prt: PrtDetail }) {
 					<TableHeader>
 						<TableRow>
 							<TableHead>Item</TableHead>
-							<TableHead>Heat no.</TableHead>
-							<TableHead>Source</TableHead>
 							<TableHead className="text-right">Qty</TableHead>
 							<TableHead className="text-right">Rate</TableHead>
 							<TableHead className="text-right">Taxable</TableHead>
@@ -50,10 +49,12 @@ export function ReturnLinesCard({ prt }: { prt: PrtDetail }) {
 						{prt.lines.map((line) => (
 							<TableRow key={line.id}>
 								<TableCell className="whitespace-normal">
-									{line.itemName}
+									<span className="block">{line.itemName}</span>
+									<span className="block text-[13px] text-muted-foreground">
+										{SOURCE_LABEL[line.source]}
+										{line.batchNumber ? ` · Heat ${line.batchNumber}` : ""}
+									</span>
 								</TableCell>
-								<TableCell>{line.batchNumber ?? "–"}</TableCell>
-								<TableCell>{SOURCE_LABEL[line.source]}</TableCell>
 								<TableCell className="text-right tabular-nums">
 									{formatQty(line.qty, line.uom, 3)}
 								</TableCell>
@@ -61,47 +62,67 @@ export function ReturnLinesCard({ prt }: { prt: PrtDetail }) {
 									{formatMoney(line.ratePaise)}
 								</TableCell>
 								<TableCell className="text-right tabular-nums">
-									{formatMoney(line.taxablePaise)}
+									{isDraft ? "–" : formatMoney(line.taxablePaise)}
 								</TableCell>
 								<TableCell className="text-right tabular-nums">
 									{line.gstPercent}%
 								</TableCell>
 								<TableCell className="text-right tabular-nums">
-									{formatMoney(line.taxablePaise + line.gstPaise)}
+									{isDraft
+										? "–"
+										: formatMoney(line.taxablePaise + line.gstPaise)}
 								</TableCell>
 							</TableRow>
 						))}
 					</TableBody>
 				</Table>
 
-				<dl className="ml-auto grid w-fit grid-cols-[auto_auto] gap-x-6 gap-y-1 text-right text-sm">
-					<dt className="text-muted-foreground">Taxable</dt>
-					<dd className="tabular-nums">{formatMoney(totals.taxable)}</dd>
-					{note ? (
-						note.isInterstate ? (
-							<>
-								<dt className="text-muted-foreground">IGST</dt>
-								<dd className="tabular-nums">{formatMoney(note.igstPaise)}</dd>
-							</>
+				{isDraft ? (
+					<dl className="ml-auto grid w-fit grid-cols-[auto_auto] gap-x-6 gap-y-1 text-right text-sm">
+						<dt className="font-medium">Total on post</dt>
+						<dd className="font-medium tabular-nums">
+							{prt.preview ? formatMoney(prt.preview.debitNoteTotalPaise) : "–"}
+						</dd>
+						<dd className="col-span-2 text-[13px] text-muted-foreground">
+							Taxable value and GST are fixed when the return is posted.
+						</dd>
+					</dl>
+				) : (
+					<dl className="ml-auto grid w-fit grid-cols-[auto_auto] gap-x-6 gap-y-1 text-right text-sm">
+						<dt className="text-muted-foreground">Taxable</dt>
+						<dd className="tabular-nums">{formatMoney(totals.taxable)}</dd>
+						{note ? (
+							note.isInterstate ? (
+								<>
+									<dt className="text-muted-foreground">IGST</dt>
+									<dd className="tabular-nums">
+										{formatMoney(note.igstPaise)}
+									</dd>
+								</>
+							) : (
+								<>
+									<dt className="text-muted-foreground">CGST</dt>
+									<dd className="tabular-nums">
+										{formatMoney(note.cgstPaise)}
+									</dd>
+									<dt className="text-muted-foreground">SGST</dt>
+									<dd className="tabular-nums">
+										{formatMoney(note.sgstPaise)}
+									</dd>
+								</>
+							)
 						) : (
 							<>
-								<dt className="text-muted-foreground">CGST</dt>
-								<dd className="tabular-nums">{formatMoney(note.cgstPaise)}</dd>
-								<dt className="text-muted-foreground">SGST</dt>
-								<dd className="tabular-nums">{formatMoney(note.sgstPaise)}</dd>
+								<dt className="text-muted-foreground">GST</dt>
+								<dd className="tabular-nums">{formatMoney(totals.gst)}</dd>
 							</>
-						)
-					) : (
-						<>
-							<dt className="text-muted-foreground">GST</dt>
-							<dd className="tabular-nums">{formatMoney(totals.gst)}</dd>
-						</>
-					)}
-					<dt className="font-medium">Total</dt>
-					<dd className="font-medium tabular-nums">
-						{formatMoney(totals.total)}
-					</dd>
-				</dl>
+						)}
+						<dt className="font-medium">Total</dt>
+						<dd className="font-medium tabular-nums">
+							{formatMoney(totals.total)}
+						</dd>
+					</dl>
+				)}
 			</CardContent>
 		</Card>
 	);

@@ -73,7 +73,7 @@ export function DocumentFlow({
 					) : null;
 					return (
 						<li
-							key={step.label}
+							key={`${step.label}-${step.docNo ?? ""}-${step.href ?? ""}`}
 							aria-current={step.state === "current" ? "step" : undefined}
 							className={cn(
 								"flex min-w-40 flex-col overflow-hidden rounded-md border bg-card text-[13px]",

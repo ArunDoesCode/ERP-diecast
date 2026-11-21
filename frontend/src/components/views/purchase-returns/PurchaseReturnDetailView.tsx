@@ -25,6 +25,8 @@ import {
 } from "@/components/shared/DocumentFlow";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorState } from "@/components/shared/ErrorState";
+import { NoAccessState } from "@/components/shared/NoAccessState";
+import { PageHeader } from "@/components/shared/PageHeader";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/ui/button";
 import {
@@ -90,7 +92,7 @@ export function PurchaseReturnDetailView({ returnId }: { returnId: number }) {
 	const back = { backHref: "/purchase-returns", backLabel: "purchase returns" };
 
 	if (!canView) {
-		return <EmptyState title="You can't view purchase returns" />;
+		return <NoAccessState what="purchase returns" />;
 	}
 	if (query.isLoading) {
 		return (
@@ -106,9 +108,16 @@ export function PurchaseReturnDetailView({ returnId }: { returnId: number }) {
 			query.error instanceof ApiClientError && query.error.status === 404;
 		return (
 			<div className="flex flex-col gap-4">
-				<DetailHeader docNo="" status={null} loading {...back} />
+				<PageHeader
+					title="Return not found"
+					actions={
+						<Button type="button" size="sm" variant="outline" asChild>
+							<Link href={back.backHref}>Back to {back.backLabel}</Link>
+						</Button>
+					}
+				/>
 				{notFound ? (
-					<EmptyState title="Return not found" />
+					<EmptyState title="It may have been deleted, or the link is wrong" />
 				) : (
 					<ErrorState
 						message={prtErrorMessage(
@@ -232,7 +241,7 @@ export function PurchaseReturnDetailView({ returnId }: { returnId: number }) {
 				</output>
 			) : null}
 
-			<div className="grid gap-4 min-[1024px]:grid-cols-[minmax(0,1fr)_minmax(0,380px)]">
+			<div className="grid gap-4 min-[1280px]:grid-cols-[minmax(0,1fr)_minmax(0,380px)]">
 				<div className="flex min-w-0 flex-col gap-4">
 					<ReturnLinesCard prt={prt} />
 					<ReturnPreviewCard prt={prt} />

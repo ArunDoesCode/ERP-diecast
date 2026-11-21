@@ -10,6 +10,7 @@ import type {
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
 	Select,
 	SelectContent,
@@ -92,7 +93,7 @@ function GstSelect({
 				id={id}
 				aria-label={label}
 				aria-invalid={invalid || undefined}
-				className="w-24"
+				className="w-full min-w-24"
 			>
 				<SelectValue placeholder="GST" />
 			</SelectTrigger>
@@ -134,101 +135,97 @@ export function InvoiceLinesEditor({
 	);
 	return (
 		<div className="flex flex-col gap-3">
-			<Table>
-				<TableHeader>
-					<TableRow>
-						<TableHead>GRN</TableHead>
-						<TableHead>Item</TableHead>
-						<TableHead className="text-right">Billable</TableHead>
-						<TableHead className="text-right">Billed *</TableHead>
-						<TableHead className="text-right">Rate ₹ *</TableHead>
-						<TableHead>GST % *</TableHead>
-						<TableHead className="text-right">PO rate</TableHead>
-						<TableHead className="text-right">Taxable</TableHead>
-						<TableHead>Match</TableHead>
-						<TableHead className="w-10">
-							<span className="sr-only">Remove</span>
-						</TableHead>
-					</TableRow>
-				</TableHeader>
-				<TableBody>
-					{rows.map((row) => {
-						const line = byId.get(row.grnItemId);
-						if (!line) return null;
-						const errors = showErrors ? itemRowErrors(row, line) : {};
-						const qty = parseQty(row.qty, line.uom);
-						const rate = rupeesToPaise(row.rate);
-						const gst = row.gst === "" ? null : Number(row.gst);
-						const live =
-							qty !== null && rate !== null && rate > 0 && gst !== null;
-						const match = live
-							? matchLine(
-									{
-										uom: line.uom,
-										qty,
-										ratePaise: rate,
-										gstBp: gstPercentToBp(gst),
-										billableQty: line.billableQty,
-										poRatePaise: line.poRatePaise,
-										poGstBp: gstPercentToBp(line.poGstPercent),
-									},
-									priceTolBp,
-									weightTolBp,
-								)
-							: null;
-						const base = `sinv-line-${row.grnItemId}`;
-						return (
-							<TableRow key={row.grnItemId}>
-								<TableCell className="font-mono">{line.grnNumber}</TableCell>
-								<TableCell className="whitespace-normal">
-									{line.itemName}
-								</TableCell>
-								<TableCell className="text-right tabular-nums">
-									{formatQty(line.billableQty, line.uom, 3)}
-								</TableCell>
-								<TableCell className="min-w-32 text-right">
-									<label htmlFor={`${base}-qty`} className="sr-only">
-										Billed qty for {line.itemName}
-									</label>
+			<ul className="flex flex-col gap-3">
+				{rows.map((row) => {
+					const line = byId.get(row.grnItemId);
+					if (!line) return null;
+					const errors = showErrors ? itemRowErrors(row, line) : {};
+					const qty = parseQty(row.qty, line.uom);
+					const rate = rupeesToPaise(row.rate);
+					const gst = row.gst === "" ? null : Number(row.gst);
+					const live =
+						qty !== null && rate !== null && rate > 0 && gst !== null;
+					const match = live
+						? matchLine(
+								{
+									uom: line.uom,
+									qty,
+									ratePaise: rate,
+									gstBp: gstPercentToBp(gst),
+									billableQty: line.billableQty,
+									poRatePaise: line.poRatePaise,
+									poGstBp: gstPercentToBp(line.poGstPercent),
+								},
+								priceTolBp,
+								weightTolBp,
+							)
+						: null;
+					const base = `sinv-line-${row.grnItemId}`;
+					return (
+						<li
+							key={row.grnItemId}
+							className="flex flex-col gap-3 rounded-md border p-3"
+						>
+							<div className="flex items-start justify-between gap-2">
+								<div className="min-w-0">
+									<p className="text-sm font-medium">{line.itemName}</p>
+									<p className="text-[13px] text-muted-foreground">
+										<span className="font-mono">{line.grnNumber}</span> ·
+										Billable {formatQty(line.billableQty, line.uom, 3)}
+									</p>
+								</div>
+								<Button
+									type="button"
+									size="icon-sm"
+									variant="ghost"
+									aria-label={`Remove ${line.itemName} (${line.grnNumber})`}
+									disabled={disabled}
+									onClick={() => onRemove(row.grnItemId)}
+								>
+									<IconTrash />
+								</Button>
+							</div>
+							<div className="grid grid-cols-1 gap-x-3 gap-y-2 sm:grid-cols-3">
+								<div className="min-h-19 space-y-1">
+									<Label htmlFor={`${base}-qty`}>
+										Billed qty ({line.uom}) *
+									</Label>
 									<Input
 										id={`${base}-qty`}
 										inputMode="decimal"
 										value={row.qty}
 										disabled={disabled}
 										aria-invalid={errors.qty ? true : undefined}
-										className="ml-auto w-28 text-right tabular-nums"
+										className="text-right tabular-nums"
 										onChange={(event) =>
 											onChange(row.grnItemId, { qty: event.target.value })
 										}
 									/>
 									{errors.qty ? (
-										<p className="mt-1 text-[13px] whitespace-normal text-destructive">
-											{errors.qty}
-										</p>
+										<p className="text-[13px] text-destructive">{errors.qty}</p>
 									) : null}
-								</TableCell>
-								<TableCell className="min-w-32 text-right">
-									<label htmlFor={`${base}-rate`} className="sr-only">
-										Rate in rupees for {line.itemName}
-									</label>
+								</div>
+								<div className="min-h-19 space-y-1">
+									<Label htmlFor={`${base}-rate`}>Rate ₹ *</Label>
 									<Input
 										id={`${base}-rate`}
 										inputMode="decimal"
 										value={row.rate}
 										disabled={disabled}
 										aria-invalid={errors.rate ? true : undefined}
-										className="ml-auto w-28 text-right tabular-nums"
+										className="text-right tabular-nums"
 										onChange={(event) =>
 											onChange(row.grnItemId, { rate: event.target.value })
 										}
 									/>
 									{errors.rate ? (
-										<p className="mt-1 text-[13px] whitespace-normal text-destructive">
+										<p className="text-[13px] text-destructive">
 											{errors.rate}
 										</p>
 									) : null}
-								</TableCell>
-								<TableCell>
+								</div>
+								<div className="min-h-19 space-y-1">
+									<Label htmlFor={`${base}-gst`}>GST % *</Label>
 									<GstSelect
 										id={`${base}-gst`}
 										label={`GST % for ${line.itemName}`}
@@ -240,59 +237,56 @@ export function InvoiceLinesEditor({
 										}
 									/>
 									{errors.gst ? (
-										<p className="mt-1 text-[13px] whitespace-normal text-destructive">
-											{errors.gst}
-										</p>
+										<p className="text-[13px] text-destructive">{errors.gst}</p>
 									) : null}
-								</TableCell>
-								<TableCell className="text-right tabular-nums">
-									{formatMoney(line.poRatePaise)}
-								</TableCell>
-								<TableCell className="text-right tabular-nums">
-									{live ? formatMoney(lineTaxable(qty, rate)) : "–"}
-								</TableCell>
-								<TableCell>
-									{match ? (
-										<span className="flex flex-wrap gap-1">
-											{match.checks.length === 0 ? (
-												<StatusBadge doc="supplierInvoiceMatch" status="ok" />
-											) : (
-												match.checks.map((check) => (
+								</div>
+							</div>
+							<dl className="flex flex-wrap items-center gap-x-6 gap-y-1 border-t pt-2 text-sm">
+								<div className="flex gap-2">
+									<dt className="text-muted-foreground">PO rate</dt>
+									<dd className="tabular-nums">
+										{formatMoney(line.poRatePaise)}
+									</dd>
+								</div>
+								<div className="flex gap-2">
+									<dt className="text-muted-foreground">Taxable</dt>
+									<dd className="tabular-nums">
+										{live ? formatMoney(lineTaxable(qty, rate)) : "–"}
+									</dd>
+								</div>
+								<div className="flex items-center gap-2">
+									<dt className="text-muted-foreground">Match</dt>
+									<dd>
+										{match ? (
+											<span className="flex flex-wrap gap-1">
+												{match.checks.length === 0 ? (
+													<StatusBadge doc="supplierInvoiceMatch" status="ok" />
+												) : (
+													match.checks.map((check) => (
+														<StatusBadge
+															key={check}
+															doc="supplierInvoiceMatch"
+															status={check}
+														/>
+													))
+												)}
+												{match.belowPoRate ? (
 													<StatusBadge
-														key={check}
 														doc="supplierInvoiceMatch"
-														status={check}
+														status="below_po_rate"
 													/>
-												))
-											)}
-											{match.belowPoRate ? (
-												<StatusBadge
-													doc="supplierInvoiceMatch"
-													status="below_po_rate"
-												/>
-											) : null}
-										</span>
-									) : (
-										"–"
-									)}
-								</TableCell>
-								<TableCell>
-									<Button
-										type="button"
-										size="icon-sm"
-										variant="ghost"
-										aria-label={`Remove ${line.itemName} (${line.grnNumber})`}
-										disabled={disabled}
-										onClick={() => onRemove(row.grnItemId)}
-									>
-										<IconTrash />
-									</Button>
-								</TableCell>
-							</TableRow>
-						);
-					})}
-				</TableBody>
-			</Table>
+												) : null}
+											</span>
+										) : (
+											"–"
+										)}
+									</dd>
+								</div>
+							</dl>
+						</li>
+					);
+				})}
+			</ul>
 			{additions.length > 0 ? (
 				<div className="flex flex-wrap gap-2">
 					{additions.map((line) => (

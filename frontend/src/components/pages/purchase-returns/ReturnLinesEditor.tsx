@@ -106,7 +106,9 @@ export function ReturnLinesEditor({
 						const cap = rowCap(line, row.source, ownQty[row.key] ?? 0);
 						const error =
 							serverErrors[row.key] ??
-							(showErrors ? qtyError(row.qty, line.uom, cap) : null);
+							(showErrors || row.qty.trim() !== ""
+								? qtyError(row.qty, line.uom, cap)
+								: null);
 						const inputId = `prt-qty-${row.key.replace(":", "-")}`;
 						return (
 							<TableRow key={row.key}>

@@ -45,9 +45,9 @@ function CancelledMark() {
 	return (
 		<div
 			aria-hidden="true"
-			className="pointer-events-none absolute inset-0 flex items-center justify-center"
+			className="pointer-events-none absolute top-4 right-4 flex justify-end"
 		>
-			<span className="-rotate-12 rounded-md border-4 border-destructive px-6 py-2 text-5xl font-bold tracking-widest text-destructive opacity-40">
+			<span className="-rotate-6 rounded-md border-2 border-destructive px-3 py-1 text-xl font-bold tracking-widest text-destructive opacity-30">
 				CANCELLED
 			</span>
 		</div>

@@ -13,6 +13,7 @@ import {
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { FilterBar } from "@/components/shared/FilterBar";
+import { NoAccessState } from "@/components/shared/NoAccessState";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Pagination } from "@/components/shared/Pagination";
 import { StatusBadge } from "@/components/shared/StatusBadge";
@@ -209,7 +210,7 @@ export function PurchaseReturnListView() {
 	});
 
 	if (!canView) {
-		return <EmptyState title="You can't view purchase returns" />;
+		return <NoAccessState what="purchase returns" />;
 	}
 
 	const meta = (controls.awaiting ? awaitingQuery : returnsQuery).data?.meta;
@@ -256,7 +257,7 @@ export function PurchaseReturnListView() {
 						controls.onSupplierChange(value === "all" ? null : Number(value))
 					}
 				>
-					<SelectTrigger className="w-40" aria-label="Supplier">
+					<SelectTrigger className="w-36" aria-label="Supplier">
 						<SelectValue placeholder="Supplier" />
 					</SelectTrigger>
 					<SelectContent>
@@ -278,7 +279,7 @@ export function PurchaseReturnListView() {
 								controls.onDateFromChange(event.target.value)
 							}
 							aria-label="Date from"
-							className="w-36"
+							className="w-32"
 						/>
 						<Input
 							type="date"
@@ -286,9 +287,9 @@ export function PurchaseReturnListView() {
 							min={controls.dateFrom ?? undefined}
 							onChange={(event) => controls.onDateToChange(event.target.value)}
 							aria-label="Date to"
-							className="w-36"
+							className="w-32"
 						/>
-						<div className="relative w-44">
+						<div className="relative w-36">
 							<IconSearch
 								aria-hidden="true"
 								className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground"

@@ -10,6 +10,7 @@ import {
 import type { CatalogLine } from "@/components/pages/supplier-invoices/invoice-form-types";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorState } from "@/components/shared/ErrorState";
+import { NoAccessState } from "@/components/shared/NoAccessState";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -214,7 +215,7 @@ export function SupplierInvoiceFormView({
 	}, [existing, billable]);
 
 	if (!canManage) {
-		return <EmptyState title="You can't enter supplier invoices" />;
+		return <NoAccessState what="supplier invoices" />;
 	}
 	if (!isEdit && poIdParam === undefined && grnId === undefined) {
 		return <PoPicker />;
@@ -295,28 +296,31 @@ function NothingToBill({
 	prId?: number | null;
 }) {
 	return (
-		<EmptyState
-			title="Nothing left to bill on this PO"
-			description={message}
-			action={
-				<Button type="button" variant="outline" size="sm" asChild>
-					<Link
-						href={
-							grnId
-								? `/grn/${grnId}`
+		<div className="flex flex-col gap-4">
+			<PageHeader title="Nothing left to bill on this PO" />
+			<EmptyState
+				title="Every received item is already on a bill"
+				description={message}
+				action={
+					<Button type="button" variant="outline" size="sm" asChild>
+						<Link
+							href={
+								grnId
+									? `/grn/${grnId}`
+									: prId
+										? `/purchase-orders/${prId}`
+										: "/purchase-orders/tracking"
+							}
+						>
+							{grnId
+								? "Back to the GRN"
 								: prId
-									? `/purchase-orders/${prId}`
-									: "/purchase-orders/tracking"
-						}
-					>
-						{grnId
-							? "Back to the GRN"
-							: prId
-								? "Back to the PO"
-								: "Back to purchase orders"}
-					</Link>
-				</Button>
-			}
-		/>
+									? "Back to the PO"
+									: "Back to purchase orders"}
+						</Link>
+					</Button>
+				}
+			/>
+		</div>
 	);
 }

@@ -25,6 +25,8 @@ import {
 } from "@/components/shared/DocumentFlow";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorState } from "@/components/shared/ErrorState";
+import { NoAccessState } from "@/components/shared/NoAccessState";
+import { PageHeader } from "@/components/shared/PageHeader";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/ui/button";
 import {
@@ -104,7 +106,7 @@ export function SupplierInvoiceDetailView({
 	};
 
 	if (!canView) {
-		return <EmptyState title="You can't view supplier invoices" />;
+		return <NoAccessState what="supplier invoices" />;
 	}
 	if (query.isLoading) {
 		return (
@@ -120,9 +122,16 @@ export function SupplierInvoiceDetailView({
 			query.error instanceof ApiClientError && query.error.status === 404;
 		return (
 			<div className="flex flex-col gap-4">
-				<DetailHeader docNo="" status={null} loading {...back} />
+				<PageHeader
+					title="Invoice not found"
+					actions={
+						<Button type="button" size="sm" variant="outline" asChild>
+							<Link href={back.backHref}>Back to {back.backLabel}</Link>
+						</Button>
+					}
+				/>
 				{notFound ? (
-					<EmptyState title="Invoice not found" />
+					<EmptyState title="It may have been deleted, or the link is wrong" />
 				) : (
 					<ErrorState
 						message={sinvErrorMessage(

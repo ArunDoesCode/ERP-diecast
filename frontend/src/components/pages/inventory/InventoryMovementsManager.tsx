@@ -3,6 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { IconPlus } from "@tabler/icons-react";
 import { type PaginationState, useTable } from "@tanstack/react-table";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { DataTable } from "@/components/common/DataTable";
@@ -70,7 +71,8 @@ const REFERENCE_TYPE_LABEL: Record<AssetReferenceType, string> = {
 	grn_correction: "GRN correction",
 	opening_stock: "Opening stock",
 	sco_loss: "SCO loss",
-	pro: "PRO",
+	pro: "Purchase return",
+	pro_cancel: "Return cancelled",
 	sco_issue: "SCO issue",
 	sco_receipt: "SCO receipt",
 	job_order_issue: "Job order issue",
@@ -94,6 +96,28 @@ function sourceLabel(movement: AssetMovement) {
 	const source = movement.sourceDocument;
 	if (!source || source.id === 0) return `${label} (manual)`;
 	return `${label} ${source.number ?? `#${source.id}`}`;
+}
+
+/** Document number of the source, linked to the return page for pro / pro_cancel rows. */
+function SourceCell({ movement }: { movement: AssetMovement }) {
+	const source = movement.sourceDocument;
+	const isReturn =
+		movement.referenceType === "pro" || movement.referenceType === "pro_cancel";
+	if (!isReturn || !source || source.id === 0) {
+		return <>{sourceLabel(movement)}</>;
+	}
+	const id = source.id || movement.referenceId;
+	return (
+		<span>
+			{REFERENCE_TYPE_LABEL[movement.referenceType]}{" "}
+			<Link
+				href={`/purchase-returns/${id}`}
+				className="font-mono text-brand-accent hover:underline"
+			>
+				{source.number ?? `#${id}`}
+			</Link>
+		</span>
+	);
 }
 
 function toMovementPayload(
@@ -501,7 +525,7 @@ export function InventoryMovementsManager() {
 			{
 				id: "source",
 				header: "Source",
-				cell: ({ row }) => sourceLabel(row.original),
+				cell: ({ row }) => <SourceCell movement={row.original} />,
 			},
 			{
 				accessorKey: "quantityChange",
@@ -627,7 +651,7 @@ export function InventoryMovementsManager() {
 							</p>
 							<p>
 								<span className="font-medium">Source:</span>{" "}
-								{sourceLabel(detailMovement)}
+								<SourceCell movement={detailMovement} />
 							</p>
 							{detailMovement.notes ? (
 								<p>

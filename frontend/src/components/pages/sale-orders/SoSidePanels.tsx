@@ -150,7 +150,7 @@ export function SoActivityPanel({ soId }: { soId: number }) {
 							const changes =
 								row.before === null
 									? []
-									: activityChanges(row.before, row.after);
+									: activityChanges(row.before, row.after, row.action);
 							const edited =
 								changes.length === 1 &&
 								changes[0].from === "edited" &&

@@ -75,7 +75,7 @@ export function InvoiceTotalsPanel({
 }) {
 	const over = printedOverTolerance(totals, taxType, printed);
 	return (
-		<Card className="min-[1280px]:sticky min-[1280px]:top-4">
+		<Card className="min-[1536px]:sticky min-[1536px]:top-4">
 			<CardHeader>
 				<CardTitle>Totals</CardTitle>
 				<p className="text-[13px] text-muted-foreground">

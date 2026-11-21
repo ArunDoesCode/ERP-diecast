@@ -13,6 +13,7 @@ import {
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { FilterBar } from "@/components/shared/FilterBar";
+import { NoAccessState } from "@/components/shared/NoAccessState";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Pagination } from "@/components/shared/Pagination";
 import { StatusBadge } from "@/components/shared/StatusBadge";
@@ -119,7 +120,7 @@ export function SupplierInvoiceListView() {
 	});
 
 	if (!canView) {
-		return <EmptyState title="You can't view supplier invoices" />;
+		return <NoAccessState what="supplier invoices" />;
 	}
 
 	const counts = query.data?.meta.statusCounts;

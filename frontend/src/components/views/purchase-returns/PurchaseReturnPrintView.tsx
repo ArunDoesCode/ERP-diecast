@@ -9,6 +9,7 @@ import {
 } from "@/components/pages/purchase-returns/ReturnPrintSheets";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorState } from "@/components/shared/ErrorState";
+import { NoAccessState } from "@/components/shared/NoAccessState";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -37,7 +38,7 @@ export function PurchaseReturnPrintView({
 	useBreadcrumbLast(prt?.proNumber);
 
 	if (!canView) {
-		return <EmptyState title="You can't view purchase returns" />;
+		return <NoAccessState what="purchase returns" />;
 	}
 	if (query.isLoading) {
 		return <Skeleton className="mx-auto h-96 w-full max-w-4xl" />;

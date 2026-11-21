@@ -149,7 +149,7 @@ type Props = {
 const STACK_TABLE =
 	"max-[1099px]:block max-[1099px]:[&_tbody]:block max-[1099px]:[&_tfoot]:block";
 const STACK_ROW =
-	"max-[1099px]:grid max-[1099px]:grid-cols-2 max-[1099px]:gap-2 max-[1099px]:p-3";
+	"max-[1099px]:grid max-[1099px]:grid-cols-2 max-[1099px]:gap-x-3 max-[1099px]:gap-y-4 max-[1099px]:p-3";
 const CELL =
 	"max-[1099px]:block max-[1099px]:p-0 max-[1099px]:before:mb-1 max-[1099px]:before:block max-[1099px]:before:text-[13px] max-[1099px]:before:text-muted-foreground max-[1099px]:before:content-[attr(data-label)]";
 

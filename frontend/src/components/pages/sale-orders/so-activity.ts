@@ -40,6 +40,9 @@ const HIDDEN = new Set([
 	"createdBy",
 ]);
 
+/** Counters written by an explosion run: noise next to the "Exploded" label. */
+const EXPLODE_HIDDEN = new Set(["number", "rowCount", "flaggedCount"]);
+
 export function humanize(text: string) {
 	const spaced = text
 		.replace(/[._]/g, " ")
@@ -82,6 +85,7 @@ export type ActivityChange = { label: string; from: string; to: string };
 export function activityChanges(
 	before: unknown,
 	after: unknown,
+	action?: string,
 ): ActivityChange[] {
 	const b = asRecord(before) ?? {};
 	const a = asRecord(after) ?? {};
@@ -89,6 +93,7 @@ export function activityChanges(
 	const out: ActivityChange[] = [];
 	for (const key of keys) {
 		if (HIDDEN.has(key) || /Id$/.test(key)) continue;
+		if (action === "so.explode" && EXPLODE_HIDDEN.has(key)) continue;
 		const from = b[key];
 		const to = a[key];
 		if (JSON.stringify(from) === JSON.stringify(to)) continue;
