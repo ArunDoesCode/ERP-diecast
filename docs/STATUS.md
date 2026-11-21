@@ -21,6 +21,7 @@
 | subcontracting | frozen v4 | [map](modules/subcontracting.md) | full — incl. IST day | merged (PR #14, #86) → UAT-1 |
 | db-migrations | frozen v1 | — | full — baseline + `db:migrate` | merged (PR #86) |
 | design-system | frozen v2 | [map](modules/design-system.md) | full — v2 look (graphite + indigo, 14 px, 36 px controls, 44 px rows, label-above fields) app-wide | v1 merged (PR #108); v2 epic PR open, waiting for your merge |
+| factory-flows | frozen v1 | [map](modules/factory-flows.md) | full — Home queues, PR/PO/GRN pages, receive goods, approvals preview, fuller lists | epic PR open, merge #111 first |
 | bom | none | — | none | after workflow v2 (first customer of the new flow) |
 | sale-order | none | — | none | after bom |
 
@@ -30,8 +31,10 @@ Legend — Code: none / schema only / partial / full. Tests per module: see each
 | Item | Branch | Phase | PR | Waiting on |
 |---|---|---|---|---|
 | Design-review fixes, GRN on shared patterns, BR-GRN-45 (#109) | claude/cranky-payne-f2bc8a | done, local | none yet | you: push, open PR, merge |
+| factory-flows epic (Home, document pages, receiving, approvals preview, lists) | epic/factory-flows | handover | see PR | you: merge #111, then review decisions + merge |
 
 ## Waiting on you
+- [ ] factory-flows: merge PR #111 first, then review the overnight decisions (OWNER.md, D-040/D-041) and merge the factory-flows PR; 7 parked e2e specs in its issue.
 - [ ] Push `claude/cranky-payne-f2bc8a`, open its PR, merge; then close #109.
 - [ ] To let the local e2e step run (D-024), allow `db:reset` on the test DB (`localhost:5433/diecast_test`) for the pipeline.
 - [ ] Set `permissions.defaultMode` to `auto` in `~/.claude/settings.json`.

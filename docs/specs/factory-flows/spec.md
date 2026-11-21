@@ -152,6 +152,9 @@ in moring once completed" and "make sure u reasearch other erp's and take decisi
 | 2 Arrived box at receipt | A — empty + "Fill open quantity" | BR-FF-64 | stricter than SAP Copy To / ERPNext Create Receipt pre-fill (https://learning.sap.com/courses/managing-logistics-in-sap-business-one/solving-issues-in-purchasing) |
 | 3 Plant head's first tile | A — Waiting for my approval | BR-FF-13 | SAP puts pending approvals first (https://help.sap.com/saphelp_sbo92/helpdata/en/45/06da03d8696c30e10000000a114a6b/content.htm) |
 
+## Implementation status
+Built on `epic/factory-flows` (2026-11-21). All BR-FF-01..115 done; no slice parked. Tests: `backend/tests/routes/factoryFlows{Home,Documents,Receiving,Inbox,Lists,CreatePo,Round1}.test.ts`, `backend/tests/lib/factoryFlowsMenu.test.ts`, `backend/tests/scripts/factoryFlowsMenuMigration.test.ts`, `backend/tests/scenarios/factoryFlows{ProcurementChain,ApprovalRead}.test.ts`, `frontend/e2e/factory-flows.spec.ts`. UI-only rules (BR-FF-05, 07, 15, 17, 19, 32, 47, 56, 57, 71, 73, 78, 87, 103, 104, 110–114) → e2e + manual checklist. 7 e2e specs parked (issue in the PR).
+
 ## Changelog
 - 2026-11-20 v0 — draft (pass 1): index + five parts.
 - 2026-11-20 v0 — pass 2: cards 1–3 = A (pre-approved); BR-FF-09 open quantity (designer Q1); approver
@@ -166,3 +169,4 @@ in moring once completed" and "make sure u reasearch other erp's and take decisi
   BR-FF-113 cites the v2 text. Edge cases E-56..E-70; assumptions A-54..A-82.
 - 2026-11-20 v0 — pre-freeze review rounds 1–2 (spec, security, performance, code, design): SEC-01..07, CR-01..10, PERF-01..08, SPEC-01..18, DES-001..011 fixed; BR-PO-19 left unchanged (Late); approval BR-APR-52 response narrowed (BR-FF-77, CR v3 in approval.md).
 - 2026-11-20 v1 — frozen. OWNER.md approved on the owner's behalf (owner pre-approved recommended options in chat, 2026-11-20: "automate that sessions take ur own decision and record them and run whatever parallel subagents u want ... ill do a complete merge in moring once completed"; "dont want for my review ill review the decicsion u take tonight"); cards 1–3 = A and all 19 confirm rows = yes, each with a benchmark (research → Decision benchmarks). For the owner's morning review.
+- 2026-11-21 v1 — build assumptions A-84..A-91 (git model, PO page by PO id, undated PO = Later, sequential re-order 400 per BR-PO-01, no PO-from-scratch page, GRN without lines has no QA status, panel details, IST day for timestamps). No rule changed.
