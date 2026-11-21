@@ -5,10 +5,42 @@
  * Percent values are integer tenths (800 = 80.0 %); null = "No data".
  */
 import { afterAll, describe, expect, test } from "bun:test";
-import { istDay, makeRatingFx } from "../helpers/ratingFixtures";
+import { inArray } from "drizzle-orm";
+import { db } from "../../src/db/client";
+import { serviceMaster } from "../../src/db/schemas/02_procurement-catalog";
+import {
+  subcontractingGrnItems,
+  subcontractingGrns,
+  subcontractingOrderItems,
+  subcontractingOrders,
+} from "../../src/db/schemas/02_procurement-purchasing";
+import { istDay, makeRatingFx, noonIst } from "../helpers/ratingFixtures";
 
 const fx = makeRatingFx("srt");
-afterAll(() => fx.cleanup());
+const scoIds: number[] = [];
+const scoGrnIds: number[] = [];
+const serviceIds: number[] = [];
+afterAll(async () => {
+  if (scoGrnIds.length) {
+    await db
+      .delete(subcontractingGrnItems)
+      .where(inArray(subcontractingGrnItems.scoGrnId, scoGrnIds));
+    await db
+      .delete(subcontractingGrns)
+      .where(inArray(subcontractingGrns.id, scoGrnIds));
+  }
+  if (scoIds.length) {
+    await db
+      .delete(subcontractingOrderItems)
+      .where(inArray(subcontractingOrderItems.scoId, scoIds));
+    await db
+      .delete(subcontractingOrders)
+      .where(inArray(subcontractingOrders.id, scoIds));
+  }
+  if (serviceIds.length)
+    await db.delete(serviceMaster).where(inArray(serviceMaster.id, serviceIds));
+  await fx.cleanup();
+});
 
 const sup = () => fx.newSupplier();
 
@@ -65,7 +97,7 @@ describe("on-time delivery", () => {
     expect((await fx.card(s)).onTime.lines).toBe(1);
   });
 
-  test("BR-SRT-04 / A-42 a PO cancelled after dispatch, after its due date, is late and counted", async () => {
+  test("BR-SRT-04 / A-42 a PO cancelled after dispatch, after its due date, is late judged by the cancel date and counted", async () => {
     const s = await sup();
     await fx.mkPo(s, {
       status: "cancelled",
@@ -76,20 +108,85 @@ describe("on-time delivery", () => {
     const c = await fx.card(s);
     expect(c.onTime.lines).toBe(1);
     expect(c.onTime.lateLines).toBe(1);
+    expect(c.onTime.onTimeLines).toBe(0);
     expect(c.onTime.cancelledAfterDispatchCount).toBe(1);
     expect(c.onTime.pctTenths).toBe(0);
+    const l = await fx.lines(s, "measure=on_time");
+    expect(l.json.data).toHaveLength(1);
+    expect(l.json.data[0].daysLate).toBe(10);
   });
 
-  test("BR-SRT-04 / A-42 a PO cancelled after dispatch but before its due date is not late", async () => {
+  test("BR-SRT-04 / A-42 a PO cancelled after dispatch on or before its due date is not judged and not counted", async () => {
+    for (const cancelledDay of [istDay(-20), istDay(-10)]) {
+      const s = await sup();
+      await fx.mkPo(s, {
+        status: "cancelled",
+        due: istDay(-10),
+        cancelledDay,
+        lines: [{}],
+      });
+      const c = await fx.card(s);
+      expect(c.onTime.lines).toBe(0);
+      expect(c.onTime.lateLines).toBe(0);
+      expect(c.onTime.onTimeLines).toBe(0);
+      expect(c.onTime.pctTenths).toBeNull();
+      expect(c.onTime.cancelledAfterDispatchCount).toBe(0);
+    }
+  });
+
+  test("BR-SRT-04 / A-46 a failed po_sent is not a dispatch: a cancelled PO with only a failed send is ignored", async () => {
     const s = await sup();
     await fx.mkPo(s, {
       status: "cancelled",
-      due: istDay(-10),
-      cancelledDay: istDay(-20),
+      due: istDay(-20),
+      cancelledDay: istDay(-10),
+      sentStatus: "failed",
       lines: [{}],
     });
     const c = await fx.card(s);
+    expect(c.onTime.lines).toBe(0);
     expect(c.onTime.lateLines).toBe(0);
+    expect(c.onTime.cancelledAfterDispatchCount).toBe(0);
+  });
+
+  test("BR-SRT-07 / BR-SRT-02 a GRN with no received date counts its arrival from the line created_at (on time)", async () => {
+    const s = await sup();
+    await fx.mkPo(s, {
+      due: istDay(-20),
+      lines: [{}],
+      grns: [
+        {
+          noReceivedDate: true,
+          lineCreatedAt: noonIst(istDay(-25)),
+          lines: [{ line: 0, recv: 1000 }],
+        },
+      ],
+    });
+    const c = await fx.card(s);
+    expect(c.onTime.lines).toBe(1);
+    expect(c.onTime.onTimeLines).toBe(1);
+    expect(c.onTime.lateLines).toBe(0);
+    const l = await fx.lines(s, "measure=on_time");
+    expect(l.json.data[0].completionDate).toBe(istDay(-25));
+  });
+
+  test("BR-SRT-07 a GRN with no received date and a line created after the due date is late", async () => {
+    const s = await sup();
+    await fx.mkPo(s, {
+      due: istDay(-20),
+      lines: [{}],
+      grns: [
+        {
+          noReceivedDate: true,
+          lineCreatedAt: noonIst(istDay(-15)),
+          lines: [{ line: 0, recv: 1000 }],
+        },
+      ],
+    });
+    const c = await fx.card(s);
+    expect(c.onTime.lateLines).toBe(1);
+    const l = await fx.lines(s, "measure=on_time");
+    expect(l.json.data[0].daysLate).toBe(5);
   });
 
   test("BR-SRT-05 the original due date is used, a revised date is never used", async () => {
@@ -414,6 +511,71 @@ describe("on-time delivery", () => {
     expect(c.onTime.lines).toBe(0);
     expect(c.onTime.pctTenths).toBeNull();
     expect(c.onTime.noDueDateCount).toBe(1);
+  });
+
+  test("BR-SRT-30 a vendor with only subcontracting data shows no data in every measure", async () => {
+    const s = await sup();
+    const owner = (await fx.owner()).id;
+    const raw = await fx.newItem();
+    const fin = await fx.newItem();
+    const [svc] = await db
+      .insert(serviceMaster)
+      .values({ code: fx.uid(), name: `${fx.RUN} svc`, defaultUom: "job" })
+      .returning({ id: serviceMaster.id });
+    serviceIds.push(svc!.id);
+    const [sco] = await db
+      .insert(subcontractingOrders)
+      .values({
+        scoNumber: fx.uid(),
+        vendorId: s,
+        status: "material_received",
+        expectedReturnDate: noonIst(istDay(-20)), // overdue, would be late if counted
+        createdBy: owner,
+        createdAt: noonIst(istDay(-60)),
+      })
+      .returning({ id: subcontractingOrders.id });
+    scoIds.push(sco!.id);
+    const [item] = await db
+      .insert(subcontractingOrderItems)
+      .values({
+        scoId: sco!.id,
+        rawItemId: raw.id,
+        rawQtyToIssue: 100,
+        serviceId: svc!.id,
+        serviceDescription: "svc",
+        serviceUnitPricePaise: 500,
+        finishedItemId: fin.id,
+        expectedReturnQty: 100,
+      })
+      .returning({ id: subcontractingOrderItems.id });
+    const [g] = await db
+      .insert(subcontractingGrns)
+      .values({
+        grnNumber: fx.uid(),
+        scoId: sco!.id,
+        vendorId: s,
+        vendorChallanNo: fx.uid(),
+        status: "partial_accepted",
+        receivedDate: noonIst(istDay(-5)),
+        createdBy: owner,
+      })
+      .returning({ id: subcontractingGrns.id });
+    scoGrnIds.push(g!.id);
+    await db.insert(subcontractingGrnItems).values({
+      scoGrnId: g!.id,
+      scoItemId: item!.id,
+      processedQty: 100,
+      acceptedQty: 60,
+      rejectedQty: 40,
+      qaStatus: "partial_accepted",
+    });
+    const c = await fx.card(s);
+    expect(c.onTime.lines).toBe(0);
+    expect(c.onTime.pctTenths).toBeNull();
+    expect(c.rejection.pctTenths).toBeNull();
+    expect(c.priceVariance.pctTenths).toBeNull();
+    expect(c.score).toBeNull();
+    expect(c.label).toBeNull();
   });
 
   test("BR-SRT-30 a supplier with no PO lines has no data in every measure", async () => {

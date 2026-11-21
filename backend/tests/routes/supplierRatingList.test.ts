@@ -390,4 +390,42 @@ describe("trend", () => {
     expect(at(4).onTime.lines).toBe(0);
     expect(at(5).onTime.lines).toBe(0);
   });
+
+  test("BR-SRT-38 a rejection line belongs to the month of its GRN received date, not the month the line is judged on time", async () => {
+    const s = await fx.newSupplier();
+    await fx.mkPo(s, {
+      created: monthDay(6, 5),
+      due: monthDay(4, 20),
+      lines: [{ qty: 1000 }, { qty: 1000 }],
+      grns: [
+        {
+          day: monthDay(4, 28),
+          lines: [{ line: 0, recv: 1000, rej: 20, qa: "failed" }],
+        },
+        {
+          day: monthDay(3, 2),
+          lines: [{ line: 1, recv: 1000, qa: "passed" }],
+        },
+      ],
+    });
+    const m = await fx.trend(s);
+    expect(m[11 - 4].rejection.pctTenths).toBe(20);
+    expect(m[11 - 3].rejection.pctTenths).toBe(0);
+    expect(m[11 - 5].rejection.pctTenths).toBeNull();
+  });
+
+  test("BR-SRT-39 a price line belongs to the month of its PO date, not the delivery month", async () => {
+    const s = await fx.newSupplier();
+    const item = await fx.newItem({ standard: 20000 });
+    await fx.mkPo(s, {
+      created: monthDay(6, 30),
+      due: monthDay(4, 10),
+      lines: [{ item: item.id, qty: 1000, rate: 21000 }],
+      grns: [{ day: monthDay(4, 5), lines: [{ line: 0, recv: 1000 }] }],
+    });
+    const m = await fx.trend(s);
+    expect(m[11 - 6].priceVariance.pctTenths).toBe(50);
+    expect(m[11 - 4].priceVariance.pctTenths).toBeNull();
+    expect(m[11 - 5].priceVariance.pctTenths).toBeNull();
+  });
 });

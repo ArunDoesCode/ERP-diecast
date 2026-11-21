@@ -71,6 +71,10 @@ export type GrnSpec = {
   /** IST day received; ignored when `at` is given */
   day?: string;
   at?: Date;
+  /** store received_date as NULL (arrival then comes from the GRN line created_at) */
+  noReceivedDate?: boolean;
+  /** created_at of this GRN's lines (default now) */
+  lineCreatedAt?: Date;
   status?:
     | "draft"
     | "pending_qa"
@@ -101,6 +105,8 @@ export type PoSpec = {
   cancelledDay?: string;
   /** write a po_sent communication row (default true) */
   sentRecord?: boolean;
+  /** status of the po_sent communication row (default "logged") */
+  sentStatus?: "logged" | "success" | "failed";
   lines?: LineSpec[];
   grns?: GrnSpec[];
 };
@@ -265,7 +271,7 @@ export function makeRatingFx(tag: string) {
         poId: po!.id,
         type: "po_sent",
         channel: "email",
-        status: "logged",
+        status: spec.sentStatus ?? "logged",
         sentBy: createdBy,
         sentAt: noonIst(createdDay),
       });
@@ -312,7 +318,9 @@ export function makeRatingFx(tag: string) {
           poId: g.noPo ? null : po!.id,
           supplierId,
           status: g.status ?? "accepted",
-          receivedDate: g.at ?? noonIst(g.day ?? istDay(-35)),
+          receivedDate: g.noReceivedDate
+            ? null
+            : (g.at ?? noonIst(g.day ?? istDay(-35))),
         })
         .returning({ id: grns.id, grnNumber: grns.grnNumber });
       created.grns.push(gr!.id);
@@ -331,6 +339,7 @@ export function makeRatingFx(tag: string) {
             rejectedQty: gl.rej ?? 0,
             qaStatus: gl.qa ?? ((gl.rej ?? 0) > 0 ? "failed" : "passed"),
             isQaBypassed: gl.bypass ?? false,
+            ...(g.lineCreatedAt ? { createdAt: g.lineCreatedAt } : {}),
           })
           .returning({ id: grnItems.id });
         ids.push(gi!.id);
