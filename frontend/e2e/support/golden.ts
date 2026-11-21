@@ -314,7 +314,10 @@ export async function qaDecideOnScreen(
 	rejected = 0,
 	overrideReason?: string,
 ) {
-	await page.getByRole("button", { name: "Inspect" }).first().click();
+	await page
+		.getByRole("button", { name: "Inspect", exact: true })
+		.first()
+		.click();
 	const dlg = page.getByRole("dialog", { name: /QA decision/ });
 	await dlg.getByLabel("Accepted qty").fill(String(accepted));
 	await dlg.getByLabel("Rejected qty").fill(String(rejected));
@@ -447,18 +450,28 @@ export async function makeScoSetup(t: {
  */
 export async function approveInQueue(ownerPage: Page, docNumber: string) {
 	await ownerPage.goto("/approvals");
-	const rowLink = ownerPage.getByRole("button", {
-		name: docNumber,
-		exact: true,
-	});
+	// Below 1100 px the preview is its own page (BR-FF-81): the doc number is a link there.
+	const narrow = (ownerPage.viewportSize()?.width ?? 1440) < 1100;
+	const rowLink = ownerPage
+		.getByRole(narrow ? "link" : "button", { name: docNumber, exact: true })
+		.first();
 	await expect(rowLink).toBeVisible({ timeout: 15_000 });
 	await rowLink.click();
-	const pane = ownerPage.getByRole("complementary", {
+	let pane = ownerPage.getByRole("complementary", {
 		name: `Preview of ${docNumber}`,
 	});
+	if (narrow) {
+		await expect(ownerPage).toHaveURL(/\/approvals\/[^/]+\/\d+/);
+		pane = ownerPage.locator("main");
+	}
 	await pane
 		.getByLabel("Note (required)")
 		.fill("Approved in the e2e golden path");
 	await pane.getByRole("button", { name: "Approve", exact: true }).click();
+	if (narrow) {
+		// After acting, the list is the place to confirm the row is gone.
+		await ownerPage.goto("/approvals");
+		await expect(ownerPage.getByRole("heading", { level: 1 })).toBeVisible();
+	}
 	await expect(rowLink).toBeHidden({ timeout: 15_000 });
 }

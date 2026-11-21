@@ -122,6 +122,7 @@ test.describe("Receiving from the goods-receipt screen", () => {
 		await page
 			.getByLabel("Search order number or supplier")
 			.fill(cat.supplierName);
+		await expect(page).toHaveURL(/q=/); // debounced search has settled (BR-FF-63)
 		const row = page.getByRole("listitem").filter({ hasText: po.poNumber });
 		await expect(row).toBeVisible();
 		await expect(row).toContainText(cat.supplierName);
@@ -164,7 +165,9 @@ test.describe("Receiving from the goods-receipt screen", () => {
 		await expect(page.getByText(/^GRN-/).first()).toBeVisible();
 		await expect(page.getByText("Draft").first()).toBeVisible();
 		// BR-FF-44: S holds no grn.qa_decide -> no Inspect
-		await expect(page.getByRole("button", { name: "Inspect" })).toHaveCount(0);
+		await expect(
+			page.getByRole("button", { name: "Inspect", exact: true }),
+		).toHaveCount(0);
 		const grnUrl = page.url();
 
 		// QA inspector sees Inspect and no PO link (BR-FF-03, 44)
@@ -173,7 +176,7 @@ test.describe("Receiving from the goods-receipt screen", () => {
 		await signIn(qa, "qa_inspector");
 		await qa.goto(grnUrl);
 		await expect(
-			qa.getByRole("button", { name: "Inspect" }).first(),
+			qa.getByRole("button", { name: "Inspect", exact: true }).first(),
 		).toBeVisible();
 		await expect(qa.getByRole("link", { name: po.poNumber })).toHaveCount(0);
 		await expect(qa.getByText(po.poNumber).first()).toBeVisible(); // plain text
@@ -287,7 +290,14 @@ test.describe("Approvals inbox with preview", () => {
 		await expect(row).toBeVisible({ timeout: 15_000 });
 		await expect(row).toContainText("1 of 1");
 
-		await row.click();
+		// BR-FF-81: below 1100 px the preview is its own page (reached by the doc-number link)
+		const narrow = (page.viewportSize()?.width ?? 1440) < 1100;
+		if (narrow) {
+			await row.getByRole("link", { name: pr.prNumber }).click();
+			await expect(page).toHaveURL(/\/approvals\/[^/]+\/\d+/);
+		} else {
+			await row.click();
+		}
 		// BR-FF-81: lines, amount and the note box, then the act buttons
 		await expect(page.getByText(cat.itemName).first()).toBeVisible();
 		await expect(
@@ -301,10 +311,14 @@ test.describe("Approvals inbox with preview", () => {
 		// BR-FF-82: empty note -> error at the box, still pending
 		await approve.click();
 		await expect(page.getByText("Note is required")).toBeVisible();
-		await expect(row).toBeVisible();
+		if (!narrow) await expect(row).toBeVisible();
 
 		await page.getByLabel(/Note/i).fill("ok");
 		await approve.click();
+		if (narrow) {
+			await page.goto("/approvals");
+			await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+		}
 		await expect(row).toBeHidden({ timeout: 15_000 });
 		const d: Json = await api(
 			t.back_office,

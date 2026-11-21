@@ -37,7 +37,10 @@ test("T-5 (4) accepting above 105 % asks for a reason; a correction lowers stock
 	const qa = await qaCtx.newPage();
 	await uiLogin(qa, "qa_inspector");
 	await qa.goto(`/grn/${grnId}`);
-	await qa.getByRole("button", { name: "Inspect" }).first().click();
+	await qa
+		.getByRole("button", { name: "Inspect", exact: true })
+		.first()
+		.click();
 	const qaDlg = qa.getByRole("dialog", { name: /QA decision/ });
 	await qaDlg.getByLabel("Accepted qty").fill("110");
 	await qaDlg.getByLabel("Rejected qty").fill("0");
@@ -47,7 +50,10 @@ test("T-5 (4) accepting above 105 % asks for a reason; a correction lowers stock
 
 	// Back office is asked for the reason: no reason, no submit.
 	await page.goto(`/grn/${grnId}`);
-	await page.getByRole("button", { name: "Inspect" }).first().click();
+	await page
+		.getByRole("button", { name: "Inspect", exact: true })
+		.first()
+		.click();
 	const dlg = page.getByRole("dialog", { name: /QA decision/ });
 	await dlg.getByLabel("Accepted qty").fill("110");
 	await dlg.getByLabel("Rejected qty").fill("0");
