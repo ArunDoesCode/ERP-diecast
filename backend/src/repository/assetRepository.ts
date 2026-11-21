@@ -23,6 +23,7 @@ import {
   purchaseRequestItems,
   purchaseReturns,
   serviceMaster,
+  stockTransfers,
   supplierItems,
   supplierMaster,
 } from "../db/schemas/02_procurement";
@@ -68,7 +69,7 @@ const inventoryMovementColumns = {
   referenceLineId: inventoryLedger.referenceLineId,
   sourceNumber: sql<
     string | null
-  >`coalesce(${grns.grnNumber}, ${purchaseReturns.proNumber})`,
+  >`coalesce(${grns.grnNumber}, ${purchaseReturns.proNumber}, ${stockTransfers.transferNumber})`,
   quantityChange: inventoryLedger.quantityChange,
   balanceAfter: inventoryLedger.balanceAfter,
   unitCostPaise: inventoryLedger.unitCostPaise,
@@ -388,6 +389,16 @@ export const assetRepository = {
           and(
             eq(purchaseReturns.id, inventoryLedger.referenceId),
             inArray(inventoryLedger.referenceType, ["pro", "pro_cancel"]),
+          ),
+        )
+        .leftJoin(
+          stockTransfers,
+          and(
+            eq(stockTransfers.id, inventoryLedger.referenceId),
+            inArray(inventoryLedger.referenceType, [
+              "stock_transfer",
+              "stock_transfer_reversal",
+            ]),
           ),
         )
         .where(whereClause)

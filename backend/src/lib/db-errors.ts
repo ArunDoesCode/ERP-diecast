@@ -48,3 +48,11 @@ export function conflictLocation(error: unknown): {
     table: text(pg?.table_name),
   };
 }
+
+/** 40P01 deadlock detected or 40001 serialization failure: safe to retry. */
+export function isRetryableConflict(error: unknown): boolean {
+  return (
+    findPgError(error, "40P01") !== undefined ||
+    findPgError(error, "40001") !== undefined
+  );
+}
