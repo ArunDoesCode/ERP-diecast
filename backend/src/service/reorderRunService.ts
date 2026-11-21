@@ -1,6 +1,6 @@
 import { db } from "../db/client";
 import { conflictLocation, isUniqueViolation } from "../lib/db-errors";
-import { ConflictError } from "../lib/errors";
+import { AppError, ConflictError } from "../lib/errors";
 import { istDayKey } from "../lib/ist-day";
 import { milliToNumber } from "../lib/milli";
 import { MAX_MONEY_PAISE } from "../lib/money";
@@ -23,10 +23,10 @@ const STALE_RUN_MS = 15 * 60_000;
 
 // BR-RO-16: the only texts a run may save or show. Raw errors go to the log.
 const FAILURE_TEXT = {
-  OWNER_MISSING: "No draft owner is set - choose a draft owner",
-  OWNER_INACTIVE: "Draft owner is inactive - choose a new owner",
-  OWNER_NO_PR_RIGHT: "Draft owner cannot use requisitions - choose a new owner",
-  INTERRUPTED: "Interrupted - server stopped",
+  OWNER_MISSING: "No draft owner is set – choose a draft owner",
+  OWNER_INACTIVE: "Draft owner is inactive – choose a new owner",
+  OWNER_NO_PR_RIGHT: "Draft owner cannot use requisitions – choose a new owner",
+  INTERRUPTED: "Interrupted – server stopped",
   RUN_ERROR: "Something went wrong, nothing was saved",
 } as const;
 
@@ -35,6 +35,12 @@ const OWNER_FAILURE: Record<Exclude<OwnerCheck, "ok">, string> = {
   inactive: FAILURE_TEXT.OWNER_INACTIVE,
   no_right: FAILURE_TEXT.OWNER_NO_PR_RIGHT,
 };
+
+class ReorderRunInsertError extends AppError {
+  constructor() {
+    super("Reorder run could not be saved", 500, "REORDER_RUN_INSERT_FAILED");
+  }
+}
 
 export type StartRunInput = {
   trigger: "schedule" | "manual";
@@ -74,8 +80,7 @@ async function openRun(
       });
       return row?.id;
     });
-    if (runId === undefined)
-      throw new Error("reorder run insert returned no row");
+    if (runId === undefined) throw new ReorderRunInsertError();
     return { kind: "started", runId };
   } catch (error) {
     if (!isUniqueViolation(error)) throw error;
@@ -93,20 +98,34 @@ type Line = {
 };
 
 /** Transaction B body (BR-RO-13, 26, 29): read, compute, one PR, run items, run done. */
-async function executeRun(runId: number, ownerId: number, now: Date) {
-  await db.transaction(async (tx) => {
+async function executeRun(
+  runId: number,
+  now: Date,
+): Promise<{ failureReason: string } | null> {
+  return db.transaction(async (tx) => {
+    // SEC-02/SPEC-08: re-read the owner here; the run row and the PR requester use this one owner.
+    const settings = await reorderRepository.getSettings(tx);
+    const ownerId = settings?.draftOwnerId ?? null;
+    const ownerState = await checkDraftOwner(ownerId);
+    if (ownerState !== "ok" || ownerId === null) {
+      return {
+        failureReason:
+          OWNER_FAILURE[ownerState === "ok" ? "missing" : ownerState],
+      };
+    }
+    await reorderRepository.setRunOwner(tx, runId, ownerId);
+
     const { checked, rows } = await reorderRepository.readLowItems(tx);
 
     const needsQty = rows.filter((r) => r.state === "needs_reorder_qty");
     // rows arrive sorted: largest shortfall first, lower item id on a tie
     const toOrder = rows.filter((r) => r.state === "will_be_ordered");
-    const candidates = toOrder.slice(0, MAX_PR_LINES);
-    const deferred = toOrder.slice(MAX_PR_LINES);
-
     const lines: Line[] = [];
     const invalid: RunReadRow[] = [];
+    const deferred: RunReadRow[] = [];
     let total = 0n;
-    for (const row of candidates) {
+    // SPEC-04: invalid lines use no cap slot; valid ones fill up to the cap, the rest are deferred.
+    for (const row of toOrder) {
       const orderMilli = computeOrderMilli({
         shortfallMilli: row.shortfall_m,
         reorderQtyMilli: row.rq_m,
@@ -124,6 +143,10 @@ async function executeRun(runId: number, ownerId: number, now: Date) {
         total + estimate > limit
       ) {
         invalid.push(row);
+        continue;
+      }
+      if (lines.length >= MAX_PR_LINES) {
+        deferred.push(row);
         continue;
       }
       total += estimate;
@@ -197,6 +220,7 @@ async function executeRun(runId: number, ownerId: number, now: Date) {
       itemsSkipped: needsQty.length + invalid.length,
       itemsDeferred: deferred.length,
     });
+    return null;
   });
 }
 
@@ -214,27 +238,30 @@ export const reorderRunService = {
     const { runId } = opened;
 
     try {
-      const settings = await reorderRepository.getSettings();
-      const ownerId = settings?.draftOwnerId ?? null;
-      const ownerState = await checkDraftOwner(ownerId);
-      if (ownerState !== "ok" || ownerId === null) {
+      const failed = await executeRun(runId, now);
+      if (failed) {
         await reorderRepository.finishRun(db, runId, {
           state: "failed",
           finishedAt: new Date(),
-          failureReason:
-            OWNER_FAILURE[ownerState === "ok" ? "missing" : ownerState],
+          failureReason: failed.failureReason,
         });
-        return opened;
       }
-      await executeRun(runId, ownerId, now);
     } catch (error) {
       // BR-RO-16: raw error to the log only; the PR rolled back with the transaction.
       console.error(`Reorder run ${runId} failed`, error);
-      await reorderRepository.finishRun(db, runId, {
-        state: "failed",
-        finishedAt: new Date(),
-        failureReason: FAILURE_TEXT.RUN_ERROR,
-      });
+      try {
+        await reorderRepository.finishRun(db, runId, {
+          state: "failed",
+          finishedAt: new Date(),
+          failureReason: FAILURE_TEXT.RUN_ERROR,
+        });
+      } catch (finishError) {
+        // CR-01: the run stays `running`; the stale sweep marks it interrupted.
+        console.error(
+          `Reorder run ${runId} could not be marked failed`,
+          finishError,
+        );
+      }
     }
     return opened;
   },

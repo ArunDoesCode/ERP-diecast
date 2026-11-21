@@ -322,6 +322,13 @@ export const reorderRepository = {
         itemsDeferred: data.itemsDeferred ?? 0,
         failureReason: data.failureReason ?? null,
       })
+      .where(and(eq(reorderRuns.id, runId), eq(reorderRuns.state, "running")));
+  },
+
+  async setRunOwner(tx: DbExecutor, runId: number, ownerId: number) {
+    await tx
+      .update(reorderRuns)
+      .set({ draftOwnerId: ownerId })
       .where(eq(reorderRuns.id, runId));
   },
 
