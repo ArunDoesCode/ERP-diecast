@@ -3,7 +3,7 @@ module: purchase-order
 spec: docs/specs/purchase-order.md (frozen)
 last_verified_commit: eea4fb1
 last_verified_on: 2026-09-29
-partially_verified: 986ea76 (2026-11-21) — rfq / rate-contract parts (Code locations service + repository rows, line columns, details extras, create / rate / update / approval flows, gotchas, tests); de68fdf — invoice and returns parts of Summary, Code locations, Data model, API, Key flows, Frontend split, Known gaps
+partially_verified: 986ea76 (2026-11-21) — rfq / rate-contract parts (Code locations service + repository rows, line columns, details extras, create / rate / update / approval flows, gotchas, tests); de68fdf — invoice and returns parts of Summary, Code locations, Data model, API, Key flows, Frontend split, Known gaps; d386e04 — index `(supplier_id, created_at)`, what the supplier rating reads
 depends_on: [purchase-requisition, approval, suppliers, grn, auth-setup, rfq]
 ---
 
@@ -35,6 +35,8 @@ Maturity: full for M1 scope. Users: anyone with `po.manage`.
 
 ## Data model
 - `purchase_orders`: `poNumber` (`PO-{periodKey}-{seq}`), `supplierId`, `status`, `subtotalPaise`/`taxAmountPaise`/`totalAmountPaise` (sums of stored line values), `paymentTermsDays`, `deliveryTerms`, `notes`, `expectedDeliveryDate` (never overwritten), `revisedDeliveryDate`/`delayReason`, confirmation fields (`supplierConfirmed`, `confirmationMethod`, `confirmedAt`, `confirmedBy`, `confirmationNote`; never gate a status), cancel audit (`cancelledBy/At`, `cancelReason`), `shortClosed`, `closedAt/By`, `closeNote`, `invoicedBy/At` (written by `supplierInvoiceLinkService.reevaluatePoInvoiced` via `setStatus`, cleared when it moves back), approval mirror (`approvedBy`, `currentApprovalLevel`, `totalApprovalLevels`).
+- Index `idx_purchase_orders_supplier_created` on `(supplier_id, created_at)` (migration `20261121105810_military_jasper_sitwell`, supplier rating; the contract report called it `..._created_at`).
+- Read by the supplier rating (`supplier-rating.md`, no writes): POs in `dispatched` or later count; a `cancelled` PO counts only if it has a `po_sent` communication whose status is not `failed`, and then only when `cancelled_at` (IST day) is after `expected_delivery_date` (a late line, "cancelled after dispatch"); cancelled on or before the due date is ignored. `expectedDeliveryDate` is the due date; `revisedDeliveryDate` is shown, never used to judge. `shortClosed` + `closedAt` judge a short-closed line.
 - `poStatusEnum`: `draft, pending_approval, approved, dispatched, partial_received, fully_received, invoiced, closed, cancelled`. No `rejected`: an approval reject cancels the PO.
 - `purchase_order_items`: `poId`, `itemId`, `qty` (the PR line's remaining quantity at draft time; never editable), `receivedQty` (GRN; lowered/raised by replacement purchase returns), `returnedQty` (posted purchase returns, BR-PRT-20), `unitPricePaise`, `gstPercent`, `lineValuePaise`, `lineTaxPaise`, `uom`; RFQ / contract links: `quoteItemId` (set only by the award), `contractItemId` + `contractRatePaise` snapshot (set by the server), `rateOverrideReason/By/At` (rate ≠ contract rate). Indexes `idx_po_items_contract_item`, `idx_po_items_quote_item`.
 - `pr_po_item_links`: PO side written and deleted only by this module.
@@ -116,3 +118,4 @@ Kept in `docs/specs/purchase-order.md` (ERPNext, Odoo, SAP B1 and what was adapt
 | 2026-09-29 | work/m1 0a406f4..eea4fb1 | M1 build: GST per line, supplier defaults, row locks with 409 races, cancel audit + PR line cancel, short-close, communications, invoice duplicate check, overdue by due date, receipt status both ways, approval effects on PR lines; frozen spec v2; po-lifecycle test |
 | 2026-11-21 | c0f73b0..de68fdf (partial) | Purchase returns (returned qty, `returns[]` on details) and supplier invoice (manual invoice route/UI removed, invoiced set by the invoice service, `invoiced → fully_received`). Other changes since eea4fb1 not re-verified |
 | 2026-11-21 | df25886..986ea76 (partial) | RFQ / rate contracts: `createDraftInTx` shared with the award, `Actor` on create / update / details, contract columns + checks at create / update / submit / approve, open-RFQ 409, `PO_LINE_FROM_AWARD`, contract-first rate chain, details extras. Rest not re-verified |
+| 2026-11-21 | 20261121105810 (partial) | Supplier rating: index `(supplier_id, created_at)`; rating reads sent / cancelled-after-dispatch POs. Rest not re-verified |

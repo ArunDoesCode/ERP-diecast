@@ -3,7 +3,7 @@ module: grn
 spec: docs/specs/grn.md (v1 frozen) + docs/specs/grn-stock.md (v1 frozen)
 last_verified_commit: eea4fb1
 last_verified_on: 2026-09-29
-partially_verified: de68fdf (2026-11-21) — Code locations rows schema/posting/service, Data model, GRN details + correction in API/Key flows, gotchas on returns/invoices, Known gaps
+partially_verified: de68fdf (2026-11-21) — Code locations rows schema/posting/service, Data model, GRN details + correction in API/Key flows, gotchas on returns/invoices, Known gaps; d386e04 — `grn_items.created_at`, `idx_grns_received_date` (supplier rating)
 depends_on: [purchase-order, inventory, suppliers]
 ---
 
@@ -36,6 +36,8 @@ ledger. All grn + grn-stock BRs are implemented and tested (`grnService.test.ts`
 ## Data model
 - `grns`: `grnNumber` `GRN-<YYYY-MM>-<seq>` (`allocateDocumentSequence`, never reused), `poId`, `supplierId` (copied from PO), `status`, `receivedDate` (server time only), `challanNo` (required; unique per supplier), vehicle/driver fields.
 - `grnItems`: `receivedQty` (= arrived), `acceptedQty` (never changed by corrections), `rejectedQty`, `qaStatus` (text: pending/passed/failed/waived), `isQaBypassed`, `qaBypassReason`, `qaBypassedBy`, `qaBypassedAt`, `batchNumber` (heat no.), `overReceiptExcessQty`, `overReceiptReason`, `overReceiptBy`.
+- `grnItems.createdAt` (timestamp, default now, not null; migration `20261121111608_old_marvel_apes`): the supplier rating reads arrival as `coalesce(grns.received_date, grn_items.created_at)` (`supplier-rating.md`). Older rows got the migration time.
+- Index `idx_grns_received_date` on `grns(received_date)` (migration `20261121105810_military_jasper_sitwell`, for the rating window).
 - `grnItems.rejectedReturnedQty` / `acceptedReturnedQty`: posted purchase-return qty per source, moved only by return post/cancel (BR-PRT-19).
 - `grnCorrections`: one row per correction (line, qty, reason, who, when). Details expose `correctedQty` and `netAcceptedQty` = accepted − corrections.
 - Ledger rows from GRN: accept → `grn`, bypass → `grn_bypass`, correction → `grn_correction` (type `adjustment`, −qty at the cost + location of the line's original posting). `referenceId` = GRN id, `referenceLineId` = GRN line id.
@@ -96,3 +98,4 @@ Full shapes: `cd backend && bun --env-file=… run contract:query "<METHOD /path
 | 2026-09-29 | work/m1-stock 8cab134..1fe3cfd | grn + grn-stock v1 built: one-tx posting engine, challan rules, QA/bypass/over-receipt rules, corrections with PO roll-back, lock order, tests |
 | 2026-09-29 | work/m1 da516f2..eea4fb1 | Merged into work/m1; routes on permission keys (`requirePermission`), service takes `Actor`, UI via `useCan`; test fixtures = real employees (MRG-T1) |
 | 2026-11-21 | c0f73b0..de68fdf (partial) | Purchase returns + supplier invoice: returned qty + `returns[]` on details, correction floors BR-PRT-42 / BR-SINV-30, invoiced re-test after correction, `INSUFFICIENT_STOCK` code. Other changes since eea4fb1 not re-verified |
+| 2026-11-21 | 20261121105810, 20261121111608 (partial) | Supplier rating: `grn_items.created_at` (arrival fallback) and index `grns(received_date)`. Rest not re-verified |

@@ -3,7 +3,8 @@ module: sale-order
 spec: docs/specs/sale-order/spec.md (v1, frozen)
 last_verified_commit: 9d56369
 last_verified_on: 2026-11-21
-depends_on: [bom, purchase-requisition, purchase-order, subcontracting, inventory, auth-setup]
+partially_verified: d386e04 (2026-11-21) — dispatch hooks (signatures, callers), Dispatch button + delivery-notes panel, Known gaps
+depends_on: [bom, purchase-requisition, purchase-order, subcontracting, inventory, auth-setup, dispatch]
 ---
 
 # Sale order (customers, SO, BOM explosion, drafts) — as-built map
@@ -16,7 +17,7 @@ depends_on: [bom, purchase-requisition, purchase-order, subcontracting, inventor
 Customer master and sale orders (draft → confirmed → on hold / closed / cancelled). A confirmed SO can be
 exploded through active BOMs into a snapshot of rows (cast / job_work / assemble / buy), netted against free
 stock and open PR / PO / SCO supply, with reservations. From a current snapshot the user raises one draft PR
-and SCOs per job worker. Dispatch (delivery notes) is not built; its hooks exist as service functions.
+and SCOs per job worker. Dispatch (delivery notes, `dispatch.md`) calls the SO hooks to raise delivered qty, close and reopen the SO.
 
 ## Code locations
 | Layer | Path | Key symbols |
@@ -31,6 +32,7 @@ and SCOs per job worker. Dispatch (delivery notes) is not built; its hooks exist
 | controller / routes | `controller/{customerController,saleOrderController,notImplemented}.ts`; `routes/customer.ts`, `routes/saleOrder.ts`; `END_POINTS.customer`, `END_POINTS.saleOrder` | |
 | permissions | `lib/permissions.ts` | `so.view`, `so.manage`, `so.explode`, `customer.manage`; screens `sale-orders` (120), `customers` (125), group Sales |
 | frontend api | `lib/api/customers/`, `lib/api/sale-order/`, `types/customer.ts` (GST_STATES, GSTIN_PATTERN), `types/sale-order.ts` | `customerKeys` root `["customers"]`; `soKeys` root `["sale-orders"]` (list, detail, audit, explosions, explosion, explosion-rows) |
+| frontend (dispatch) | `SaleOrderDetailView` ("Dispatch" button, DocumentFlow steps per note), `SoSidePanels.SoDeliveryNotesPanel` | notes read by `useDeliveryNotesQuery({soId, page 1, pageSize 100}, dispatch.view)` |
 | frontend ui | `app/(protected)/customers/**`, `app/(protected)/sale-orders/**` (list, new, `[id]`, `[id]/edit`, `[id]/explosion?run=E1`); `components/views/{customers,sale-orders}/`; `components/pages/customers/` (CustomerForm, CustomerActiveDialog); `components/pages/sale-orders/` (SaleOrderForm, SoItemPicker, SoLinesCard, SoInfoCards, SoSidePanels, SoReasonDialog, ExplosionTable, explosion-helpers, so-format) | status-tone `so`, `soSnapshot`, `customer`, `soRowTag` |
 
 ## Data model
@@ -59,6 +61,8 @@ Seeds: owner + back_office all four keys; floor_supervisor none.
 - Netting: free stock (on hand minus other SOs' claims; excludes virtual, scrap yard, inactive, `vendor_premise` locations) → open PR (pending / po_draft) → PO → SCO; supply due after `requiredBy` is late and not counted; undated counts.
 - Drafts: pre-read (404 / 403) outside tx; tx: SO lock → status → snapshot superseded / out of date → rows `FOR UPDATE OF` → validate all → `prService.create(.., tx)` → SCOs → `markRaised` → audit. Numbers allocated only after validation.
 - Dispatch hooks (exported from `saleOrderService`, `tx` first, SO row lock first, one audit row each): `applyDelivery(tx, {lineId, qty, actorId, noteRef})` (signed qty, needs confirmed, lowers stock claims oldest first); `closeFullyDelivered(tx, {soId, actorId, noteRef?})`; `reopenAfterDeliveryCancel(tx, {soId, actorId, noteRef?})` (hand-closed → 409 `SO_CLOSED_BY_HAND`).
+- Hook callers (only `deliveryNoteService`, A-65; object arguments, not the positional form in the dispatch data.md): `post` → `applyDelivery` per note line in soLineId order with `qty` = line qty and `noteRef` = DN number, then `closeFullyDelivered` (no-op unless confirmed and every line delivered; sets `closeKind` fully_delivered). `cancel` → `applyDelivery` with negative qty, then `reopenAfterDeliveryCancel` (closed fully delivered → confirmed; `SO_CLOSED_BY_HAND` is mapped to 409 `DISPATCH_SO_CLOSED_MANUALLY`). Dispatch locks the SO header and all lines (`findAllLinesForUpdate`) before calling, and pre-checks confirmed + open qty to return its own codes.
+- Screen (BR-DSP-37, 38): "Dispatch" (outline beside Explode / Create drafts; primary when the user has no other next step) shows with `dispatch.manage`, SO confirmed and any line with open qty > 0 → `/delivery-notes/new?so=<id>`. "Delivery notes" panel above "Raised documents" with `dispatch.view`; DocumentFlow gets one step per non-cancelled note (a plain "not yet" step when none).
 
 ## Invariants & gotchas
 - `saleOrderId` on a PR (create, or edit when set/changed) must be a **confirmed** SO, else 400 `PR_SALE_ORDER_INVALID` (BR-SO-48). An old PR whose SO later closed stays editable.
@@ -81,9 +85,10 @@ Seeds: owner + back_office all four keys; floor_supervisor none.
 | `backend/tests/routes/saleOrder.test.ts` | BR-SO-02, 04..18, 20, 48, 52..54, 56, 57, 59..61 |
 | `backend/tests/routes/saleOrderExplosion.test.ts` | BR-SO-09, 14..17, 19..47, 49..52, 54, 60, 62 |
 | `backend/tests/service/saleOrderDispatchHooks.test.ts` | BR-SO-54, 55, 58 |
+| `backend/tests/routes/dispatchCancel.test.ts` | BR-SO-18 (SO back to confirmed after a note cancel; see `dispatch.md`) |
 
 ## Known gaps / debt
-- Dispatch screens ("Dispatch" button, delivery-notes panel) wait for the dispatch build.
+- Dispatch button and delivery-notes panel (BR-DSP-37, 38) have no automated test.
 - BR-SO-49 (next-step button) is manual UAT only. PERF-05 counts query → backlog.
 - Customer select on the SO form lists the first 100 active customers (no search).
 
@@ -91,3 +96,4 @@ Seeds: owner + back_office all four keys; floor_supervisor none.
 | Date | PR / commit | Change |
 |---|---|---|
 | 2026-11-21 | 93bb4c9..c179312, 6619864, 0f69a73 | Map created: sale order built to spec v1 on `epic/scm` (S1–S3, fixes CR-01..05, PERF-01/02, SEC-001/002) |
+| 2026-11-21 | bb8cfe9..d386e04 (partial) | Dispatch: hook callers in `deliveryNoteService`, Dispatch button + delivery-notes panel + DocumentFlow note steps on the SO screen. Rest not re-verified |

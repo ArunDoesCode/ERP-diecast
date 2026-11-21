@@ -4,8 +4,8 @@
 > PR), `/watch-prs` (merges), `/status` (on demand) and `/wrap`. Humans: read this, then run `/status`.
 
 **Updated:** 2026-11-21 · **Milestone:** M1 Procurement hardening and M2 Subcontracting are merged. UAT-1 at the factory has not started. SCM epic (`epic/scm`) in progress.
-**Now:** SCM epic — bom, sale-order, reorder, purchase-returns, supplier-invoice, rfq and stock-transfer built and green (3017 backend tests pass). Maps written for all seven.
-**Next action:** next SCM sub-feature `supplier-rating`. Later in the epic: dispatch.
+**Now:** SCM epic — all nine modules built: bom, sale-order, reorder, purchase-returns, supplier-invoice, rfq, stock-transfer, supplier-rating, dispatch. Maps written for all nine. Epic closing.
+**Next action:** close the epic: end-to-end scenario test, full suite green, browser check of the new screens, then the epic PR `epic/scm` → `main` for you.
 
 ## Modules
 | Module | Spec | Map | Code | State |
@@ -22,20 +22,21 @@
 | db-migrations | frozen v1 | — | full — baseline + `db:migrate` | merged (PR #86) |
 | design-system | frozen v2 | [map](modules/design-system.md) | full — v2 look (graphite + indigo, 14 px, 36 px controls, 44 px rows, label-above fields) app-wide | v1 merged (PR #108); v2 epic PR open, waiting for your merge |
 | bom | frozen v1 | [map](modules/bom.md) | full | built, green — epic/scm |
-| sale-order | frozen v1 | [map](modules/sale-order.md) | full (dispatch hooks only, no dispatch screens) | built, green — epic/scm |
+| sale-order | frozen v1 | [map](modules/sale-order.md) | full (incl. Dispatch button + delivery-notes panel) | built, green — epic/scm |
 | reorder | frozen v1 | [map](modules/reorder.md) | full | built, green — epic/scm |
 | purchase-returns | frozen v1 | [map](modules/purchase-returns.md) | full | built, green — epic/scm |
 | supplier-invoice | frozen v1 | [map](modules/supplier-invoice.md) | full (no payments) | built, green — epic/scm |
 | rfq (RFQ, quotes, award, rate contracts) | frozen v1 | [map](modules/rfq.md) | full | built, green — epic/scm |
 | stock-transfer | frozen v1 | [map](modules/stock-transfer.md) | full | built, green — epic/scm |
-| supplier-rating | frozen v1 | — | none | next in epic/scm |
+| supplier-rating | frozen v1 | [map](modules/supplier-rating.md) | full (read-only, live SQL) | built — epic/scm |
+| dispatch | frozen v1 | [map](modules/dispatch.md) | full (delivery notes, no invoice) | built — epic/scm |
 
 Legend — Code: none / schema only / partial / full. Tests per module: see each map's **Tests** table.
 
 ## Active work
 | Item | Branch | Phase | PR | Waiting on |
 |---|---|---|---|---|
-| SCM epic: bom, sale-order, reorder, purchase-returns, supplier-invoice, rfq, stock-transfer | feature/scm-rfq (epic/scm) | built, green (3017 backend tests) | none yet | next sub-feature: supplier-rating |
+| SCM epic: all nine modules (bom … dispatch) | feature/scm-rfq (epic/scm) | built; epic closing | none yet | scenario test, full suite, browser check, then epic PR into `main` |
 | Design-review fixes, GRN on shared patterns, BR-GRN-45 (#109) | claude/cranky-payne-f2bc8a | done, local | none yet | you: push, open PR, merge |
 
 ## Waiting on you
@@ -50,6 +51,8 @@ Legend — Code: none / schema only / partial / full. Tests per module: see each
 - [ ] rfq build assumptions to confirm: A-43 (award PO lines can't be removed; cancel the PO instead), A-48 (cancelling an RFQ with submitted quotes needs `rfq.award`) — `docs/specs/rfq/assumptions.md`.
 
 ## Recently done
+- 2026-11-21 — SCM epic: dispatch (BR-DSP-01..44): pending-dispatch list, delivery-note drafts, post (stock out at average, `DN/<FY>/<seq>`, SO delivered qty + auto close, price / company snapshots, e-way flag with a same-state limit setting), cancel (stock back, SO reopened), transport + e-way after post with history, print challan; Dispatch button + notes panel on the SO; movements labels. Map `dispatch` added; sale-order, inventory, subcontracting, auth-setup maps partly refreshed.
+- 2026-11-21 — SCM epic: supplier rating (BR-SRT-01..41): live on-time / rejection / price-variance %, score + Good / Watch / Poor, ratings list, card + 12-month trend on the supplier page, line drill-down. Map `supplier-rating` added; grn, purchase-order maps partly refreshed; shared test helpers `ratingFixtures.ts`, `dispatchFixtures.ts`.
 - 2026-11-21 — SCM epic: stock transfer between our own locations (BR-STR-01..35): draft / post / cancel / reverse, two ledger rows per line at plant average cost (plant stock and value unchanged), `ST-<year>-<seq>` numbers, new `store` location type, transfer numbers + Source type filter on the movements list, "Move stock" on the stock view; 3017 backend tests pass. Map `stock-transfer` added; inventory map partly refreshed.
 - 2026-11-21 — SCM epic: RFQ + supplier quotes + comparison + award (one draft PO per winning supplier through the shared PO draft) and rate contracts (contract-first PO rate, locked GST, override with key + reason, qty cap at PO create / update / submit / approve), one last-rate chain with batched `GET /asset/items/last-rates` (BR-RFQ-01..57, 60, 61, 70..74); 2919 backend tests pass. Map `rfq` added; purchase-order, inventory, approval maps partly refreshed; shared test helper `tests/helpers/rfqFixtures.ts`.
 - 2026-11-21 — SCM epic: purchase returns (BR-PRT-01..47: draft/post/cancel, debit note + return challan, GRN correction floor) and supplier invoice with 3-way match (BR-SINV-01..41: match, release, cancel, PO `invoiced` set by the invoice service, debit-note links); manual PO "Record invoice" removed, old invoice rows kept as `legacy`; 2639 backend tests pass. Maps added; grn, purchase-order, inventory maps partly refreshed.

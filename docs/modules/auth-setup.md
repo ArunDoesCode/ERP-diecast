@@ -3,6 +3,7 @@ module: auth-setup
 spec: docs/specs/auth-setup.md (frozen)
 last_verified_commit: eea4fb1
 last_verified_on: 2026-09-29
+partially_verified: d386e04 (2026-11-21) — supplier-rating and dispatch keys, seeds and screens only; other SCM keys added since eea4fb1 are not listed here (see each module map)
 depends_on: []
 ---
 
@@ -60,6 +61,8 @@ login is still not built (token issuing exists, no login route).
 | grn | `grn.view`, `grn.edit_draft`, `grn.qa_decide`, `grn.qa_bypass`, `grn.correct`, `grn.over_receipt_override` |
 | approval | `approval.policy.view`, `approval.policy.manage`, `approval.view_all`, `approval.view_others_pending`, `approval.auto_approve_own` |
 | sco | `sco.view`, `sco.manage`, `sco.close`, `sco.issue_receive`, `sco.qa_decide`, `sco.loss_override` |
+| supplier rating | `supplier.rating.view` (seeds: owner, back_office). Screen `supplier-ratings` `/supplier-ratings` (order 145, group Procurement) |
+| dispatch | `dispatch.view`, `dispatch.manage` (seeds: owner, back_office, floor_supervisor), `dispatch.cancel` (owner). Screens `delivery-notes-pending` `/delivery-notes/pending` (130) and `delivery-notes` `/delivery-notes` (135), group Dispatch, both on `dispatch.view` |
 New key = add to `PERMISSIONS`, use it in a route descriptor, add to `SEED_GRANTS` if a seed role needs it.
 
 ## API
@@ -132,3 +135,4 @@ New key = add to `PERMISSIONS`, use it in a route descriptor, add to `SEED_GRANT
 |---|---|---|
 | 2026-09-27 | 0a406f4 | Map created from as-built code (no prior spec) |
 | 2026-09-29 | work/m1 0a406f4..eea4fb1 | permission layer S1–S7 built (auth-setup v9): keys, screens, role admin, guardrails, audit log; role_pages/requireRole removed |
+| 2026-11-21 | fc99801, bb8cfe9 (partial) | Keys `supplier.rating.view`, `dispatch.view` / `.manage` / `.cancel` + seeds + three screens; `tests/lib/permissions.test.ts` pins the seed lists. Rest not re-verified |
