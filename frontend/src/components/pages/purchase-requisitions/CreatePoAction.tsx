@@ -114,6 +114,13 @@ export function CreatePoAction({
 				lines: [],
 			};
 			group.lines.push({ prItemId: line.id, unitPricePaise });
+			const date = line.expectedDate?.slice(0, 10);
+			if (
+				date &&
+				(!group.expectedDeliveryDate || date < group.expectedDeliveryDate)
+			) {
+				group.expectedDeliveryDate = date;
+			}
 			byId.set(supplierId, group);
 		}
 

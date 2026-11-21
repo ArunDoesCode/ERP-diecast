@@ -162,6 +162,8 @@ export function useCreatePurchaseOrderMutation() {
 export type PoDraftGroup = {
 	supplierId: number;
 	supplierName: string;
+	/** Earliest required-by date (YYYY-MM-DD) of the group's PR lines (A-92); omitted when none. */
+	expectedDeliveryDate?: string;
 	lines: Array<{ prItemId: number; unitPricePaise: number }>;
 };
 
@@ -191,6 +193,7 @@ export function useCreateDraftPosMutation() {
 					try {
 						const result = await createPurchaseOrder({
 							supplierId: group.supplierId,
+							expectedDeliveryDate: group.expectedDeliveryDate,
 							lines: group.lines,
 						});
 						if (!result.success) {
