@@ -38,6 +38,7 @@ import {
 	toEditDefaults,
 	toLookupItemOptions,
 } from "@/components/pages/purchase-requisitions/purchase-requisition-modal-shared";
+import { DocumentFlow } from "@/components/shared/DocumentFlow";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/ui/button";
 import {
@@ -729,6 +730,27 @@ export function EditPurchaseRequisitionModal({
 											<StatusBadge doc="pr" status={pr.status} />
 										</div>
 									</div>
+
+									{pr.reorderRunId ? (
+										<DocumentFlow
+											steps={[
+												{
+													label: "Reorder run",
+													docNo: `Run ${pr.reorderRunId}`,
+													href: canViewRun
+														? `/inventory/reorder/runs/${pr.reorderRunId}`
+														: undefined,
+													state: "done",
+												},
+												{
+													label: "Purchase requisition",
+													docNo: pr.prNumber,
+													status: <StatusBadge doc="pr" status={pr.status} />,
+													state: "current",
+												},
+											]}
+										/>
+									) : null}
 
 									{pr.status === "cancelled" ? (
 										<div className="rounded-md border p-3 text-sm">

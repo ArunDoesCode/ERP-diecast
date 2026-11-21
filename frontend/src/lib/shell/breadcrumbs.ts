@@ -41,6 +41,21 @@ export function buildBreadcrumbs(
 ): Crumb[] {
 	const segments = pathname.split("/").filter(Boolean);
 	const crumbs: Crumb[] = [];
+	if (segments[0] === "inventory" && segments[1] === "reorder") {
+		// Nested screen: Inventory > Reorder > (Reorder runs >) run.
+		crumbs.push(
+			{ label: LIST_LABELS.inventory, href: "/inventory" },
+			{ label: "Reorder", href: "/inventory/reorder" },
+		);
+		if (segments[2] === "runs") {
+			crumbs.push({ label: "Reorder runs", href: "/inventory/reorder/runs" });
+			if (segments.length > 3) {
+				crumbs.push({ label: options?.docNumber ?? "Details" });
+			}
+		}
+		delete crumbs[crumbs.length - 1].href;
+		return crumbs;
+	}
 	if (options?.group) crumbs.push({ label: options.group });
 	if (segments.length === 0) {
 		crumbs.push({ label: LIST_LABELS.landing });

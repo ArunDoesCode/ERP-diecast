@@ -3,6 +3,10 @@
 import Link from "next/link";
 import { useState } from "react";
 
+import {
+	actionLabel,
+	activityChanges,
+} from "@/components/pages/sale-orders/so-activity";
 import { raisedDocHref } from "@/components/pages/sale-orders/so-format";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -119,12 +123,6 @@ export function SoRaisedPanel({ so }: { so: SoDetail }) {
 	);
 }
 
-function describe(value: unknown) {
-	if (value === null || value === undefined) return "–";
-	if (typeof value === "object") return JSON.stringify(value);
-	return String(value);
-}
-
 export function SoActivityPanel({ soId }: { soId: number }) {
 	const [showAll, setShowAll] = useState(false);
 	const query = useSaleOrderAuditQuery(soId, {
@@ -148,19 +146,36 @@ export function SoActivityPanel({ soId }: { soId: number }) {
 					<p className="text-muted-foreground">No activity yet.</p>
 				) : (
 					<ul className="flex flex-col gap-2">
-						{rows.map((row) => (
-							<li key={row.id} className="flex flex-col text-[13px]">
-								<span>
-									<span className="font-semibold">{row.action}</span> ·{" "}
-									{row.actorName ?? "System"} · {formatDateTime(row.at)}
-								</span>
-								{row.before !== null || row.after !== null ? (
-									<span className="break-words text-muted-foreground">
-										{describe(row.before)} → {describe(row.after)}
+						{rows.map((row) => {
+							const changes =
+								row.before === null
+									? []
+									: activityChanges(row.before, row.after);
+							const edited =
+								changes.length === 1 &&
+								changes[0].from === "edited" &&
+								changes[0].to === "edited";
+							return (
+								<li key={row.id} className="flex flex-col text-[13px]">
+									<span>
+										<span className="font-semibold">
+											{actionLabel(row.action)}
+										</span>{" "}
+										· {row.actorName ?? "System"} · {formatDateTime(row.at)}
 									</span>
-								) : null}
-							</li>
-						))}
+									{changes.map((change) => (
+										<span
+											key={change.label}
+											className="break-words text-muted-foreground"
+										>
+											{edited
+												? "Lines changed"
+												: `${change.label}: ${change.from} → ${change.to}`}
+										</span>
+									))}
+								</li>
+							);
+						})}
 					</ul>
 				)}
 				{!showAll && total > 10 ? (

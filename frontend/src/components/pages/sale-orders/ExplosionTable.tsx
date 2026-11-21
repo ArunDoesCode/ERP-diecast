@@ -54,6 +54,20 @@ type Props = {
 	onChangePick: (rowId: number, patch: Partial<RowPick>) => void;
 };
 
+function supplyParts(row: SoExplosionRow) {
+	const parts: string[] = [];
+	const add = (label: string, value: number) => {
+		if (value > 0) parts.push(`${label} ${qty(row, value)}`);
+	};
+	add("Free", row.freeQty);
+	add("Reserved", row.reservedOtherQty);
+	add("PR", row.openPrQty);
+	add("PO", row.openPoQty);
+	if (row.lateSupplyQty > 0) parts.push(`late ${qty(row, row.lateSupplyQty)}`);
+	add("SCO", row.openScoQty);
+	return parts;
+}
+
 function qty(row: SoExplosionRow, value: number) {
 	return formatQty(value, null, qtyDecimals(row.uom));
 }
@@ -93,26 +107,24 @@ export function ExplosionTable({
 							<span className="sr-only">Pick</span>
 						)}
 					</TableHead>
-					<TableHead className="sticky left-10 z-10 min-w-56 bg-table-header">
+					<TableHead className="sticky left-10 z-10 min-w-40 bg-table-header">
 						Item
 					</TableHead>
-					<TableHead className="min-w-32">Type</TableHead>
-					<TableHead>Rev</TableHead>
+					<TableHead>Type</TableHead>
+					<TableHead className="hidden xl:table-cell">Rev</TableHead>
 					<TableHead className={NUM}>Gross</TableHead>
-					<TableHead className={NUM}>Free</TableHead>
-					<TableHead className={NUM}>Reserved</TableHead>
-					<TableHead className={NUM}>Open PR</TableHead>
-					<TableHead className={NUM}>Open PO</TableHead>
-					<TableHead className={NUM}>Open SCO</TableHead>
+					<TableHead className="hidden xl:table-cell">
+						Stock and supply
+					</TableHead>
 					<TableHead className={NUM}>Net</TableHead>
-					<TableHead className="min-w-44">Raise</TableHead>
+					<TableHead className="min-w-32">Raise</TableHead>
 				</TableRow>
 			</TableHeader>
 			<TableBody>
 				{loading
 					? Array.from({ length: 8 }, (_, index) => (
 							<TableRow key={`skeleton-${index + 1}`}>
-								<TableCell colSpan={12}>
+								<TableCell colSpan={8}>
 									<Skeleton className="h-5 w-full" />
 								</TableCell>
 							</TableRow>
@@ -180,13 +192,25 @@ export function ExplosionTable({
 														aria-hidden="true"
 													/>
 												)}
-												<span className="font-mono">{row.sku}</span>
-												<span className="rounded-sm bg-muted px-1.5 text-[12px] text-muted-foreground">
-													L{row.level}
-												</span>
-												<span className="text-muted-foreground">
-													{row.name}
-												</span>
+												<div className="min-w-0">
+													<div className="flex flex-wrap items-center gap-x-1.5">
+														<span className="font-mono">{row.sku}</span>
+														<span className="rounded-sm bg-muted px-1.5 text-[12px] text-muted-foreground">
+															L{row.level}
+														</span>
+													</div>
+													<div className="text-muted-foreground">
+														{row.name}
+													</div>
+													<div className="text-[13px] text-muted-foreground xl:hidden">
+														{[
+															row.bomRevision ? `Rev ${row.bomRevision}` : null,
+															...supplyParts(row),
+														]
+															.filter(Boolean)
+															.join(" · ")}
+													</div>
+												</div>
 											</div>
 										</TableCell>
 										<TableCell>
@@ -195,36 +219,20 @@ export function ExplosionTable({
 												{tag ? (
 													<StatusBadge doc="soRowTag" status={tag} />
 												) : null}
-												{tag === "no_bom" ? (
-													<span className="text-[13px] text-muted-foreground">
-														Fix BOM and re-run
-													</span>
-												) : null}
 											</div>
 										</TableCell>
-										<TableCell>{row.bomRevision ?? "–"}</TableCell>
+										<TableCell className="hidden xl:table-cell">
+											{row.bomRevision ?? "–"}
+										</TableCell>
 										<TableCell className={NUM}>
 											{qty(row, row.grossQty)}
 										</TableCell>
-										<TableCell className={NUM}>
-											{qty(row, row.freeQty)}
-										</TableCell>
-										<TableCell className={NUM}>
-											{qty(row, row.reservedOtherQty)}
-										</TableCell>
-										<TableCell className={NUM}>
-											{qty(row, row.openPrQty)}
-										</TableCell>
-										<TableCell className={NUM}>
-											<div>{qty(row, row.openPoQty)}</div>
-											{row.lateSupplyQty > 0 ? (
-												<div className="text-[13px] text-muted-foreground">
-													+{qty(row, row.lateSupplyQty)} late
-												</div>
-											) : null}
-										</TableCell>
-										<TableCell className={NUM}>
-											{qty(row, row.openScoQty)}
+										<TableCell className="hidden xl:table-cell">
+											<div className="flex flex-wrap gap-x-3 text-[13px] text-muted-foreground">
+												{supplyParts(row).map((part) => (
+													<span key={part}>{part}</span>
+												))}
+											</div>
 										</TableCell>
 										<TableCell className={`${NUM} font-bold`}>
 											{qty(row, net)}
@@ -268,7 +276,11 @@ export function ExplosionTable({
 														</span>
 													) : null}
 												</div>
-											) : row.blockReason || tag === "no_bom" ? null : plan ? (
+											) : tag === "no_bom" ? (
+												<span className="text-[13px] whitespace-nowrap text-muted-foreground">
+													Fix BOM and re-run
+												</span>
+											) : row.blockReason ? null : plan ? (
 												<span className="text-[13px] text-muted-foreground">
 													{plan}
 												</span>
@@ -283,7 +295,7 @@ export function ExplosionTable({
 										<TableRow id={sourcesId}>
 											<TableCell />
 											<TableCell
-												colSpan={11}
+												colSpan={7}
 												className="text-[13px] text-muted-foreground"
 											>
 												Needed by:{" "}
@@ -299,7 +311,7 @@ export function ExplosionTable({
 									{pickState && row.type === "job_work" ? (
 										<TableRow>
 											<TableCell />
-											<TableCell colSpan={11}>
+											<TableCell colSpan={7}>
 												<div className="flex flex-wrap items-end gap-4">
 													<div className="space-y-1">
 														<Label htmlFor={`jw-vendor-${row.id}`}>

@@ -168,7 +168,7 @@ export function ReorderListView() {
 					variant="outline"
 					onClick={controls.showAll}
 				>
-					Show All
+					Show all
 				</Button>
 			}
 		/>

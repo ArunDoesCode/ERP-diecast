@@ -58,6 +58,15 @@ export function NavSidebar() {
 		);
 	}, [screens]);
 
+	// Longest matching path wins, so /inventory/reorder does not also light up /inventory.
+	const activePath = useMemo(() => {
+		const matches = sidebarGroups
+			.flatMap((group) => group.pages)
+			.map((page) => page.path)
+			.filter((path) => pathname === path || pathname.startsWith(`${path}/`));
+		return matches.sort((a, b) => b.length - a.length)[0];
+	}, [sidebarGroups, pathname]);
+
 	return (
 		<Sidebar variant="inset" collapsible="icon">
 			<SidebarHeader>
@@ -92,9 +101,7 @@ export function NavSidebar() {
 							<SidebarGroupContent>
 								<SidebarMenu>
 									{group.pages.map((page) => {
-										const isActive =
-											pathname === page.path ||
-											pathname.startsWith(`${page.path}/`);
+										const isActive = page.path === activePath;
 
 										const NavIcon = getNavIcon(page.path);
 										return (

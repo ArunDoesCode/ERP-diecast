@@ -145,6 +145,14 @@ type Props = {
 	onReload?: () => void;
 };
 
+/** Below 1100 px the line table stacks: one card per line, labels from data-label. */
+const STACK_TABLE =
+	"max-[1099px]:block max-[1099px]:[&_tbody]:block max-[1099px]:[&_tfoot]:block";
+const STACK_ROW =
+	"max-[1099px]:grid max-[1099px]:grid-cols-2 max-[1099px]:gap-2 max-[1099px]:p-3";
+const CELL =
+	"max-[1099px]:block max-[1099px]:p-0 max-[1099px]:before:mb-1 max-[1099px]:before:block max-[1099px]:before:text-[13px] max-[1099px]:before:text-muted-foreground max-[1099px]:before:content-[attr(data-label)]";
+
 export function SaleOrderForm({ existing, onReload }: Props) {
 	const router = useRouter();
 	const createMutation = useCreateSaleOrderMutation();
@@ -533,8 +541,8 @@ export function SaleOrderForm({ existing, onReload }: Props) {
 							))}
 						</ul>
 					) : null}
-					<Table>
-						<TableHeader>
+					<Table className={STACK_TABLE}>
+						<TableHeader className="max-[1099px]:hidden">
 							<TableRow>
 								<TableHead className="w-8">#</TableHead>
 								<TableHead className="min-w-56">Item *</TableHead>
@@ -559,9 +567,16 @@ export function SaleOrderForm({ existing, onReload }: Props) {
 								const row = index + 1;
 								const locked = line.id !== undefined && confirmedEdit;
 								return (
-									<TableRow key={line.key}>
-										<TableCell className="tabular-nums">{row}</TableCell>
-										<TableCell>
+									<TableRow key={line.key} className={STACK_ROW}>
+										<TableCell
+											className={`tabular-nums ${CELL} max-[1099px]:hidden`}
+										>
+											{row}
+										</TableCell>
+										<TableCell
+											data-label="Item"
+											className={`${CELL} max-[1099px]:col-span-2`}
+										>
 											{locked ? (
 												<span>{line.itemLabel}</span>
 											) : (
@@ -578,8 +593,10 @@ export function SaleOrderForm({ existing, onReload }: Props) {
 												/>
 											)}
 										</TableCell>
-										<TableCell>{line.uom || "–"}</TableCell>
-										<TableCell>
+										<TableCell data-label="Unit" className={CELL}>
+											{line.uom || "–"}
+										</TableCell>
+										<TableCell data-label="Qty" className={CELL}>
 											<Input
 												aria-label={`Quantity, line ${row}`}
 												inputMode="decimal"
@@ -591,11 +608,14 @@ export function SaleOrderForm({ existing, onReload }: Props) {
 											/>
 										</TableCell>
 										{confirmedEdit ? (
-											<TableCell className="text-right tabular-nums">
+											<TableCell
+												data-label="Delivered"
+												className={`text-right tabular-nums ${CELL}`}
+											>
 												{line.delivered}
 											</TableCell>
 										) : null}
-										<TableCell>
+										<TableCell data-label="Unit price (₹)" className={CELL}>
 											<Input
 												aria-label={`Unit price, line ${row}`}
 												inputMode="decimal"
@@ -606,7 +626,7 @@ export function SaleOrderForm({ existing, onReload }: Props) {
 												}
 											/>
 										</TableCell>
-										<TableCell>
+										<TableCell data-label="Delivery date" className={CELL}>
 											<Input
 												aria-label={`Delivery date, line ${row}`}
 												type="date"
@@ -619,7 +639,7 @@ export function SaleOrderForm({ existing, onReload }: Props) {
 												}
 											/>
 										</TableCell>
-										<TableCell>
+										<TableCell data-label="GST %" className={CELL}>
 											<Select
 												value={line.gst}
 												onValueChange={(value) =>
@@ -641,10 +661,13 @@ export function SaleOrderForm({ existing, onReload }: Props) {
 												</SelectContent>
 											</Select>
 										</TableCell>
-										<TableCell className="text-right tabular-nums">
+										<TableCell
+											data-label="Line value"
+											className={`text-right tabular-nums ${CELL}`}
+										>
 											{formatMoney(lineValuePaise(line))}
 										</TableCell>
-										<TableCell>
+										<TableCell className="max-[1099px]:col-span-2 max-[1099px]:justify-self-end">
 											{line.delivered > 0 ? null : (
 												<Button
 													type="button"
@@ -662,7 +685,7 @@ export function SaleOrderForm({ existing, onReload }: Props) {
 							})}
 						</TableBody>
 						<TableFooter>
-							<TableRow>
+							<TableRow className="max-[1099px]:flex max-[1099px]:justify-between max-[1099px]:p-3">
 								<TableCell
 									colSpan={confirmedEdit ? 8 : 7}
 									className="text-right font-medium"
@@ -672,7 +695,7 @@ export function SaleOrderForm({ existing, onReload }: Props) {
 								<TableCell className="text-right font-bold tabular-nums">
 									{formatMoney(total)}
 								</TableCell>
-								<TableCell />
+								<TableCell className="max-[1099px]:hidden" />
 							</TableRow>
 						</TableFooter>
 					</Table>

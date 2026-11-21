@@ -137,16 +137,18 @@ export function BomNeedsPanel({
 							<TableHeader>
 								<TableRow>
 									<TableHead>Part</TableHead>
-									<TableHead>Do</TableHead>
 									<TableHead className="text-right">Qty</TableHead>
 								</TableRow>
 							</TableHeader>
 							<TableBody>
 								{result.rows.map((row) => (
 									<TableRow key={row.index}>
-										<TableCell>
+										<TableCell className="whitespace-normal">
 											<span style={{ paddingLeft: `${row.level * 16}px` }}>
 												{row.sku}
+											</span>
+											<span className="ml-2 text-[13px] text-muted-foreground">
+												{DO_LABELS[row.treatment]}
 											</span>
 											{row.treatment === "no_bom" ||
 											row.treatment === "loop" ? (
@@ -157,8 +159,7 @@ export function BomNeedsPanel({
 												/>
 											) : null}
 										</TableCell>
-										<TableCell>{DO_LABELS[row.treatment]}</TableCell>
-										<TableCell className="text-right tabular-nums">
+										<TableCell className="text-right whitespace-normal tabular-nums">
 											{formatBomQty(row.qty, row.unit)}
 											{row.treatment === "cast" && row.pourQty !== undefined ? (
 												<span className="block text-[13px] text-muted-foreground">

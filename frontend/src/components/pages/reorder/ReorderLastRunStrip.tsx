@@ -47,7 +47,7 @@ export function ReorderLastRunStrip({
 						</span>
 						<Link
 							href={`/inventory/reorder/runs/${run.id}`}
-							className="font-mono text-brand-accent hover:underline"
+							className="font-mono whitespace-nowrap text-brand-accent hover:underline"
 						>
 							{runNo(run.id)}
 						</Link>

@@ -98,7 +98,12 @@ const columns: DataTableColumnDef<ReorderRun>[] = [
 		header: "PR",
 		cell: ({ row }) =>
 			row.original.pr?.prNumber ? (
-				<span className="font-mono">{row.original.pr.prNumber}</span>
+				<Link
+					href={`/purchase-requisitions?prId=${row.original.pr.id}`}
+					className="font-mono text-brand-accent hover:underline"
+				>
+					{row.original.pr.prNumber}
+				</Link>
 			) : (
 				"–"
 			),
