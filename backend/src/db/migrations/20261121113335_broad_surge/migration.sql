@@ -1,0 +1,1 @@
+ALTER TABLE "delivery_note_transport_history" ALTER COLUMN "new_value" DROP NOT NULL;

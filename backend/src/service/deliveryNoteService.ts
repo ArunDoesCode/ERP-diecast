@@ -321,7 +321,8 @@ function ewayAnswer(
   company: CompanyRow | undefined,
 ) {
   const plantState = company?.stateCode.trim() || null;
-  const sameState = plantState !== null && plantState === shipToStateCode;
+  const sameState =
+    plantState !== null && plantState === shipToStateCode.trim();
   const limit = company?.ewayIntraLimitPaise ?? DEFAULT_EWAY_LIMIT_PAISE;
   return {
     sameState,
@@ -865,6 +866,7 @@ export const deliveryNoteService = {
           repo.findSoLines(header.soId, tx),
         ]);
         if (!so) throw new NotFoundError("Sale order not found");
+        if (so.status !== "confirmed") throw soNotConfirmed(); // BR-DSP-11
         const today = istDayKey();
         const noteDate = input.noteDate ?? header.noteDate;
         if (input.noteDate !== undefined) {
@@ -969,6 +971,17 @@ export const deliveryNoteService = {
         if (input.remarks !== undefined) {
           set.remarks = input.remarks?.trim() || null;
         }
+        const before: Record<string, unknown> = {};
+        const after: Record<string, unknown> = {};
+        const headerNow = header as Record<string, unknown>;
+        for (const [k, v] of Object.entries(set)) {
+          if (k === "lastUpdatedBy" || k === "lastUpdatedAt") continue;
+          const old = headerNow[k] ?? null;
+          if (old !== (v ?? null)) {
+            before[k] = old;
+            after[k] = v ?? null;
+          }
+        }
         await repo.updateHeader(id, set, tx);
         await refreshDraftAmounts(id, tx, viewer.actorId);
         await audit(
@@ -976,9 +989,10 @@ export const deliveryNoteService = {
           viewer.actorId,
           "dispatch.edit",
           header,
-          { status: "draft" },
+          { status: "draft", ...before },
           {
             status: "draft",
+            ...after,
             changed: Object.keys(input),
           },
         );
@@ -1438,7 +1452,7 @@ export const deliveryNoteService = {
             noteId: id,
             field: key,
             oldValue: current[col] === null ? null : String(current[col]),
-            newValue: merged[col] === null ? "" : String(merged[col]),
+            newValue: merged[col] === null ? null : String(merged[col]),
             changedBy: viewer.actorId,
             changedAt: now,
           })),

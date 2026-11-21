@@ -246,7 +246,7 @@ export const deliveryNoteTransportHistory = pgTable(
     // transportDocDate | ewayBillNo | ewayBillDate | distanceKm
     field: text("field").notNull(),
     oldValue: text("old_value"),
-    newValue: text("new_value").notNull(),
+    newValue: text("new_value"), // null = cleared
     // no-index: audit who-did-it column, read only by joining to employees
     changedBy: integer("changed_by")
       .references(() => employees.id)
