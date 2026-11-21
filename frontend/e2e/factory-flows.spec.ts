@@ -115,16 +115,14 @@ test.describe("Receiving from the goods-receipt screen", () => {
 
 		await signIn(page, "floor_supervisor");
 		await page.goto("/grn");
-		await page.getByRole("button", { name: "Receive goods" }).click();
+		await page.getByRole("link", { name: "Receive goods" }).click();
 		await expect(page).toHaveURL(/\/grn\/receive/);
 
 		// BR-FF-63: narrow by supplier name
 		await page
-			.getByRole("searchbox")
-			.or(page.getByPlaceholder(/search/i))
-			.first()
+			.getByLabel("Search order number or supplier")
 			.fill(cat.supplierName);
-		const row = page.getByRole("row").filter({ hasText: po.poNumber });
+		const row = page.getByRole("listitem").filter({ hasText: po.poNumber });
 		await expect(row).toBeVisible();
 		await expect(row).toContainText(cat.supplierName);
 		await expect(row).toContainText(cat.itemName);
@@ -187,9 +185,9 @@ test.describe("Receiving from the goods-receipt screen", () => {
 	}) => {
 		await signIn(page, "qa_inspector");
 		await page.goto("/grn");
-		await expect(
-			page.getByRole("button", { name: "Receive goods" }),
-		).toHaveCount(0);
+		await expect(page.getByRole("link", { name: "Receive goods" })).toHaveCount(
+			0,
+		);
 	});
 });
 
@@ -216,9 +214,7 @@ test.describe("Document pages and access", () => {
 		await expect(bo.getByText(po.poNumber).first()).toBeVisible();
 		await expect(bo.getByText(cat.supplierName).first()).toBeVisible();
 		// BR-FF-44: dispatched, B has no grn.edit_draft? back_office holds it -> "Receive goods" is the primary button
-		await expect(
-			bo.getByRole("button", { name: "Receive goods" }),
-		).toBeVisible();
+		await expect(bo.getByRole("link", { name: "Receive goods" })).toBeVisible();
 		await bo.goto("/purchase-orders/2147483000");
 		await expect(bo.getByText(/Document not found/i)).toBeVisible();
 		await ctx.close();
