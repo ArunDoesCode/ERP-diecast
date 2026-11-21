@@ -453,7 +453,7 @@ describe("BR-SO-55 cancelling a note reopens the SO", () => {
     expect(close.status).toBe(200);
     await expect(
       cancelNote(soId, lineIds[0] as number, 600, uid()),
-    ).rejects.toMatchObject({ status: 409, code: "SO_CLOSED_BY_HAND" });
+    ).rejects.toMatchObject({ statusCode: 409, code: "SO_CLOSED_BY_HAND" });
     const d = await detail(soId);
     expect(d.status).toBe("closed");
     expect(d.closeKind).toBe("manual");

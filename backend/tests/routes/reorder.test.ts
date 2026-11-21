@@ -602,7 +602,7 @@ describe("BR-RO-15 / BR-RO-20 settings", () => {
     expect((await patch({ bogus: 1 })).status).toBe(400);
   });
 
-  test("BR-RO-20 owner-candidates list active pr.manage holders incl. super-admin, not qa / inactive", async () => {
+  test("BR-RO-20 owner-candidates list active pr.manage holders incl. super-admin and floor supervisor, not qa / inactive", async () => {
     const r = await call(
       "GET",
       `/api/reorder/owner-candidates?q=${encodeURIComponent(RUN)}&pageSize=100`,
@@ -616,7 +616,7 @@ describe("BR-RO-15 / BR-RO-20 settings", () => {
     expect(got).toContain((await actor("bo2")).id);
     expect(got).toContain((await actor("sa")).id);
     expect(got).not.toContain((await actor("qa")).id);
-    expect(got).not.toContain((await actor("fs")).id);
+    expect(got).toContain((await actor("fs")).id);
     for (const id of extraEmployeeIds) expect(got).not.toContain(id);
   });
 });
