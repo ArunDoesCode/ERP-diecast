@@ -64,7 +64,13 @@ const MONEY_COLUMNS: [string, string][] = [
   ["sco_challan_lines", "unit_issue_cost_paise"],
   ["supplier_invoices", "billed_amount_paise"],
   ["supplier_payments", "amount_paid_paise"],
-  ["purchase_returns", "debit_note_amount_paise"],
+  // purchase-returns data.md: debit_note_amount_paise moved to purchase_debit_notes
+  ["purchase_debit_notes", "taxable_paise"],
+  ["purchase_debit_notes", "total_paise"],
+  ["purchase_debit_notes", "bill_offset_paise"],
+  // supplier-invoice data.md: totals on the rebuilt supplier_invoices
+  ["supplier_invoices", "total_paise"],
+  ["supplier_invoices", "taxable_paise"],
   ["purchase_return_items", "unit_price_paise"],
   ["supplier_items", "supplier_unit_price_paise"],
   ["supplier_services", "service_unit_price_paise"],
@@ -97,8 +103,8 @@ describe("BR-STD-22 the 17 new indexes exist by name", () => {
 });
 
 describe("BR-STD-39 the 23 money columns are 64-bit", () => {
-  test("BR-STD-39 the plan lists 23 money columns", () => {
-    expect(MONEY_COLUMNS.length).toBe(23);
+  test("BR-STD-39 the plan lists 22 original money columns plus the reshaped ones", () => {
+    expect(MONEY_COLUMNS.length).toBe(22 + 5);
   });
 
   for (const [table, column] of MONEY_COLUMNS) {

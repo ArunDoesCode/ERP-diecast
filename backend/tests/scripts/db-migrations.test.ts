@@ -627,6 +627,16 @@ describe("db:migrate behaviour (BR-MIG-04, 13, 14, 15, 22)", () => {
     await recreateDb(SCRATCH);
     expect((await migrate()).code).toBe(0);
     await q(SCRATCH, async (s) => {
+      // as if the DB was built before the second migration: keep only the baseline's journal row
+      await s.unsafe(
+        `DELETE FROM drizzle.__drizzle_migrations
+         WHERE id <> (SELECT min(id) FROM drizzle.__drizzle_migrations)`,
+      );
+      // generic undo of every later migration: rebuild public from the baseline SQL only,
+      // so migrations added in future never need to be reversed here
+      await s.unsafe(`DROP SCHEMA public CASCADE`);
+      await s.unsafe(`CREATE SCHEMA public`);
+      await s.unsafe(sqlOf(folders()[0]));
       await s.unsafe(
         `INSERT INTO public.modules (name) VALUES ('mig_keep_a'), ('mig_keep_b')`,
       );
@@ -638,46 +648,6 @@ describe("db:migrate behaviour (BR-MIG-04, 13, 14, 15, 22)", () => {
       );
       await s.unsafe(`INSERT INTO public.pages (path) VALUES ('/x')`);
       await s.unsafe(`INSERT INTO public.role_pages VALUES (1, 1)`);
-      // as if the DB was built before the second migration: keep only the baseline's journal row
-      await s.unsafe(
-        `DELETE FROM drizzle.__drizzle_migrations
-         WHERE id <> (SELECT min(id) FROM drizzle.__drizzle_migrations)`,
-      );
-      // undo what the later migrations added, so they can run again on this DB
-      const later = folders().slice(2).map(sqlOf).join("\n");
-      // indexes, foreign keys (on tables that outlive the replay), then tables (CASCADE)
-      for (const m of later.matchAll(/CREATE (?:UNIQUE )?INDEX "([^"]+)"/g)) {
-        await s.unsafe(`DROP INDEX IF EXISTS public."${m[1]}"`);
-      }
-      for (const m of later.matchAll(
-        /ALTER TABLE "([^"]+)" ADD CONSTRAINT "([^"]+)" FOREIGN KEY/g,
-      )) {
-        await s.unsafe(
-          `ALTER TABLE IF EXISTS public."${m[1]}" DROP CONSTRAINT IF EXISTS "${m[2]}"`,
-        );
-      }
-      // CHECK constraints and columns added to tables that outlive the replay
-      for (const m of later.matchAll(
-        /ALTER TABLE "([^"]+)" ADD CONSTRAINT "([^"]+)" CHECK/g,
-      )) {
-        await s.unsafe(
-          `ALTER TABLE IF EXISTS public."${m[1]}" DROP CONSTRAINT IF EXISTS "${m[2]}"`,
-        );
-      }
-      for (const m of later.matchAll(
-        /ALTER TABLE "([^"]+)" ADD COLUMN "([^"]+)"/g,
-      )) {
-        await s.unsafe(
-          `ALTER TABLE IF EXISTS public."${m[1]}" DROP COLUMN IF EXISTS "${m[2]}" CASCADE`,
-        );
-      }
-      for (const m of later.matchAll(/CREATE TABLE "([^"]+)"/g)) {
-        await s.unsafe(`DROP TABLE IF EXISTS public."${m[1]}" CASCADE`);
-      }
-      // enum types last (tables using them are gone)
-      for (const m of later.matchAll(/CREATE TYPE "([^"]+)"/g)) {
-        await s.unsafe(`DROP TYPE IF EXISTS public."${m[1]}" CASCADE`);
-      }
     });
     const modulesBefore = await q(SCRATCH, (s) => count(s, "modules"));
     const r = await migrate();
