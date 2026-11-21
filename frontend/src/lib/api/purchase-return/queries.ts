@@ -9,6 +9,7 @@ import {
 } from "@tanstack/react-query";
 import { toast } from "sonner";
 
+import { assetKeys } from "@/lib/api/asset/queries";
 import { ApiClientError } from "@/lib/api/client";
 import { grnKeys } from "@/lib/api/grn/queries";
 import { purchaseOrderKeys } from "@/lib/api/purchase-orders/queries";
@@ -16,6 +17,7 @@ import type {
 	PrtAwaitingParams,
 	PrtCancelPayload,
 	PrtCreatePayload,
+	PrtDetail,
 	PrtListParams,
 	PrtUpdatePayload,
 } from "@/types/purchase-return";
@@ -43,15 +45,35 @@ export const purchaseReturnKeys = {
 	prefill: (grnId: number) => ["purchase-returns", "prefill", grnId] as const,
 };
 
-/** A return changes GRN and PO quantities too (BR-PRT-38). */
-function invalidateAfterReturn(queryClient: QueryClient) {
+/**
+ * A return changes GRN and PO quantities too (BR-PRT-38). The affected GRN and
+ * PO ids come from the cached return detail; without it, fall back to the
+ * detail prefixes. Stock only moves on post and cancel-posted.
+ */
+function invalidateAfterReturn(
+	queryClient: QueryClient,
+	opts: { id?: number; stock?: boolean } = {},
+) {
 	void queryClient.invalidateQueries({ queryKey: purchaseReturnKeys.all });
 	void queryClient.invalidateQueries({ queryKey: grnKeys.list() });
-	void queryClient.invalidateQueries({ queryKey: ["grn", "detail"] });
-	void queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
+	void queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.cards() });
+	const cached =
+		opts.id === undefined
+			? undefined
+			: queryClient.getQueryData<{ data: PrtDetail }>(
+					purchaseReturnKeys.detail(opts.id),
+				)?.data;
 	void queryClient.invalidateQueries({
-		queryKey: purchaseOrderKeys.cards(),
+		queryKey: cached ? grnKeys.detail(cached.grnId) : ["grn", "detail"],
 	});
+	void queryClient.invalidateQueries({
+		queryKey: cached
+			? purchaseOrderKeys.detail(cached.poId)
+			: ["purchase-orders", "detail"],
+	});
+	if (opts.stock) {
+		void queryClient.invalidateQueries({ queryKey: assetKeys.stock() });
+	}
 }
 
 export type PrtErrorDetails = {

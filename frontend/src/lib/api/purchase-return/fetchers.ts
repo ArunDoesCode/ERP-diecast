@@ -36,7 +36,7 @@ export function getPurchaseReturns(params?: PrtListParams) {
 }
 
 export function getAwaitingReturns(params?: PrtAwaitingParams) {
-	return api.get<PagedResponse<PrtAwaitingRow>>(
+	return api.get<PagedResponse<PrtAwaitingRow, PrtListMeta>>(
 		`${API_ROUTES.purchaseReturns.awaiting}${toQueryString(params)}`,
 	);
 }

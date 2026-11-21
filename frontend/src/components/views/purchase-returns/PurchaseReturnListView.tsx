@@ -176,12 +176,6 @@ export function PurchaseReturnListView() {
 		},
 		canView && controls.awaiting,
 	);
-	// The counts come with the list; on the awaiting tab that query is off, so
-	// fetch one row of the list tab just for them.
-	const countsQuery = usePurchaseReturnsQuery(
-		{ page: 1, pageSize: 1 },
-		canView && controls.awaiting,
-	);
 	const suppliers = useSuppliersQuery({
 		page: 1,
 		pageSize: 100,
@@ -218,7 +212,7 @@ export function PurchaseReturnListView() {
 		return <EmptyState title="You can't view purchase returns" />;
 	}
 
-	const meta = (controls.awaiting ? countsQuery : returnsQuery).data?.meta;
+	const meta = (controls.awaiting ? awaitingQuery : returnsQuery).data?.meta;
 	const counts = meta?.statusCounts;
 	const quickCount: Record<string, number | undefined> = {
 		all: counts ? counts.draft + counts.posted + counts.cancelled : undefined,
