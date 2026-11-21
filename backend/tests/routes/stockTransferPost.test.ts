@@ -273,10 +273,9 @@ const post = (id: number, role: Role = "back_office") =>
   call("POST", `/${id}/post`, role, {});
 const reverse = (
   id: number,
-  reason: string | undefined = "wrong store",
+  reason: string | null = "wrong store",
   role: Role = "back_office",
-) =>
-  call("POST", `/${id}/reverse`, role, reason === undefined ? {} : { reason });
+) => call("POST", `/${id}/reverse`, role, reason === null ? {} : { reason });
 async function mustPost(fx: Fx) {
   const r = await post(fx.d.id);
   if (r.status !== 200)
@@ -565,7 +564,7 @@ describe("reverse (BR-STR-19..24)", () => {
   test("BR-STR-19 reverse needs a reason: missing, empty and 501 characters are 400", async () => {
     const fx = await mkTransfer();
     await mustPost(fx);
-    expect((await reverse(fx.d.id, undefined)).status).toBe(400);
+    expect((await reverse(fx.d.id, null)).status).toBe(400);
     expect((await reverse(fx.d.id, "   ")).status).toBe(400);
     expect((await reverse(fx.d.id, "x".repeat(501))).status).toBe(400);
     expect((await detail(fx.d.id)).status).toBe("posted");

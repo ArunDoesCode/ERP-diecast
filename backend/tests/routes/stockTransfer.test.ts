@@ -87,7 +87,13 @@ const call = (
   path: string,
   role: Role | null,
   body?: unknown,
-) => raw(method, `/api/stock-transfer${path}`, role, body);
+) =>
+  raw(
+    method,
+    `/api/stock-transfer${path === "/" ? "" : path.startsWith("/?") ? path.slice(1) : path}`,
+    role,
+    body,
+  );
 const asset = (method: string, path: string, role: Role, body?: unknown) =>
   raw(method, `/api/asset${path}`, role, body);
 
